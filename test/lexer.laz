@@ -1,4 +1,4 @@
-func main = () => {
+let main = () => {
    number test = 5;
    print("hello world!");
    // a comment!

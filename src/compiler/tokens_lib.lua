@@ -3,15 +3,16 @@ local tokens = {}
 tokens.types = {
     ["string"] = "type",
     ["number"] = "type",
-    ["boolean"] = "type",
+    ["bool"] = "type",
     ["nil"] = "type",
     ["func"] = "type",
     ["class"] = "type"
 }
 
 tokens.variables = {
-    ["const"] = "variable_modifier",
-    ["export"] = "export_keyword"
+    ["mut"] = "variable_modifier",
+    ["export"] = "export_keyword",
+    ["let"] = "variable_initilization"
 }
 
 tokens.class = {

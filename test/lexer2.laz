@@ -1,0 +1,4 @@
+let main = () => {
+   let var: string;
+   let mut var = "hey";
+}
