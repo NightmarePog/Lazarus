@@ -42,19 +42,22 @@ number increment = count++
 bool someBool = 5>4 // will be true
 ```
 ### functions
-
+```
 func foo = (number x, string y) => {
     // function body
 }
-
+```
 Lazarus supports anonymous functions too!
+```
 (str x) => {
     //anonymous function!
 }
-
+```
+```
 func add = (number x, number y) => {
     return x+y
 }
+```
 
 ### class
 ```
