@@ -1,0 +1,16 @@
+func main = () => {
+   number test = 5;
+   print("hello world!");
+   // a comment!
+
+   /*
+   multi
+   line
+   comment
+   */
+   number test = 1;
+   number test2 = 3;
+   if (test == test2) {
+      print("test -w-");
+   }
+}

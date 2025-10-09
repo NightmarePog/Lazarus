@@ -27,23 +27,23 @@ here, I don't want it complicated and i'll use basic data types lua uses
 ```
 ### variable declaration
 ```
-func foo = () => {
+let foo = () => {
     // function body
 };
-number bee = 5;
+let number bee = 5;
 ```
 
-Lazarus also supports constant variables
-const number PI = 3.14;
+Lazarus also supports mutable variables
+let mut PI: number = 3.14;
 ### basic arithmetic and logic
 ```
-number count = 5+5;
-number increment = count++
-bool someBool = 5>4 // will be true
+let count: number = 5+5;
+let increment = count++
+let someBool: bool = 5>4 // will be true
 ```
 ### functions
 
-func foo = (number x, string y) => {
+let foo = (number x, string y) => {
     // function body
 }
 
@@ -52,13 +52,13 @@ Lazarus supports anonymous functions too!
     //anonymous function!
 }
 
-func add = (number x, number y) => {
+let add = (number x, number y) => {
     return x+y
 }
 
 ### class
 ```
-class Dog = {
+let Dog: Class = {
     private string sound;
     constructor = (string sound) => {
         self.sound = sound
@@ -69,7 +69,7 @@ class Dog = {
     }
 }
 
-Dog dog = new Dog("Woof!");
+let dog = new Dog("Woof!");
 dog.makeSound();
 // prints Woof!
 ```
@@ -89,7 +89,7 @@ printLibrary.print(PI, randomVal());
 
 ### creating libraries
 ```
-export func foo = () => {
+export let foo: func = () => {
     // library function!
 }
 export const number maxRes = 1920;

@@ -1,0 +1,24 @@
+-- src/main.lua
+package.path = package.path .. ";./src/?.lua;"
+
+local file_read = require("compiler.load_data")
+local lexer = require("compiler.lexer")
+
+local function main()
+    if not arg[1] then
+        error("no path parameter found")
+        return
+    end
+
+    local result, err = file_read.read_file(arg[1])
+    if err then
+        error("failed to compile - file not found")
+    end
+    local tokenized_code = lexer.tokenize(result)
+    lexer.lex(tokenized_code)
+    print("lexer success")
+
+    
+end
+
+main()
