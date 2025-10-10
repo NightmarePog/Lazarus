@@ -1,4 +1,4 @@
-# Lazarus ver tes 0.1
+# Lazarus ver test 0.1
 
 ## comments
 ```
@@ -9,6 +9,7 @@
 multi
 line
 */
+```
 
 ## variables and their functions
 - able to set if it's mutable
@@ -30,7 +31,7 @@ let var = number
 // here is a mutable variable
 let mut var = 5;
 var = 8; // I can change variable value without any problem
-
+```
 ### union types
 - union type is a type where you can assign multiple types to single variable
 ```
@@ -47,4 +48,30 @@ if (type(input) != undefined) {
     // here, we are that that input is string
 }
 ```
+
+## scopes
+```
+{
+    // I am a scope!
+    let foo = 5;
+}
+print(foo); // Error! Foo is not in this Scope
+```
+## functions
+```
+let func = () => {
+    // function!
+}
+
+func()
+```
+
+```
+let add = (num1: number, num2: number): number => {
+    return num1+num2
+}
+add(5, 10);
+add("abcd", 5) // this won't compile!
+```
+
 
