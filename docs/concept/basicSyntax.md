@@ -3,11 +3,11 @@ Lazarus is language compiled into lua code with C/TypeScript like syntax
 
 ## features
 ### basic data types
-here, I don't want it complicated and i'll use basic data types lua uses
 - string
 - number
 - boolean 
-- nil
+- undefined
+- any
 - func
 - class
 ### comments
