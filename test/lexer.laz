@@ -1,5 +1,5 @@
 let main = () => {
-   number test = 5;
+   let test: number = 5;
    print("hello world!");
    // a comment!
 
@@ -8,8 +8,8 @@ let main = () => {
    line
    comment
    */
-   number test = 1;
-   number test2 = 3;
+   let test = 1;
+   let test2 = 3;
    if (test == test2) {
       print("test -w-");
    }
