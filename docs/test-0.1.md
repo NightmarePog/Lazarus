@@ -74,4 +74,17 @@ add(5, 10);
 add("abcd", 5) // this won't compile!
 ```
 
-
+## logic and arithmetic
+```
+&& - logic and
+|| - logic or
+== - equals
+<= - less or equal
+>= - greater or equal
+< - less
+> - greater
+! - not
+!= - not equal
+++ - increment
+-- - decrement
+```
