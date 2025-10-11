@@ -48,7 +48,7 @@ function module.tokenize(code)
                     i = i + 1 -- skip next char
                 elseif tokensLib.variables[three_char] then
                     table.insert(tokens, three_char)
-                    i = i+2
+                    i = i+2 -- reserved only for '...'
                 
                 elseif not char:match("%s") then
                     table.insert(tokens, char)

@@ -97,3 +97,9 @@ add("abcd", 5) // this won't compile!
 ```
 extern print(...)
 ```
+
+# ast interfaces needed:
+- variable
+- declaration
+- extern
+- return

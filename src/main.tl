@@ -1,6 +1,7 @@
 -- src/main.lua
 package.path = package.path .. ";./src/?.lua;"
 
+--[[
 local file_read = require("compiler.load_data")
 local lexer = require("compiler.lexer")
 
@@ -22,3 +23,4 @@ local function main()
 end
 
 main()
+--]]
