@@ -10,68 +10,68 @@ tokens.types = {
 }
 
 tokens.variables = {
-    ["mut"] = "variable_modifier",
-    ["export"] = "export_keyword",
-    ["let"] = "variable_initilization"
+    ["mut"] = "laz_mut_variable_modifier",
+    ["export"] = "laz_export_keyword",
+    ["let"] = "laz_variable_initilization"
 }
 
 tokens.class = {
-    ["public"] = "access_modifier",
-    ["private"] = "access_modifier",
-    ["constructor"] = "special_method"
+    ["public"] = "laz_access_modifier",
+    ["private"] = "laz_access_modifier",
+    ["constructor"] = "laz_special_method"
 }
 
 tokens.control = {
-    ["if"] = "control",
-    ["else"] = "control",
-    ["while"] = "loop",
-    ["for"] = "loop",
-    ["break"] = "loop_control",
-    ["continue"] = "loop_control",
-    ["return"] = "return_keyword"
+    ["if"] = "laz_if_control",
+    ["else"] = "laz_else_control",
+    ["while"] = "laz_while_loop",
+    ["for"] = "laz_for_loop",
+    ["break"] = "loop_break_control",
+    ["continue"] = "loop_continue_control",
+    ["return"] = "returns_keyword"
 }
 
 tokens.imports = {
-    ["import"] = "import",
-    ["from"] = "import",
-    ["as"] = "import"
+    ["import"] = "laz_import",
+    ["from"] = "laz_from",
+    ["as"] = "laz_as"
 }
 
 tokens.compoundOperators = {
-    ["=="] = "operator_compound",
-    ["!="] = "operator_compound",
-    ["<="] = "operator_compound",
-    [">="] = "operator_compound",
-    ["++"] = "operator_compound",
-    ["--"] = "operator_compound",
-    ["&&"] = "operator_compound",
-    ["||"] = "operator_compound",
-    ["=>"] = "operator_compound"
+    ["=="] = "laz_equals_operator_compound",
+    ["!="] = "laz_not_equals_operator_compound",
+    ["<="] = "laz_less_or_equal_operator_compound",
+    [">="] = "laz_greater_or_equaloperator_compound",
+    ["++"] = "laz_incrimement_operator_compound",
+    ["--"] = "laz_decrement_operator_compound",
+    ["&&"] = "laz_and_operator_compound",
+    ["||"] = "laz_or_operator_compound",
+    ["=>"] = "laz_func_arrow_operator_compound"
 }
 
 tokens.singleOperators = {
-    ["+"] = "operator_single",
-    ["-"] = "operator_single",
-    ["*"] = "operator_single",
-    ["/"] = "operator_single",
-    ["%"] = "operator_single",
-    ["<"] = "operator_single",
-    [">"] = "operator_single",
-    ["="] = "operator_single",
-    ["!"] = "operator_single"
+    ["+"] = "laz_plus_operator_single",
+    ["-"] = "laz_minus_operator_single",
+    ["*"] = "laz_times_operator_single",
+    ["/"] = "laz_division_operator_single",
+    ["%"] = "laz_modulo_operator_single",
+    ["<"] = "laz_less_operator_single",
+    [">"] = "laz_greater_operator_single",
+    ["="] = "laz_assign_operator_single",
+    ["!"] = "laz_not_operator_single"
 }
 
 tokens.symbols = {
-    ["("] = "paren_open",
-    [")"] = "paren_close",
-    ["{"] = "brace_open",
-    ["}"] = "brace_close",
-    ["["] = "bracket_open",
-    ["]"] = "bracket_close",
-    [";"] = "semicolon",
-    [","] = "comma",
-    ["."] = "dot",
-    [":"] = "colon"
+    ["("] = "laz_paren_open",
+    [")"] = "laz_paren_close",
+    ["{"] = "laz_brace_open",
+    ["}"] = "laz_brace_close",
+    ["["] = "laz_bracket_open",
+    ["]"] = "laz_bracket_close",
+    [";"] = "laz_semicolon",
+    [","] = "laz_comma",
+    ["."] = "laz_dot",
+    [":"] = "laz_colon"
 }
 
 tokens.index = {}
