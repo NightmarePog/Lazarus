@@ -48,7 +48,12 @@ if (type(input) != undefined) {
     // here, we are that that input is string
 }
 ```
-
+### unknown count of arguments
+```
+let foo = (...) => {
+    // body
+}
+```
 ## scopes
 ```
 {
@@ -87,4 +92,8 @@ add("abcd", 5) // this won't compile!
 != - not equal
 ++ - increment
 -- - decrement
+```
+# extern
+```
+extern print(...)
 ```

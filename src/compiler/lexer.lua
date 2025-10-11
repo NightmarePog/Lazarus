@@ -18,35 +18,40 @@ function module.tokenize(code)
 
     local i = 1
     while i <= #code do
-        local ch = code:sub(i, i)
-        local nextCh = code:sub(i + 1, i + 1)
-        local twoChar = ch .. nextCh
+        local char = code:sub(i, i)
+        local next_char = code:sub(i + 1, i + 1)
+        local two_char = char .. next_char
+        local three_char = char .. next_char .. code:sub(i+1, i+1)
 
         if in_string then
-            current = current .. ch
-            if ch == '"' then
+            current = current .. char
+            if char == '"' then
                 in_string = false
                 addToken()
             end
 
         else
-            if ch == '"' then
+            if char == '"' then
                 addToken()
                 in_string = true
-                current = ch
+                current = char
 
-            elseif ch:match("[%w_]") then
-                current = current .. ch
+            elseif char:match("[%w_]") then
+                current = current .. char
 
             else
                 addToken()
 
                 -- compound operator check
-                if tokensLib.compoundOperators[twoChar] then
-                    table.insert(tokens, twoChar)
+                if tokensLib.compoundOperators[two_char] then
+                    table.insert(tokens, two_char)
                     i = i + 1 -- skip next char
-                elseif not ch:match("%s") then
-                    table.insert(tokens, ch)
+                elseif tokensLib.variables[three_char] then
+                    table.insert(tokens, three_char)
+                    i = i+2
+                
+                elseif not char:match("%s") then
+                    table.insert(tokens, char)
                 end
             end
         end

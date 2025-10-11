@@ -1,0 +1,5 @@
+extern let print = (...);
+
+int main() {
+   print("hello world!");
+}

@@ -42,20 +42,27 @@ let increment = count++
 let someBool: bool = 5>4 // will be true
 ```
 ### functions
-
+```
 let foo = (number x, string y) => {
     // function body
 }
-
+```
 Lazarus supports anonymous functions too!
+```
 (str x) => {
     //anonymous function!
 }
-
+```
+```
 let add = (number x, number y) => {
     return x+y
 }
-
+```
+```
+let add = (...) => {
+    print(...)
+}
+```
 ### class
 ```
 let Dog: Class = {
@@ -129,4 +136,14 @@ if (i < 10) {
 lua = {
     local string = "Hello world!"
 }
+```
+
+### extern
+```
+// important to say is that only function name matters
+// it's gonna use that function only according to name
+extern print(...);
+// beware!
+extern print(num: numbers);
+// this is still gonna use print(...) from lua
 ```

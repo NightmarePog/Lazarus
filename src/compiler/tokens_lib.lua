@@ -4,15 +4,16 @@ tokens.types = {
     ["string"] = "type",
     ["number"] = "type",
     ["bool"] = "type",
-    ["nil"] = "type",
+    ["undefined"] = "type",
     ["func"] = "type",
-    ["class"] = "type"
+    ["class"] = "type",
 }
 
 tokens.variables = {
     ["mut"] = "laz_mut_variable_modifier",
     ["export"] = "laz_export_keyword",
-    ["let"] = "laz_variable_initilization"
+    ["let"] = "laz_variable_initilization",
+    ["..."] = "laz_undefined_count_parameters"
 }
 
 tokens.class = {
@@ -68,7 +69,7 @@ tokens.symbols = {
     ["}"] = "laz_brace_close",
     ["["] = "laz_bracket_open",
     ["]"] = "laz_bracket_close",
-    [";"] = "laz_semicolon",
+    [";"] = "laz_expression_end",
     [","] = "laz_comma",
     ["."] = "laz_dot",
     [":"] = "laz_colon"
