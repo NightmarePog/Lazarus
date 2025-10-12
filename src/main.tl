@@ -1,7 +1,7 @@
 -- src/main.lua
 package.path = package.path .. ";./src/?.lua;"
 
---[[
+
 local file_read = require("compiler.load_data")
 local lexer = require("compiler.lexer")
 
@@ -14,6 +14,9 @@ local function main()
     local result, err = file_read.read_file(arg[1])
     if err then
         error("failed to compile - file not found")
+        if arg[1] then
+            print("file not found on path "..arg[1])
+        end
     end
     local tokenized_code = lexer.tokenize(result)
     lexer.lex(tokenized_code)
@@ -23,4 +26,3 @@ local function main()
 end
 
 main()
---]]

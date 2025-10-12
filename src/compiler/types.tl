@@ -18,7 +18,7 @@ global type Operations = enum
    "literal"
 end
 
-global type_binary_ops = {
+global type_operations = {
     number: {Operations} = {
         "plus",
         "minus",
@@ -66,5 +66,46 @@ global type_binary_ops = {
     }
 }
 
+
+
+global interface Node 
+   node_type: string
+end
+
+global interface NodeDeclaration is Node
+   where self.node_type == "Declaration"
+   type: DataTypes
+   value: any
+end
+
+global interface NodeVariable is Node
+   where self.node_type == "Variable"
+   type: DataTypes
+   value: NodeDeclaration | NodeFunction
+end
+
+
+global interface NodeFunction is Node
+   where self.node_type == "Function"
+   scope: table
+   parameters: {NodeDeclaration}
+   return_type: DataTypes
+end
+
+global interface NodeExtern is Node
+   where self.node_type == "Extern"
+   value: NodeVariable
+
+end
+
+global interface NodeReturn is  Node
+   where self.node_type == "Return"
+   value: NodeVariable | NodeDeclaration
+end
+
+global interface FunctionCall is Node
+   where self.node_type == "FunctionCall"
+   parameters: NodeVariable | NodeDeclaration
+end
 
 return ast_types

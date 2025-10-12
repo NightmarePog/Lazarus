@@ -1,7 +1,7 @@
 local tokensLib = require("compiler.tokens_lib")
 local module = {}
 
-function module.tokenize(code)
+function module.tokenize(code: string): {string}
     local tokens = {}
     local current = ""
     local in_string = false
@@ -66,8 +66,12 @@ function module.tokenize(code)
     return tokens
 end
 
+local type TokenResult = record 
+    type: string
+    value: string | number
+end
 
-local function token_type(token)
+local function get_token_type(token: string): TokenResult
     local tokenType = tokensLib.getTokenType(token)
 
     if tokenType then
@@ -83,11 +87,11 @@ local function token_type(token)
     end
 end
 
-local function print_token_type(token_type) 
-    print("TYPE: ".. token_type["type"].. ", VALUE: ".. token_type["value"] )
+local function print_token_type(token_type: TokenResult) 
+    print("TYPE: ".. token_type["type"].. ", VALUE: ".. tostring(token_type["value"]))
 end
 
-function module.lex(code_tokens)
+function module.lex(code_tokens: {string})
     local typed_tokens = {}
     for _, token in ipairs(code_tokens) do
         local found = false
@@ -105,8 +109,8 @@ function module.lex(code_tokens)
         if not found then
             error("unknown token: " .. token)
         end
-        table.insert(typed_tokens, token_type(token))
-        print_token_type(token_type(token))
+        table.insert(typed_tokens, get_token_type(token))
+        print_token_type(get_token_type(token))
     end
 end
 
