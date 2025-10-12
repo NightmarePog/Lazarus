@@ -1,5 +1,5 @@
 return {
-    include_dir = {
-        "src/",
-    }
+   build_dir = "build",
+   source_dir = "src",
+   include_dir = { "src" }
 }

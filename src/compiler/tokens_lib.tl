@@ -2,7 +2,6 @@
 local type TokenMap = { string: string }
 
 
--- Definice celkové struktury `tokens`
 local tokens = {
     types = {
         string = "type_string",
