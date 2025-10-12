@@ -15,10 +15,13 @@ local function main()
             print("file not found on path "..arg[1])
         end
     end
-    local tokenized_code = lexer.tokenize(result)
-    lexer.lex(tokenized_code)
-    print("lexer success")
 
+    -- lexer
+    local tokenized_code = lexer.tokenize(result)
+    lexer.lex_check(tokenized_code)
+    print("lexer success")
+    -- parser
+    
     
 end
 

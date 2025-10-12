@@ -1,8 +1,9 @@
 local tokensLib = require("compiler.tokens_lib")
+local types = require("compiler.types")
 local module = {}
 
-function module.tokenize(code: string): {string}
-    local tokens = {}
+function module.tokenize(code: string): Tokens
+    local tokens: Tokens  = {} 
     local current = ""
     local in_string = false
 
@@ -67,8 +68,8 @@ function module.tokenize(code: string): {string}
 end
 
 local type TokenResult = record 
-    type: string
-    value: string | number
+    type: DataTypes | nil
+    value: string
 end
 
 local function get_token_type(token: string): TokenResult
@@ -79,19 +80,19 @@ local function get_token_type(token: string): TokenResult
     elseif token:match('^".*"$') then
         return { type = "string", value = token:sub(2, -2) }
     elseif tonumber(token) then
-        return { type = "number", value = tonumber(token) }
+        return { type = "number", value = token }
     elseif token:match("^[%a_][%w_]*$") then
         return { type = "identifier", value = token }
     else
-        return { type = "unknown", value = token }
+        error("Error, failed to identify "..token)
     end
 end
 
 local function print_token_type(token_type: TokenResult) 
-    print("TYPE: ".. token_type["type"].. ", VALUE: ".. tostring(token_type["value"]))
+    print("TYPE: ".. (token_type["type"] or "nil").. ", VALUE: ".. (tostring(token_type["value"] or "nil")))
 end
 
-function module.lex(code_tokens: {string})
+function module.lex_check(code_tokens: Tokens)
     local typed_tokens = {}
     for _, token in ipairs(code_tokens) do
         local found = false

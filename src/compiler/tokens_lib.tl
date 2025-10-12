@@ -1,4 +1,4 @@
-
+local types = require("compiler.types")
 local type TokenMap = { string: string }
 
 
@@ -14,6 +14,8 @@ local tokens = {
 
     variables = {
         ["..."] = "variables_undefined_count",
+        ["let"] = "declare_variable",
+        ["extern"] = "extern_variable"
     } as TokenMap,
 
     control = {
@@ -33,28 +35,28 @@ local tokens = {
     } as TokenMap,
 
     singleOperators = {
-        ["+"] = "laz_plus_operator_single",
-        ["-"] = "laz_minus_operator_single",
-        ["*"] = "laz_times_operator_single",
-        ["/"] = "laz_division_operator_single",
-        ["%"] = "laz_modulo_operator_single",
-        ["<"] = "laz_less_operator_single",
-        [">"] = "laz_greater_operator_single",
-        ["="] = "laz_assign_operator_single",
-        ["!"] = "laz_not_operator_single",
+        ["+"] = "plus_operator_single",
+        ["-"] = "minus_operator_single",
+        ["*"] = "times_operator_single",
+        ["/"] = "division_operator_single",
+        ["%"] = "modulo_operator_single",
+        ["<"] = "less_operator_single",
+        [">"] = "greater_operator_single",
+        ["="] = "assign_operator_single",
+        ["!"] = "not_operator_single",
     } as TokenMap,
 
     symbols = {
-        ["("] = "laz_paren_open",
-        [")"] = "laz_paren_close",
-        ["{"] = "laz_brace_open",
-        ["}"] = "laz_brace_close",
-        ["["] = "laz_bracket_open",
-        ["]"] = "laz_bracket_close",
-        [";"] = "laz_expression_end",
-        [","] = "laz_comma",
-        ["."] = "laz_dot",
-        [":"] = "laz_end_of_line",
+        ["("] = "paren_open",
+        [")"] = "paren_close",
+        ["{"] = "brace_open",
+        ["}"] = "brace_close",
+        ["["] = "bracket_open",
+        ["]"] = "bracket_close",
+        [";"] = "expression_end",
+        [","] = "comma",
+        ["."] = "dot",
+        [":"] = "end_of_line",
     } as TokenMap,
 
     index = {} as TokenMap,
@@ -73,8 +75,8 @@ add(tokens.compoundOperators)
 add(tokens.singleOperators)
 add(tokens.symbols)
 
-function tokens.getTokenType(token: string): string | nil
-    return tokens.index[token]
+function tokens.getTokenType(token: string): DataTypes | nil
+    return tokens.index[token] as DataTypes -- might not be ideal
 end
 
 return tokens

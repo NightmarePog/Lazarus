@@ -103,3 +103,5 @@ extern print(...)
 - declaration
 - extern
 - return
+
+- first version will use semicolons on the end

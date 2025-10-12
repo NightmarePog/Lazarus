@@ -1,5 +1,5 @@
 
-local ast_types = {}
+local types = {}
 
 global type DataTypes = enum
    "number"
@@ -8,6 +8,7 @@ global type DataTypes = enum
    "undefined"
    "func"
    "variable"
+   "identifier"
 end
 
 global type Operations = enum
@@ -108,4 +109,12 @@ global interface FunctionCall is Node
    parameters: NodeVariable | NodeDeclaration
 end
 
-return ast_types
+global interface ASTRoot is Node
+   where self.node_type == "ASTRoot"
+   body: {Node}
+end
+
+
+global type Tokens = {string}
+
+return types
