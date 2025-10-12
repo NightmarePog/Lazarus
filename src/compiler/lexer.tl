@@ -1,7 +1,7 @@
 local tokensLib = require("compiler.tokens_lib")
-local types = require("compiler.types")
 local module = {}
 
+-- removes comments and tokenize file
 function module.tokenize(code: string): Tokens
     local tokens: Tokens  = {} 
     local current = ""
@@ -61,19 +61,19 @@ function module.tokenize(code: string): Tokens
     end
 
     for _, value in ipairs(tokens) do
-        print(value)
     end
     addToken()
     return tokens
 end
 
 local type TokenResult = record 
-    type: DataTypes | nil
+    type: Token | nil
     value: string
 end
 
+-- returns type of a token
 local function get_token_type(token: string): TokenResult
-    local tokenType = tokensLib.getTokenType(token)
+    local tokenType = tokensLib.get_token_type(token)
 
     if tokenType then
         return { type = tokenType, value = token }
@@ -88,16 +88,21 @@ local function get_token_type(token: string): TokenResult
     end
 end
 
+-- prints a token and it's type
 local function print_token_type(token_type: TokenResult) 
-    print("TYPE: ".. (token_type["type"] or "nil").. ", VALUE: ".. (tostring(token_type["value"] or "nil")))
+    print(
+        "TYPE: " .. (token_type["type"] and tostring(token_type["type"]) or "unknown") ..
+        ", VALUE: " .. (token_type["value"] and tostring(token_type["value"]) or "unknown")
+    )
 end
 
+-- lexical check
 function module.lex_check(code_tokens: Tokens)
     local typed_tokens = {}
     for _, token in ipairs(code_tokens) do
         local found = false
 
-        if tokensLib.getTokenType(token) then
+        if tokensLib.get_token_type(token) then
             found = true
         elseif token:match('^".*"$') then
             found = true -- string literal

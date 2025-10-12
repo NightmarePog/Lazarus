@@ -4,3 +4,12 @@ let main = () => {
    print("hello world!");
    return 0;
 }
+
+/*
+Goals:
+   - Compile it
+
+status:
+   - Lexer - done
+   - ast - working on
+*/

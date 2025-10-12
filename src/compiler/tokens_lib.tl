@@ -1,7 +1,8 @@
-local types = require("compiler.types")
-local type TokenMap = { string: string }
+require("compiler.types")
+global type Token = string
+local type TokenMap = { string: Token }
 
-
+-- Syntax value to token
 local tokens = {
     types = {
         string = "type_string",
@@ -62,6 +63,7 @@ local tokens = {
     index = {} as TokenMap,
 }
 
+-- adds new token into a table
 local function add(tbl: TokenMap)
     for k, v in pairs(tbl) do
         tokens.index[k] = v
@@ -75,8 +77,9 @@ add(tokens.compoundOperators)
 add(tokens.singleOperators)
 add(tokens.symbols)
 
-function tokens.getTokenType(token: string): DataTypes | nil
-    return tokens.index[token] as DataTypes -- might not be ideal
+-- gets token from a table
+function tokens.get_token_type(token: string):  Token | nil
+    return tokens.index[token]
 end
 
 return tokens
