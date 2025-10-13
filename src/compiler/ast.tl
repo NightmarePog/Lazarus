@@ -18,13 +18,43 @@ local function parse(tokens: Tokens): ASTRoot
     
 end
 
-local expression_start_locator = {
-    expression_start = 0,
+
+-- not sure where to put these :p
+
+local expression_start = {
+    start = 0,
+    _all_expressions: {integer} = {},
+    current = 1
+
 }
 
-function expression_start_locator.reset_expression_start()
-    expression_start_locator.expression_start = 0
+function expression_start:new(tokens: Tokens) 
+    for i, token in ipairs(tokens) do
+        local cur_token_type = tokens_lib.get_token_type(token)
+        if (cur_token_type == tokens_lib["symbols"]["expression_end"]) then
+            table.insert(self._all_expressions, i+1)
+        end
+
+    end
 end
+
+function expression_start:next(): integer
+    self.current = self.current+1
+    self.start = self._all_expressions[self.current]
+    return self.start
+end
+
+
+function expression_start:reset() 
+    self.start = 0
+end
+
+
+function expression_start:get_current(): number
+    return self.start
+end
+
+
 
 
 
