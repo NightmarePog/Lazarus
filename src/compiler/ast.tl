@@ -18,6 +18,16 @@ local function parse(tokens: Tokens): ASTRoot
     
 end
 
+local expression_start_locator = {
+    expression_start = 0,
+}
+
+function expression_start_locator.reset_expression_start()
+    expression_start_locator.expression_start = 0
+end
+
+
+
 return {
     parse = parse
 }
