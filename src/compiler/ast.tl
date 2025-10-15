@@ -13,9 +13,6 @@ local function token_type_find(tbl: {TokenTypes}, key: string): TokenTypes, inte
     end
 end
 
-
-local current: Node
-
 local function parse(tokens: {TokenTypes}): ASTRoot 
 
     local root: ASTRoot

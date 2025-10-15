@@ -1,3 +1,4 @@
 let test1: number = 5;
 let test2 = 2;
-let test3 = 5+9;
+let test3 = 5+9; // TODO expression vs literal
+let test4 = 434;
