@@ -1,16 +1,15 @@
 require("compiler.types")
-global type Token = string
 local type TokenMap = { string: Token }
 
 -- Syntax value to token
 local tokens = {
     types = {
-        string = "type_string",
-        number = "type_number",
-        bool = "type_bool",
-        undefined = "type_undefined",
-        func = "type_function",
-        class = "type_class",
+        string = "type",
+        number = "type",
+        bool = "type",
+        undefined = "type",
+        func = "type",
+        class = "type",
     } as TokenMap,
 
     variables = {
@@ -57,7 +56,7 @@ local tokens = {
         [";"] = "expression_end",
         [","] = "comma",
         ["."] = "dot",
-        [":"] = "end_of_line",
+        [":"] = "double_dots",
     } as TokenMap,
 
     index = {} as TokenMap,

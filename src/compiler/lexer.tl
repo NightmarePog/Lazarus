@@ -60,19 +60,12 @@ function module.tokenize(code: string): Tokens
         i = i + 1
     end
 
-    for _, value in ipairs(tokens) do
-    end
     addToken()
     return tokens
 end
 
-local type TokenResult = record 
-    type: Token | nil
-    value: string
-end
-
 -- returns type of a token
-local function get_token_type(token: string): TokenResult
+local function get_token_type(token: string): TokenTypes
     local tokenType = tokensLib.get_token_type(token)
 
     if tokenType then
@@ -89,7 +82,7 @@ local function get_token_type(token: string): TokenResult
 end
 
 -- prints a token and it's type
-local function print_token_type(token_type: TokenResult) 
+local function print_token_type(token_type: TokenTypes) 
     print(
         "TYPE: " .. (token_type["type"] and tostring(token_type["type"]) or "unknown") ..
         ", VALUE: " .. (token_type["value"] and tostring(token_type["value"]) or "unknown")
@@ -97,7 +90,7 @@ local function print_token_type(token_type: TokenResult)
 end
 
 -- lexical check
-function module.lex_check(code_tokens: Tokens)
+function module.lex_check(code_tokens: Tokens): {TokenTypes}
     local typed_tokens = {}
     for _, token in ipairs(code_tokens) do
         local found = false
@@ -116,8 +109,9 @@ function module.lex_check(code_tokens: Tokens)
             error("unknown token: " .. token)
         end
         table.insert(typed_tokens, get_token_type(token))
-        print_token_type(get_token_type(token))
+        --print_token_type(get_token_type(token))
     end
+    return typed_tokens
 end
 
 

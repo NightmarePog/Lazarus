@@ -19,10 +19,10 @@ local function main()
 
     -- lexer
     local tokenized_code = lexer.tokenize(result)
-    lexer.lex_check(tokenized_code)
+    local tokenized_code_with_types = lexer.lex_check(tokenized_code)
     print("lexer success")
     -- parser
-    ast.parse(tokenized_code) 
+    ast.parse(tokenized_code_with_types) 
 end
 
 main()

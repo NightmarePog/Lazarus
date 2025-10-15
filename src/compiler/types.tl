@@ -89,7 +89,9 @@ end
 global interface NodeVariable is Node
    where self.node_type == "Variable"
    type: DataTypes
+   name: string
    value: NodeDeclaration | NodeFunction
+   value_assigned: boolean
 end
 
 -- Function Node
@@ -130,7 +132,12 @@ global interface ASTRoot is Node
    body: {Node}
 end
 
--- {string} but typed for Tokens for better readability
-global type Tokens = {string}
+global type Token = string
+global type Tokens = {Token}
+global type TokenTypes = record 
+    type: string | nil
+    value: string
+end
+
 
 return types
