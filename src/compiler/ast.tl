@@ -20,7 +20,6 @@ local function parse(tokens: {TokenTypes}): ASTRoot
     local id_token   = token_type_find(v, "identifier")
     local type_token = token_type_find(v, "type")
     
-    -- najít token po "="
     local value_token: TokenTypes
     for i, t in ipairs(v) do
         if t.type == "assign_operator_single" and v[i+1] then
