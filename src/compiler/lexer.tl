@@ -82,7 +82,7 @@ local function get_token_type(token: string): TokenTypes
 end
 
 -- prints a token and it's type
-local function print_token_type(token_type: TokenTypes) 
+function module.print_token_type(token_type: TokenTypes) 
     print(
         "TYPE: " .. (token_type["type"] and tostring(token_type["type"]) or "unknown") ..
         ", VALUE: " .. (token_type["value"] and tostring(token_type["value"]) or "unknown")

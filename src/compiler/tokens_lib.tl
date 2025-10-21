@@ -14,12 +14,12 @@ local tokens = {
 
     variables = {
         ["..."] = "variables_undefined_count",
-        ["let"] = "declare_variable",
-        ["extern"] = "extern_variable"
+        ["let"] = "keyword",
+        ["extern"] = "keyword"
     } as TokenMap,
 
     control = {
-        ["return"] = "returns_keyword",
+        ["return"] = "keyword",
     } as TokenMap,
 
     compoundOperators = {

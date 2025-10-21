@@ -12,31 +12,53 @@ local function token_type_find(tbl: {TokenTypes}, key: string): TokenTypes, inte
         end
     end
 end
+local function parse_var(v: {TokenTypes})
+    local data_type = token_type_find(v, "type")
+    local name = token_type_find(v, "identifier")
+    if not name then
+        error("no name for the variable found")
+    end
+
+    if not data_type then
+        data_type = {
+            type = "type",
+            value = "undefined"
+        }
+    end
+    -- if val then bla bla
+    local var: NodeVariable = {
+        type = data_type.value as DataTypes,
+        name = name.value,
+
+    }
+    for i, val in pairs(var as {string:any}) do
+        print(i, val)
+
+    end
+
+    --[[
+    global interface NodeVariable is Node
+   where self.node_type == "Variable"
+   type: DataTypes
+   name: string
+   value: NodeDeclaration | NodeFunction
+   value_assigned: boolean
+end
+--]]
+end
+
 
 local function parse(tokens: {TokenTypes}): ASTRoot 
 
     local root: ASTRoot
     utils.map_expression(tokens, function(v: {TokenTypes})
-    local id_token   = token_type_find(v, "identifier")
-    local type_token = token_type_find(v, "type")
-    
-    local value_token: TokenTypes
-    for i, t in ipairs(v) do
-        if t.type == "assign_operator_single" and v[i+1] then
-            value_token = v[i+1]
-            break
+        local keyword = token_type_find(v, "keyword")
+        if keyword.value == "let" then
+            parse_var(v)
+        else
+            error("No keyword found TODO this")
         end
-    end
-
-    if id_token then
-        local var: NodeVariable = {}
-        var.name  = id_token.value
-        var.type  = (type_token and type_token.value or "undefined") as DataTypes
-        var.value = (value_token and value_token.value or nil) as NodeDeclaration -- fix later Node declaration
-        print("Var:", var.name, var.type, var.value)
-    end
-end)
-
+    end)
     return root
     
 end
