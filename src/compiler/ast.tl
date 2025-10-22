@@ -12,6 +12,34 @@ local function token_type_find(tbl: {TokenTypes}, key: string): TokenTypes, inte
         end
     end
 end
+
+local function value_parser(value: {TokenTypes}) 
+    local function get_equals_symbol(): integer, any
+        for k, v in ipairs(value) do
+            if v.value == "=" then
+                return k, v
+            end
+        end
+    end
+
+    local equals_i = get_equals_symbol()
+    for i = equals_i+1, #value do
+    local v = value[i]
+    print("iterating:", i, v.value, v.type)  
+    end
+    --[[
+    
+    for later:
+    5+5*(5)
+    6*identifier
+    () => {}
+    true
+    2.43
+    -3.14    
+    ]]
+end
+
+
 local function parse_var(v: {TokenTypes})
     local data_type = token_type_find(v, "type")
     local name = token_type_find(v, "identifier")
@@ -31,10 +59,7 @@ local function parse_var(v: {TokenTypes})
         name = name.value,
 
     }
-    for i, val in pairs(var as {string:any}) do
-        print(i, val)
-
-    end
+    value_parser(v)
 
     --[[
     global interface NodeVariable is Node
