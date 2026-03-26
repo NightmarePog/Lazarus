@@ -1,10 +1,12 @@
+-- this script is lpeg magic
+
 local lpeg           = require("lpeglabel")
 local P, R, S, C, Ct = lpeg.P, lpeg.R, lpeg.S, lpeg.C, lpeg.Ct
 
-local whitespace     = require("lexer.whitespace")
-local keywords       = require("lexer.keywords")
-local symbols        = require("lexer.symbols")
-local identifier     = require("lexer.identifier")
+local whitespace     = require("frontend.lexer.whitespace")
+local keywords       = require("frontend.lexer.keywords")
+local symbols        = require("frontend.lexer.symbols")
+local identifier     = require("frontend.lexer.identifier")
 
 local M              = {}
 
@@ -18,23 +20,30 @@ local NEW            = C(P("new")) / function(v)
     return { type = "NEW", value = v }
 end
 
+local STRING         =
+    (P('"') * C((1 - S('"')) ^ 0) * P('"')
+        + P("'") * C((1 - S("'")) ^ 0) * P("'")) /
+    function(v)
+        return { type = "STRING", value = v }
+    end
 
-local LUA_BLOCK =
+local LUA_BLOCK      =
     P("lua") * S(" \t") ^ 0 * P("{") *
     C((1 - P("}")) ^ 1) * P("}") /
     function(v)
         return { type = "LUA_BLOCK", value = v }
     end
 
-local NUMBER    =
+local NUMBER         =
     C(R("09") ^ 1 * (P(".") * R("09") ^ 1) ^ -1) /
     function(v)
         return { type = "NUMBER", value = v }
     end
 
-local TOKEN     =
+local TOKEN          =
     NEW
     + LUA_BLOCK
+    + STRING
     + keywords.LET
     + keywords.CONST
     + keywords.FUNC

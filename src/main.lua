@@ -1,28 +1,44 @@
 package.path = "./src/?.lua;" .. package.path
 package.path = "./src/?/init.lua;" .. package.path
 
-local lexer = require("lexer")
-local token_pattern = lexer.token_pattern
+local inspect = require("inspect")
+local lexer = require("frontend.lexer")
+local parser = require("frontend.parser")
+local codegen = require("backend.codegen")
 
 local code = [[
-lua { print(self) }
+extends Base
+
+func init() {
+    print("Hello world!")
+}
+
+func foo() {
+lua {
+    local a = b
+}
+}
 ]]
 
--- Funkce pro tisk tokenů
-local function print_tokens(tokens)
-    for i, t in ipairs(tokens) do
-        if t then
-            print(string.format("[%d] type = %s, value = %s", i, t.type, t.value))
-        end
-    end
-end
-
--- Spustíme lexer
-local tokens = token_pattern:match(code)
-
+-- ===== Lexer ======
+local tokens = lexer.token_pattern:match(code)
 if not tokens then
-    print("Lex returned nil")
-else
-    print("=== Lexer Output ===")
-    print_tokens(tokens)
+    print("Lexer returned nil")
+    return
 end
+
+print("=== Lexer Output ===")
+for i, t in ipairs(tokens) do
+    print(string.format("[%d] type = %s, value = %s", i, t.type, t.value or ""))
+end
+
+-- ===== Parser ======
+local ast = parser.parseProgram(tokens)
+
+-- ===== Kompletní AST print ======
+print("\n=== AST Output (full) ===")
+print(inspect(ast))
+
+local lua_code = codegen.generate(ast)
+print("\n=== Generated Lua Code ===")
+print(lua_code)
