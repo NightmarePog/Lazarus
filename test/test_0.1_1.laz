@@ -1,15 +1,92 @@
-extern let print = (...);
+class Main {
+    let a: number = 10
+    const b: number = 5
+    let c: string = "hello"
+    let d: bool = true
+    let e: number? = nil
+    let numbers: [number] = [1, 2, 3, 4]
+    let names: [string] = ["Alice", "Bob"]
+    let map: {string: number} = {x: 1, y: 2}
 
-let main = () => {
-   print("hello world!");
-   return 0;
-};
+    func init() {
+        self.x = 0
+        self.y = 0
+        self.name = "Alice"
+    }
 
-/*
-Goals:
-   - Compile it
+    public func move(dx: number, dy: number) {
+        self.x += dx
+        self.y += dy
+    }
 
-status:
-   - Lexer - done
-   - ast - working on
-*/
+    public func get_position(): {string: number} {
+        return {x: self.x, y: self.y}
+    }
+
+    static func add(a: number, b: number): number {
+        return a + b
+    }
+
+    public func greet() {
+        print("Hello, " ++ self.name)
+    }
+
+    public func get_number(): number {
+        return lua {
+            return 42
+        }
+    }
+
+    static func main() {
+        let obj = Main()
+
+        print(obj.a)
+        print(obj.b)
+        print(obj.c)
+        print(obj.d)
+        print(obj.e)
+
+        for i, n in obj.numbers {
+            print(i ++ ": " ++ n)
+        }
+
+        for name in obj.names {
+            print(name)
+        }
+
+        for key, val in obj.map {
+            print(key ++ " -> " ++ val)
+        }
+
+        obj.greet()
+        print("Position before move: " ++ obj.get_position().x ++ ", " ++ obj.get_position().y)
+
+        obj.move(5, -3)
+        print("Position after move: " ++ obj.get_position().x ++ ", " ++ obj.get_position().y)
+
+        print("Static add: " ++ Main.add(7, 8))
+        print("Lua returned number: " ++ obj.get_number())
+
+        if (obj.a > obj.b) {
+            print("a is greater than b")
+        } else if (obj.a == obj.b) {
+            print("a equals b")
+        } else {
+            print("a is smaller than b")
+        }
+
+        for i = 1, 5 {
+            print("For loop index: " ++ i)
+        }
+
+        let counter: number = 0
+        while (counter < 3) {
+            print("While counter: " ++ counter)
+            counter++
+        }
+
+        lua {
+            print("Hello from inline Lua!")
+        }
+    }
+}

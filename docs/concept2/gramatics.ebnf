@@ -1,0 +1,72 @@
+(* Basic file structure *)
+File            = [ Inheritance ] { Import } { Declaration } ;
+
+Inheritance      = "extends" Identifier ;
+Import           = "import" Identifier { "." Identifier } ;
+
+(* Declarations within the file (classes) *)
+Declaration      = VarDecl | FuncDecl | StaticFuncDecl | LuaBlock ;
+
+(* Variables and constants *)
+VarDecl          = ( "let" | "const" ) Identifier [ ":" Type ] [ "=" Expression ] ;
+
+(* Functions and methods *)
+FuncDecl         = [ AccessModifier ] "func" Identifier "(" [ Params ] ")" [ ":" Type ] Block ;
+StaticFuncDecl   = "static" "func" Identifier "(" [ Params ] ")" [ ":" Type ] Block ;
+Params           = Param { "," Param } ;
+Param            = Identifier [ ":" Type ] ;
+
+AccessModifier   = "public" | "private" ;
+
+(* Blocks and statements *)
+Block            = "{" { Statement } "}" ;
+Statement        = VarDecl | Assignment | IfStmt | ForStmt | WhileStmt | ReturnStmt | CallStmt | LuaBlock | "break" | "continue" ;
+
+(* Control flow *)
+IfStmt           = "if" "(" Expression ")" Block { "else" "if" "(" Expression ")" Block } [ "else" Block ] ;
+
+WhileStmt        = "while" "(" Expression ")" Block ;
+
+ForStmt          = "for" ( ForIn | ForClassic ) Block ;
+ForClassic       = Identifier "=" Expression "," Expression ;
+ForIn            = [ Identifier "," ] Identifier "in" Expression ;
+
+ReturnStmt       = "return" [ Expression ] ;
+
+(* Expressions *)
+Expression       = LogicalOr ;
+LogicalOr        = LogicalAnd { "or" LogicalAnd } ;
+LogicalAnd       = Comparison { "and" Comparison } ;
+Comparison       = Addition [ ( "==" | "!=" | ">" | "<" | ">=" | "<=" ) Addition ] ;
+Addition         = Multiplication { ( "+" | "-" ) Multiplication } ;
+Multiplication   = Unary { ( "*" | "/" ) Unary } ;
+Unary            = ( "!" | "-" | "++" | "--" ) Unary | Primary ;
+
+Primary          = Literal | Identifier | Call | ObjectCreation | "(" Expression ")" | "self" [ "." Identifier ] | InlineLuaReturn | Cast ;
+
+(* Literals and types *)
+Literal          = Number | String | Bool | "nil" | ArrayLiteral | MapLiteral ;
+ArrayLiteral     = "[" [ Expression { "," Expression } ] "]" ;
+MapLiteral       = "{" [ MapPair { "," MapPair } ] "}" ;
+MapPair          = ( String | Identifier ) ":" Expression ;
+
+Type             = BasicType [ "?" ] | ArrayType | MapType ;
+BasicType        = "number" | "string" | "bool" | "nil" | Identifier ;
+ArrayType        = "[" Type "]" ;
+MapType          = "{" Type ":" Type "}" ;
+
+(* Special elements *)
+ObjectCreation   = Identifier "(" [ Args ] ")" ;
+Call             = [ Primary "." ] Identifier "(" [ Args ] ")" ;
+Args             = Expression { "," Expression } ;
+Cast             = Expression "as" Type ;
+
+(* Lua Integration *)
+LuaBlock         = "lua" { LuaCode } ;
+InlineLuaReturn  = "lua" { LuaCode } ; (* Used as an expression with 'return' inside *)
+
+(* Basic tokens (Lexer) *)
+Identifier       = ( "a"..."z" | "A"..."Z" | "_" ) { "a"..."z" | "A"..."Z" | "_" | "0"..."9" } ;
+Number           = [ "-" ] digit { digit } [ "." digit { digit } ] ;
+String           = '"' { any_character } '"' ;
+Bool             = "true" | "false" ;
