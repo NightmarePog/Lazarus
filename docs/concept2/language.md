@@ -64,8 +64,9 @@ const name: string = "John"
 
 ## 7. Class
 
-class Player extends Entity {
-}
+the whole file is class
+- file name = class name
+- inheratence by extends className on top of the file
 
 ---
 
