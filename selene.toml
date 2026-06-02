@@ -1,0 +1,11 @@
+std = "lua51"
+
+[lints]
+unused_variable = "warn"
+shadowing = "warn"
+multiple_statements = "allow"
+mixed_table = "allow"
+empty_if = "warn"
+empty_loop = "warn"
+unused_function = "warn"
+unscoped_variables = "deny"

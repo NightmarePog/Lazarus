@@ -1,19 +1,20 @@
-local lpeg = require("lpeglabel")
-local P, C = lpeg.P, lpeg.C
-local M = {}
+---@alias TokenType
+--- | "LET"
+--- | "ASSIGN"
+--- | "PLUS"
+--- | "MINUS"
+--- | "IDENTIFIER"
+--- | "NUMBER"
+--- | "SYMBOL"
 
+---@type table<string, TokenType>
+local Keywords = { ["let"] = "LET", ["="] = "ASSIGN", ["+"] = "PLUS", ["-"] = "MINUS" }
 
-local function keyword(name)
-    return C(P(name) * -lpeg.R("az", "AZ", "09") * -P("_")) / function(v)
-        return { type = name:upper(), value = v }
+-- Freeze the table so no one can modify it at runtime
+setmetatable(Keywords, {
+    __newindex = function (_, key, _)
+        error("Attempt to modify read-only Keywords table: " .. tostring(key))
     end
-end
+})
 
-M.LET     = keyword("let")
-M.CONST   = keyword("const")
-M.FUNC    = keyword("func")
-M.EXTENDS = keyword("extends")
-M.IMPORT  = keyword("import")
-M.LUA     = keyword("lua")
-
-return M
+return Keywords

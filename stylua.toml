@@ -1,0 +1,23 @@
+# .stylua.toml
+
+# Consistent indentation using spaces
+indent_type = "Spaces"
+indent_width = 4 # Change to 2 if you prefer tighter indentation
+
+# Fixed column width formatting
+column_width = 100
+
+# Unix line endings
+line_endings = "Unix"
+
+# Double quotes enforced everywhere
+# 'AutoPreferDouble' uses double quotes unless the string contains a double quote,
+# which prevents ugly escaping like "\"Hello\"".
+# If you truly want strict enforcement even with escaping, use "ForceDouble".
+quote_style = "AutoPreferDouble"
+
+# Always use parentheses in function calls (e.g., print("hello") instead of print "hello")
+call_parentheses = "Always"
+
+# Collapse simple if statements and functions into one line when safe
+collapse_simple_statement = "Always"

@@ -1,0 +1,40 @@
+{
+  "runtime": {
+    "version": "LuaJIT"
+  },
+  "diagnostics": {
+    "enable": true,
+    "globals": [
+      "describe",
+      "it",
+      "pending",
+      "before_each",
+      "after_each",
+      "setup",
+      "teardown",
+      "insulate",
+      "expose",
+      "assert",
+      "spy",
+      "stub",
+      "mock"
+    ],
+    "severity": {
+      "undefined-field": "error",
+      "missing-parameter": "error",
+      "missing-return": "error",
+      "cast-type-mismatch": "error",
+      "param-type-mismatch": "error",
+      "return-type-mismatch": "error",
+      "need-check-nil": "error"
+    },
+    "neededFileDocs": true
+  },
+  "workspace": {
+    "library": [
+      "/home/nightmare/.luarocks/share/lua/5.5",
+      "./types"
+    ],
+    "checkThirdParty": true
+  }
+}

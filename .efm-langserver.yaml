@@ -1,0 +1,12 @@
+version: 2
+tools:
+  ldoc-checker:
+    # Run ldoc on the single file, dump output to dev/null
+    lint-command: "ldoc -d /tmp/ldoc_dump ${INPUT}"
+    # LDoc outputs warnings like: "filepath:line: warning: message"
+    lint-formats:
+      - "%f:%l: warning: %m"
+
+languages:
+  lua:
+    - <<: *ldoc-checker
