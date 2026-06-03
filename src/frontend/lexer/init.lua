@@ -37,6 +37,7 @@ function Lexer:_advance()
 end
 
 ---@return Token
+---@private
 function Lexer:_read_identifier()
     local start = self.pos
     local line, col = self.line, self.col
@@ -52,6 +53,7 @@ function Lexer:_read_identifier()
 end
 
 ---@return Token
+---@private
 function Lexer:_read_number()
     local start = self.pos
     local line, col = self.line, self.col
@@ -65,6 +67,7 @@ function Lexer:_read_number()
 end
 
 ---@return Token
+---@private
 function Lexer:_read_symbol()
     local line, col = self.line, self.col
     local char = self.current
@@ -80,6 +83,7 @@ function Lexer:_read_symbol()
 end
 
 ---@return Token?
+---@private
 function Lexer:_next_token()
     while self.current ~= "" and self.current:match("%s") do
         self:_advance()

@@ -6,3 +6,6 @@ format:
 
 lint:
 	selene src spec types
+
+dev:
+	lua src/repl.lua

@@ -1,0 +1,32 @@
+package.path = package.path .. ";./src/?.lua;./src/?/init.lua"
+
+local Lexer = require "frontend.lexer"
+local Parser = require "frontend.parser"
+local A = "let var_name = 5"
+local B = "let var_name = 5 / 5"
+local C = "let var_name = true"
+
+local function dump(val, indent)
+    indent = indent or 0
+    local pad = string.rep("  ", indent)
+
+    if type(val) ~= "table" then
+        return tostring(val)
+    end
+
+    local lines = { "{" }
+    for k, v in pairs(val) do
+        local key = type(k) == "string" and k or ("[" .. k .. "]")
+        table.insert(lines, pad .. "  " .. key .. " = " .. dump(v, indent + 1))
+    end
+    table.insert(lines, pad .. "}")
+    return table.concat(lines, "\n")
+end
+
+local function main()
+    local lexer = Lexer.new(A):scan()
+    local parser = Parser.new(lexer):parse()
+    print(dump(parser))
+end
+
+main()
