@@ -3,8 +3,6 @@ package.path = package.path .. ";./src/?.lua;./src/?/init.lua"
 local Lexer = require "frontend.lexer"
 local Parser = require "frontend.parser"
 local A = "let var_name = 5"
-local B = "let var_name = 5 / 5"
-local C = "let var_name = true"
 
 local function dump(val, indent)
     indent = indent or 0
