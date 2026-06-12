@@ -5,8 +5,8 @@
 --- any errors it raises.
 
 local Error    = require("error")
-local Keywords = require("src.frontend.lexer.keywords")
-local Token    = require("src.frontend.lexer.token")
+local Keywords = require("frontend.lexer.keywords")
+local Token    = require("frontend.lexer.token")
 
 ---@class Lexer
 ---@field source  string  Original source text
@@ -56,11 +56,16 @@ function Lexer:_read_identifier()
 
     local value    = self.source:sub(start, self.pos - 1)
     local tok_type = (Keywords.TOKENS[value] or "IDENTIFIER") --[[@as TokenType]]
+    -- Only identifiers carry a meaningful literal (the name itself).
+    -- Keywords have no semantic payload — their type already encodes the meaning.
+    local literal  = tok_type == "IDENTIFIER" and value or nil
 
-    return Token.new(tok_type, value, line, col, value)
+    return Token.new(tok_type, value, line, col, literal)
 end
 
 --- Scan a decimal integer literal starting at the current position.
+--- Throws `UNEXPECTED_CHAR` if a letter immediately follows the digits,
+--- e.g. `123abc` — rather than silently splitting into two tokens.
 ---@private
 ---@return Token
 function Lexer:_read_number()
@@ -71,8 +76,47 @@ function Lexer:_read_number()
         self:_advance()
     end
 
+    if self.current ~= "" and self.current:match("[%a_]") then
+        Error.throw(Error.Type.UNEXPECTED_CHAR,
+            "Unexpected character '" .. self.current .. "' after number literal",
+            self.line, self.col, self.source, 1)
+    end
+
     local raw = self.source:sub(start, self.pos - 1)
     return Token.new("NUMBER", raw, line, col, tonumber(raw))
+end
+
+--- Scan a double-quoted string literal.
+--- Throws `UNTERMINATED_STRING` if EOF or a newline is reached before the
+--- closing `"`.
+---@private
+---@return Token
+function Lexer:_read_string()
+    local start     = self.pos
+    local line, col = self.line, self.col
+    self:_advance()  -- consume opening "
+
+    local chars = {}
+    while self.current ~= "" and self.current ~= '"' do
+        if self.current == "\n" then
+            Error.throw(Error.Type.UNTERMINATED_STRING,
+                "Unterminated string literal",
+                line, col, self.source)
+        end
+        chars[#chars + 1] = self.current
+        self:_advance()
+    end
+
+    if self.current == "" then
+        Error.throw(Error.Type.UNTERMINATED_STRING,
+            "Unterminated string literal",
+            line, col, self.source)
+    end
+
+    self:_advance()  -- consume closing "
+    local raw     = self.source:sub(start, self.pos - 1)  -- includes surrounding quotes
+    local literal = table.concat(chars, "")               -- content only
+    return Token.new("STRING", raw, line, col, literal)
 end
 
 --- Scan a single-character symbol (operator or punctuation).
@@ -92,7 +136,7 @@ function Lexer:_read_symbol()
             line, col, self.source, 1)
     end
 
-    return Token.new(tok_type --[[@as TokenType]], char, line, col, char)
+    return Token.new(tok_type --[[@as TokenType]], char, line, col)
 end
 
 --- Return the next non-whitespace token, or `nil` at EOF.
@@ -107,6 +151,7 @@ function Lexer:_next_token()
 
     if self.current:match("[%a_]") then return self:_read_identifier() end
     if self.current:match("%d")    then return self:_read_number()     end
+    if self.current == '"'         then return self:_read_string()     end
 
     return self:_read_symbol()
 end

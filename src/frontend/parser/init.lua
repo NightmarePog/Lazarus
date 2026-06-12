@@ -5,7 +5,7 @@
 --- the returned function with the `Parser` table.
 
 local Error = require("error")
-local AST   = require("src.frontend.parser.ast")
+local AST   = require("frontend.parser.ast")
 
 ---@class Parser
 ---@field pos             integer      Current position in `token_table` (1-based)
@@ -84,10 +84,8 @@ end
 ---@param ... string
 ---@return boolean
 function Parser:_match(...)
-    local types = { ... }
-
-    for _, t in ipairs(types) do
-        if self:_check(t) then
+    for i = 1, select("#", ...) do
+        if self:_check(select(i, ...) --[[@as string]]) then
             self:_advance()
             return true
         end
@@ -110,7 +108,7 @@ function Parser:_consume(type, message)
             (t and t.line)    --[[@as integer|nil]],
             (t and t.column)  --[[@as integer|nil]],
             self.source,
-            (t and #t.value)  --[[@as integer|nil]])
+            (t and t.value and #t.value)  --[[@as integer|nil]])
     end
 
     return self:_advance()
@@ -134,7 +132,9 @@ function Parser:parse()
     return AST.new(nodes)
 end
 
-require("src.frontend.parser.statements")(Parser)
-require("src.frontend.parser.expressions")(Parser)
+local expr_fns = require("frontend.parser.expressions")
+local stmt_fns = require("frontend.parser.statements")
+for name, fn in pairs(expr_fns) do Parser[name --[[@as string]]] = fn end
+for name, fn in pairs(stmt_fns) do Parser[name --[[@as string]]] = fn end
 
 return Parser

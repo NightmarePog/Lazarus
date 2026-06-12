@@ -4,10 +4,13 @@ local Lexer = require "frontend.lexer"
 local Parser = require "frontend.parser"
 
 local source = [[
-let foo = 3+2
-let var_name = 5+5-2*(2+foo)
+private foo = 3+2
+private var_name = 5+5-2*(2+foo)
 ]]
 
+---@param val    any
+---@param indent integer?
+---@return string
 local function dump(val, indent)
     indent = indent or 0
     local pad = string.rep("  ", indent)
@@ -18,7 +21,7 @@ local function dump(val, indent)
 
     local lines = { "{" }
     for k, v in pairs(val) do
-        local key = type(k) == "string" and k or ("[" .. k .. "]")
+        local key = type(k) == "string" and k or ("[" .. tostring(k) .. "]")
         table.insert(lines, pad .. "  " .. key .. " = " .. dump(v, indent + 1))
     end
     table.insert(lines, pad .. "}")

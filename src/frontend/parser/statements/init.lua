@@ -4,14 +4,14 @@
 --- and add it to `HANDLERS`.  No other code needs to change.
 
 local Error    = require("error")
-local Keywords = require("src.frontend.lexer.keywords")
-local ExprStmt = require("src.frontend.parser.nodes.expression_stmt")
+local Keywords = require("frontend.lexer.keywords")
+local ExprStmt = require("frontend.parser.nodes.expression_stmt")
 
 --- All registered statement handlers, keyed by their trigger token type.
 --- Add new handlers here — the dispatcher builds the registry automatically.
 ---@type StatementParser[]
 local HANDLERS = {
-    (require("src.frontend.parser.statements.let")),
+    (require("frontend.parser.statements.let")),
 }
 
 ---@type table<string, StatementParser?>
@@ -20,8 +20,7 @@ for _, handler in ipairs(HANDLERS) do
     registry[handler.keyword] = handler
 end
 
----@param Parser Parser
-return function(Parser)
+return {
     --- Parse one statement.
     ---
     --- If the current token matches a registered keyword the corresponding
@@ -29,7 +28,7 @@ return function(Parser)
     --- keyword-only tokens produce a `SYNTAX_ERROR`.  Anything else is
     --- treated as an expression statement.
     ---@return Stmt
-    function Parser:_statement()
+    _statement = function(self)
         local token = self:_current()
 
         if not token then
@@ -55,5 +54,5 @@ return function(Parser)
         end
 
         return ExprStmt.new(self:_expression())
-    end
-end
+    end,
+}

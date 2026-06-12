@@ -4,11 +4,17 @@
 ---@field type "IdentifierExpr"
 ---@field name string   Raw identifier text from the source
 local IdentifierExpr = {}
+IdentifierExpr.__index = IdentifierExpr
 
 ---@param name string
 ---@return IdentifierExpr
 function IdentifierExpr.new(name)
-    return { type = "IdentifierExpr", name = name } --[[@as IdentifierExpr]]
+    return setmetatable({ type = "IdentifierExpr", name = name }, IdentifierExpr)
+end
+
+---@return string
+function IdentifierExpr:__tostring()
+    return ("IdentifierExpr(%s)"):format(self.name)
 end
 
 return IdentifierExpr

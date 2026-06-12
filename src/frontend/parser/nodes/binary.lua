@@ -6,13 +6,19 @@
 ---@field left  Expr
 ---@field right Expr
 local BinaryExpr = {}
+BinaryExpr.__index = BinaryExpr
 
 ---@param op    string
 ---@param left  Expr
 ---@param right Expr
 ---@return BinaryExpr
 function BinaryExpr.new(op, left, right)
-    return { type = "BinaryExpr", op = op, left = left, right = right } --[[@as BinaryExpr]]
+    return setmetatable({ type = "BinaryExpr", op = op, left = left, right = right }, BinaryExpr)
+end
+
+---@return string
+function BinaryExpr:__tostring()
+    return ("BinaryExpr(%s, %s, %s)"):format(self.op, tostring(self.left), tostring(self.right))
 end
 
 return BinaryExpr

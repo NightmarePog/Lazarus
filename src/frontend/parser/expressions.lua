@@ -9,21 +9,20 @@
 --- automatically enforces the correct binding strength.
 
 local Error          = require("error")
-local LiteralExpr    = require("src.frontend.parser.nodes.literal")
-local IdentifierExpr = require("src.frontend.parser.nodes.identifier")
-local BinaryExpr     = require("src.frontend.parser.nodes.binary")
+local LiteralExpr    = require("frontend.parser.nodes.literal")
+local IdentifierExpr = require("frontend.parser.nodes.identifier")
+local BinaryExpr     = require("frontend.parser.nodes.binary")
 
----@param Parser Parser
-return function(Parser)
+return {
     --- Entry point — delegates to the lowest-precedence rule.
     ---@return Expr
-    function Parser:_expression()
+    _expression = function(self)
         return self:_additive()
-    end
+    end,
 
     --- Parse additive expressions (`+`, `-`), left-associative.
     ---@return Expr
-    function Parser:_additive()
+    _additive = function(self)
         local left = self:_multiplicative()
 
         while self:_match("PLUS", "MINUS") do
@@ -33,11 +32,11 @@ return function(Parser)
         end
 
         return left
-    end
+    end,
 
     --- Parse multiplicative expressions (`*`), left-associative.
     ---@return Expr
-    function Parser:_multiplicative()
+    _multiplicative = function(self)
         local left = self:_primary()
 
         while self:_match("MULTIPLY") do
@@ -47,11 +46,11 @@ return function(Parser)
         end
 
         return left
-    end
+    end,
 
     --- Parse a primary: a literal, identifier, or parenthesised sub-expression.
     ---@return Expr
-    function Parser:_primary()
+    _primary = function(self)
         local token = self:_current()
 
         if not token then
@@ -90,5 +89,5 @@ return function(Parser)
             "Unexpected token '" .. tok.value .. "'",
             tok.line, tok.column, self.source, #tok.value)
         error("unreachable")
-    end
-end
+    end,
+}

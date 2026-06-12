@@ -3,13 +3,13 @@
 local Keywords = {}
 
 ---@alias TokenType
---- | "LET"
+--- | "PRIVATE"
 --- | "ASSIGN"
 --- | "PLUS"
 --- | "MINUS"
 --- | "IDENTIFIER"
 --- | "NUMBER"
---- | "SYMBOL"
+--- | "STRING"
 --- | "MULTIPLY"
 --- | "LEFT_BRACKET"
 --- | "RIGHT_BRACKET"
@@ -18,13 +18,13 @@ local Keywords = {}
 --- The table is frozen: mutation raises a runtime error.
 ---@type table<string, TokenType>
 local TOKENS = {
-    ["let"] = "LET",
-    ["="]   = "ASSIGN",
-    ["+"]   = "PLUS",
-    ["-"]   = "MINUS",
-    ["*"]   = "MULTIPLY",
-    ["("]   = "LEFT_BRACKET",
-    [")"]   = "RIGHT_BRACKET",
+    ["private"] = "PRIVATE",
+    ["="]       = "ASSIGN",
+    ["+"]       = "PLUS",
+    ["-"]       = "MINUS",
+    ["*"]       = "MULTIPLY",
+    ["("]       = "LEFT_BRACKET",
+    [")"]       = "RIGHT_BRACKET",
 }
 setmetatable(TOKENS, {
     __newindex = function(_, key)
@@ -34,15 +34,20 @@ setmetatable(TOKENS, {
 Keywords.TOKENS = TOKENS
 
 --- Token types that may appear in expressions or as primary values.
---- Everything NOT in this set is considered an invalid position for an
---- expression-level token (e.g. `LET`, `ASSIGN`).
+--- Explicit list — add new operator token types here when they are introduced.
+--- Keywords (PRIVATE, ASSIGN, …) are intentionally absent so they never
+--- silently fall through to expression-statement parsing.
 ---@type table<string, boolean>
-local VALID_TYPES = { NUMBER = true, IDENTIFIER = true }
-for _, token_type in pairs(TOKENS) do
-    if token_type ~= "LET" and token_type ~= "ASSIGN" then
-        VALID_TYPES[token_type] = true
-    end
-end
+local VALID_TYPES = {
+    NUMBER        = true,
+    STRING        = true,
+    IDENTIFIER    = true,
+    PLUS          = true,
+    MINUS         = true,
+    MULTIPLY      = true,
+    LEFT_BRACKET  = true,
+    RIGHT_BRACKET = true,
+}
 
 --- Return `true` when `token_type` cannot legally appear in expression
 --- position (i.e. it is a keyword-only or assignment-only token).

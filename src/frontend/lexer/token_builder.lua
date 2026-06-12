@@ -3,14 +3,14 @@
 --- `PendingToken` is an intermediate form with zero-position that can be
 --- promoted to a real `Token` via `with_position`.
 
-local Token = require("src.frontend.lexer.token")
+local Token = require("frontend.lexer.token")
 
 ---@class PendingToken
 ---@field type    TokenType
 ---@field value   string
 ---@field literal any
 ---@field line    integer
----@field col     integer
+---@field column  integer
 
 ---@class TokenBuilder
 local TokenBuilder = {}
@@ -20,7 +20,7 @@ local TokenBuilder = {}
 ---@param value string
 ---@return PendingToken
 function TokenBuilder.make(type, value)
-    return { type = type, value = value, literal = value, line = 0, col = 0 } --[[@as PendingToken]]
+    return { type = type, value = value, literal = value, line = 0, column = 0 } --[[@as PendingToken]]
 end
 
 --- Promote a `PendingToken` to a positioned `Token`.

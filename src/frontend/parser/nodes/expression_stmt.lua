@@ -4,11 +4,17 @@
 ---@field type       "ExpressionStmt"
 ---@field expression Expr
 local ExpressionStmt = {}
+ExpressionStmt.__index = ExpressionStmt
 
 ---@param expression Expr
 ---@return ExpressionStmt
 function ExpressionStmt.new(expression)
-    return { type = "ExpressionStmt", expression = expression } --[[@as ExpressionStmt]]
+    return setmetatable({ type = "ExpressionStmt", expression = expression }, ExpressionStmt)
+end
+
+---@return string
+function ExpressionStmt:__tostring()
+    return ("ExpressionStmt(%s)"):format(tostring(self.expression))
 end
 
 return ExpressionStmt

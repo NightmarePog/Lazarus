@@ -1,16 +1,16 @@
---- Statement handler for `let` variable declarations.
+--- Statement handler for `private` variable declarations.
 ---
---- Grammar: `let <identifier> [ = <expression> ]`
+--- Grammar: `private <identifier> [ = <expression> ]`
 ---
 --- The `=` and initialiser are optional; omitting them produces a `VariableDecl`
 --- with `value = nil`.
 
-local StatementParser = require("src.frontend.parser.statements.statement_parser")
-local VariableDecl    = require("src.frontend.parser.nodes.variable")
+local StatementParser = require("frontend.parser.statements.statement_parser")
+local VariableDecl    = require("frontend.parser.nodes.variable")
 
 ---@type StatementParser
-return StatementParser.new("LET", function(parser)
-    local name_token = parser:_consume("IDENTIFIER", "Expected variable name after 'let'")
+return StatementParser.new("PRIVATE", function(parser)
+    local name_token = parser:_consume("IDENTIFIER", "Expected variable name after 'private'")
 
     local value = nil
     if parser:_match("ASSIGN") then
