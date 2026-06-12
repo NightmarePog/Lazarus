@@ -9,3 +9,6 @@ lint:
 
 dev:
 	lua src/repl.lua
+
+doc:
+	doxygen doc/Doxyfile

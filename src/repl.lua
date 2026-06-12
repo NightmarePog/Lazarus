@@ -2,7 +2,11 @@ package.path = package.path .. ";./src/?.lua;./src/?/init.lua"
 
 local Lexer = require "frontend.lexer"
 local Parser = require "frontend.parser"
-local A = "let var_name = 5"
+
+local source = [[
+let foo = 3+2
+let var_name = 5+5-2*(2+foo)
+]]
 
 local function dump(val, indent)
     indent = indent or 0
@@ -22,9 +26,9 @@ local function dump(val, indent)
 end
 
 local function main()
-    local lexer = Lexer.new(A):scan()
-    local parser = Parser.new(lexer):parse()
-    print(dump(parser))
+    local tokens = Lexer.new(source):scan()
+    local ast = Parser.new(tokens, source):parse()
+    print(dump(ast))
 end
 
 main()

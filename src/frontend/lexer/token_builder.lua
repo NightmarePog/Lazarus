@@ -1,4 +1,9 @@
-local Token = require("frontend.lexer.token")
+--- Test-only helpers for building `Token` values without running the lexer.
+---
+--- `PendingToken` is an intermediate form with zero-position that can be
+--- promoted to a real `Token` via `with_position`.
+
+local Token = require("src.frontend.lexer.token")
 
 ---@class PendingToken
 ---@field type    TokenType
@@ -10,13 +15,15 @@ local Token = require("frontend.lexer.token")
 ---@class TokenBuilder
 local TokenBuilder = {}
 
+--- Create a zero-position pending token with the given type and value.
 ---@param type  TokenType
 ---@param value string
 ---@return PendingToken
 function TokenBuilder.make(type, value)
-    return { type = type, value = value, literal = value, line = 0, col = 0 }
+    return { type = type, value = value, literal = value, line = 0, col = 0 } --[[@as PendingToken]]
 end
 
+--- Promote a `PendingToken` to a positioned `Token`.
 ---@param token PendingToken
 ---@param line  integer
 ---@param col   integer
@@ -25,6 +32,7 @@ function TokenBuilder.with_position(token, line, col)
     return Token.new(token.type, token.value, line, col, token.literal)
 end
 
+--- Construct a NUMBER token, converting `value` to a Lua number for `literal`.
 ---@param value string
 ---@param line  integer
 ---@param col   integer
@@ -33,6 +41,7 @@ function TokenBuilder.number(value, line, col)
     return Token.new("NUMBER", value, line, col, tonumber(value))
 end
 
+--- Construct a keyword or identifier token.
 ---@param type  TokenType
 ---@param value string
 ---@param line  integer

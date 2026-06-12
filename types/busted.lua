@@ -2,6 +2,7 @@
 ---@meta
 
 ---@class luassert
+---@overload fun(v: any, msg?: string): any
 ---@field equal       fun(expected: any, actual: any, msg?: string)
 ---@field same        fun(expected: any, actual: any, msg?: string)
 ---@field is_true     fun(value: any, msg?: string)

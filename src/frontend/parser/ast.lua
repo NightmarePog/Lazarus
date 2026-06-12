@@ -1,6 +1,8 @@
+--- Root AST node produced by the parser (`Program`).
+
 ---@class AST
 ---@field type "Program"
----@field body Stmt[]
+---@field body Stmt[]   Top-level statement list
 local AST = {}
 AST.__index = AST
 
@@ -9,7 +11,7 @@ AST.__index = AST
 function AST.new(body)
     return setmetatable({
         type = "Program",
-        body = body
+        body = body,
     }, AST)
 end
 
