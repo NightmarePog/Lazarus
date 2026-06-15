@@ -13,14 +13,14 @@ describe("Error", function ()
         it("formats with location when line and col are present", function ()
             local e = Error.new(Error.Type.UNEXPECTED_CHAR, "bad char", 2, 5)
             local s = tostring(e) --[[@as string]]
-            -- Matches the new "file:line:col" location syntax within the text block
+            -- Location is rendered as "<file>:line:col" (file is currently "unknown")
             assert.matches("Location: .-:2:5", s)
             assert.matches("UNEXPECTED_CHAR", s)
             assert.matches("bad char", s)
         end)
 
         it("handles completely missing location info gracefully", function ()
-            -- Bypass Error.new auto-detection to explicitly test the 'unknown' fallback
+            -- Construct an Error without line/col to exercise the 'unknown' fallback
             local e = setmetatable({
                 type = Error.Type.INVALID_NUMBER,
                 message = "not a number"

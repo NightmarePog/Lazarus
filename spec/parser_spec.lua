@@ -83,7 +83,8 @@ describe("Parser", function ()
             local ok, err = pcall(function () parse("= 5") end)
             assert.is_false(ok)
             -- ASSIGN is a keyword-only token; the dispatcher rejects it
-            assert.is_false(ok)
+            local err = err --[[@as Error]]
+            assert.equal(Error.Type.UNEXPECTED_TOKEN, err.type)
         end)
 
         it("throws on an empty grouped expression '()'", function ()
@@ -104,7 +105,8 @@ describe("Parser", function ()
             local ok, err = pcall(function () parse("private x = 1 +") end)
             assert.is_false(ok)
             -- parser runs out of tokens inside _primary
-            assert.is_false(ok)
+            local err = err --[[@as Error]]
+            assert.equal(Error.Type.UNEXPECTED_EOF, err.type)
         end)
     end)
 end)

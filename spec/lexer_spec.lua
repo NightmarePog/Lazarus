@@ -76,11 +76,11 @@ describe("Lexer", function ()
             assert.equal("x1y2", tok(tokens, 1).value)
         end)
 
-        it("throws UNEXPECTED_CHAR when a letter immediately follows a number literal", function ()
+        it("throws INVALID_NUMBER when a letter immediately follows a number literal", function ()
             local ok, err = pcall(function () scan("1foo") end)
             assert.is_false(ok)
             local err = err --[[@as Error]]
-            assert.equal(Error.Type.UNEXPECTED_CHAR, err.type)
+            assert.equal(Error.Type.INVALID_NUMBER, err.type)
         end)
     end)
 
@@ -104,11 +104,11 @@ describe("Lexer", function ()
             assert.equal(99, tok(tokens, 1).literal)
         end)
 
-        it("throws UNEXPECTED_CHAR when a letter immediately follows a number", function ()
+        it("throws INVALID_NUMBER when a letter immediately follows a number", function ()
             local ok, err = pcall(function () scan("123abc") end)
             assert.is_false(ok)
             local err = err --[[@as Error]]
-            assert.equal(Error.Type.UNEXPECTED_CHAR, err.type)
+            assert.equal(Error.Type.INVALID_NUMBER, err.type)
             assert.matches("after number literal", err.message)
         end)
     end)
