@@ -2,21 +2,24 @@ package.path = package.path .. ";./src/?.lua;./src/?/init.lua"
 
 local Lexer = require "frontend.lexer"
 local Parser = require "frontend.parser"
+local Schematic = require "frontend.schematic"
+local Optimizer = require "frontend.optimizer"
+local Codegen = require "backend"
 
 local source = [[
-private foo = 3+2
+constant foo = 3+2
 private var_name = 5+5-2*(2+foo)
 ]]
 
 ---@param val    any
 ---@param indent integer?
----@return string
+---@return string?
 local function dump(val, indent)
     indent = indent or 0
     local pad = string.rep("  ", indent)
 
     if type(val) ~= "table" then
-        return tostring(val)
+        return tostring(val or "")
     end
 
     local lines = { "{" }
@@ -31,7 +34,11 @@ end
 local function main()
     local tokens = Lexer.new(source):scan()
     local ast = Parser.new(tokens, source):parse()
-    print(dump(ast))
+    Schematic.analyze(ast, source)
+    local opt = Optimizer.optimize(ast)
+    print(dump(opt))
+    local output = Codegen.new(opt):generate()
+    print(output)
 end
 
 main()
