@@ -16,11 +16,11 @@ local Token = require("frontend.lexer.token")
 local TokenBuilder = {}
 
 --- Create a zero-position pending token with the given type and value.
----@param type  TokenType
----@param value string
+---@param tok_type TokenType
+---@param value    string
 ---@return PendingToken
-function TokenBuilder.make(type, value)
-    return { type = type, value = value, literal = value, line = 0, column = 0 } --[[@as PendingToken]]
+function TokenBuilder.make(tok_type, value)
+    return { type = tok_type, value = value, literal = value, line = 0, column = 0 } --[[@as PendingToken]]
 end
 
 --- Promote a `PendingToken` to a positioned `Token`.
@@ -42,13 +42,13 @@ function TokenBuilder.number(value, line, col)
 end
 
 --- Construct a keyword or identifier token.
----@param type  TokenType
----@param value string
----@param line  integer
----@param col   integer
+---@param tok_type TokenType
+---@param value    string
+---@param line     integer
+---@param col      integer
 ---@return Token
-function TokenBuilder.identifier(type, value, line, col)
-    return Token.new(type, value, line, col, value)
+function TokenBuilder.identifier(tok_type, value, line, col)
+    return Token.new(tok_type, value, line, col, value)
 end
 
 return TokenBuilder

@@ -8,7 +8,6 @@
 local StatementParser = require("frontend.parser.statements.statement_parser")
 local VariableDecl    = require("frontend.parser.nodes.variable")
 
----@type StatementParser
 return StatementParser.new("PRIVATE", function(parser)
     local name_token = parser:_consume("IDENTIFIER", "Expected variable name after 'private'")
 
@@ -17,5 +16,5 @@ return StatementParser.new("PRIVATE", function(parser)
         value = parser:_expression()
     end
 
-    return VariableDecl.new(name_token.value, value)
+    return VariableDecl.new(name_token.value, value, name_token.line, name_token.column)
 end)

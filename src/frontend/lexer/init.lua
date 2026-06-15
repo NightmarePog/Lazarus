@@ -64,7 +64,7 @@ function Lexer:_read_identifier()
 end
 
 --- Scan a decimal integer literal starting at the current position.
---- Throws `UNEXPECTED_CHAR` if a letter immediately follows the digits,
+--- Throws `INVALID_NUMBER` if a letter immediately follows the digits,
 --- e.g. `123abc` — rather than silently splitting into two tokens.
 ---@private
 ---@return Token
@@ -77,7 +77,7 @@ function Lexer:_read_number()
     end
 
     if self.current ~= "" and self.current:match("[%a_]") then
-        Error.throw(Error.Type.UNEXPECTED_CHAR,
+        Error.throw(Error.Type.INVALID_NUMBER,
             "Unexpected character '" .. self.current .. "' after number literal",
             self.line, self.col, self.source, 1)
     end

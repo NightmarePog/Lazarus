@@ -4,6 +4,7 @@ local Keywords = {}
 
 ---@alias TokenType
 --- | "PRIVATE"
+--- | "CONSTANT"
 --- | "ASSIGN"
 --- | "PLUS"
 --- | "MINUS"
@@ -15,10 +16,10 @@ local Keywords = {}
 --- | "RIGHT_BRACKET"
 
 --- Maps source-text strings to their `TokenType`.
---- The table is frozen: mutation raises a runtime error.
 ---@type table<string, TokenType>
-local TOKENS = {
-    ["private"] = "PRIVATE",
+local TOKENS_DATA = {
+    ["private"]  = "PRIVATE",
+    ["constant"] = "CONSTANT",
     ["="]       = "ASSIGN",
     ["+"]       = "PLUS",
     ["-"]       = "MINUS",
@@ -26,10 +27,17 @@ local TOKENS = {
     ["("]       = "LEFT_BRACKET",
     [")"]       = "RIGHT_BRACKET",
 }
-setmetatable(TOKENS, {
+
+--- Truly read-only view of `TOKENS_DATA`. Because lookups go through an empty
+--- proxy table, *every* assignment hits `__newindex` — including overwriting an
+--- existing key — so the map cannot be mutated at all after definition.
+---@type table<string, TokenType>
+local TOKENS = setmetatable({}, {
+    __index = TOKENS_DATA,
     __newindex = function(_, key)
         error("Attempt to modify read-only Keywords.TOKENS: " .. tostring(key))
     end,
+    __metatable = false,
 })
 Keywords.TOKENS = TOKENS
 

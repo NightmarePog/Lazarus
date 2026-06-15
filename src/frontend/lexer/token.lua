@@ -9,7 +9,7 @@
 ---@alias TokenLiteral string | number | boolean | nil
 
 ---@class Token
----@field type    TokenType    Symbolic type constant (e.g. `"NUMBER"`, `"LET"`)
+---@field type    TokenType    Symbolic type constant (e.g. `"NUMBER"`, `"PRIVATE"`)
 ---@field value   string       Raw source text of the token
 ---@field line    integer      1-based source line
 ---@field column  integer      1-based source column

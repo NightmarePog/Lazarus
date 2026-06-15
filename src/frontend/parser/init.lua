@@ -38,15 +38,6 @@ function Parser:_current()
     return self.token_table[self.pos]
 end
 
---- Return the token `offset` positions ahead of current (default 1).
---- `_peek(0)` is equivalent to `_current()`; `_peek()` is the next token.
----@param offset? integer
----@return Token?
-function Parser:_peek(offset)
-    offset = offset or 1
-    return self.token_table[self.pos + offset]
-end
-
 --- Consume and return the current token, advancing the position.
 --- Throws `UNEXPECTED_EOF` if already at the end of the stream.
 ---@return Token
@@ -72,11 +63,11 @@ function Parser:_previous()
 end
 
 --- Return `true` if the current token has the given type (without consuming).
----@param type string
+---@param tok_type string
 ---@return boolean
-function Parser:_check(type)
+function Parser:_check(tok_type)
     local token = self:_current()
-    return token ~= nil and token.type == type
+    return token ~= nil and token.type == tok_type
 end
 
 --- If the current token matches any of the given types, consume it and
@@ -96,13 +87,13 @@ end
 
 --- Consume the current token if it has the expected type.
 --- Throws `SYNTAX_ERROR` with `message` and the token's source position otherwise.
----@param type    string
----@param message string
+---@param tok_type string
+---@param message  string
 ---@return Token
-function Parser:_consume(type, message)
+function Parser:_consume(tok_type, message)
     local token = self:_current()
 
-    if not (token and token.type == type) then
+    if not (token and token.type == tok_type) then
         local t = token or self:_previous()
         Error.throw(Error.Type.SYNTAX_ERROR, message,
             (t and t.line)    --[[@as integer|nil]],
