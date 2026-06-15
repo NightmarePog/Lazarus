@@ -3,13 +3,17 @@
 ---@class ExpressionStmt: Stmt
 ---@field type       "ExpressionStmt"
 ---@field expression Expr
+---@field line       integer | nil 1-based source line of the expression's first token
+---@field col        integer | nil 1-based source column of the expression's first token
 local ExpressionStmt = {}
 ExpressionStmt.__index = ExpressionStmt
 
 ---@param expression Expr
+---@param line?      integer
+---@param col?       integer
 ---@return ExpressionStmt
-function ExpressionStmt.new(expression)
-    return setmetatable({ type = "ExpressionStmt", expression = expression }, ExpressionStmt)
+function ExpressionStmt.new(expression, line, col)
+    return setmetatable({ type = "ExpressionStmt", expression = expression, line = line, col = col }, ExpressionStmt)
 end
 
 ---@return string

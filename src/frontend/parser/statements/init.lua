@@ -11,7 +11,8 @@ local ExprStmt = require("frontend.parser.nodes.expression_stmt")
 --- Add new handlers here — the dispatcher builds the registry automatically.
 ---@type StatementParser[]
 local HANDLERS = {
-    (require("frontend.parser.statements.let")),
+    (require("frontend.parser.statements.private")),
+    (require("frontend.parser.statements.constant")),
 }
 
 ---@type table<string, StatementParser?>
@@ -25,8 +26,9 @@ return {
     ---
     --- If the current token matches a registered keyword the corresponding
     --- handler is called (with the keyword already consumed).  Unrecognised
-    --- keyword-only tokens produce a `SYNTAX_ERROR`.  Anything else is
-    --- treated as an expression statement.
+    --- keyword-only tokens produce an `UNEXPECTED_TOKEN` error.  Anything else
+    --- is treated as an expression statement.
+    ---@param self Parser
     ---@return Stmt
     _statement = function(self)
         local token = self:_current()
@@ -53,6 +55,6 @@ return {
                 tok.line, tok.column, self.source, #tok.value)
         end
 
-        return ExprStmt.new(self:_expression())
+        return ExprStmt.new(self:_expression(), tok.line, tok.column)
     end,
 }

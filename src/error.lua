@@ -25,6 +25,7 @@ Error.Type = {
     UNEXPECTED_EOF      = "UNEXPECTED_EOF",
     UNEXPECTED_TOKEN    = "UNEXPECTED_TOKEN",
     SYNTAX_ERROR        = "SYNTAX_ERROR",
+    SEMANTIC_ERROR      = "SEMANTIC_ERROR",
 }
 
 --- Construct a new Error value. All positional fields are optional; when
@@ -49,7 +50,13 @@ end
 
 ---@return string
 function Error:__tostring()
-    return Error.format(self) .. Error.traceback(4)
+    -- The internal Lua stack trace is debugging output for *compiler*
+    -- developers, not for users of the Lazarus language. Only append it when
+    -- `LAZARUS_DEBUG` is set so end users see a clean diagnostic box.
+    if os.getenv("LAZARUS_DEBUG") then
+        return Error.format(self) .. Error.traceback(4)
+    end
+    return Error.format(self)
 end
 
 --- Create an Error and immediately raise it via `error()`.  This function
@@ -76,6 +83,21 @@ local function format_location(err)
         return string.format("unknown:%d", err.line)
     end
     return "unknown"
+end
+
+--- Count the display width (number of UTF-8 codepoints) of `s`.
+--- Continuation bytes (`10xxxxxx`) are skipped so that a multibyte glyph such
+--- as `│` counts as one column rather than its byte length — keeping caret
+--- alignment correct regardless of the box-drawing characters in the prefix.
+---@param s string
+---@return integer
+local function display_width(s)
+    local width = 0
+    for i = 1, #s do
+        local b = s:byte(i)
+        if b < 0x80 or b >= 0xC0 then width = width + 1 end
+    end
+    return width
 end
 
 --- Extract a single line from `source` by 1-based line number.
@@ -108,7 +130,7 @@ local function format_snippet(err)
     lines = { "│ " .. line_prefix .. src_line }
 
     if err.col then
-        local inner_pad = string.rep(" ", #line_prefix + err.col - 1)
+        local inner_pad = string.rep(" ", display_width(line_prefix) + err.col - 1)
         local carets    = Color.RED .. string.rep("^", math.max(1, err.span or 1)) .. Color.RESET
         lines[#lines + 1] = "│ " .. inner_pad .. carets
     end

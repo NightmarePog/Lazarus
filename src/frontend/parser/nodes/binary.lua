@@ -5,15 +5,19 @@
 ---@field op    string   Token type of the operator (e.g. `"PLUS"`, `"MULTIPLY"`)
 ---@field left  Expr
 ---@field right Expr
+---@field line  integer | nil 1-based source line of the operator
+---@field col   integer | nil 1-based source column of the operator
 local BinaryExpr = {}
 BinaryExpr.__index = BinaryExpr
 
 ---@param op    string
 ---@param left  Expr
 ---@param right Expr
+---@param line? integer
+---@param col?  integer
 ---@return BinaryExpr
-function BinaryExpr.new(op, left, right)
-    return setmetatable({ type = "BinaryExpr", op = op, left = left, right = right }, BinaryExpr)
+function BinaryExpr.new(op, left, right, line, col)
+    return setmetatable({ type = "BinaryExpr", op = op, left = left, right = right, line = line, col = col }, BinaryExpr)
 end
 
 ---@return string

@@ -5,8 +5,8 @@
 
 --- Base class for all expression nodes.
 ---@class Expr
----@field type string  Discriminant tag (e.g. `"BinaryExpr"`, `"LiteralExpr"`)
+---@field type string Discriminant tag (e.g. `"BinaryExpr"`, `"LiteralExpr"`)
 
 --- Base class for all statement nodes.
 ---@class Stmt
----@field type string  Discriminant tag (e.g. `"VariableDecl"`, `"ExpressionStmt"`)
+---@field type string Discriminant tag (e.g. `"VariableDecl"`, `"ExpressionStmt"`)

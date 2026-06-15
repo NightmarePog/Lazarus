@@ -15,12 +15,14 @@ local BinaryExpr     = require("frontend.parser.nodes.binary")
 
 return {
     --- Entry point — delegates to the lowest-precedence rule.
+    ---@param self Parser
     ---@return Expr
     _expression = function(self)
         return self:_additive()
     end,
 
     --- Parse additive expressions (`+`, `-`), left-associative.
+    ---@param self Parser
     ---@return Expr
     _additive = function(self)
         local left = self:_multiplicative()
@@ -28,13 +30,14 @@ return {
         while self:_match("PLUS", "MINUS") do
             local op    = self:_previous() --[[@as Token]]
             local right = self:_multiplicative()
-            left = BinaryExpr.new(op.type, left, right)
+            left = BinaryExpr.new(op.type, left, right, op.line, op.column)
         end
 
         return left
     end,
 
     --- Parse multiplicative expressions (`*`), left-associative.
+    ---@param self Parser
     ---@return Expr
     _multiplicative = function(self)
         local left = self:_primary()
@@ -42,13 +45,14 @@ return {
         while self:_match("MULTIPLY") do
             local op    = self:_previous() --[[@as Token]]
             local right = self:_primary()
-            left = BinaryExpr.new(op.type, left, right)
+            left = BinaryExpr.new(op.type, left, right, op.line, op.column)
         end
 
         return left
     end,
 
     --- Parse a primary: a literal, identifier, or parenthesised sub-expression.
+    ---@param self Parser
     ---@return Expr
     _primary = function(self)
         local token = self:_current()
@@ -72,17 +76,17 @@ return {
 
         if tok.type == "NUMBER" then
             self:_advance()
-            return LiteralExpr.new("number", tok.literal)
+            return LiteralExpr.new("number", tok.literal, tok.line, tok.column)
         end
 
         if tok.type == "STRING" then
             self:_advance()
-            return LiteralExpr.new("string", tok.literal)
+            return LiteralExpr.new("string", tok.literal, tok.line, tok.column)
         end
 
         if tok.type == "IDENTIFIER" then
             self:_advance()
-            return IdentifierExpr.new(tok.value)
+            return IdentifierExpr.new(tok.value, tok.line, tok.column)
         end
 
         Error.throw(Error.Type.UNEXPECTED_TOKEN,
