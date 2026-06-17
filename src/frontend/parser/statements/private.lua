@@ -1,20 +1,15 @@
---- Statement handler for `private` variable declarations.
+--- Statement handler for `private` bindings.
 ---
---- Grammar: `private <identifier> [ = <expression> ]`
+--- Grammar: `private [ mut ] <identifier> [ = <expression> ]`
 ---
---- The `=` and initialiser are optional; omitting them produces a `VariableDecl`
---- with `value = nil`.
+--- Immutable by default; `mut` opts into reassignability. The initialiser is
+--- required unless `mut` is present.
 
 local StatementParser = require("frontend.parser.statements.statement_parser")
-local VariableDecl    = require("frontend.parser.nodes.variable")
+local binding         = require("frontend.parser.statements.binding")
 
 return StatementParser.new("PRIVATE", function(parser)
-    local name_token = parser:_consume("IDENTIFIER", "Expected variable name after 'private'")
-
-    local value = nil
-    if parser:_match("ASSIGN") then
-        value = parser:_expression()
-    end
-
-    return VariableDecl.new(name_token.value, value, name_token.line, name_token.column)
+    local mutable = parser:_match("MUTABLE")
+    return binding.read_binding(parser, "private", mutable,
+        "Expected variable name after 'private'")
 end)

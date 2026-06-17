@@ -6,13 +6,17 @@
 local Error    = require("error")
 local Keywords = require("frontend.lexer.keywords")
 local ExprStmt = require("frontend.parser.nodes.expression_stmt")
+local binding  = require("frontend.parser.statements.binding")
 
 --- All registered statement handlers, keyed by their trigger token type.
 --- Add new handlers here — the dispatcher builds the registry automatically.
 ---@type StatementParser[]
 local HANDLERS = {
     (require("frontend.parser.statements.private")),
-    (require("frontend.parser.statements.constant")),
+    (require("frontend.parser.statements.public")),
+    (require("frontend.parser.statements.mut")),
+    (require("frontend.parser.statements.function")),
+    (require("frontend.parser.statements.return")),
 }
 
 ---@type table<string, StatementParser?>
@@ -47,6 +51,17 @@ return {
         if handler then
             self:_advance()
             return handler.parse(self)
+        end
+
+        -- Bare binding / reassignment: `<identifier> = <expr>`. The keyword is
+        -- absent (no visibility, immutable), so it is recognised by lookahead
+        -- rather than by the registry. Schematic resolves declaration vs
+        -- reassignment by scope.
+        if tok.type == "IDENTIFIER" then
+            local nxt = self.token_table[self.pos + 1]
+            if nxt and nxt.type == "ASSIGN" then
+                return binding.read_binding(self, nil, false, "Expected variable name")
+            end
         end
 
         if Keywords.is_invalid_token_type(tok.type) then

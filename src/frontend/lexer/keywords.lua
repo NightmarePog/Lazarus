@@ -4,7 +4,8 @@ local Keywords = {}
 
 ---@alias TokenType
 --- | "PRIVATE"
---- | "CONSTANT"
+--- | "PUBLIC"
+--- | "MUTABLE"
 --- | "ASSIGN"
 --- | "PLUS"
 --- | "MINUS"
@@ -14,18 +15,29 @@ local Keywords = {}
 --- | "MULTIPLY"
 --- | "LEFT_BRACKET"
 --- | "RIGHT_BRACKET"
+--- | "FUNCTION"
+--- | "RETURN"
+--- | "BODY_START"
+--- | "BODY_END"
+--- | "COMMA"
 
 --- Maps source-text strings to their `TokenType`.
 ---@type table<string, TokenType>
 local TOKENS_DATA = {
-    ["private"]  = "PRIVATE",
-    ["constant"] = "CONSTANT",
-    ["="]       = "ASSIGN",
-    ["+"]       = "PLUS",
-    ["-"]       = "MINUS",
-    ["*"]       = "MULTIPLY",
-    ["("]       = "LEFT_BRACKET",
-    [")"]       = "RIGHT_BRACKET",
+    ["private"] = "PRIVATE",
+    ["public"] = "PUBLIC",
+    ["mut"] = "MUTABLE",
+    ["fn"] = "FUNCTION",
+    ["return"] = "RETURN",
+    ["="] = "ASSIGN",
+    ["+"] = "PLUS",
+    ["-"] = "MINUS",
+    ["*"] = "MULTIPLY",
+    ["("] = "LEFT_BRACKET",
+    [")"] = "RIGHT_BRACKET",
+    ["{"] = "BODY_START",
+    ["}"] = "BODY_END",
+    [","] = "COMMA"
 }
 
 --- Truly read-only view of `TOKENS_DATA`. Because lookups go through an empty
@@ -34,10 +46,10 @@ local TOKENS_DATA = {
 ---@type table<string, TokenType>
 local TOKENS = setmetatable({}, {
     __index = TOKENS_DATA,
-    __newindex = function(_, key)
+    __newindex = function (_, key)
         error("Attempt to modify read-only Keywords.TOKENS: " .. tostring(key))
     end,
-    __metatable = false,
+    __metatable = false
 })
 Keywords.TOKENS = TOKENS
 
@@ -47,14 +59,14 @@ Keywords.TOKENS = TOKENS
 --- silently fall through to expression-statement parsing.
 ---@type table<string, boolean>
 local VALID_TYPES = {
-    NUMBER        = true,
-    STRING        = true,
-    IDENTIFIER    = true,
-    PLUS          = true,
-    MINUS         = true,
-    MULTIPLY      = true,
-    LEFT_BRACKET  = true,
-    RIGHT_BRACKET = true,
+    NUMBER = true,
+    STRING = true,
+    IDENTIFIER = true,
+    PLUS = true,
+    MINUS = true,
+    MULTIPLY = true,
+    LEFT_BRACKET = true,
+    RIGHT_BRACKET = true
 }
 
 --- Return `true` when `token_type` cannot legally appear in expression
@@ -68,9 +80,9 @@ end
 setmetatable(Keywords, {
     __index = TOKENS,
 
-    __newindex = function(_, key)
+    __newindex = function (_, key)
         error("Attempt to modify read-only Keywords table: " .. tostring(key))
-    end,
+    end
 })
 
 return Keywords

@@ -39,6 +39,17 @@ fold_expr = function(node, constants)
         return constants[node.name] or node
     end
 
+    -- Calls are never folded, but their callee and arguments are, so constants
+    -- still propagate into argument expressions.
+    if node.type == "CallExpr" then
+        ---@cast node CallExpr
+        node.callee = fold_expr(node.callee, constants)
+        for i, arg in ipairs(node.args) do
+            node.args[i] = fold_expr(arg, constants)
+        end
+        return node
+    end
+
     if node.type ~= "BinaryExpr" then return node end
     ---@cast node BinaryExpr
 

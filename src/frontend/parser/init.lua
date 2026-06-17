@@ -13,8 +13,8 @@ local AST   = require("frontend.parser.ast")
 ---@field source          string | nil Original source text, forwarded to errors for snippets
 ---@field _statement      fun(self: Parser): Stmt
 ---@field _expression     fun(self: Parser): Expr
----@field _additive       fun(self: Parser): Expr
----@field _multiplicative fun(self: Parser): Expr
+---@field _binary         fun(self: Parser, min_prec: integer): Expr
+---@field _call           fun(self: Parser): Expr
 ---@field _primary        fun(self: Parser): Expr
 local Parser = {}
 Parser.__index = Parser

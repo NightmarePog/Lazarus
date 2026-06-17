@@ -7,8 +7,45 @@ local Optimizer = require "frontend.optimizer"
 local Codegen = require "backend"
 
 local source = [[
-constant foo = 3+2
-private var_name = 5+5-2*(2+foo)
+private base  = 2 * 3 + 1
+private scale = (base + 3) * 2
+
+public mut answer = 0
+public mut label  = "none"
+
+fn square(n) {
+    return n * n
+}
+
+fn step(v) {
+    mut r = v
+    r = r * 2
+    r = r + base
+    return r
+}
+
+fn compute(seed) {
+    fn bump(x) {
+        return x + base
+    }
+
+    mut total = seed
+    total = total + square(seed)
+    total = step(total)
+    total = bump(total)
+    total = total + scale
+    return total
+}
+
+fn brand() {
+    return "lazarus"
+}
+
+fn main() {
+    answer = compute(4)
+    label  = brand()
+    return answer
+}
 ]]
 
 ---@param val    any

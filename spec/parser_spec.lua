@@ -18,11 +18,33 @@ describe("Parser", function ()
             assert.equal("x", decl.name)
         end)
 
-        it("parses a declaration without an initialiser", function ()
-            local ast = parse("private x")
+        it("parses a mutable declaration without an initialiser", function ()
+            local ast = parse("private mut x")
             local decl = ast.body[1] --[[@as VariableDecl]]
             assert.equal("VariableDecl", decl.type)
+            assert.is_true(decl.mutable)
             assert.is_nil(decl.value)
+        end)
+
+        it("rejects an immutable declaration without an initialiser", function ()
+            local ok, err = pcall(function () parse("private x") end)
+            assert.is_false(ok)
+            local err = err --[[@as Error]]
+            assert.equal(Error.Type.SYNTAX_ERROR, err.type)
+            assert.matches("must be initialised", err.message)
+        end)
+
+        it("parses a public binding", function ()
+            local decl = parse("public x = 1").body[1] --[[@as VariableDecl]]
+            assert.equal("public", decl.visibility)
+            assert.is_false(decl.mutable)
+        end)
+
+        it("parses a bare local binding as a VariableDecl", function ()
+            local decl = parse("x = 1").body[1] --[[@as VariableDecl]]
+            assert.equal("VariableDecl", decl.type)
+            assert.is_nil(decl.visibility)
+            assert.is_false(decl.mutable)
         end)
 
         it("parses multiple statements", function ()

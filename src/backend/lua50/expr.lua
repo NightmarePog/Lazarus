@@ -19,6 +19,23 @@ emit_expr = function(node)
         return node.name
     end
 
+    if node.type == "CallExpr" then
+        ---@cast node CallExpr
+        local args = {}
+        for i, arg in ipairs(node.args) do
+            args[i] = emit_expr(arg)
+        end
+
+        local callee = emit_expr(node.callee)
+        -- A binary expression is not directly callable in Lua; parenthesise it
+        -- defensively so the emitted text stays syntactically valid.
+        if node.callee.type == "BinaryExpr" then
+            callee = "(" .. callee .. ")"
+        end
+
+        return callee .. "(" .. table.concat(args, ", ") .. ")"
+    end
+
     if node.type == "BinaryExpr" then
         ---@cast node BinaryExpr
         local op = OP_MAP[node.op]

@@ -30,11 +30,18 @@ describe("Optimizer", function ()
     end)
 
     describe("constant propagation", function ()
-        it("substitutes a folded constant into a later expression", function ()
-            local ast = optimize("constant foo = 3 + 2\nprivate x = foo + 1")
+        it("substitutes a folded immutable binding into a later expression", function ()
+            local ast = optimize("private foo = 3 + 2\nprivate x = foo + 1")
             local v = value_of(ast, 2)
             assert.equal("LiteralExpr", v.type)
             assert.equal(6, v.value)
+        end)
+
+        it("does NOT propagate a mutable binding", function ()
+            local ast = optimize("private mut foo = 5\nprivate x = foo + 1")
+            local v = value_of(ast, 2)
+            -- `foo` may change, so its reference must survive.
+            assert.equal("BinaryExpr", v.type)
         end)
     end)
 
@@ -49,7 +56,8 @@ describe("Optimizer", function ()
         end)
 
         it("does NOT simplify `x + 0` for an identifier operand", function ()
-            local ast = optimize("private a = 1\nprivate b = a + 0")
+            -- `a` is mutable, so it is not propagated and stays an identifier.
+            local ast = optimize("private mut a = 1\nprivate b = a + 0")
             local v = value_of(ast, 2)
             assert.equal("BinaryExpr", v.type)
         end)
