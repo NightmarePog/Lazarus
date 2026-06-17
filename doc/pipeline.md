@@ -26,6 +26,9 @@ Lua 5.0 source
 
 Entry point (dev): `src/repl.lua`
 
+To add a new language feature, follow [`adding-features.md`](adding-features.md)
+— the standard stage-by-stage recipe built on this pipeline.
+
 ---
 
 ## Stage 1 — Lexer

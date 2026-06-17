@@ -10,5 +10,8 @@ lint:
 dev:
 	lua src/repl.lua
 
+build:
+	lua src/cli.lua build $(FILE)
+
 doc:
 	doxygen doc/Doxyfile

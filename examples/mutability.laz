@@ -1,0 +1,13 @@
+public mut counter = 0
+
+fn step(v) {
+    mut total = v
+    total = total + 1
+    total = total * 2
+    return total
+}
+
+fn main() {
+    counter = step(4)
+    return counter
+}

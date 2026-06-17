@@ -1,0 +1,13 @@
+private offset = 10
+
+fn double(n) {
+    return n * 2
+}
+
+fn shift(n) {
+    return n + offset
+}
+
+fn main() {
+    return shift(double(5))
+}
