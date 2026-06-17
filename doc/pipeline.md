@@ -254,10 +254,20 @@ private x   = 5 + 5 - 2 * (2 + foo)
 
 ### Internal structure
 
+Each fold rule lives in its own module, dispatched by AST node type — the same
+architecture as Schematic. The driver (`init.lua`) owns the shared `FoldContext`
+(constants table, expression folding, constant recording, child scopes, block
+recursion); the rules stay small.
+
 | File | Role |
 |---|---|
-| `init.lua` | `optimize(ast)` — statement walk, constants table, calls `fold_stmt` |
-| `expr.lua` | `fold_expr(node, constants)` — recursive folding, propagation, simplification |
+| `init.lua` | `optimize(ast)` — driver + `FoldContext` helpers |
+| `statements/init.lua` | Statement-fold dispatcher — node type → rule registry |
+| `statements/statement_fold.lua` | `FoldStatement` interface (`type` + `fold`) |
+| `statements/{variable,function,return,expression}.lua` | One fold per statement node |
+| `expressions/init.lua` | `fold_expr` dispatcher over expression rules |
+| `expressions/expression_fold.lua` | `FoldExpression` interface (`type` + `fold`) |
+| `expressions/{identifier,binary,call}.lua` | One fold per expression node |
 
 ---
 

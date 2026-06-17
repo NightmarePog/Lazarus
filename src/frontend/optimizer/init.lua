@@ -1,63 +1,73 @@
---- Optimizer pass: applies expression folding and constant propagation to the AST.
+--- Optimizer pass: applies constant folding and constant propagation to the AST.
+---
+--- The rules themselves live next to this file, one module per node type:
+---   • `statements/` — a `FoldStatement` per statement (variable, function, …)
+---   • `expressions/` — a `FoldExpression` per expression (identifier, binary, …)
+---
+--- This module is just the driver. It builds a shared `FoldContext` carrying the
+--- constants table and walks each block, dispatching every statement to its
+--- registered rule. The cross-cutting helpers a rule might need — expression
+--- folding, constant recording, child-scope creation, recursion into nested
+--- blocks — live on the context so the individual rules stay small and focused.
 
-local fold_expr = require("frontend.optimizer.expr")
+local statement_registry = require("frontend.optimizer.statements")
+local fold_expr          = require("frontend.optimizer.expressions")
 
----@type fun(node: Stmt, constants: table<string, LiteralExpr>): Stmt
-local fold_stmt
+---@class FoldContext
+---@field constants table<string, LiteralExpr>
+local FoldContext = {}
+FoldContext.__index = FoldContext
 
---- Fold every statement in a block, threading the constant table so later
---- statements can substitute constants declared earlier in the same block.
----@param stmts     Stmt[]
 ---@param constants table<string, LiteralExpr>
-local function fold_block(stmts, constants)
-    for i, stmt in ipairs(stmts) do
-        stmts[i] = fold_stmt(stmt, constants)
-
-        -- After folding, record *immutable* bindings whose value collapsed to a
-        -- literal so subsequent statements can substitute them inline. Mutable
-        -- bindings and reassignments are skipped — their value can change.
-        if stmt.type == "VariableDecl" and not stmt.mutable and not stmt.reassign then
-            ---@cast stmt VariableDecl
-            local val = stmt.value
-            if val and val.type == "LiteralExpr" then
-                ---@cast val LiteralExpr
-                constants[stmt.name] = val
-            end
-        end
-    end
+---@return FoldContext
+function FoldContext.new(constants)
+    return setmetatable({ constants = constants }, FoldContext)
 end
 
----@param node      Stmt
----@param constants table<string, LiteralExpr>
----@return Stmt
-function fold_stmt(node, constants)
-    if node.type == "VariableDecl" or node.type == "ReturnStmt" then
-        ---@cast node VariableDecl | ReturnStmt
-        -- Both carry an optional `value` expression (an absent initialiser or a
-        -- bare `return`), so they fold identically.
-        if node.value then node.value = fold_expr(node.value, constants) end
-    elseif node.type == "ExpressionStmt" then
-        ---@cast node ExpressionStmt
-        node.expression = fold_expr(node.expression, constants)
-    elseif node.type == "FunctionDecl" then
-        ---@cast node FunctionDecl
-        -- Constants visible from the enclosing scope still propagate into the
-        -- body, but a parameter of the same name shadows them, so drop those
-        -- entries from the body's copy of the table.
-        local inner = {}
-        for name, lit in pairs(constants) do inner[name] = lit end
-        for _, param in ipairs(node.params) do inner[param] = nil end
-        fold_block(node.body, inner)
+--- Fold an expression against the constants visible in this context, returning
+--- the possibly-replaced node.
+---@param node Expr
+---@return Expr
+function FoldContext:fold_expr(node)
+    return fold_expr(node, self.constants)
+end
+
+--- Record an immutable binding whose value folded to a literal, so later
+--- statements in the block can substitute it inline.
+---@param name    string
+---@param literal LiteralExpr
+function FoldContext:record_constant(name, literal)
+    self.constants[name] = literal
+end
+
+--- Create a child context for a function body: it inherits the enclosing
+--- constants, but a parameter shadowing a constant drops that entry so the
+--- parameter's runtime value is never substituted away.
+---@param params string[]
+---@return FoldContext
+function FoldContext:child(params)
+    local inner = {}
+    for name, lit in pairs(self.constants) do inner[name] = lit end
+    for _, param in ipairs(params) do inner[param] = nil end
+    return FoldContext.new(inner)
+end
+
+--- Walk a block in source order, dispatching each statement to its fold rule.
+--- Statement types with no registered rule are left untouched.
+---@param stmts Stmt[]
+function FoldContext:fold_block(stmts)
+    for idx, stmt in ipairs(stmts) do
+        local rule = statement_registry[stmt.type]
+        if rule then
+            rule.fold(self, { stmt = stmt, idx = idx, stmts = stmts })
+        end
     end
-    return node
 end
 
 ---@param ast AST
 ---@return AST
 local function optimize(ast)
-    ---@type table<string, LiteralExpr>
-    local constants = {}
-    fold_block(ast.body, constants)
+    FoldContext.new({}):fold_block(ast.body)
     return ast
 end
 

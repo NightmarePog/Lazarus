@@ -1,4 +1,7 @@
---- Expression folder: constant propagation and constant folding.
+--- Fold rule for binary expressions: constant folding.
+---
+--- Both operands are folded first; when both collapse to numeric literals the
+--- whole node is evaluated at compile time and replaced with a single literal.
 ---
 --- Note on algebraic identities (`x + 0 → x`, `x * 0 → 0`, `x * 1 → x`, …):
 --- these are intentionally NOT applied to non-literal operands. Lazarus has no
@@ -9,7 +12,8 @@
 --- already handled by constant folding below. Re-introduce identity rewrites
 --- once a type-analysis pass can prove the surviving operand is numeric.
 
-local LiteralExpr = require("frontend.parser.nodes.literal")
+local FoldExpression = require("frontend.optimizer.expressions.expression_fold")
+local LiteralExpr    = require("frontend.parser.nodes.literal")
 
 --- Operators eligible for compile-time folding when both operands are numeric
 --- literals. Division is absent until `/` is implemented across all stages
@@ -29,45 +33,20 @@ local function num(node)
     return node.value --[[@as number]]
 end
 
----@type fun(node: Expr, constants: table<string, LiteralExpr>): Expr
-local fold_expr
-
-fold_expr = function(node, constants)
-    -- Constant propagation: substitute known compile-time values
-    if node.type == "IdentifierExpr" then
-        ---@cast node IdentifierExpr
-        return constants[node.name] or node
-    end
-
-    -- Calls are never folded, but their callee and arguments are, so constants
-    -- still propagate into argument expressions.
-    if node.type == "CallExpr" then
-        ---@cast node CallExpr
-        node.callee = fold_expr(node.callee, constants)
-        for i, arg in ipairs(node.args) do
-            node.args[i] = fold_expr(arg, constants)
-        end
-        return node
-    end
-
-    if node.type ~= "BinaryExpr" then return node end
+return FoldExpression.new("BinaryExpr", function(node, constants, recurse)
     ---@cast node BinaryExpr
-
-    local left  = fold_expr(node.left,  constants)
-    local right = fold_expr(node.right, constants)
-    local op    = node.op
+    local left  = recurse(node.left,  constants)
+    local right = recurse(node.right, constants)
     local lv    = num(left)
     local rv    = num(right)
 
     -- Constant folding: only when both operands are known numeric literals.
     if lv ~= nil and rv ~= nil then
-        local fn = FOLD_OPS[op]
+        local fn = FOLD_OPS[node.op]
         if fn then return LiteralExpr.new("number", fn(lv, rv), node.line, node.col) end
     end
 
     node.left  = left
     node.right = right
     return node
-end
-
-return fold_expr
+end)
