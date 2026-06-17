@@ -8,6 +8,9 @@ See [`doc/pipeline.md`](doc/pipeline.md) for the full architecture, and
 [`doc/adding-features.md`](doc/adding-features.md) for the standard recipe to
 implement a new language feature.
 
+The planned next major version (classes, a static type system, modules, and Lua
+interop) is specified in [`doc/design/`](doc/design/).
+
 ## Compiler
 
 `src/cli.lua` is the compiler entry point (`bin/lazarus` is a thin launcher):
