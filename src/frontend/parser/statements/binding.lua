@@ -20,6 +20,7 @@ local COMPOUND = {
     PLUS_ASSIGN  = "PLUS",
     MINUS_ASSIGN = "MINUS",
     STAR_ASSIGN  = "MULTIPLY",
+    SLASH_ASSIGN = "DIVIDE",
 }
 
 --- Parse one binding once visibility and mutability are known.

@@ -122,6 +122,34 @@ describe("Parser", function ()
             end)
         end
 
+        local arithmetic = {
+            { "a / b", "DIVIDE" }, { "a % b", "MODULO" },
+            { "a ^ b", "POWER" }, { "a ++ b", "CONCAT" },
+        }
+        for _, case in ipairs(arithmetic) do
+            it("parses '" .. case[1] .. "' as BinaryExpr " .. case[2], function ()
+                local b = value_of(case[1]) --[[@as BinaryExpr]]
+                assert.equal("BinaryExpr", b.type)
+                assert.equal(case[2], b.op)
+            end)
+        end
+
+        it("binds '/' at the multiplicative level (tighter than '+')", function ()
+            -- a + b / c  ->  a + (b / c)
+            local top = value_of("a + b / c") --[[@as BinaryExpr]]
+            assert.equal("PLUS", top.op)
+            assert.equal("BinaryExpr", top.right.type)
+            assert.equal("DIVIDE", top.right.op)
+        end)
+
+        it("binds '^' tighter than '*'", function ()
+            -- a * b ^ c  ->  a * (b ^ c)
+            local top = value_of("a * b ^ c") --[[@as BinaryExpr]]
+            assert.equal("MULTIPLY", top.op)
+            assert.equal("BinaryExpr", top.right.type)
+            assert.equal("POWER", top.right.op)
+        end)
+
         it("parses 'a and b' as BinaryExpr AND", function ()
             local b = value_of("a and b") --[[@as BinaryExpr]]
             assert.equal("AND", b.op)
@@ -245,6 +273,11 @@ describe("Parser", function ()
         it("desugars '-=' to a MINUS reassignment", function ()
             local v = parse("i -= 2").body[1].value --[[@as BinaryExpr]]
             assert.equal("MINUS", v.op)
+        end)
+
+        it("desugars '/=' to a DIVIDE reassignment", function ()
+            local v = parse("i /= 2").body[1].value --[[@as BinaryExpr]]
+            assert.equal("DIVIDE", v.op)
         end)
     end)
 

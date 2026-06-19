@@ -28,7 +28,6 @@ local function has(haystack, needle)
     return haystack:find(needle, 1, true) ~= nil
 end
 
--- Lazarus has no comment syntax yet, so the program below is comment-free.
 -- What each piece exercises (and the arithmetic it folds to):
 --   base  = 2 * 3 + 1        -> 7   immutable; folds and propagates
 --   scale = (base + 3) * 2   -> 20  folds using the propagated `base`
@@ -225,6 +224,51 @@ fn main() {
             assert.equal("neg", _G.label)   -- classify(-3)
 
             _G.total, _G.steps, _G.firsteven, _G.flag, _G.label = nil, nil, nil, nil, nil
+        end)
+    end)
+
+    describe("arithmetic, concat and comments", function ()
+        -- Exercises /, %, ^, ++ and compound /=, plus both comment forms,
+        -- through the whole pipeline and at runtime.
+        local PROG = [[
+// division, modulo, power, concat and compound /=
+public mut q = 0
+public mut r = 0
+public mut p = 0
+public mut greeting = "none"
+
+fn main() {
+    mut x = 20
+    x /= 2          // x is now 10
+    q = x
+    r = x % 3       /* 10 mod 3 = 1 */
+    p = 2 ^ 4       // folds to 16
+    greeting = "hi, " ++ "laz"
+    return q
+}
+]]
+
+        it("generates Lua that loads", function ()
+            local chunk, err = load_chunk(compile(PROG))
+            assert.is_truthy(chunk, "failed to load: " .. tostring(err))
+        end)
+
+        it("synthesises modulo with math.floor in the emitted Lua", function ()
+            local body = compile(PROG, { header = false, entry = false })
+            assert.is_true(has(body, "math.floor"))
+        end)
+
+        it("produces the correct runtime results", function ()
+            _G.q, _G.r, _G.p, _G.greeting = nil, nil, nil, nil
+            local chunk = assert(load_chunk(compile(PROG)))
+            chunk()
+
+            assert.equal(10, _G.q)            -- 20 /= 2
+            assert.equal(1,  _G.r)            -- 10 % 3
+            assert.equal(16, _G.p)            -- 2 ^ 4
+            assert.equal("hi, laz", _G.greeting)
+
+            _G.q, _G.r, _G.p, _G.greeting = nil, nil, nil, nil
         end)
     end)
 end)

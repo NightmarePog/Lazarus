@@ -23,7 +23,11 @@ return {
     LESS_EQUAL    = 3,
     GREATER       = 3,
     GREATER_EQUAL = 3,
+    CONCAT        = 4,
     PLUS          = 4,
     MINUS         = 4,
     MULTIPLY      = 5,
+    DIVIDE        = 5,
+    MODULO        = 5,
+    POWER         = 6,
 }

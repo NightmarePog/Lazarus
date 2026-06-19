@@ -132,6 +132,29 @@ describe("Codegen", function ()
         end)
     end)
 
+    describe("arithmetic / concat operators", function ()
+        -- mutable operands so they round-trip instead of being constant-folded.
+        local function emit_c(expr)
+            return compile("private mut a = 1\nprivate mut b = 2\nprivate c = " .. expr)
+        end
+
+        it("emits '/' straight through", function ()
+            assert.matches("c = a / b", emit_c("a / b"))
+        end)
+
+        it("emits '^' straight through", function ()
+            assert.matches("c = a %^ b", emit_c("a ^ b"))
+        end)
+
+        it("emits '++' as Lua '..'", function ()
+            assert.matches("c = a %.%. b", emit_c("a ++ b"))
+        end)
+
+        it("synthesises '%' for Lua 5.0 which has no '%' operator", function ()
+            assert.matches("%(a %- math%.floor%(a / b%) %* b%)", emit_c("a % b"))
+        end)
+    end)
+
     describe("footer (entry call)", function ()
         it("appends main() when a main function is present", function ()
             local out = compile_program("fn main() { return 0 }")
@@ -160,6 +183,10 @@ describe("Codegen", function ()
             'private s = "hello"',
             "fn counter() { mut n = 0\nn = n + 1\nreturn n }",
             "fn main() { return 0 }",
+            "private mut a = 7\nprivate mut b = 2\nprivate q = a / b",
+            "private mut a = 7\nprivate mut b = 2\nprivate r = a % b",
+            "private mut a = 2\nprivate mut b = 8\nprivate p = a ^ b",
+            'private mut a = "x"\nprivate mut b = "y"\nprivate s = a ++ b',
         }
 
         for _, src in ipairs(cases) do

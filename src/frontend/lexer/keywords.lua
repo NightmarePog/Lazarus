@@ -40,6 +40,11 @@ local Keywords = {}
 --- | "PLUS_ASSIGN"
 --- | "MINUS_ASSIGN"
 --- | "STAR_ASSIGN"
+--- | "SLASH_ASSIGN"
+--- | "DIVIDE"
+--- | "MODULO"
+--- | "POWER"
+--- | "CONCAT"
 --- | "SEMICOLON"
 
 --- Maps source-text strings to their `TokenType`.
@@ -67,6 +72,10 @@ local TOKENS_DATA = {
     ["+"] = "PLUS",
     ["-"] = "MINUS",
     ["*"] = "MULTIPLY",
+    ["/"] = "DIVIDE",
+    ["%"] = "MODULO",
+    ["^"] = "POWER",
+    ["++"] = "CONCAT",
     ["=="] = "EQ",
     ["!="] = "NEQ",
     ["<"] = "LESS",
@@ -76,6 +85,7 @@ local TOKENS_DATA = {
     ["+="] = "PLUS_ASSIGN",
     ["-="] = "MINUS_ASSIGN",
     ["*="] = "STAR_ASSIGN",
+    ["/="] = "SLASH_ASSIGN",
     ["("] = "LEFT_BRACKET",
     [")"] = "RIGHT_BRACKET",
     ["{"] = "BODY_START",
@@ -109,6 +119,10 @@ local VALID_TYPES = {
     PLUS = true,
     MINUS = true,
     MULTIPLY = true,
+    DIVIDE = true,
+    MODULO = true,
+    POWER = true,
+    CONCAT = true,
     LEFT_BRACKET = true,
     RIGHT_BRACKET = true,
     -- Tokens that can begin an expression: boolean literals and the `not` prefix.

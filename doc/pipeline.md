@@ -65,6 +65,10 @@ Single-pass scanner. Walks the source byte by byte and emits a flat list of toke
 | `PLUS` | `+` |
 | `MINUS` | `-` |
 | `MULTIPLY` | `*` |
+| `DIVIDE` | `/` |
+| `MODULO` | `%` |
+| `POWER` | `^` |
+| `CONCAT` | `++` (string concatenation; lowers to Lua `..`) |
 | `LEFT_BRACKET` | `(` |
 | `RIGHT_BRACKET` | `)` |
 | `BODY_START` | `{` |
@@ -75,9 +79,11 @@ Single-pass scanner. Walks the source byte by byte and emits a flat list of toke
 | `TRUE` `FALSE` | boolean literals |
 | `AND` `OR` `NOT` | logical operators |
 | `EQ` `NEQ` `LESS` `LESS_EQUAL` `GREATER` `GREATER_EQUAL` | `==` `!=` `<` `<=` `>` `>=` |
-| `PLUS_ASSIGN` `MINUS_ASSIGN` `STAR_ASSIGN` | `+=` `-=` `*=` |
+| `PLUS_ASSIGN` `MINUS_ASSIGN` `STAR_ASSIGN` `SLASH_ASSIGN` | `+=` `-=` `*=` `/=` |
 
-Multi-character operators (`==`, `<=`, `+=`, …) are matched by **maximal munch**: the scanner prefers the two-character token over the single-character one.
+Multi-character operators (`==`, `<=`, `+=`, `++`, …) are matched by **maximal munch**: the scanner prefers the two-character token over the single-character one.
+
+Comments are skipped by the scanner and produce no tokens: `// …` runs to end of line, `/* … */` spans lines (an unterminated block comment is an `UNTERMINATED_COMMENT` error). The leading `/` is disambiguated before symbol scanning, so `/`, `/=`, `//` and `/*` never collide.
 
 ### Internal structure
 
@@ -160,8 +166,9 @@ optimizer folds any binding with a foldable initialiser automatically.
 | Logical or | `or` |
 | Logical and | `and` |
 | Comparison / equality | `==` `!=` `<` `<=` `>` `>=` |
-| Additive | `+` `-` |
-| Multiplicative | `*` |
+| Additive / concat | `+` `-` `++` |
+| Multiplicative | `*` `/` `%` |
+| Exponent | `^` |
 | Unary | prefix `not` |
 | Call | postfix `f(...)` |
 | Primary | literals, identifiers, `(` grouped `)` |

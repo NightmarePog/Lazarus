@@ -16,12 +16,17 @@ local FoldExpression = require("frontend.optimizer.expressions.expression_fold")
 local LiteralExpr    = require("frontend.parser.nodes.literal")
 
 --- Operators eligible for compile-time folding when both operands are numeric
---- literals. Division is absent until `/` is implemented across all stages
---- (lexer, parser, codegen).
+--- literals. `MODULO` mirrors the Lua 5.0 lowering in codegen
+--- (`a - math.floor(a / b) * b`). A fold producing a non-finite result
+--- (e.g. divide-by-zero → inf) is rejected below, since inf/nan has no Lua
+--- literal form.
 local FOLD_OPS = {
     PLUS     = function(a, b) return a + b end,
     MINUS    = function(a, b) return a - b end,
     MULTIPLY = function(a, b) return a * b end,
+    DIVIDE   = function(a, b) return a / b end,
+    MODULO   = function(a, b) return a - math.floor(a / b) * b end,
+    POWER    = function(a, b) return a ^ b end,
 }
 
 ---@param node Expr
@@ -43,7 +48,14 @@ return FoldExpression.new("BinaryExpr", function(node, constants, recurse)
     -- Constant folding: only when both operands are known numeric literals.
     if lv ~= nil and rv ~= nil then
         local fn = FOLD_OPS[node.op]
-        if fn then return LiteralExpr.new("number", fn(lv, rv), node.line, node.col) end
+        if fn then
+            local result = fn(lv, rv)
+            -- Reject non-finite folds (divide/modulo by zero, overflow): inf and
+            -- nan have no valid Lua literal form, so leave the expression intact.
+            if result == result and result ~= math.huge and result ~= -math.huge then
+                return LiteralExpr.new("number", result, node.line, node.col)
+            end
+        end
     end
 
     node.left  = left

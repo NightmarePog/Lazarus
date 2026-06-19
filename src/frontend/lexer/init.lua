@@ -150,12 +150,60 @@ function Lexer:_read_symbol()
     return Token.new(tok_type --[[@as TokenType]], char, line, col)
 end
 
+--- Skip a line (`// …`) or block (`/* … */`) comment starting at the current
+--- position. Returns `true` when a comment was consumed, `false` when the
+--- current character does not begin a comment (a lone `/` or `/=` operator).
+--- Throws `UNTERMINATED_COMMENT` if a block comment reaches EOF unclosed.
+---@private
+---@return boolean
+function Lexer:_skip_comment()
+    if self.current ~= "/" then return false end
+    local next_char = self.pos < #self.source and self.source:sub(self.pos + 1, self.pos + 1) or ""
+
+    if next_char == "/" then
+        self:_advance()  -- first '/'
+        self:_advance()  -- second '/'
+        -- Consume to end of line; leave the newline for the whitespace pass so
+        -- line/column bookkeeping stays in one place.
+        while self.current ~= "" and self.current ~= "\n" do
+            self:_advance()
+        end
+        return true
+    end
+
+    if next_char == "*" then
+        local line, col = self.line, self.col
+        self:_advance()  -- '/'
+        self:_advance()  -- '*'
+        while true do
+            if self.current == "" then
+                Error.throw(Error.Type.UNTERMINATED_COMMENT,
+                    "Unterminated block comment",
+                    line, col, self.source, 2)
+            end
+            if self.current == "*" and self.source:sub(self.pos + 1, self.pos + 1) == "/" then
+                self:_advance()  -- '*'
+                self:_advance()  -- '/'
+                return true
+            end
+            self:_advance()
+        end
+    end
+
+    return false  -- '/' or '/=' operator, not a comment
+end
+
 --- Return the next non-whitespace token, or `nil` at EOF.
 ---@private
 ---@return Token?
 function Lexer:_next_token()
-    while self.current ~= "" and self.current:match("%s") do
-        self:_advance()
+    -- Skip runs of whitespace and comments, which may alternate, until a real
+    -- token begins.
+    while true do
+        while self.current ~= "" and self.current:match("%s") do
+            self:_advance()
+        end
+        if not self:_skip_comment() then break end
     end
 
     if self.current == "" then return nil end

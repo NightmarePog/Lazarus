@@ -1,9 +1,12 @@
 --- Expression emitter: converts an `Expr` AST node to a Lua source string.
 
 --- Lazarus binary operator token → Lua operator. Most map straight through;
---- `!=` becomes Lua's `~=`, and the logical/comparison words are identical.
+--- `!=` becomes Lua's `~=`, `++` becomes Lua's `..`, and the logical/comparison
+--- words are identical. `MODULO` is absent on purpose — Lua 5.0 has no `%`, so it
+--- is synthesised in `emit_expr` instead.
 local OP_MAP = {
-    PLUS = "+", MINUS = "-", MULTIPLY = "*",
+    PLUS = "+", MINUS = "-", MULTIPLY = "*", DIVIDE = "/", POWER = "^",
+    CONCAT = "..",
     EQ = "==", NEQ = "~=",
     LESS = "<", LESS_EQUAL = "<=", GREATER = ">", GREATER_EQUAL = ">=",
     AND = "and", OR = "or",
@@ -60,14 +63,21 @@ emit_expr = function(node)
 
     if node.type == "BinaryExpr" then
         ---@cast node BinaryExpr
-        local op = OP_MAP[node.op]
-        assert(op, "emit_expr: unknown operator: " .. tostring(node.op))
-
         local l = emit_expr(node.left)
         local r = emit_expr(node.right)
 
         if node.left.type  == "BinaryExpr" then l = "(" .. l .. ")" end
         if node.right.type == "BinaryExpr" then r = "(" .. r .. ")" end
+
+        -- Lua 5.0 has no `%`; synthesise `a % b` as `(a - math.floor(a / b) * b)`.
+        -- NOTE: this duplicates both operands, so side-effecting operands would
+        -- evaluate twice. Acceptable for now; revisit by binding to temporaries.
+        if node.op == "MODULO" then
+            return "(" .. l .. " - math.floor(" .. l .. " / " .. r .. ") * " .. r .. ")"
+        end
+
+        local op = OP_MAP[node.op]
+        assert(op, "emit_expr: unknown operator: " .. tostring(node.op))
 
         return l .. " " .. op .. " " .. r
     end

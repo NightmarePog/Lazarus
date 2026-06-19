@@ -262,6 +262,7 @@ describe("Lexer", function ()
     describe("compound assignment operators", function ()
         local cases = {
             { "+=", "PLUS_ASSIGN" }, { "-=", "MINUS_ASSIGN" }, { "*=", "STAR_ASSIGN" },
+            { "/=", "SLASH_ASSIGN" },
         }
         for _, case in ipairs(cases) do
             it("tokenises '" .. case[1] .. "' as " .. case[2], function ()
@@ -275,6 +276,76 @@ describe("Lexer", function ()
             local tokens = scan("i += 1")
             assert.equal(3, #tokens)
             assert.equal("PLUS_ASSIGN", tok(tokens, 2).type)
+        end)
+    end)
+
+    describe("arithmetic / concat operators", function ()
+        local cases = {
+            { "/", "DIVIDE" }, { "%", "MODULO" }, { "^", "POWER" }, { "++", "CONCAT" },
+        }
+        for _, case in ipairs(cases) do
+            it("tokenises '" .. case[1] .. "' as " .. case[2], function ()
+                local tokens = scan(case[1])
+                assert.equal(1, #tokens)
+                assert.equal(case[2], tok(tokens, 1).type)
+            end)
+        end
+
+        it("uses maximal munch: '++' is one CONCAT, not two PLUS", function ()
+            local tokens = scan("a ++ b")
+            assert.equal(3, #tokens)
+            assert.equal("CONCAT", tok(tokens, 2).type)
+        end)
+
+        it("uses maximal munch: '/=' is one SLASH_ASSIGN, not DIVIDE then ASSIGN", function ()
+            local tokens = scan("i /= 2")
+            assert.equal(3, #tokens)
+            assert.equal("SLASH_ASSIGN", tok(tokens, 2).type)
+        end)
+
+        it("still tokenises a lone '/' as DIVIDE", function ()
+            local tokens = scan("a / b")
+            assert.equal("DIVIDE", tok(tokens, 2).type)
+        end)
+    end)
+
+    describe("comments", function ()
+        it("skips a line comment to end of line", function ()
+            local tokens = scan("a // this is ignored\nb")
+            assert.equal(2, #tokens)
+            assert.equal("IDENTIFIER", tok(tokens, 1).type)
+            assert.equal("IDENTIFIER", tok(tokens, 2).type)
+            assert.equal(2, tok(tokens, 2).line)
+        end)
+
+        it("skips a line comment at end of input (no trailing newline)", function ()
+            local tokens = scan("a // trailing")
+            assert.equal(1, #tokens)
+            assert.equal("IDENTIFIER", tok(tokens, 1).type)
+        end)
+
+        it("skips an inline block comment", function ()
+            local tokens = scan("a /* x */ b")
+            assert.equal(2, #tokens)
+            assert.equal("IDENTIFIER", tok(tokens, 2).type)
+        end)
+
+        it("skips a multi-line block comment and tracks line numbers", function ()
+            local tokens = scan("a /* one\ntwo */ b")
+            assert.equal(2, #tokens)
+            assert.equal(2, tok(tokens, 2).line)
+        end)
+
+        it("does not treat '/' or '/=' as a comment", function ()
+            assert.equal("DIVIDE", tok(scan("a / b"), 2).type)
+            assert.equal("SLASH_ASSIGN", tok(scan("i /= 2"), 2).type)
+        end)
+
+        it("throws UNTERMINATED_COMMENT for an unclosed block comment", function ()
+            local ok, err = pcall(function () scan("a /* never closed") end)
+            assert.is_false(ok)
+            local err = err --[[@as Error]]
+            assert.equal(Error.Type.UNTERMINATED_COMMENT, err.type)
         end)
     end)
 
