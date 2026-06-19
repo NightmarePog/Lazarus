@@ -13,6 +13,7 @@
 
 local Error          = require("error")
 local StatementCheck = require("frontend.schematic.statements.statement_check")
+local Naming         = require("frontend.schematic.naming")
 
 return StatementCheck.new("VariableDecl", function(ctx, frame)
     local stmt    = frame.stmt --[[@as VariableDecl]]
@@ -33,6 +34,8 @@ return StatementCheck.new("VariableDecl", function(ctx, frame)
         end
 
         ctx:check_duplicate(symbols, stmt.name, stmt)
+        Naming.check_value(stmt.name, stmt, ctx.source, "Binding")
+        Naming.check_type(stmt.type_ann, ctx.source)
 
         -- Determine the binding's static type: the annotation if present and
         -- checked against the initialiser, otherwise inferred from it.

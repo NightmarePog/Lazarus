@@ -234,6 +234,8 @@ Single-pass semantic checker. Walks the AST in source order maintaining a symbol
 | Mixing `int` and `float`, or non-numeric arithmetic operand | `TYPE_MISMATCH` |
 | `++` on non-`str`, `and`/`or`/`not` on non-`bool`, equality across types | `TYPE_MISMATCH` |
 | `if`/`while`/`for` condition that is not `bool` | `TYPE_MISMATCH` |
+| Value name (variable/function/parameter/loop var) not `snake_case` | `SEMANTIC_ERROR` |
+| Type name not `PascalCase` (built-in scalars exempt) | `SEMANTIC_ERROR` |
 
 ### Type checking
 

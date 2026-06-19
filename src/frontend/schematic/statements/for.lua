@@ -7,6 +7,7 @@
 --- so its declarations do not leak.
 
 local StatementCheck = require("frontend.schematic.statements.statement_check")
+local Naming         = require("frontend.schematic.naming")
 
 return StatementCheck.new("ForStmt", function(ctx, frame)
     local stmt  = frame.stmt --[[@as ForStmt]]
@@ -14,6 +15,8 @@ return StatementCheck.new("ForStmt", function(ctx, frame)
 
     if stmt.init then
         local init  = stmt.init --[[@as VariableDecl]]
+        Naming.check_value(init.name, init, ctx.source, "Loop variable")
+        Naming.check_type(init.type_ann, ctx.source)
         local vtype = ctx:resolve_type(init.type_ann)
         if init.value then
             ctx:check_expr(init.value, scope)
