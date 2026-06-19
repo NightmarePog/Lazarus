@@ -81,11 +81,11 @@ describe("Integration", function ()
         local body = compile(PROGRAM, { header = false, entry = false })
 
         it("folds an immutable initialiser", function ()
-            assert.is_true(has(body, "local base = 7"))
+            assert.is_true(has(body, "Main.base = 7"))
         end)
 
         it("propagates one immutable into another's initialiser", function ()
-            assert.is_true(has(body, "local scale = 20"))
+            assert.is_true(has(body, "Main.scale = 20"))
         end)
 
         it("propagates an outer immutable into a function body", function ()
@@ -97,8 +97,8 @@ describe("Integration", function ()
             assert.is_true(has(body, "return x + 7"))
         end)
 
-        it("lowers a public binding to a global (no `local`)", function ()
-            assert.is_true(has(body, "answer = 0"))
+        it("lowers a public binding to a class member (no `local`)", function ()
+            assert.is_true(has(body, "Main.answer = 0"))
             assert.is_false(has(body, "local answer"))
         end)
 
@@ -123,14 +123,11 @@ describe("Integration", function ()
             --   total = step(20)        = 20*2 + 7 = 47
             --   total = bump(47)        = 47 + 7   = 54
             --   total = 54 + scale(20)            = 74
-            _G.answer, _G.label = nil, nil
-            local chunk = assert(load_chunk(compile(PROGRAM)))
-            chunk() -- the appended main() call runs the program
-
-            assert.equal(74, _G.answer)
-            assert.equal("lazarus", _G.label)
-
-            _G.answer, _G.label = nil, nil
+            -- The chunk runs main() and returns the class table, whose public
+            -- members hold the results.
+            local Main = assert(load_chunk(compile(PROGRAM)))()
+            assert.equal(74, Main.answer)
+            assert.equal("lazarus", Main.label)
         end)
     end)
 
@@ -213,17 +210,13 @@ fn main() {
         end)
 
         it("produces the correct runtime results", function ()
-            _G.total, _G.steps, _G.firsteven, _G.flag, _G.label = nil, nil, nil, nil, nil
-            local chunk = assert(load_chunk(compile(CF_PROGRAM)))
-            chunk()
+            local Main = assert(load_chunk(compile(CF_PROGRAM)))()
 
-            assert.equal(15, _G.total)      -- 1+2+3+4+5
-            assert.equal(7,  _G.steps)      -- counted down from 7
-            assert.equal(4,  _G.firsteven)  -- loop breaks at i == 4
-            assert.equal(true, _G.flag)     -- not (15 == 0)
-            assert.equal("neg", _G.label)   -- classify(-3)
-
-            _G.total, _G.steps, _G.firsteven, _G.flag, _G.label = nil, nil, nil, nil, nil
+            assert.equal(15, Main.total)      -- 1+2+3+4+5
+            assert.equal(7,  Main.steps)      -- counted down from 7
+            assert.equal(4,  Main.firsteven)  -- loop breaks at i == 4
+            assert.equal(true, Main.flag)     -- not (15 == 0)
+            assert.equal("neg", Main.label)   -- classify(-3)
         end)
     end)
 
@@ -259,16 +252,12 @@ fn main() {
         end)
 
         it("produces the correct runtime results", function ()
-            _G.q, _G.r, _G.p, _G.greeting = nil, nil, nil, nil
-            local chunk = assert(load_chunk(compile(PROG)))
-            chunk()
+            local Main = assert(load_chunk(compile(PROG)))()
 
-            assert.equal(10, _G.q)            -- 20 /= 2
-            assert.equal(1,  _G.r)            -- 10 % 3
-            assert.equal(16, _G.p)            -- 2 ^ 4
-            assert.equal("hi, laz", _G.greeting)
-
-            _G.q, _G.r, _G.p, _G.greeting = nil, nil, nil, nil
+            assert.equal(10, Main.q)            -- 20 /= 2
+            assert.equal(1,  Main.r)            -- 10 % 3
+            assert.equal(16, Main.p)            -- 2 ^ 4
+            assert.equal("hi, laz", Main.greeting)
         end)
     end)
 end)

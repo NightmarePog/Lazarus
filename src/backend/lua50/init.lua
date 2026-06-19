@@ -1,7 +1,17 @@
 --- Code generator: walks the AST and emits Lua 5.0 source text.
+---
+--- A file is a **class**: the program lowers to a plain class table `C` whose
+--- top-level functions and bindings are static members. No metatables are used
+--- (`__index` lookups are avoided for speed) — members are accessed by direct
+--- indexing (`C.field`, `C.fn(...)`). The emitted chunk is `local C = {}`, the
+--- members, then (for a program) `C.main()` and finally `return C` so importers
+--- and the test harness can read it.
 
-local emit_stmt = require("backend.lua50.stmt")
+local stmt      = require("backend.lua50.stmt")
+local Context   = require("backend.lua50.context")
 local const     = require("const")
+
+local emit_member = stmt.emit_member
 
 --- Banner comment emitted at the top of a generated file. Static (no
 --- timestamp) so output stays reproducible across builds.
@@ -15,25 +25,27 @@ local HEADER = table.concat({
 
 ---@class CodegenOptions
 ---@field header? boolean  Emit the banner comment (default: true)
----@field entry?  boolean  Append the `main()` call when a `main` function exists (default: true)
+---@field entry?  boolean  Append the `C.main()` call and `return C` footer (default: true)
 
 ---@class Codegen
----@field ast AST
+---@field ast        AST
+---@field class_name string
 local Codegen = {}
 Codegen.__index = Codegen
 
----@param ast AST
+--- @param ast         AST
+--- @param class_name? string  The class name (defaults to "Main"); the CLI derives it from the filename.
 ---@return Codegen
-function Codegen.new(ast)
-    return setmetatable({ ast = ast }, Codegen)
+function Codegen.new(ast, class_name)
+    return setmetatable({ ast = ast, class_name = class_name or "Main" }, Codegen)
 end
 
 --- True when a top-level function named `main` is declared — the program entry
 --- point that the footer calls.
 ---@return boolean
 function Codegen:_has_entry()
-    for _, stmt in ipairs(self.ast.body) do
-        if stmt.type == "FunctionDecl" and stmt.name == "main" then
+    for _, stmt_node in ipairs(self.ast.body) do
+        if stmt_node.type == "FunctionDecl" and stmt_node.name == "main" then
             return true
         end
     end
@@ -42,31 +54,50 @@ end
 
 --- Emit the program as a Lua 5.0 source string.
 ---
---- Layout: `HEADER` banner, a blank line, the translated statements, and — when
---- a `main` function is present — a trailing `main()` call. Each section is
---- toggleable via `opts`; disabling both yields the bare statement body (used by
---- the unit tests that assert on exact fragments).
+--- Layout: `HEADER` banner, the class table and its members, and — for a
+--- program — a `C.main()` call followed by `return C`. Each non-class section is
+--- toggleable via `opts`; disabling both yields just the class table and members
+--- (used by unit tests that assert on member fragments).
 ---@param opts? CodegenOptions
 ---@return string
 function Codegen:generate(opts)
     opts = opts or {}
     local with_header = opts.header ~= false
     local with_entry  = opts.entry  ~= false
+    local class_name  = self.class_name
 
-    local body = {}
-    for _, stmt in ipairs(self.ast.body) do
-        body[#body + 1] = emit_stmt(stmt)
+    -- Collect member names so references to them can be qualified as `C.name`.
+    ---@type table<string, boolean>
+    local members = {}
+    for _, stmt_node in ipairs(self.ast.body) do
+        if stmt_node.type == "FunctionDecl" or stmt_node.type == "VariableDecl" then
+            members[stmt_node.name] = true
+        end
+    end
+    Context.reset(class_name, members)
+
+    local member_lines = {}
+    for _, stmt_node in ipairs(self.ast.body) do
+        member_lines[#member_lines + 1] = emit_member(stmt_node)
+    end
+
+    local class_block = "local " .. class_name .. " = {}"
+    if #member_lines > 0 then
+        class_block = class_block .. "\n\n" .. table.concat(member_lines, "\n")
     end
 
     local sections = {}
     if with_header then
         sections[#sections + 1] = HEADER
     end
-    if #body > 0 then
-        sections[#sections + 1] = table.concat(body, "\n")
-    end
-    if with_entry and self:_has_entry() then
-        sections[#sections + 1] = "main()"
+    sections[#sections + 1] = class_block
+    if with_entry then
+        local footer = {}
+        if self:_has_entry() then
+            footer[#footer + 1] = class_name .. ".main()"
+        end
+        footer[#footer + 1] = "return " .. class_name
+        sections[#sections + 1] = table.concat(footer, "\n")
     end
 
     return table.concat(sections, "\n\n")

@@ -60,7 +60,24 @@ x != y               ->  x ~= y
 enforced at compile time. (On a future 5.4 backend, `int` literals/ops can emit
 integer forms.)
 
-### A class → metatable
+### A class → plain table (no metatables)
+
+> **Implementation decision (2026-06-19, supersedes the metatable sketch below).**
+> Classes lower to a **plain table** with members indexed directly — **no
+> metatables, no `__index`**. Reasons are purely mechanical (generated code is
+> never hand-edited): metatable `__index` lookups are runtime overhead, and with
+> tag/`kind` dispatch and inheritance deferred to v2 beta, the `__index` chain
+> isn't needed. Instance methods use **explicit `self`**: `fn m(self,…)` →
+> `function C.m(self, …)`, and a call `obj.m(args)` → `C.m(obj, args)` (the
+> receiver's class is known statically). Construction `C(args)` → `C.new(args)`
+> where `new` builds a plain table (no `setmetatable`).
+>
+> Members stay on the table (rather than all-locals) so the generated chunk can't
+> exceed Lua's hard limits (~200 locals/scope, ~60 upvalues/function) and fail to
+> load. A **future codegen optimization** may auto-prefer locals where provably
+> under those limits, to reclaim the per-call hash-lookup cost — but the table
+> form is the safe default. See `../pipeline.md` and the memory
+> `codegen-class-table-model`.
 
 ```
 // Point.laz
@@ -74,22 +91,21 @@ lowers to roughly:
 
 ```lua
 local Point = {}
-Point.__index = Point
 
-function Point.new(x, y)              -- init
-    local self = setmetatable({}, Point)
+function Point.new(x, y)              -- init: a plain table, no setmetatable
+    local self = {}
     self.x = x
     self.y = y
     return self
 end
 
-function Point:dist()                 -- self method, Lua ':'
+function Point.dist(self)            -- explicit self, called as Point.dist(p)
     return self.x * self.x + self.y * self.y
 end
 ```
 
 - Construction `Point(3, 4)` emits `Point.new(3, 4)`.
-- Method call `p.dist()` (implicit receiver) emits `p:dist()`.
+- Method call `p.dist()` (implicit receiver) emits `Point.dist(p)`.
 - Field default `x: int = 0` with no `init` assignment emits `self.x = 0` at the
   top of `new`.
 - A **private** `init` simply means Codegen does not expose `Point.new` beyond its

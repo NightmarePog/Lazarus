@@ -1,7 +1,13 @@
 --- Statement emitter: converts a `Stmt` AST node to a Lua source string.
+---
+--- Top-level statements are class **members** (`emit_member`): functions become
+--- `function C.name(...)` and bindings become `C.name = value`. Statements inside
+--- a body (`emit_stmt`) emit as ordinary Lua; nested functions and `local`
+--- bindings declare locals in the codegen `Context` so that references to them
+--- stay bare while references to class members are qualified as `C.member`.
 
----@type fun(node: Expr): string
 local emit_expr = require("backend.lua50.expr")
+local Context   = require("backend.lua50.context")
 
 --- Indent every non-empty line of `text` by four spaces. Blank lines are left
 --- empty so the output stays lint-clean (no trailing whitespace).
@@ -31,17 +37,31 @@ local function emit_block(stmts)
     return indent(table.concat(lines, "\n"))
 end
 
+--- Emit the body of a function, with its parameters declared as locals in a
+--- fresh scope. Returns the joined, indented body (or nil when empty).
+---@param params string[]
+---@param body   Stmt[]
+---@return string?
+local function emit_fn_body(params, body)
+    Context.push_scope()
+    for _, p in ipairs(params) do Context.declare_local(p) end
+    local out = emit_block(body)
+    Context.pop_scope()
+    return out
+end
+
 ---@param node Stmt
 ---@return string
 function emit_stmt(node)
     if node.type == "VariableDecl" then
         ---@cast node VariableDecl
-        -- A reassignment, or a `public` binding (a global), is emitted without
-        -- `local`. Everything else is a fresh local declaration.
-        if node.reassign or node.visibility == "public" then
+        -- A reassignment rebinds an existing name (possibly a class member, which
+        -- is qualified). A fresh binding is a new local.
+        if node.reassign then
             local rhs = node.value and emit_expr(node.value) or "nil"
-            return node.name .. " = " .. rhs
+            return Context.emit_name(node.name) .. " = " .. rhs
         end
+        Context.declare_local(node.name)
         if node.value then
             return "local " .. node.name .. " = " .. emit_expr(node.value)
         end
@@ -55,18 +75,13 @@ function emit_stmt(node)
 
     if node.type == "FunctionDecl" then
         ---@cast node FunctionDecl
+        -- A function nested inside a body is an ordinary local function.
+        Context.declare_local(node.name)
         local params = table.concat(node.params, ", ")
         local header = "local function " .. node.name .. "(" .. params .. ")"
-
-        local body_lines = {}
-        for _, stmt in ipairs(node.body) do
-            body_lines[#body_lines + 1] = emit_stmt(stmt)
-        end
-
-        if #body_lines == 0 then
-            return header .. "\nend"
-        end
-        return header .. "\n" .. indent(table.concat(body_lines, "\n")) .. "\nend"
+        local body = emit_fn_body(node.params, node.body)
+        if not body then return header .. "\nend" end
+        return header .. "\n" .. body .. "\nend"
     end
 
     if node.type == "ReturnStmt" then
@@ -128,16 +143,17 @@ function emit_stmt(node)
         end
         if node.step then loop_body[#loop_body + 1] = node.step end
 
+        -- Emit init first so the loop variable is declared local before the
+        -- condition/step/body reference it.
+        local do_body = {}
+        if node.init then do_body[#do_body + 1] = emit_stmt(node.init) end
+
         local cond = node.condition and emit_expr(node.condition) or "true"
         local while_parts = { "while " .. cond .. " do" }
         local inner = emit_block(loop_body)
         if inner then while_parts[#while_parts + 1] = inner end
         while_parts[#while_parts + 1] = "end"
-        local while_str = table.concat(while_parts, "\n")
-
-        local do_body = {}
-        if node.init then do_body[#do_body + 1] = emit_stmt(node.init) end
-        do_body[#do_body + 1] = while_str
+        do_body[#do_body + 1] = table.concat(while_parts, "\n")
 
         return "do\n" .. indent(table.concat(do_body, "\n")) .. "\nend"
     end
@@ -145,4 +161,30 @@ function emit_stmt(node)
     error("emit_stmt: unknown node type: " .. tostring(node.type))
 end
 
-return emit_stmt
+--- Emit a top-level statement as a class **member**: a self-less function as a
+--- static method `function C.name(...)`, a binding as a static field
+--- `C.name = value`. Anything else falls back to ordinary statement emission.
+---@param node Stmt
+---@return string
+local function emit_member(node)
+    local C = Context.class
+
+    if node.type == "FunctionDecl" then
+        ---@cast node FunctionDecl
+        local params = table.concat(node.params, ", ")
+        local header = "function " .. C .. "." .. node.name .. "(" .. params .. ")"
+        local body = emit_fn_body(node.params, node.body)
+        if not body then return header .. "\nend" end
+        return header .. "\n" .. body .. "\nend"
+    end
+
+    if node.type == "VariableDecl" then
+        ---@cast node VariableDecl
+        local rhs = node.value and emit_expr(node.value) or "nil"
+        return C .. "." .. node.name .. " = " .. rhs
+    end
+
+    return emit_stmt(node)
+end
+
+return { emit_stmt = emit_stmt, emit_member = emit_member }

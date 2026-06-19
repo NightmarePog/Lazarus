@@ -24,37 +24,50 @@ local function compile_program(source)
     return Codegen.new(build(source)):generate()
 end
 
+-- The constant class scaffold that precedes every member in `compile` output
+-- (a file lowers to a plain class table named `Main` by default).
+local SCAFFOLD = "local Main = {}"
+
+--- Just the emitted member lines, with the constant scaffold stripped, for
+--- focused assertions on what a top-level statement lowers to.
+local function members(source)
+    local out = compile(source)
+    if out == SCAFFOLD then return "" end
+    return out:sub(#SCAFFOLD + 3) -- skip the scaffold and its trailing "\n\n"
+end
+
 describe("Codegen", function ()
     describe("emission", function ()
-        it("emits a variable declaration as a local", function ()
-            assert.equal("local x = 5", compile("private x = 5"))
+        it("emits a top-level binding as a class member", function ()
+            assert.equal("Main.x = 5", members("private x = 5"))
         end)
 
-        it("emits a valueless mutable declaration as a bare local", function ()
-            assert.equal("local x", compile("private mut x"))
+        it("emits a valueless mutable binding as a nil member", function ()
+            assert.equal("Main.x = nil", members("private mut x"))
         end)
 
-        it("folds and emits an immutable declaration as a local", function ()
-            assert.equal("local foo = 5", compile("private foo = 3 + 2"))
+        it("folds and emits an immutable member initialiser", function ()
+            assert.equal("Main.foo = 5", members("private foo = 3 + 2"))
         end)
 
-        it("emits a public binding as a global (no local)", function ()
-            assert.equal("x = 5", compile("public x = 5"))
+        it("emits a public binding as a member too (export is a Phase 6 concern)", function ()
+            assert.equal("Main.x = 5", members("public x = 5"))
         end)
 
-        it("emits a reassignment without 'local'", function ()
-            assert.equal("local function f()\n    local n = 0\n    n = 1\n    return n\nend",
-                compile("fn f() { mut n = 0\nn = 1\nreturn n }"))
+        it("emits a method with locals and a reassignment", function ()
+            assert.equal("function Main.f()\n    local n = 0\n    n = 1\n    return n\nend",
+                members("fn f() { mut n = 0\nn = 1\nreturn n }"))
         end)
 
-        it("parenthesises nested binary operands", function ()
-            -- `a` is mutable, so it is not propagated/folded and must round-trip.
-            assert.equal("local a = 1\nlocal b = (a + 1) * 2",
-                compile("private mut a = 1\nprivate b = (a + 1) * 2"))
+        it("qualifies member references and parenthesises nested binary operands", function ()
+            -- `a` is a mutable member, so it is not propagated/folded; references
+            -- to it inside `b` are qualified as `Main.a`.
+            assert.equal("Main.a = 1\nMain.b = (Main.a + 1) * 2",
+                members("private mut a = 1\nprivate b = (a + 1) * 2"))
         end)
 
         it("emits string literals via %q", function ()
-            assert.equal('local s = "hi"', compile('private s = "hi"'))
+            assert.equal('Main.s = "hi"', members('private s = "hi"'))
         end)
     end)
 
@@ -121,39 +134,40 @@ describe("Codegen", function ()
             assert.matches("Target runtime: Lua 5%.0", out)
         end)
 
-        it("places the body after the header", function ()
+        it("places the class body after the header", function ()
             local out = compile_program("private x = 5")
-            assert.matches("\n\nlocal x = 5", out)
+            assert.matches("\n\nlocal Main = {}", out)
         end)
 
         it("omits the header when disabled", function ()
-            assert.equal("local x = 5",
+            assert.equal(SCAFFOLD .. "\n\nMain.x = 5",
                 Codegen.new(build("private x = 5")):generate({ header = false, entry = false }))
         end)
     end)
 
     describe("arithmetic / concat operators", function ()
-        -- mutable operands so they round-trip instead of being constant-folded.
-        local function emit_c(expr)
-            return compile("private mut a = 1\nprivate mut b = 2\nprivate c = " .. expr)
+        -- function-local operands so they emit bare, isolating the operator
+        -- (members would be qualified as Main.a / Main.b).
+        local function emit_op(decls, expr)
+            return compile("fn f() {\n" .. decls .. "\nmut c = " .. expr .. "\n}")
         end
+        local nums = "mut a = 1\nmut b = 2"
+        local strs = 'mut a = "x"\nmut b = "y"'
 
         it("emits '/' straight through", function ()
-            assert.matches("c = a / b", emit_c("a / b"))
+            assert.matches("c = a / b", emit_op(nums, "a / b"))
         end)
 
         it("emits '^' straight through", function ()
-            assert.matches("c = a %^ b", emit_c("a ^ b"))
+            assert.matches("c = a %^ b", emit_op(nums, "a ^ b"))
         end)
 
         it("emits '++' as Lua '..'", function ()
-            -- ++ is string concatenation, so use string operands.
-            local out = compile('private mut a = "x"\nprivate mut b = "y"\nprivate c = a ++ b')
-            assert.matches("c = a %.%. b", out)
+            assert.matches("c = a %.%. b", emit_op(strs, "a ++ b"))
         end)
 
         it("synthesises '%' for Lua 5.0 which has no '%' operator", function ()
-            assert.matches("%(a %- math%.floor%(a / b%) %* b%)", emit_c("a % b"))
+            assert.matches("%(a %- math%.floor%(a / b%) %* b%)", emit_op(nums, "a % b"))
         end)
     end)
 
@@ -169,14 +183,14 @@ describe("Codegen", function ()
         end)
 
         it("emits a float literal as a plain Lua number", function ()
-            assert.equal("local pi = 3.14", compile("private pi: float = 3.14"))
+            assert.equal("Main.pi = 3.14", members("private pi: float = 3.14"))
         end)
     end)
 
     describe("footer (entry call)", function ()
-        it("appends main() when a main function is present", function ()
+        it("appends C.main() then returns the class when a main is present", function ()
             local out = compile_program("fn main() { return 0 }")
-            assert.matches("\n\nmain%(%)$", out)
+            assert.matches("Main%.main%(%)\nreturn Main$", out)
         end)
 
         it("does not append main() when there is no main", function ()

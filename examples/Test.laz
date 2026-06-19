@@ -1,0 +1,11 @@
+fn test_func(a) {
+    return a+1
+}
+
+fn main() {
+    mut a = 0
+    b = 2
+    for i = 0; i<10;i = i+1 {
+        a = a(a)
+    }
+}

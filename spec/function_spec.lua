@@ -28,6 +28,16 @@ local function compile(source)
     return Codegen.new(ast):generate({ header = false, entry = false })
 end
 
+-- The constant class scaffold prefixing every member in `compile` output.
+local SCAFFOLD = "local Main = {}"
+
+--- Just the emitted member lines, with the constant scaffold stripped.
+local function members(source)
+    local out = compile(source)
+    if out == SCAFFOLD then return "" end
+    return out:sub(#SCAFFOLD + 3)
+end
+
 describe("Functions", function ()
     describe("parser", function ()
         it("parses a no-parameter function with a return", function ()
@@ -138,27 +148,27 @@ describe("Functions", function ()
     end)
 
     describe("codegen", function ()
-        it("emits a no-parameter function with a return", function ()
-            assert.equal("local function f()\n    return 0\nend", compile("fn f() { return 0 }"))
+        it("emits a no-parameter function as a static method", function ()
+            assert.equal("function Main.f()\n    return 0\nend", members("fn f() { return 0 }"))
         end)
 
         it("emits a parameter list", function ()
-            assert.equal("local function add(a, b)\n    return a + b\nend",
-                compile("fn add(a, b) { return a + b }"))
+            assert.equal("function Main.add(a, b)\n    return a + b\nend",
+                members("fn add(a, b) { return a + b }"))
         end)
 
         it("emits an empty body", function ()
-            assert.equal("local function noop()\nend", compile("fn noop() {}"))
+            assert.equal("function Main.noop()\nend", members("fn noop() {}"))
         end)
 
         it("emits a bare return", function ()
-            assert.equal("local function f()\n    return\nend", compile("fn f() { return }"))
+            assert.equal("function Main.f()\n    return\nend", members("fn f() { return }"))
         end)
 
-        it("indents a nested function", function ()
+        it("indents a nested function as a local function", function ()
             assert.equal(
-                "local function outer()\n    local function inner()\n        return 1\n    end\nend",
-                compile("fn outer() { fn inner() { return 1 } }"))
+                "function Main.outer()\n    local function inner()\n        return 1\n    end\nend",
+                members("fn outer() { fn inner() { return 1 } }"))
         end)
     end)
 
@@ -264,14 +274,14 @@ describe("Function calls", function ()
     end)
 
     describe("codegen", function ()
-        it("emits a no-argument call", function ()
-            assert.equal("local function f()\n    return 0\nend\nf()",
-                compile("fn f() { return 0 }\nf()"))
+        it("emits a no-argument call, qualifying the member callee", function ()
+            assert.equal("function Main.f()\n    return 0\nend\nMain.f()",
+                members("fn f() { return 0 }\nf()"))
         end)
 
         it("emits a call with arguments", function ()
-            assert.equal("local function add(a, b)\n    return a + b\nend\nadd(1, 2)",
-                compile("fn add(a, b) { return a + b }\nadd(1, 2)"))
+            assert.equal("function Main.add(a, b)\n    return a + b\nend\nMain.add(1, 2)",
+                members("fn add(a, b) { return a + b }\nadd(1, 2)"))
         end)
     end)
 

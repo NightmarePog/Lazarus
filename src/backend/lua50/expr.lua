@@ -1,5 +1,7 @@
 --- Expression emitter: converts an `Expr` AST node to a Lua source string.
 
+local Context = require("backend.lua50.context")
+
 --- Lazarus binary operator token → Lua operator. Most map straight through;
 --- `!=` becomes Lua's `~=`, `++` becomes Lua's `..`, and the logical/comparison
 --- words are identical. `MODULO` is absent on purpose — Lua 5.0 has no `%`, so it
@@ -29,7 +31,7 @@ emit_expr = function(node)
 
     if node.type == "IdentifierExpr" then
         ---@cast node IdentifierExpr
-        return node.name
+        return Context.emit_name(node.name)
     end
 
     if node.type == "CallExpr" then

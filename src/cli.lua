@@ -98,6 +98,15 @@ local function default_output(path)
     return stem .. ".lua"
 end
 
+--- Derive the class name from a source path: the basename without its extension
+--- (a file *is* a class, named after the file). e.g. `src/Main.laz` -> `Main`.
+---@param path string
+---@return string
+local function class_name_from_path(path)
+    local base = path:match("([^/\\]+)$") or path
+    return (base:gsub("%.[^.]*$", ""))
+end
+
 --- Run the front end (lexer → parser → schematic) and the optimizer, returning
 --- the AST ready for codegen. Any compile error is an `Error` object thrown by
 --- a stage; `run_stage` is responsible for catching it.
@@ -174,7 +183,8 @@ function commands.build(args)
     end
 
     local source = read_file(input)
-    local lua = run_stage(function() return Codegen.new(front_end(source)):generate() end)
+    local class_name = class_name_from_path(input)
+    local lua = run_stage(function() return Codegen.new(front_end(source), class_name):generate() end)
 
     if output == "-" then
         print(lua)

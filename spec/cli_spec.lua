@@ -29,13 +29,15 @@ local function run(args)
     return out, code
 end
 
---- Write `src` to a fresh temp file with a `.laz` extension and return its path.
+--- Write `src` to a temp file named `Prog.laz` (a fixed PascalCase basename, so
+--- the generated class name is the predictable `Prog`) and return its path.
 ---@param src string
 ---@return string path
 local function tmp_laz(src)
     local stem = os.tmpname()
     os.remove(stem) -- os.tmpname may create an empty file; we want our own name
-    local path = stem .. ".laz"
+    local dir = stem:match("^(.*)[/\\][^/\\]*$") or "."
+    local path = dir .. "/Prog.laz"
     local fh = assert(io.open(path, "w"))
     fh:write(src)
     fh:close()
@@ -78,9 +80,9 @@ describe("CLI", function()
             os.remove(laz)
 
             assert.equal(0, code)
-            assert.is_true(has(out, "local function square(n)"))
-            assert.is_true(has(out, "answer = square(49)") or has(out, "answer = square(7)"))
-            assert.is_true(has(out, "main()"))
+            assert.is_true(has(out, "function Prog.square(n)"))
+            assert.is_true(has(out, "Prog.answer = Prog.square(7)"))
+            assert.is_true(has(out, "Prog.main()"))
         end)
 
         it("generates Lua that loads and runs to the right result", function()
@@ -89,11 +91,9 @@ describe("CLI", function()
             os.remove(laz)
 
             assert.equal(0, code)
-            _G.answer = nil
-            local chunk = assert(load_chunk(out), "generated Lua failed to load")
-            chunk() -- runs the appended main()
-            assert.equal(49, _G.answer)
-            _G.answer = nil
+            -- The chunk runs main() and returns the class; read its public member.
+            local Prog = assert(load_chunk(out), "generated Lua failed to load")()
+            assert.equal(49, Prog.answer)
         end)
 
         it("writes <file>.lua next to the source by default", function()
@@ -106,7 +106,7 @@ describe("CLI", function()
 
             local written = read(expected)
             assert.is_truthy(written, "expected output file was not created")
-            assert.is_true(has(written, "local function square(n)"))
+            assert.is_true(has(written, "function Prog.square(n)"))
 
             os.remove(laz)
             os.remove(expected)

@@ -345,16 +345,25 @@ recursion); the rules stay small.
 **Output:** `string` (Lua 5.0 source)  
 **Files:** `src/backend/lua50/`
 
-Walks the optimised AST and emits Lua source line by line. No transformations — purely a serialisation step.
+Walks the optimised AST and emits Lua source. A file lowers to a **class**: a
+plain table `C` (named after the file; the CLI uses the filename stem, default
+`Main`) whose **top-level** functions and bindings are members. **No metatables**
+are emitted — `__index` lookups are avoided; members are accessed by direct
+indexing. Inside a body, a reference to a member is qualified as `C.member`, while
+locals and parameters stay bare (tracked by `backend/lua50/context.lua`). The
+chunk is `local C = {}`, the members, then — for a program — `C.main()` and
+finally `return C` (so importers and tests can read the class). See the memory
+`codegen-class-table-model` for the rationale and the planned locals optimization.
 
 ### Emission rules
 
 | AST node | Lua output |
 |---|---|
-| `VariableDecl` (private/local declaration) | `local name = <expr>` (or `local name` when valueless) |
-| `VariableDecl { visibility="public" }` | `name = <expr>` (a Lua global) |
-| `VariableDecl { reassign=true }` | `name = <expr>` (no `local` — rebinds an existing name) |
-| `FunctionDecl { name, params, body }` | `local function name(params)` + indented body + `end` |
+| Top-level `VariableDecl` (a static member) | `C.name = <expr>` (or `C.name = nil` when valueless) |
+| Top-level `FunctionDecl` (a static method) | `function C.name(params)` + indented body + `end` |
+| Nested `VariableDecl` (a `local` declaration) | `local name = <expr>` (or `local name` when valueless) |
+| `VariableDecl { reassign=true }` | `<target> = <expr>` (no `local`; `<target>` is `C.name` for a member, else bare) |
+| Nested `FunctionDecl` | `local function name(params)` + indented body + `end` |
 | `ReturnStmt { value }` | `return <expr>`, or `return` when `value=nil` |
 | `ExpressionStmt { expression }` | `<expr>` |
 | `IfStmt { clauses, else_body }` | `if c then … elseif c then … else … end` |
@@ -365,18 +374,19 @@ Walks the optimised AST and emits Lua source line by line. No transformations �
 | `LiteralExpr { kind="number", value }` | `42` |
 | `LiteralExpr { kind="string", value }` | `"hello"` (via `string.format("%q", …)`) |
 | `LiteralExpr { kind="boolean", value }` | `true` / `false` |
-| `IdentifierExpr { name }` | `name` |
+| `IdentifierExpr { name }` | `name`, or `C.name` when it refers to a class member |
 | `BinaryExpr { op, left, right }` | `left op right` (`!=`→`~=`; inner `BinaryExpr` operands parenthesised) |
 | `UnaryExpr { op, operand }` | `not <operand>` (a `BinaryExpr` operand is parenthesised) |
-| `CallExpr { callee, args }` | `callee(arg, arg)` |
+| `CallExpr { callee, args }` | `callee(arg, arg)` (a member callee is qualified, e.g. `C.f(...)`) |
 
 ### Internal structure
 
 | File | Role |
 |---|---|
-| `init.lua` | `Codegen` class — `Codegen.new(ast):generate()` |
-| `stmt.lua` | `emit_stmt(node)` — statement → Lua string |
+| `init.lua` | `Codegen` class — `Codegen.new(ast, class_name):generate()`; class table + members + `C.main()` + `return C` |
+| `stmt.lua` | `emit_stmt(node)` (nested) and `emit_member(node)` (top-level members) |
 | `expr.lua` | `emit_expr(node)` — expression → Lua string |
+| `context.lua` | per-generation class name, member set, and locals scope stack; `emit_name` qualifies members |
 
 `src/backend/init.lua` delegates to `backend.lua50` and is the public entry point (`require "backend"`).
 
