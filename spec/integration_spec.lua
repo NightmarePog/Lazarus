@@ -137,8 +137,94 @@ describe("Integration", function ()
 
     describe("recursion (self-reference)", function ()
         it("compiles a function that refers to itself", function ()
-            local out = compile("fn loop() { return loop }\nfn main() { return loop }")
+            local out = compile("fn recur() { return recur }\nfn main() { return recur }")
             assert.is_truthy(load_chunk(out), "self-referential function failed to load")
+        end)
+    end)
+
+    describe("control flow", function ()
+        -- Exercises every control-flow form at once: if/else if/else, a C-style
+        -- for with compound assignment, while, an explicit loop with break, plus
+        -- comparison operators, booleans and `not`.
+        local CF_PROGRAM = [[
+public mut total   = 0
+public mut steps   = 0
+public mut firsteven = 0
+public mut flag    = false
+public mut label   = "none"
+
+fn classify(n) {
+    if n < 0 {
+        return "neg"
+    } else if n == 0 {
+        return "zero"
+    } else {
+        return "pos"
+    }
+}
+
+fn sum_to(n) {
+    mut acc = 0
+    for i = 1; i <= n; i += 1 {
+        acc += i
+    }
+    return acc
+}
+
+fn count_down(n) {
+    mut cnt = 0
+    mut k   = n
+    while k > 0 {
+        k   -= 1
+        cnt += 1
+    }
+    return cnt
+}
+
+fn first_four() {
+    mut i = 1
+    loop {
+        if i == 4 {
+            break
+        }
+        i += 1
+    }
+    return i
+}
+
+fn main() {
+    total     = sum_to(5)
+    steps     = count_down(7)
+    firsteven = first_four()
+    flag      = not (total == 0)
+    label     = classify(0 - 3)
+    return total
+}
+]]
+
+        it("generates Lua that loads", function ()
+            local chunk, err = load_chunk(compile(CF_PROGRAM))
+            assert.is_truthy(chunk, "failed to load: " .. tostring(err))
+        end)
+
+        it("lowers the C-style for to a do/while block", function ()
+            local body = compile(CF_PROGRAM, { header = false, entry = false })
+            assert.is_true(has(body, "while i <= n do"))
+            assert.is_true(has(body, "i = i + 1"))
+        end)
+
+        it("produces the correct runtime results", function ()
+            _G.total, _G.steps, _G.firsteven, _G.flag, _G.label = nil, nil, nil, nil, nil
+            local chunk = assert(load_chunk(compile(CF_PROGRAM)))
+            chunk()
+
+            assert.equal(15, _G.total)      -- 1+2+3+4+5
+            assert.equal(7,  _G.steps)      -- counted down from 7
+            assert.equal(4,  _G.firsteven)  -- loop breaks at i == 4
+            assert.equal(true, _G.flag)     -- not (15 == 0)
+            assert.equal("neg", _G.label)   -- classify(-3)
+
+            _G.total, _G.steps, _G.firsteven, _G.flag, _G.label = nil, nil, nil, nil, nil
         end)
     end)
 end)

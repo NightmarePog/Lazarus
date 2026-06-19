@@ -12,6 +12,7 @@ local HANDLERS = {
     (require("frontend.schematic.expressions.identifier")),
     (require("frontend.schematic.expressions.binary")),
     (require("frontend.schematic.expressions.call")),
+    (require("frontend.schematic.expressions.unary")),
 }
 
 ---@type table<string, ExpressionCheck>

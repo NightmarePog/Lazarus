@@ -20,8 +20,31 @@ local Keywords = {}
 --- | "BODY_START"
 --- | "BODY_END"
 --- | "COMMA"
+--- | "IF"
+--- | "ELSE"
+--- | "WHILE"
+--- | "LOOP"
+--- | "FOR"
+--- | "BREAK"
+--- | "TRUE"
+--- | "FALSE"
+--- | "AND"
+--- | "OR"
+--- | "NOT"
+--- | "EQ"
+--- | "NEQ"
+--- | "LESS"
+--- | "LESS_EQUAL"
+--- | "GREATER"
+--- | "GREATER_EQUAL"
+--- | "PLUS_ASSIGN"
+--- | "MINUS_ASSIGN"
+--- | "STAR_ASSIGN"
+--- | "SEMICOLON"
 
 --- Maps source-text strings to their `TokenType`.
+--- Multi-character operators (`==`, `+=`, …) are matched by maximal munch in the
+--- lexer, which tries the two-character key before the single-character one.
 ---@type table<string, TokenType>
 local TOKENS_DATA = {
     ["private"] = "PRIVATE",
@@ -29,15 +52,36 @@ local TOKENS_DATA = {
     ["mut"] = "MUTABLE",
     ["fn"] = "FUNCTION",
     ["return"] = "RETURN",
+    ["if"] = "IF",
+    ["else"] = "ELSE",
+    ["while"] = "WHILE",
+    ["loop"] = "LOOP",
+    ["for"] = "FOR",
+    ["break"] = "BREAK",
+    ["true"] = "TRUE",
+    ["false"] = "FALSE",
+    ["and"] = "AND",
+    ["or"] = "OR",
+    ["not"] = "NOT",
     ["="] = "ASSIGN",
     ["+"] = "PLUS",
     ["-"] = "MINUS",
     ["*"] = "MULTIPLY",
+    ["=="] = "EQ",
+    ["!="] = "NEQ",
+    ["<"] = "LESS",
+    ["<="] = "LESS_EQUAL",
+    [">"] = "GREATER",
+    [">="] = "GREATER_EQUAL",
+    ["+="] = "PLUS_ASSIGN",
+    ["-="] = "MINUS_ASSIGN",
+    ["*="] = "STAR_ASSIGN",
     ["("] = "LEFT_BRACKET",
     [")"] = "RIGHT_BRACKET",
     ["{"] = "BODY_START",
     ["}"] = "BODY_END",
-    [","] = "COMMA"
+    [","] = "COMMA",
+    [";"] = "SEMICOLON"
 }
 
 --- Truly read-only view of `TOKENS_DATA`. Because lookups go through an empty
@@ -66,7 +110,11 @@ local VALID_TYPES = {
     MINUS = true,
     MULTIPLY = true,
     LEFT_BRACKET = true,
-    RIGHT_BRACKET = true
+    RIGHT_BRACKET = true,
+    -- Tokens that can begin an expression: boolean literals and the `not` prefix.
+    TRUE = true,
+    FALSE = true,
+    NOT = true
 }
 
 --- Return `true` when `token_type` cannot legally appear in expression

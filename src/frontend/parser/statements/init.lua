@@ -17,6 +17,11 @@ local HANDLERS = {
     (require("frontend.parser.statements.mut")),
     (require("frontend.parser.statements.function")),
     (require("frontend.parser.statements.return")),
+    (require("frontend.parser.statements.if")),
+    (require("frontend.parser.statements.while")),
+    (require("frontend.parser.statements.loop")),
+    (require("frontend.parser.statements.for")),
+    (require("frontend.parser.statements.break")),
 }
 
 ---@type table<string, StatementParser?>
@@ -53,14 +58,15 @@ return {
             return handler.parse(self)
         end
 
-        -- Bare binding / reassignment: `<identifier> = <expr>`. The keyword is
-        -- absent (no visibility, immutable), so it is recognised by lookahead
-        -- rather than by the registry. Schematic resolves declaration vs
-        -- reassignment by scope.
+        -- Bare binding / reassignment: `<identifier> = <expr>` or a compound
+        -- assignment `<identifier> += <expr>`. The keyword is absent (no
+        -- visibility, immutable), so it is recognised by lookahead rather than
+        -- by the registry. Schematic resolves declaration vs reassignment by
+        -- scope.
         if tok.type == "IDENTIFIER" then
             local nxt = self.token_table[self.pos + 1]
-            if nxt and nxt.type == "ASSIGN" then
-                return binding.read_binding(self, nil, false, "Expected variable name")
+            if nxt and (nxt.type == "ASSIGN" or binding.COMPOUND[nxt.type]) then
+                return binding.read_assignment(self, "Expected variable name")
             end
         end
 
@@ -71,5 +77,28 @@ return {
         end
 
         return ExprStmt.new(self:_expression(), tok.line, tok.column)
+    end,
+
+    --- Parse a braced block `{ <statement>* }`, returning the statement list.
+    --- `context` names the construct for error messages (e.g. "if body").
+    ---@param self    Parser
+    ---@param context string
+    ---@return Stmt[]
+    _block = function(self, context)
+        local open = self:_consume("BODY_START", "Expected '{' to open " .. context)
+
+        ---@type Stmt[]
+        local body = {}
+        while not self:_check("BODY_END") do
+            if self:_is_eof() then
+                Error.throw(Error.Type.SYNTAX_ERROR,
+                    "Expected '}' to close " .. context,
+                    open.line, open.column, self.source, #open.value)
+            end
+            body[#body + 1] = self:_statement()
+        end
+
+        self:_consume("BODY_END", "Expected '}' to close " .. context)
+        return body
     end,
 }

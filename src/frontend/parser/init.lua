@@ -12,8 +12,10 @@ local AST   = require("frontend.parser.ast")
 ---@field token_table     Token[]      Flat list of tokens from the lexer
 ---@field source          string | nil Original source text, forwarded to errors for snippets
 ---@field _statement      fun(self: Parser): Stmt
+---@field _block          fun(self: Parser, context: string): Stmt[]
 ---@field _expression     fun(self: Parser): Expr
 ---@field _binary         fun(self: Parser, min_prec: integer): Expr
+---@field _unary          fun(self: Parser): Expr
 ---@field _call           fun(self: Parser): Expr
 ---@field _primary        fun(self: Parser): Expr
 local Parser = {}

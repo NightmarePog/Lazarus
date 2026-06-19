@@ -9,6 +9,10 @@ local HANDLERS = {
     (require("frontend.optimizer.statements.function")),
     (require("frontend.optimizer.statements.return")),
     (require("frontend.optimizer.statements.expression")),
+    (require("frontend.optimizer.statements.if")),
+    (require("frontend.optimizer.statements.while")),
+    (require("frontend.optimizer.statements.loop")),
+    (require("frontend.optimizer.statements.for")),
 }
 
 ---@type table<string, FoldStatement>

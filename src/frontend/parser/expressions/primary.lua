@@ -38,6 +38,11 @@ return {
             return LiteralExpr.new("string", tok.literal, tok.line, tok.column)
         end
 
+        if tok.type == "TRUE" or tok.type == "FALSE" then
+            self:_advance()
+            return LiteralExpr.new("boolean", tok.type == "TRUE", tok.line, tok.column)
+        end
+
         if tok.type == "IDENTIFIER" then
             self:_advance()
             return IdentifierExpr.new(tok.value, tok.line, tok.column)

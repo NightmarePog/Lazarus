@@ -45,6 +45,50 @@ describe("Optimizer", function ()
         end)
     end)
 
+    describe("control flow", function ()
+        it("propagates a constant into an if condition", function ()
+            local ast = optimize("private k = 5\nif k { x = 1 }")
+            local cond = ast.body[2].clauses[1].condition
+            assert.equal("LiteralExpr", cond.type)
+            assert.equal(5, cond.value)
+        end)
+
+        it("folds an arithmetic while condition", function ()
+            local ast = optimize("private a = 1\nwhile 2 + 3 { x = a }")
+            local cond = ast.body[2].condition
+            assert.equal("LiteralExpr", cond.type)
+            assert.equal(5, cond.value)
+        end)
+
+        it("folds inside a loop body", function ()
+            local ast = optimize("private k = 4\nloop { y = k + 1\nbreak }")
+            local y = ast.body[2].body[1].value
+            assert.equal("LiteralExpr", y.type)
+            assert.equal(5, y.value)
+        end)
+
+        it("does not treat the for loop variable as a constant", function ()
+            local ast = optimize("private n = 10\nfor i = 0; i < n; i += 1 { z = 2 * 4 }")
+            local for_stmt = ast.body[2]
+            -- `i` is mutable across iterations, so it must stay an identifier;
+            -- `n` is an immutable literal and folds in.
+            assert.equal("BinaryExpr", for_stmt.condition.type)
+            assert.equal("IdentifierExpr", for_stmt.condition.left.type)
+            assert.equal("LiteralExpr", for_stmt.condition.right.type)
+            assert.equal(10, for_stmt.condition.right.value)
+            -- the body still folds its own constant expressions
+            assert.equal(8, for_stmt.body[1].value.value)
+        end)
+
+        it("propagates a constant into a unary operand", function ()
+            local ast = optimize("private p = true\nprivate q = not p")
+            local q = ast.body[2].value
+            assert.equal("UnaryExpr", q.type)
+            assert.equal("LiteralExpr", q.operand.type)
+            assert.equal(true, q.operand.value)
+        end)
+    end)
+
     describe("soundness", function ()
         it("does NOT fold `s * 0` when `s` is not a numeric literal", function ()
             -- `"hi" * 0` is a runtime error in Lua; folding it to 0 would

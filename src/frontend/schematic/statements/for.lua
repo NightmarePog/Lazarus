@@ -1,0 +1,28 @@
+--- Semantic check for the C-style `for` loop.
+---
+--- The loop variable bound by `init` is a fresh, implicitly-**mutable** binding
+--- scoped to the loop, so the `step` (e.g. `i += 1`) may reassign it. Being a
+--- loop-local, it is exempt from the top-level visibility rule. The condition,
+--- step and body all see that variable; the body runs in a further child scope
+--- so its declarations do not leak.
+
+local StatementCheck = require("frontend.schematic.statements.statement_check")
+
+return StatementCheck.new("ForStmt", function(ctx, frame)
+    local stmt  = frame.stmt --[[@as ForStmt]]
+    local scope = ctx:child_scope(frame.symbols)
+
+    if stmt.init then
+        local init = stmt.init --[[@as VariableDecl]]
+        if init.value then ctx:check_expr(init.value, scope) end
+        ctx:bind(scope, init.name, "variable", true)
+        init.reassign = false
+    end
+
+    if stmt.condition then ctx:check_expr(stmt.condition, scope) end
+    if stmt.step then
+        ctx:analyze_block({ stmt.step }, scope, frame.in_function, true)
+    end
+
+    ctx:analyze_block(stmt.body, ctx:child_scope(scope), frame.in_function, true)
+end)

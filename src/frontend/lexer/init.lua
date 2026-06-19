@@ -119,13 +119,24 @@ function Lexer:_read_string()
     return Token.new("STRING", raw, line, col, literal)
 end
 
---- Scan a single-character symbol (operator or punctuation).
+--- Scan an operator or punctuation symbol, using **maximal munch**: a
+--- two-character operator (`==`, `<=`, `+=`, …) is preferred over the
+--- single-character one when the source matches it.
 --- Throws `UNEXPECTED_CHAR` for characters not in the keyword table.
 ---@private
 ---@return Token
 function Lexer:_read_symbol()
     local line, col = self.line, self.col
     local char      = self.current
+    local next_char = self.pos < #self.source and self.source:sub(self.pos + 1, self.pos + 1) or ""
+
+    -- Prefer a two-character operator when one matches (e.g. `==`, `+=`).
+    local pair = char .. next_char
+    if next_char ~= "" and Keywords.TOKENS[pair] then
+        self:_advance()
+        self:_advance()
+        return Token.new(Keywords.TOKENS[pair] --[[@as TokenType]], pair, line, col)
+    end
 
     self:_advance()
 

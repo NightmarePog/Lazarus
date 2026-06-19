@@ -9,6 +9,11 @@ local HANDLERS = {
     (require("frontend.schematic.statements.function")),
     (require("frontend.schematic.statements.return")),
     (require("frontend.schematic.statements.expression")),
+    (require("frontend.schematic.statements.if")),
+    (require("frontend.schematic.statements.while")),
+    (require("frontend.schematic.statements.loop")),
+    (require("frontend.schematic.statements.for")),
+    (require("frontend.schematic.statements.break")),
 }
 
 ---@type table<string, StatementCheck>

@@ -68,7 +68,8 @@ end
 ---@param stmts       Stmt[]
 ---@param symbols     table<string, {kind: string}>
 ---@param in_function boolean
-function SemContext:analyze_block(stmts, symbols, in_function)
+---@param in_loop?    boolean   True inside a loop body (governs `break` legality)
+function SemContext:analyze_block(stmts, symbols, in_function, in_loop)
     for idx, stmt in ipairs(stmts) do
         local rule = statement_registry[stmt.type]
         if rule then
@@ -78,6 +79,7 @@ function SemContext:analyze_block(stmts, symbols, in_function)
                 stmts       = stmts,
                 symbols     = symbols,
                 in_function = in_function,
+                in_loop     = in_loop or false,
             })
         end
     end
@@ -86,7 +88,7 @@ end
 ---@param ast    AST
 ---@param source string
 local function analyze(ast, source)
-    SemContext.new(source):analyze_block(ast.body, {}, false)
+    SemContext.new(source):analyze_block(ast.body, {}, false, false)
 end
 
 return { analyze = analyze }

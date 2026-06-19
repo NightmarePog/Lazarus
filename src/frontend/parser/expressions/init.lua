@@ -2,6 +2,7 @@
 ---
 --- Precedence (low → high):
 ---   binary operators  (precedence-climbing; operator set in `operators.lua`)
+---   unary             (prefix `not`)
 ---   call              (postfix `f(...)`)
 ---   primary           (literals, identifiers, grouped expressions)
 ---
@@ -15,6 +16,7 @@
 ---@type table<string, function>[]
 local MODULES = {
     (require("frontend.parser.expressions.binary")),
+    (require("frontend.parser.expressions.unary")),
     (require("frontend.parser.expressions.call")),
     (require("frontend.parser.expressions.primary")),
 }

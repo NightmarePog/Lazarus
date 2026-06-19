@@ -22,5 +22,5 @@ return StatementCheck.new("FunctionDecl", function(ctx, frame)
         scope[param] = { kind = "variable" }
     end
 
-    ctx:analyze_block(stmt.body, scope, true)
+    ctx:analyze_block(stmt.body, scope, true, false)
 end)

@@ -8,7 +8,6 @@
 
 local StatementParser = require("frontend.parser.statements.statement_parser")
 local FunctionDecl    = require("frontend.parser.nodes.function")
-local Error           = require("error")
 
 return StatementParser.new("FUNCTION", function(parser)
     local name_token = parser:_consume("IDENTIFIER", "Expected function name after 'fn'")
@@ -25,20 +24,8 @@ return StatementParser.new("FUNCTION", function(parser)
     end
 
     parser:_consume("RIGHT_BRACKET", "Expected ')' after parameters")
-    parser:_consume("BODY_START", "Expected '{' to open function body")
 
-    ---@type Stmt[]
-    local body = {}
-    while not parser:_check("BODY_END") do
-        if parser:_is_eof() then
-            Error.throw(Error.Type.SYNTAX_ERROR,
-                "Expected '}' to close function body",
-                name_token.line, name_token.column, parser.source, #name_token.value)
-        end
-        body[#body + 1] = parser:_statement()
-    end
-
-    parser:_consume("BODY_END", "Expected '}' to close function body")
+    local body = parser:_block("function body")
 
     return FunctionDecl.new(name_token.value, params, body, name_token.line, name_token.column)
 end)

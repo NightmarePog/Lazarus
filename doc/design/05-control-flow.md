@@ -49,6 +49,11 @@ for (i = 0; i < xs.len(); i += 1) {
 }
 ```
 
+> **Implemented (v0.1):** the parentheses are **dropped** — the header is written
+> bare and ends at the body brace: `for i = 0; i < n; i += 1 { ... }`. Each clause
+> is optional (`for ; ; { }` ≡ `loop`). The loop variable is a fresh,
+> implicitly-mutable binding. `for ... in` awaits collections.
+
 - The init binds a loop variable (a fresh `i`), the condition is `bool`, the step
   is any statement.
 - Lowers to a Lua `while` loop (not Lua's numeric `for`), because the C form is

@@ -2,7 +2,7 @@
 ---
 --- A single generic rule handles every infix operator. Precedence and the set
 --- of operators are data — see `operators.lua`. Operands are parsed by the
---- next-tighter level (`_call`).
+--- next-tighter level (`_unary`).
 
 local BinaryExpr = require("frontend.parser.nodes.binary")
 local PRECEDENCE = require("frontend.parser.expressions.operators")
@@ -22,7 +22,7 @@ return {
     ---@param min_prec integer
     ---@return Expr
     _binary = function(self, min_prec)
-        local left = self:_call()
+        local left = self:_unary()
 
         while true do
             local token = self:_current()

@@ -212,6 +212,80 @@ describe("Lexer", function ()
         end)
     end)
 
+    describe("control-flow keywords", function ()
+        local cases = {
+            { "if", "IF" }, { "else", "ELSE" }, { "while", "WHILE" },
+            { "loop", "LOOP" }, { "for", "FOR" }, { "break", "BREAK" },
+            { "true", "TRUE" }, { "false", "FALSE" },
+            { "and", "AND" }, { "or", "OR" }, { "not", "NOT" },
+        }
+        for _, case in ipairs(cases) do
+            it("tokenises '" .. case[1] .. "' as " .. case[2], function ()
+                local tokens = scan(case[1])
+                assert.equal(1, #tokens)
+                assert.equal(case[2], tok(tokens, 1).type)
+                assert.is_nil(tok(tokens, 1).literal)
+            end)
+        end
+    end)
+
+    describe("comparison operators", function ()
+        local cases = {
+            { "==", "EQ" }, { "!=", "NEQ" }, { "<", "LESS" },
+            { "<=", "LESS_EQUAL" }, { ">", "GREATER" }, { ">=", "GREATER_EQUAL" },
+        }
+        for _, case in ipairs(cases) do
+            it("tokenises '" .. case[1] .. "' as " .. case[2], function ()
+                local tokens = scan(case[1])
+                assert.equal(1, #tokens)
+                assert.equal(case[2], tok(tokens, 1).type)
+            end)
+        end
+
+        it("uses maximal munch: '==' is one token, not two ASSIGN", function ()
+            local tokens = scan("a == b")
+            assert.equal(3, #tokens)
+            assert.equal("EQ", tok(tokens, 2).type)
+        end)
+
+        it("still tokenises a lone '=' as ASSIGN", function ()
+            local tokens = scan("=")
+            assert.equal("ASSIGN", tok(tokens, 1).type)
+        end)
+
+        it("still tokenises a lone '<' as LESS", function ()
+            local tokens = scan("a < b")
+            assert.equal("LESS", tok(tokens, 2).type)
+        end)
+    end)
+
+    describe("compound assignment operators", function ()
+        local cases = {
+            { "+=", "PLUS_ASSIGN" }, { "-=", "MINUS_ASSIGN" }, { "*=", "STAR_ASSIGN" },
+        }
+        for _, case in ipairs(cases) do
+            it("tokenises '" .. case[1] .. "' as " .. case[2], function ()
+                local tokens = scan(case[1])
+                assert.equal(1, #tokens)
+                assert.equal(case[2], tok(tokens, 1).type)
+            end)
+        end
+
+        it("tokenises 'i += 1' into 3 tokens", function ()
+            local tokens = scan("i += 1")
+            assert.equal(3, #tokens)
+            assert.equal("PLUS_ASSIGN", tok(tokens, 2).type)
+        end)
+    end)
+
+    describe("semicolon", function ()
+        it("tokenises ';' as SEMICOLON", function ()
+            local tokens = scan(";")
+            assert.equal(1, #tokens)
+            assert.equal("SEMICOLON", tok(tokens, 1).type)
+        end)
+    end)
+
     describe("source positions", function ()
         it("reports line 1 col 1 for the first token", function ()
             local tokens = scan("private")

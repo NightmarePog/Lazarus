@@ -14,6 +14,7 @@
 ---@field stmts       Stmt[]                          The enclosing block
 ---@field symbols     table<string, {kind: string}>   Symbols visible in this scope
 ---@field in_function boolean                          True inside a function body
+---@field in_loop     boolean                          True inside a loop body
 
 ---@class StatementCheck
 ---@field type  string                                AST node `type` this rule handles

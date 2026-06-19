@@ -6,12 +6,24 @@
 ---
 --- To add an operator (e.g. division):
 ---   1. add its symbol + token type to `frontend/lexer/keywords.lua`
----   2. add one line here, e.g. `DIVIDE = 2`
+---   2. add one line here, e.g. `DIVIDE = 5`
 --- No other parser code needs to change.
+---
+--- Levels (low → high): logical `or`/`and`, then comparison/equality, then
+--- additive, then multiplicative. The unary `not` (in `unary.lua`) and postfix
+--- calls bind tighter than every operator here, mirroring Lua's precedence.
 
 ---@type table<string, integer>
 return {
-    PLUS     = 1,
-    MINUS    = 1,
-    MULTIPLY = 2,
+    OR            = 1,
+    AND           = 2,
+    EQ            = 3,
+    NEQ           = 3,
+    LESS          = 3,
+    LESS_EQUAL    = 3,
+    GREATER       = 3,
+    GREATER_EQUAL = 3,
+    PLUS          = 4,
+    MINUS         = 4,
+    MULTIPLY      = 5,
 }

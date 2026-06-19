@@ -1,6 +1,16 @@
 --- Expression emitter: converts an `Expr` AST node to a Lua source string.
 
-local OP_MAP = { PLUS = "+", MINUS = "-", MULTIPLY = "*" }
+--- Lazarus binary operator token → Lua operator. Most map straight through;
+--- `!=` becomes Lua's `~=`, and the logical/comparison words are identical.
+local OP_MAP = {
+    PLUS = "+", MINUS = "-", MULTIPLY = "*",
+    EQ = "==", NEQ = "~=",
+    LESS = "<", LESS_EQUAL = "<=", GREATER = ">", GREATER_EQUAL = ">=",
+    AND = "and", OR = "or",
+}
+
+--- Lazarus unary operator token → Lua operator.
+local UNARY_OP_MAP = { NOT = "not" }
 
 ---@type fun(node: Expr): string
 local emit_expr
@@ -34,6 +44,18 @@ emit_expr = function(node)
         end
 
         return callee .. "(" .. table.concat(args, ", ") .. ")"
+    end
+
+    if node.type == "UnaryExpr" then
+        ---@cast node UnaryExpr
+        local op = UNARY_OP_MAP[node.op]
+        assert(op, "emit_expr: unknown unary operator: " .. tostring(node.op))
+
+        local operand = emit_expr(node.operand)
+        -- A binary operand must be parenthesised: `not a == b` would otherwise
+        -- parse as `(not a) == b` in Lua.
+        if node.operand.type == "BinaryExpr" then operand = "(" .. operand .. ")" end
+        return op .. " " .. operand
     end
 
     if node.type == "BinaryExpr" then

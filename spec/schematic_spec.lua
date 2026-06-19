@@ -94,6 +94,77 @@ describe("Schematic", function ()
         end)
     end)
 
+    describe("control flow", function ()
+        it("accepts if / else if / else referencing visible names", function ()
+            assert.has_no.errors(function ()
+                analyze("fn f(a, b) { if a { x = 1 } else if b { x = 2 } else { x = 3 } }")
+            end)
+        end)
+
+        it("accepts a while loop mutating an outer mutable binding", function ()
+            assert.has_no.errors(function ()
+                analyze("fn f(n) { mut i = 0\n while i < n { i = i + 1 } }")
+            end)
+        end)
+
+        it("accepts an infinite loop containing break", function ()
+            assert.has_no.errors(function ()
+                analyze("fn f() { loop { break } }")
+            end)
+        end)
+
+        it("accepts a C-style for whose step mutates the loop variable", function ()
+            -- the loop variable `i` is a fresh, implicitly-mutable binding, so the
+            -- `i += 1` step must be legal even though it was not declared `mut`.
+            assert.has_no.errors(function ()
+                analyze("fn f(n) { for i = 0; i < n; i += 1 { x = i } }")
+            end)
+        end)
+
+        it("rejects an undeclared identifier in a condition", function ()
+            local ok, err = pcall(analyze, "fn f() { while nope { x = 1 } }")
+            assert.is_false(ok)
+            local err = err --[[@as Error]]
+            assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
+            assert.matches("Undeclared identifier 'nope'", err.message)
+        end)
+
+        it("does not leak a binding declared inside an if body", function ()
+            local ok, err = pcall(analyze, "fn f(a) { if a { y = 1 }\n return y }")
+            assert.is_false(ok)
+            local err = err --[[@as Error]]
+            assert.matches("Undeclared identifier 'y'", err.message)
+        end)
+
+        it("rejects break outside any loop", function ()
+            local ok, err = pcall(analyze, "fn f() { break }")
+            assert.is_false(ok)
+            local err = err --[[@as Error]]
+            assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
+            assert.matches("'break' outside", err.message)
+        end)
+
+        it("rejects break that is not the last statement in its block", function ()
+            local ok, err = pcall(analyze, "fn f() { loop { break\n x = 1 } }")
+            assert.is_false(ok)
+            local err = err --[[@as Error]]
+            assert.matches("'break' must be the last statement", err.message)
+        end)
+
+        it("checks operands of a unary expression", function ()
+            local ok, err = pcall(analyze, "private x = not nope")
+            assert.is_false(ok)
+            local err = err --[[@as Error]]
+            assert.matches("Undeclared identifier 'nope'", err.message)
+        end)
+
+        it("accepts a unary expression over a visible name", function ()
+            assert.has_no.errors(function ()
+                analyze("private p = true\nprivate q = not p")
+            end)
+        end)
+    end)
+
     describe("bare expression statements", function ()
         it("rejects a bare expression as a statement", function ()
             local ok, err = pcall(analyze, "private x = 1\nx + x")

@@ -2,14 +2,14 @@
 
 ---@class LiteralExpr: Expr
 ---@field type  "LiteralExpr"
----@field kind  "number" | "string"  Distinguishes numeric and string literals for the evaluator
----@field value any                  The converted value (`tonumber` result for numbers)
+---@field kind  "number" | "string" | "boolean"  Distinguishes literal kinds for codegen
+---@field value any                  The converted value (number, string, or boolean)
 ---@field line  integer | nil        1-based source line
 ---@field col   integer | nil        1-based source column
 local LiteralExpr = {}
 LiteralExpr.__index = LiteralExpr
 
----@param kind  "number" | "string"
+---@param kind  "number" | "string" | "boolean"
 ---@param value any
 ---@param line? integer
 ---@param col?  integer
