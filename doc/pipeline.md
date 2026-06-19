@@ -74,6 +74,7 @@ Single-pass scanner. Walks the source byte by byte and emits a flat list of toke
 | `BODY_START` | `{` |
 | `BODY_END` | `}` |
 | `COMMA` | `,` |
+| `COLON` | `:` (introduces a type annotation) |
 | `SEMICOLON` | `;` (only used inside a `for` header) |
 | `IF` `ELSE` `WHILE` `LOOP` `FOR` `BREAK` | the control-flow keywords |
 | `TRUE` `FALSE` | boolean literals |
@@ -84,6 +85,10 @@ Single-pass scanner. Walks the source byte by byte and emits a flat list of toke
 Multi-character operators (`==`, `<=`, `+=`, `++`, …) are matched by **maximal munch**: the scanner prefers the two-character token over the single-character one.
 
 Comments are skipped by the scanner and produce no tokens: `// …` runs to end of line, `/* … */` spans lines (an unterminated block comment is an `UNTERMINATED_COMMENT` error). The leading `/` is disambiguated before symbol scanning, so `/`, `/=`, `//` and `/*` never collide.
+
+A number literal with a fractional part (`3.14`) is a float; the lexer leaves a `.` that is not followed by a digit as a separate token.
+
+**Type annotations.** Bindings (`name: Type`), function parameters (`p: Type`) and return types (`fn f(): Type`) carry an optional `TypeRef` (`{ name }`). They are parsed onto `VariableDecl.type_ann` and `FunctionDecl.param_types`/`return_type`. The type *checker* lives in Schematic; annotations are **erased** before codegen, so the emitted Lua is identical with or without them.
 
 ### Internal structure
 

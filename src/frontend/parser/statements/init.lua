@@ -65,7 +65,8 @@ return {
         -- scope.
         if tok.type == "IDENTIFIER" then
             local nxt = self.token_table[self.pos + 1]
-            if nxt and (nxt.type == "ASSIGN" or binding.COMPOUND[nxt.type]) then
+            -- `name =`, `name +=`, … or an annotated declaration `name : Type = …`.
+            if nxt and (nxt.type == "ASSIGN" or nxt.type == "COLON" or binding.COMPOUND[nxt.type]) then
                 return binding.read_assignment(self, "Expected variable name")
             end
         end

@@ -63,9 +63,11 @@ function Lexer:_read_identifier()
     return Token.new(tok_type, value, line, col, literal)
 end
 
---- Scan a decimal integer literal starting at the current position.
---- Throws `INVALID_NUMBER` if a letter immediately follows the digits,
---- e.g. `123abc` — rather than silently splitting into two tokens.
+--- Scan a decimal number literal starting at the current position. Accepts an
+--- optional single fractional part (`3.14`), which marks the literal as a float
+--- — a `.` not followed by a digit is left for the next scan, so `3.foo` reads
+--- `3` then stops. Throws `INVALID_NUMBER` if a letter immediately follows the
+--- digits, e.g. `123abc` — rather than silently splitting into two tokens.
 ---@private
 ---@return Token
 function Lexer:_read_number()
@@ -74,6 +76,18 @@ function Lexer:_read_number()
 
     while self.current ~= "" and self.current:match("%d") do
         self:_advance()
+    end
+
+    -- Optional fractional part: a `.` must be followed by at least one digit to
+    -- be part of the number (otherwise it is a separate token).
+    if self.current == "." then
+        local after = self.pos < #self.source and self.source:sub(self.pos + 1, self.pos + 1) or ""
+        if after:match("%d") then
+            self:_advance()  -- consume '.'
+            while self.current ~= "" and self.current:match("%d") do
+                self:_advance()
+            end
+        end
     end
 
     if self.current ~= "" and self.current:match("[%a_]") then

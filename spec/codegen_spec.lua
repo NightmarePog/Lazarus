@@ -155,6 +155,22 @@ describe("Codegen", function ()
         end)
     end)
 
+    describe("type annotations are erased", function ()
+        it("emits the same Lua with or without a binding annotation", function ()
+            assert.equal(compile("private x = 5"), compile("private x: int = 5"))
+        end)
+
+        it("erases parameter and return annotations on a function", function ()
+            local typed   = compile("fn add(a: int, b: int): int { return a + b }")
+            local untyped = compile("fn add(a, b) { return a + b }")
+            assert.equal(untyped, typed)
+        end)
+
+        it("emits a float literal as a plain Lua number", function ()
+            assert.equal("local pi = 3.14", compile("private pi: float = 3.14"))
+        end)
+    end)
+
     describe("footer (entry call)", function ()
         it("appends main() when a main function is present", function ()
             local out = compile_program("fn main() { return 0 }")

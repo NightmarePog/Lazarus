@@ -85,6 +85,66 @@ describe("Parser", function ()
         end)
     end)
 
+    describe("type annotations", function ()
+        it("parses a type annotation on a binding", function ()
+            local decl = parse("private x: int = 1").body[1] --[[@as VariableDecl]]
+            assert.equal("x", decl.name)
+            assert.is_table(decl.type_ann)
+            assert.equal("int", decl.type_ann.name)
+        end)
+
+        it("parses an annotation on a mut binding without initialiser", function ()
+            local decl = parse("private mut x: float").body[1] --[[@as VariableDecl]]
+            assert.equal("float", decl.type_ann.name)
+            assert.is_nil(decl.value)
+        end)
+
+        it("parses an annotation on a bare local declaration", function ()
+            local decl = parse("x: bool = true").body[1] --[[@as VariableDecl]]
+            assert.is_nil(decl.visibility)
+            assert.equal("bool", decl.type_ann.name)
+        end)
+
+        it("leaves type_ann nil when no annotation is given", function ()
+            local decl = parse("private x = 1").body[1] --[[@as VariableDecl]]
+            assert.is_nil(decl.type_ann)
+        end)
+
+        it("parses parameter and return type annotations on a function", function ()
+            local fn = parse("fn add(a: int, b: int): int { return a + b }").body[1] --[[@as FunctionDecl]]
+            assert.same({ "a", "b" }, fn.params)
+            assert.equal("int", fn.param_types[1].name)
+            assert.equal("int", fn.param_types[2].name)
+            assert.equal("int", fn.return_type.name)
+        end)
+
+        it("allows a mix of annotated and unannotated parameters", function ()
+            local fn = parse("fn f(a: int, b) { return a }").body[1] --[[@as FunctionDecl]]
+            assert.equal("int", fn.param_types[1].name)
+            assert.is_nil(fn.param_types[2])
+            assert.is_nil(fn.return_type)
+        end)
+
+        it("marks a fractional number literal as a float", function ()
+            local lit = parse("private x = 3.5").body[1].value --[[@as LiteralExpr]]
+            assert.equal("number", lit.kind)
+            assert.equal("float", lit.numeric)
+            assert.equal(3.5, lit.value)
+        end)
+
+        it("marks an integer number literal as an int", function ()
+            local lit = parse("private x = 42").body[1].value --[[@as LiteralExpr]]
+            assert.equal("int", lit.numeric)
+        end)
+
+        it("errors on a missing type name after ':'", function ()
+            local ok, err = pcall(function () parse("private x: = 1") end)
+            assert.is_false(ok)
+            local err = err --[[@as Error]]
+            assert.matches("Expected a type name", err.message)
+        end)
+    end)
+
     describe("boolean / unary / comparison / logical expressions", function ()
         local function value_of(src)
             return parse("private x = " .. src).body[1].value

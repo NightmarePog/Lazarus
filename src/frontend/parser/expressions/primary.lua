@@ -30,7 +30,9 @@ return {
 
         if tok.type == "NUMBER" then
             self:_advance()
-            return LiteralExpr.new("number", tok.literal, tok.line, tok.column)
+            -- A fractional part in the source text marks the literal as a float.
+            local numeric = tok.value:find(".", 1, true) and "float" or "int"
+            return LiteralExpr.new("number", tok.literal, tok.line, tok.column, numeric)
         end
 
         if tok.type == "STRING" then

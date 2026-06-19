@@ -11,6 +11,7 @@ local Error          = require("error")
 local VariableDecl   = require("frontend.parser.nodes.variable")
 local BinaryExpr     = require("frontend.parser.nodes.binary")
 local IdentifierExpr = require("frontend.parser.nodes.identifier")
+local Types          = require("frontend.parser.types")
 
 --- Compound-assignment operators, mapped to the binary operator they expand to.
 --- `i += e` desugars to `i = i + e`, so codegen and Schematic see only ordinary
@@ -32,6 +33,9 @@ local COMPOUND = {
 local function read_binding(parser, visibility, mutable, name_err)
     local name_token = parser:_consume("IDENTIFIER", name_err)
 
+    local type_ann = nil
+    if parser:_match("COLON") then type_ann = Types.read_type(parser) end
+
     local value = nil
     if parser:_match("ASSIGN") then
         value = parser:_expression()
@@ -44,7 +48,7 @@ local function read_binding(parser, visibility, mutable, name_err)
     end
 
     return VariableDecl.new(name_token.value, value, visibility, mutable,
-        name_token.line, name_token.column)
+        name_token.line, name_token.column, type_ann)
 end
 
 --- Parse a bare assignment statement: `<identifier> = <expr>` or a compound
@@ -57,10 +61,15 @@ end
 local function read_assignment(parser, name_err)
     local name_token = parser:_consume("IDENTIFIER", name_err)
 
+    -- An optional `: Type` annotation only appears on a declaration, so it is
+    -- followed by `=` (never a compound assignment).
+    local type_ann = nil
+    if parser:_match("COLON") then type_ann = Types.read_type(parser) end
+
     if parser:_match("ASSIGN") then
         local value = parser:_expression()
         return VariableDecl.new(name_token.value, value, nil, false,
-            name_token.line, name_token.column)
+            name_token.line, name_token.column, type_ann)
     end
 
     local op_token = parser:_current()
