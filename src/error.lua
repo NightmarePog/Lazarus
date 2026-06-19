@@ -27,6 +27,7 @@ Error.Type = {
     UNEXPECTED_TOKEN    = "UNEXPECTED_TOKEN",
     SYNTAX_ERROR        = "SYNTAX_ERROR",
     SEMANTIC_ERROR      = "SEMANTIC_ERROR",
+    TYPE_MISMATCH       = "TYPE_MISMATCH",
 }
 
 --- Construct a new Error value. All positional fields are optional; when

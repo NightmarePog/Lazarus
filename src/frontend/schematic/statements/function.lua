@@ -13,14 +13,15 @@ return StatementCheck.new("FunctionDecl", function(ctx, frame)
     ctx:bind(frame.symbols, stmt.name, "function")
 
     local scope = ctx:child_scope(frame.symbols)
-    for _, param in ipairs(stmt.params) do
+    for i, param in ipairs(stmt.params) do
         if rawget(scope, param) then
             Error.throw(Error.Type.SEMANTIC_ERROR,
                 "Duplicate parameter '" .. param .. "'",
                 stmt.line, stmt.col, ctx.source)
         end
-        scope[param] = { kind = "variable" }
+        scope[param] = { kind = "variable", vtype = ctx:resolve_type(stmt.param_types[i]) }
     end
 
-    ctx:analyze_block(stmt.body, scope, true, false)
+    local return_type = ctx:resolve_type(stmt.return_type)
+    ctx:analyze_block(stmt.body, scope, true, false, return_type)
 end)

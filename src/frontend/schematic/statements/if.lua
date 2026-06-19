@@ -13,12 +13,13 @@ return StatementCheck.new("IfStmt", function(ctx, frame)
 
     for _, clause in ipairs(stmt.clauses) do
         ctx:check_expr(clause.condition, frame.symbols)
+        ctx:expect_bool(clause.condition, frame.symbols, "condition")
         ctx:analyze_block(clause.body, ctx:child_scope(frame.symbols),
-            frame.in_function, frame.in_loop)
+            frame.in_function, frame.in_loop, frame.return_type)
     end
 
     if stmt.else_body then
         ctx:analyze_block(stmt.else_body, ctx:child_scope(frame.symbols),
-            frame.in_function, frame.in_loop)
+            frame.in_function, frame.in_loop, frame.return_type)
     end
 end)

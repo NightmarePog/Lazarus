@@ -230,6 +230,22 @@ Single-pass semantic checker. Walks the AST in source order maintaining a symbol
 | `ExpressionStmt` whose expression is not a call | `SEMANTIC_ERROR` — bare expressions are not valid statements |
 | `BreakStmt` outside any loop | `SEMANTIC_ERROR` — `'break'` outside of a loop |
 | `BreakStmt` that is not the last statement in its block | `SEMANTIC_ERROR` — `'break'` must be last (Lua 5.0 requires it) |
+| Binding/return value not assignable to its declared type | `TYPE_MISMATCH` |
+| Mixing `int` and `float`, or non-numeric arithmetic operand | `TYPE_MISMATCH` |
+| `++` on non-`str`, `and`/`or`/`not` on non-`bool`, equality across types | `TYPE_MISMATCH` |
+| `if`/`while`/`for` condition that is not `bool` | `TYPE_MISMATCH` |
+
+### Type checking
+
+Schematic also runs a **gradual** static type check (`schematic/types.lua`).
+Each scope entry carries a `vtype` (`int`/`float`/`str`/`bool`/`any`); an
+annotation sets it, otherwise it is inferred from the initialiser. Anything
+unknown is `any` and flows without error, so un-annotated code still checks.
+`int` and `float` are **distinct** and never convert implicitly. Types are
+**erased** after this pass — Optimizer and Codegen see a plain AST. Call results
+are `any` for now (call-site argument checking arrives with class/function
+signatures later). User type names (non-scalars) are treated as `any` until
+classes exist.
 
 Control-flow bodies (`if`/`while`/`loop`/`for`) are checked in **child scopes**
 that inherit the enclosing declarations; bindings made inside a body stay local.

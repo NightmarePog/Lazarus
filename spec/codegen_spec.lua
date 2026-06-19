@@ -147,7 +147,9 @@ describe("Codegen", function ()
         end)
 
         it("emits '++' as Lua '..'", function ()
-            assert.matches("c = a %.%. b", emit_c("a ++ b"))
+            -- ++ is string concatenation, so use string operands.
+            local out = compile('private mut a = "x"\nprivate mut b = "y"\nprivate c = a ++ b')
+            assert.matches("c = a %.%. b", out)
         end)
 
         it("synthesises '%' for Lua 5.0 which has no '%' operator", function ()

@@ -13,6 +13,7 @@
 local Error              = require("error")
 local statement_registry = require("frontend.schematic.statements")
 local check_expr         = require("frontend.schematic.expressions")
+local TypeCheck          = require("frontend.schematic.types")
 
 ---@class SemContext
 ---@field source string
@@ -40,12 +41,13 @@ function SemContext:check_duplicate(symbols, name, node)
 end
 
 --- Bind a name in the given scope.
----@param symbols  table<string, {kind: string, mutable: boolean}>
+---@param symbols  table<string, {kind: string, mutable: boolean, vtype: string?}>
 ---@param name     string
 ---@param kind     string
 ---@param mutable? boolean  Whether the binding may be reassigned (default false)
-function SemContext:bind(symbols, name, kind, mutable)
-    symbols[name] = { kind = kind, mutable = mutable or false }
+---@param vtype?   string   The binding's static type ("int"/"float"/"str"/"bool"/"any")
+function SemContext:bind(symbols, name, kind, mutable, vtype)
+    symbols[name] = { kind = kind, mutable = mutable or false, vtype = vtype or "any" }
 end
 
 --- Validate an expression (and its sub-expressions) against visible symbols.
@@ -53,6 +55,38 @@ end
 ---@param symbols table<string, {kind: string}>
 function SemContext:check_expr(node, symbols)
     check_expr(node, symbols, self.source)
+end
+
+--- Infer an expression's type (and type-check its operators).
+---@param node    Expr
+---@param symbols table<string, {vtype: string?}>
+---@return string
+function SemContext:infer(node, symbols)
+    return TypeCheck.infer(node, symbols, self.source)
+end
+
+--- Require a condition expression to be `bool`.
+---@param node    Expr
+---@param symbols table
+---@param what    string
+function SemContext:expect_bool(node, symbols, what)
+    TypeCheck.expect_bool(node, symbols, self.source, what)
+end
+
+--- Resolve a parsed annotation to an internal type string.
+---@param ref TypeRef | nil
+---@return string
+function SemContext:resolve_type(ref)
+    return TypeCheck.resolve(ref)
+end
+
+--- Require `actual` to be assignable to `expected` (gradual; `any` accepted).
+---@param expected string
+---@param actual   string
+---@param node     Expr
+---@param what     string
+function SemContext:expect_assignable(expected, actual, node, what)
+    TypeCheck.expect_assignable(expected, actual, node, self.source, what)
 end
 
 --- Create a child scope that inherits visible declarations from `parent`.
@@ -69,7 +103,8 @@ end
 ---@param symbols     table<string, {kind: string}>
 ---@param in_function boolean
 ---@param in_loop?    boolean   True inside a loop body (governs `break` legality)
-function SemContext:analyze_block(stmts, symbols, in_function, in_loop)
+---@param return_type? string   Declared return type of the enclosing function, threaded to `return`
+function SemContext:analyze_block(stmts, symbols, in_function, in_loop, return_type)
     for idx, stmt in ipairs(stmts) do
         local rule = statement_registry[stmt.type]
         if rule then
@@ -80,6 +115,7 @@ function SemContext:analyze_block(stmts, symbols, in_function, in_loop)
                 symbols     = symbols,
                 in_function = in_function,
                 in_loop     = in_loop or false,
+                return_type = return_type,
             })
         end
     end

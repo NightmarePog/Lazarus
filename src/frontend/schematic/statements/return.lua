@@ -19,5 +19,10 @@ return StatementCheck.new("ReturnStmt", function(ctx, frame)
             stmt.line, stmt.col, ctx.source)
     end
 
-    if stmt.value then ctx:check_expr(stmt.value, frame.symbols) end
+    if stmt.value then
+        ctx:check_expr(stmt.value, frame.symbols)
+        local value_type = ctx:infer(stmt.value, frame.symbols)
+        ctx:expect_assignable(frame.return_type or "any", value_type, stmt.value,
+            "Function return")
+    end
 end)

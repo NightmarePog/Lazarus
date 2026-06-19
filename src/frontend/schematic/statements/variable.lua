@@ -33,8 +33,23 @@ return StatementCheck.new("VariableDecl", function(ctx, frame)
         end
 
         ctx:check_duplicate(symbols, stmt.name, stmt)
-        if stmt.value then ctx:check_expr(stmt.value, symbols) end
-        ctx:bind(symbols, stmt.name, stmt.mutable and "variable" or "constant", stmt.mutable)
+
+        -- Determine the binding's static type: the annotation if present and
+        -- checked against the initialiser, otherwise inferred from it.
+        local declared = ctx:resolve_type(stmt.type_ann)
+        local vtype    = declared
+        if stmt.value then
+            ctx:check_expr(stmt.value, symbols)
+            local value_type = ctx:infer(stmt.value, symbols)
+            if declared ~= "any" then
+                ctx:expect_assignable(declared, value_type, stmt.value,
+                    "Binding '" .. stmt.name .. "'")
+            else
+                vtype = value_type
+            end
+        end
+
+        ctx:bind(symbols, stmt.name, stmt.mutable and "variable" or "constant", stmt.mutable, vtype)
         stmt.reassign = false
     else
         if not existing.mutable then
@@ -43,7 +58,13 @@ return StatementCheck.new("VariableDecl", function(ctx, frame)
                 stmt.line, stmt.col, ctx.source, #stmt.name)
         end
 
-        if stmt.value then ctx:check_expr(stmt.value, symbols) end
+        if stmt.value then
+            ctx:check_expr(stmt.value, symbols)
+            -- A typed mutable only accepts values of its declared type.
+            local value_type = ctx:infer(stmt.value, symbols)
+            ctx:expect_assignable(existing.vtype or "any", value_type, stmt.value,
+                "Binding '" .. stmt.name .. "'")
+        end
         stmt.reassign = true
     end
 end)

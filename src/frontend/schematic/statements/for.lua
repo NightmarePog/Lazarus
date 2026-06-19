@@ -13,16 +13,28 @@ return StatementCheck.new("ForStmt", function(ctx, frame)
     local scope = ctx:child_scope(frame.symbols)
 
     if stmt.init then
-        local init = stmt.init --[[@as VariableDecl]]
-        if init.value then ctx:check_expr(init.value, scope) end
-        ctx:bind(scope, init.name, "variable", true)
+        local init  = stmt.init --[[@as VariableDecl]]
+        local vtype = ctx:resolve_type(init.type_ann)
+        if init.value then
+            ctx:check_expr(init.value, scope)
+            local value_type = ctx:infer(init.value, scope)
+            if vtype ~= "any" then
+                ctx:expect_assignable(vtype, value_type, init.value, "Loop variable '" .. init.name .. "'")
+            else
+                vtype = value_type
+            end
+        end
+        ctx:bind(scope, init.name, "variable", true, vtype)
         init.reassign = false
     end
 
-    if stmt.condition then ctx:check_expr(stmt.condition, scope) end
+    if stmt.condition then
+        ctx:check_expr(stmt.condition, scope)
+        ctx:expect_bool(stmt.condition, scope, "loop condition")
+    end
     if stmt.step then
-        ctx:analyze_block({ stmt.step }, scope, frame.in_function, true)
+        ctx:analyze_block({ stmt.step }, scope, frame.in_function, true, frame.return_type)
     end
 
-    ctx:analyze_block(stmt.body, ctx:child_scope(scope), frame.in_function, true)
+    ctx:analyze_block(stmt.body, ctx:child_scope(scope), frame.in_function, true, frame.return_type)
 end)
