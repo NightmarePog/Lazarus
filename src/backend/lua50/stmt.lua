@@ -189,6 +189,23 @@ local function emit_member(node)
         return C .. "." .. node.name .. " = " .. rhs
     end
 
+    if node.type == "ConstructorDecl" then
+        ---@cast node ConstructorDecl
+        -- Lowers to `function C.new(params) local self = {} <body> return self end`
+        -- — a plain table, no metatable.
+        Context.push_scope()
+        for _, p in ipairs(node.params) do Context.declare_local(p) end
+        Context.declare_local("self")
+        local lines = { "local self = {}" }
+        for _, s in ipairs(node.body) do lines[#lines + 1] = emit_stmt(s) end
+        lines[#lines + 1] = "return self"
+        Context.pop_scope()
+
+        local params = table.concat(node.params, ", ")
+        return "function " .. C .. ".new(" .. params .. ")\n"
+            .. indent(table.concat(lines, "\n")) .. "\nend"
+    end
+
     return emit_stmt(node)
 end
 

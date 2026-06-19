@@ -16,6 +16,7 @@ local Keywords = {}
 --- | "LEFT_BRACKET"
 --- | "RIGHT_BRACKET"
 --- | "FUNCTION"
+--- | "CONSTRUCTOR"
 --- | "RETURN"
 --- | "BODY_START"
 --- | "BODY_END"
@@ -58,6 +59,7 @@ local TOKENS_DATA = {
     ["public"] = "PUBLIC",
     ["mut"] = "MUTABLE",
     ["fn"] = "FUNCTION",
+    ["constructor"] = "CONSTRUCTOR",
     ["return"] = "RETURN",
     ["if"] = "IF",
     ["else"] = "ELSE",

@@ -121,10 +121,13 @@ function SemContext:analyze_block(stmts, symbols, in_function, in_loop, return_t
     end
 end
 
----@param ast    AST
----@param source string
-local function analyze(ast, source)
-    SemContext.new(source):analyze_block(ast.body, {}, false, false)
+---@param ast         AST
+---@param source      string
+---@param class_name? string  The enclosing class name (default "Main"), bound so construction `ClassName(...)` resolves.
+local function analyze(ast, source, class_name)
+    local root = {}
+    root[class_name or "Main"] = { kind = "class", mutable = false, vtype = "any" }
+    SemContext.new(source):analyze_block(ast.body, root, false, false)
 end
 
 return { analyze = analyze }

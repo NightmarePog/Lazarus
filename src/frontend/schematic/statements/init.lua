@@ -7,6 +7,7 @@
 local HANDLERS = {
     (require("frontend.schematic.statements.variable")),
     (require("frontend.schematic.statements.function")),
+    (require("frontend.schematic.statements.constructor")),
     (require("frontend.schematic.statements.return")),
     (require("frontend.schematic.statements.expression")),
     (require("frontend.schematic.statements.field_assign")),

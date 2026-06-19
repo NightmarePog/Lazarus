@@ -145,6 +145,27 @@ describe("Parser", function ()
         end)
     end)
 
+    describe("constructor", function ()
+        it("parses a constructor with parameters", function ()
+            local c = parse("constructor(x, y) { self.x = x }").body[1] --[[@as ConstructorDecl]]
+            assert.equal("ConstructorDecl", c.type)
+            assert.same({ "x", "y" }, c.params)
+            assert.equal("FieldAssign", c.body[1].type)
+        end)
+
+        it("parses an empty constructor", function ()
+            local c = parse("constructor() {}").body[1] --[[@as ConstructorDecl]]
+            assert.equal("ConstructorDecl", c.type)
+            assert.equal(0, #c.params)
+            assert.equal(0, #c.body)
+        end)
+
+        it("parses typed constructor parameters", function ()
+            local c = parse("constructor(x: int) { self.x = x }").body[1] --[[@as ConstructorDecl]]
+            assert.equal("int", c.param_types[1].name)
+        end)
+    end)
+
     describe("field access", function ()
         local function value_of(src)
             return parse("private x = " .. src).body[1].value

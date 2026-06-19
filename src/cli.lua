@@ -110,11 +110,12 @@ end
 --- Run the front end (lexer → parser → schematic) and the optimizer, returning
 --- the AST ready for codegen. Any compile error is an `Error` object thrown by
 --- a stage; `run_stage` is responsible for catching it.
----@param source string
+---@param source      string
+---@param class_name? string
 ---@return AST
-local function front_end(source)
+local function front_end(source, class_name)
     local ast = Parser.new(Lexer.new(source):scan(), source):parse()
-    Schematic.analyze(ast, source)
+    Schematic.analyze(ast, source, class_name)
     return Optimizer.optimize(ast)
 end
 
@@ -184,7 +185,7 @@ function commands.build(args)
 
     local source = read_file(input)
     local class_name = class_name_from_path(input)
-    local lua = run_stage(function() return Codegen.new(front_end(source), class_name):generate() end)
+    local lua = run_stage(function() return Codegen.new(front_end(source, class_name), class_name):generate() end)
 
     if output == "-" then
         print(lua)
@@ -205,7 +206,7 @@ function commands.check(args)
     end
 
     local source = read_file(input)
-    run_stage(function() return front_end(source) end)
+    run_stage(function() return front_end(source, class_name_from_path(input)) end)
     eprint(PROG .. ": " .. input .. " — no errors")
 end
 
@@ -219,7 +220,7 @@ function commands.ast(args)
     end
 
     local source = read_file(input)
-    local ast = run_stage(function() return front_end(source) end)
+    local ast = run_stage(function() return front_end(source, class_name_from_path(input)) end)
     print(dump(ast))
 end
 

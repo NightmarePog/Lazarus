@@ -57,6 +57,7 @@ Single-pass scanner. Walks the source byte by byte and emits a flat list of toke
 | `PUBLIC` | `public` |
 | `MUTABLE` | `mut` |
 | `FUNCTION` | `fn` |
+| `CONSTRUCTOR` | `constructor` |
 | `RETURN` | `return` |
 | `IDENTIFIER` | any `[a-zA-Z_][a-zA-Z0-9_]*` not matched as a keyword |
 | `NUMBER` | decimal integer literal |
@@ -134,6 +135,7 @@ Program
 | `ReturnStmt` | `value: Expr \| nil` | `return expr` / bare `return` |
 | `ExpressionStmt` | `expression: Expr` | bare expression as statement |
 | `FieldAssign` | `target: MemberExpr`, `value: Expr` | `self.x = 3` (incl. compound `+=`) |
+| `ConstructorDecl` | `params: string[]`, `param_types`, `body: Stmt[]` | `constructor(x) { self.x = x }` |
 | `IfStmt` | `clauses: {condition, body}[]`, `else_body: Stmt[] \| nil` | `if c { } else if d { } else { }` |
 | `WhileStmt` | `condition: Expr`, `body: Stmt[]` | `while c { ... }` |
 | `LoopStmt` | `body: Stmt[]` | `loop { ... }` |
@@ -228,6 +230,8 @@ Single-pass semantic checker. Walks the AST in source order maintaining a symbol
 | Bare `x = e` rebinding a name whose existing binding is not `mut` | `SEMANTIC_ERROR` — cannot assign to immutable binding |
 | `IdentifierExpr` whose name is not visible in scope | `SEMANTIC_ERROR` — undeclared identifier |
 | `FunctionDecl` with two parameters sharing a name | `SEMANTIC_ERROR` — duplicate parameter |
+| `ConstructorDecl` nested inside a function (not top-level) | `SEMANTIC_ERROR` — `'constructor'` must be at the top level |
+| `ReturnStmt` inside a constructor (the instance is returned implicitly) | `SEMANTIC_ERROR` — `'return'` outside of a function |
 | `ReturnStmt` outside any function | `SEMANTIC_ERROR` — `'return'` outside of a function |
 | `ReturnStmt` that is not the last statement in its block | `SEMANTIC_ERROR` — `'return'` must be last (mirrors Lua) |
 | `ExpressionStmt` whose expression is not a call | `SEMANTIC_ERROR` — bare expressions are not valid statements |
@@ -367,6 +371,9 @@ finally `return C` (so importers and tests can read the class). See the memory
 | Nested `VariableDecl` (a `local` declaration) | `local name = <expr>` (or `local name` when valueless) |
 | `VariableDecl { reassign=true }` | `<target> = <expr>` (no `local`; `<target>` is `C.name` for a member, else bare) |
 | Nested `FunctionDecl` | `local function name(params)` + indented body + `end` |
+| Top-level `ConstructorDecl` | `function C.new(params)` + `local self = {}` + body + `return self` |
+| `FieldAssign { target, value }` | `<object>.<field> = <value>` |
+| `CallExpr` whose callee names the class | `C.new(args)` (construction; the class table isn't callable) |
 | `ReturnStmt { value }` | `return <expr>`, or `return` when `value=nil` |
 | `ExpressionStmt { expression }` | `<expr>` |
 | `IfStmt { clauses, else_body }` | `if c then … elseif c then … else … end` |

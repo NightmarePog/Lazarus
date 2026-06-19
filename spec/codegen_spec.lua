@@ -171,6 +171,22 @@ describe("Codegen", function ()
         end)
     end)
 
+    describe("constructor and construction", function ()
+        it("lowers a constructor to C.new building a plain self table", function ()
+            assert.equal(
+                "function Main.new(x, y)\n    local self = {}\n    self.x = x\n    self.y = y\n    return self\nend",
+                members("constructor(x, y) { self.x = x\nself.y = y }"))
+        end)
+
+        it("lowers construction C(args) to C.new(args)", function ()
+            assert.matches("p = Main%.new%(3, 4%)", members("fn f() { mut p = Main(3, 4) }"))
+        end)
+
+        it("does not treat a normal call as construction", function ()
+            assert.matches("Main%.helper%(%)", members("fn helper() { return 0 }\nfn f() { helper() }"))
+        end)
+    end)
+
     describe("field access", function ()
         it("emits field reads and assignments", function ()
             assert.equal("function Main.f(p)\n    p.x = 3\n    return p.x\nend",

@@ -51,6 +51,13 @@ emit_expr = function(node)
             args[i] = emit_expr(arg)
         end
 
+        -- Construction: calling the class by name lowers to `C.new(...)` (the
+        -- class table itself is not callable). The class name is the only
+        -- PascalCase identifier in call position; locals are snake_case.
+        if node.callee.type == "IdentifierExpr" and node.callee.name == Context.class then
+            return Context.class .. ".new(" .. table.concat(args, ", ") .. ")"
+        end
+
         local callee = emit_expr(node.callee)
         -- A binary expression is not directly callable in Lua; parenthesise it
         -- defensively so the emitted text stays syntactically valid.

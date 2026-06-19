@@ -220,6 +220,45 @@ fn main() {
         end)
     end)
 
+    describe("constructor and instances", function ()
+        -- Class name defaults to "Main", so the program constructs `Main(...)`.
+        local PROG = [[
+public mut sum = 0
+
+constructor(x, y) {
+    self.x = x
+    self.y = y
+}
+
+fn add_coords(p) {
+    return p.x + p.y
+}
+
+fn main() {
+    mut p = Main(3, 4)
+    p.x = p.x + 10
+    sum = add_coords(p)
+    return sum
+}
+]]
+
+        it("lowers the constructor to a plain-table C.new", function ()
+            local body = compile(PROG, { header = false, entry = false })
+            assert.is_true(has(body, "function Main.new(x, y)"))
+            assert.is_true(has(body, "local self = {}"))
+            assert.is_true(has(body, "p = Main.new(3, 4)"))
+        end)
+
+        it("constructs an instance and reads/writes its fields at runtime", function ()
+            local Main = assert(load_chunk(compile(PROG)))()
+            assert.equal(17, Main.sum) -- (3 + 10) + 4
+            -- The constructor is callable directly too.
+            local q = Main.new(1, 2)
+            assert.equal(1, q.x)
+            assert.equal(2, q.y)
+        end)
+    end)
+
     describe("arithmetic, concat and comments", function ()
         -- Exercises /, %, ^, ++ and compound /=, plus both comment forms,
         -- through the whole pipeline and at runtime.

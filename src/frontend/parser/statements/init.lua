@@ -18,6 +18,7 @@ local HANDLERS = {
     (require("frontend.parser.statements.public")),
     (require("frontend.parser.statements.mut")),
     (require("frontend.parser.statements.function")),
+    (require("frontend.parser.statements.constructor")),
     (require("frontend.parser.statements.return")),
     (require("frontend.parser.statements.if")),
     (require("frontend.parser.statements.while")),
