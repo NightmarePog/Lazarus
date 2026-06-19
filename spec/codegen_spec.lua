@@ -171,6 +171,25 @@ describe("Codegen", function ()
         end)
     end)
 
+    describe("field access", function ()
+        it("emits field reads and assignments", function ()
+            assert.equal("function Main.f(p)\n    p.x = 3\n    return p.x\nend",
+                members("fn f(p) { p.x = 3\nreturn p.x }"))
+        end)
+
+        it("emits a compound field assignment desugared", function ()
+            assert.matches("p%.x = p%.x %+ 1", members("fn f(p) { p.x += 1 }"))
+        end)
+
+        it("emits a method call", function ()
+            assert.matches("p%.go%(%)", members("fn f(p) { p.go() }"))
+        end)
+
+        it("emits a chained field read", function ()
+            assert.matches("return p%.x%.y", members("fn f(p) { return p.x.y }"))
+        end)
+    end)
+
     describe("type annotations are erased", function ()
         it("emits the same Lua with or without a binding annotation", function ()
             assert.equal(compile("private x = 5"), compile("private x: int = 5"))

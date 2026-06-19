@@ -3,10 +3,12 @@
 --- To add a new statement type, create a `StatementParser` in its own file
 --- and add it to `HANDLERS`.  No other code needs to change.
 
-local Error    = require("error")
-local Keywords = require("frontend.lexer.keywords")
-local ExprStmt = require("frontend.parser.nodes.expression_stmt")
-local binding  = require("frontend.parser.statements.binding")
+local Error       = require("error")
+local Keywords    = require("frontend.lexer.keywords")
+local ExprStmt    = require("frontend.parser.nodes.expression_stmt")
+local FieldAssign = require("frontend.parser.nodes.field_assign")
+local BinaryExpr  = require("frontend.parser.nodes.binary")
+local binding     = require("frontend.parser.statements.binding")
 
 --- All registered statement handlers, keyed by their trigger token type.
 --- Add new handlers here — the dispatcher builds the registry automatically.
@@ -77,7 +79,27 @@ return {
                 tok.line, tok.column, self.source, #tok.value)
         end
 
-        return ExprStmt.new(self:_expression(), tok.line, tok.column)
+        local expr = self:_expression()
+
+        -- Field assignment: `object.field = value` (or compound `+=`). A bare
+        -- name assignment is already handled above by `read_assignment`; here the
+        -- only assignable lvalue is a field access.
+        if expr.type == "MemberExpr" then
+            if self:_match("ASSIGN") then
+                local value = self:_expression()
+                return FieldAssign.new(expr --[[@as MemberExpr]], value, tok.line, tok.column)
+            end
+            local op = self:_current()
+            local binop = op and binding.COMPOUND[op.type]
+            if binop then
+                self:_advance()
+                local rhs   = self:_expression()
+                local value = BinaryExpr.new(binop --[[@as string]], expr, rhs, tok.line, tok.column)
+                return FieldAssign.new(expr --[[@as MemberExpr]], value, tok.line, tok.column)
+            end
+        end
+
+        return ExprStmt.new(expr, tok.line, tok.column)
     end,
 
     --- Parse a braced block `{ <statement>* }`, returning the statement list.

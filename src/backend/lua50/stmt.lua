@@ -68,6 +68,11 @@ function emit_stmt(node)
         return "local " .. node.name
     end
 
+    if node.type == "FieldAssign" then
+        ---@cast node FieldAssign
+        return emit_expr(node.target) .. " = " .. emit_expr(node.value)
+    end
+
     if node.type == "ExpressionStmt" then
         ---@cast node ExpressionStmt
         return emit_expr(node.expression)

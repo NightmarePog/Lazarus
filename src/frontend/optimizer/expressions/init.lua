@@ -13,6 +13,7 @@ local HANDLERS = {
     (require("frontend.optimizer.expressions.binary")),
     (require("frontend.optimizer.expressions.call")),
     (require("frontend.optimizer.expressions.unary")),
+    (require("frontend.optimizer.expressions.member")),
 }
 
 ---@type table<string, FoldExpression>

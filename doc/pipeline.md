@@ -75,6 +75,7 @@ Single-pass scanner. Walks the source byte by byte and emits a flat list of toke
 | `BODY_END` | `}` |
 | `COMMA` | `,` |
 | `COLON` | `:` (introduces a type annotation) |
+| `DOT` | `.` (field access / method call) |
 | `SEMICOLON` | `;` (only used inside a `for` header) |
 | `IF` `ELSE` `WHILE` `LOOP` `FOR` `BREAK` | the control-flow keywords |
 | `TRUE` `FALSE` | boolean literals |
@@ -132,6 +133,7 @@ Program
 | `FunctionDecl` | `name: string`, `params: string[]`, `body: Stmt[]` | `fn f(a, b) { ... }` |
 | `ReturnStmt` | `value: Expr \| nil` | `return expr` / bare `return` |
 | `ExpressionStmt` | `expression: Expr` | bare expression as statement |
+| `FieldAssign` | `target: MemberExpr`, `value: Expr` | `self.x = 3` (incl. compound `+=`) |
 | `IfStmt` | `clauses: {condition, body}[]`, `else_body: Stmt[] \| nil` | `if c { } else if d { } else { }` |
 | `WhileStmt` | `condition: Expr`, `body: Stmt[]` | `while c { ... }` |
 | `LoopStmt` | `body: Stmt[]` | `loop { ... }` |
@@ -163,6 +165,7 @@ optimizer folds any binding with a foldable initialiser automatically.
 | `BinaryExpr` | `op: TokenType`, `left: Expr`, `right: Expr` | `a + b`, `a == b`, `a and b` |
 | `UnaryExpr` | `op: TokenType`, `operand: Expr` | `not done` |
 | `CallExpr` | `callee: Expr`, `args: Expr[]` | `f(a, b)` |
+| `MemberExpr` | `object: Expr`, `field: string` | `self.x`, `p.x.y`, `obj.m()` |
 
 ### Operator precedence (low → high)
 

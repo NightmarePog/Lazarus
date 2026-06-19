@@ -34,6 +34,16 @@ emit_expr = function(node)
         return Context.emit_name(node.name)
     end
 
+    if node.type == "MemberExpr" then
+        ---@cast node MemberExpr
+        local object = emit_expr(node.object)
+        -- A binary or unary operand is not directly indexable; parenthesise it.
+        if node.object.type == "BinaryExpr" or node.object.type == "UnaryExpr" then
+            object = "(" .. object .. ")"
+        end
+        return object .. "." .. node.field
+    end
+
     if node.type == "CallExpr" then
         ---@cast node CallExpr
         local args = {}

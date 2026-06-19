@@ -46,6 +46,7 @@ local Keywords = {}
 --- | "POWER"
 --- | "CONCAT"
 --- | "COLON"
+--- | "DOT"
 --- | "SEMICOLON"
 
 --- Maps source-text strings to their `TokenType`.
@@ -93,6 +94,7 @@ local TOKENS_DATA = {
     ["}"] = "BODY_END",
     [","] = "COMMA",
     [":"] = "COLON",
+    ["."] = "DOT",
     [";"] = "SEMICOLON"
 }
 

@@ -145,6 +145,57 @@ describe("Parser", function ()
         end)
     end)
 
+    describe("field access", function ()
+        local function value_of(src)
+            return parse("private x = " .. src).body[1].value
+        end
+
+        it("parses 'p.x' as a MemberExpr", function ()
+            local m = value_of("p.x") --[[@as MemberExpr]]
+            assert.equal("MemberExpr", m.type)
+            assert.equal("x", m.field)
+            assert.equal("IdentifierExpr", m.object.type)
+            assert.equal("p", m.object.name)
+        end)
+
+        it("parses chained access 'p.x.y' left-associatively", function ()
+            local m = value_of("p.x.y") --[[@as MemberExpr]]
+            assert.equal("y", m.field)
+            assert.equal("MemberExpr", m.object.type)
+            assert.equal("x", m.object.field)
+        end)
+
+        it("parses a method call 'p.m()' as a CallExpr over a MemberExpr", function ()
+            local c = value_of("p.m()") --[[@as CallExpr]]
+            assert.equal("CallExpr", c.type)
+            assert.equal("MemberExpr", c.callee.type)
+            assert.equal("m", c.callee.field)
+        end)
+
+        it("parses a field assignment as a FieldAssign statement", function ()
+            local s = parse("p.x = 3").body[1] --[[@as FieldAssign]]
+            assert.equal("FieldAssign", s.type)
+            assert.equal("MemberExpr", s.target.type)
+            assert.equal("x", s.target.field)
+            assert.equal("LiteralExpr", s.value.type)
+        end)
+
+        it("desugars a compound field assignment 'p.x += 1'", function ()
+            local s = parse("p.x += 1").body[1] --[[@as FieldAssign]]
+            assert.equal("FieldAssign", s.type)
+            local v = s.value --[[@as BinaryExpr]]
+            assert.equal("BinaryExpr", v.type)
+            assert.equal("PLUS", v.op)
+            assert.equal("MemberExpr", v.left.type)
+        end)
+
+        it("errors on a missing field name after '.'", function ()
+            local ok, err = pcall(function () parse("private x = p.") end)
+            assert.is_false(ok)
+            assert.matches("Expected a field name", (err --[[@as Error]]).message)
+        end)
+    end)
+
     describe("boolean / unary / comparison / logical expressions", function ()
         local function value_of(src)
             return parse("private x = " .. src).body[1].value
