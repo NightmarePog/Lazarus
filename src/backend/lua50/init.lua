@@ -1,15 +1,18 @@
 --- Code generator: walks the AST and emits Lua 5.0 source text.
 ---
 --- A file is a **class**: the program lowers to a plain class table `C` whose
---- top-level functions and bindings are static members. No metatables are used
+--- top-level functions and bindings are members. No metatables are used
 --- (`__index` lookups are avoided for speed) — members are accessed by direct
---- indexing (`C.field`, `C.fn(...)`). The emitted chunk is `local C = {}`, the
---- members, then (for a program) `C.main()` and finally `return C` so importers
---- and the test harness can read it.
+--- indexing (`C.field`, `C.f(...)`). The emitted chunk is `local C = {}`, the
+--- members, then (for a program) `return C.new(...)`: the **constructor is the
+--- entry point**, so the chunk constructs the class (forwarding the launch
+--- arguments `...`) and returns the instance. An entry program must define a
+--- constructor.
 
 local stmt      = require("backend.lua50.stmt")
 local Context   = require("backend.lua50.context")
 local const     = require("const")
+local Error     = require("error")
 
 local emit_member = stmt.emit_member
 
@@ -25,7 +28,7 @@ local HEADER = table.concat({
 
 ---@class CodegenOptions
 ---@field header? boolean  Emit the banner comment (default: true)
----@field entry?  boolean  Append the `C.main()` call and `return C` footer (default: true)
+---@field entry?  boolean  Append the `return C.new(...)` entry footer (default: true)
 
 ---@class Codegen
 ---@field ast        AST
@@ -40,12 +43,11 @@ function Codegen.new(ast, class_name)
     return setmetatable({ ast = ast, class_name = class_name or "Main" }, Codegen)
 end
 
---- True when a top-level function named `main` is declared — the program entry
---- point that the footer calls.
+--- True when the class declares a constructor — the program entry point.
 ---@return boolean
-function Codegen:_has_entry()
+function Codegen:_has_constructor()
     for _, stmt_node in ipairs(self.ast.body) do
-        if stmt_node.type == "FunctionDecl" and stmt_node.name == "main" then
+        if stmt_node.type == "ConstructorDecl" then
             return true
         end
     end
@@ -55,9 +57,9 @@ end
 --- Emit the program as a Lua 5.0 source string.
 ---
 --- Layout: `HEADER` banner, the class table and its members, and — for a
---- program — a `C.main()` call followed by `return C`. Each non-class section is
---- toggleable via `opts`; disabling both yields just the class table and members
---- (used by unit tests that assert on member fragments).
+--- program (`entry`) — `return C.new(...)` (the constructor entry point). Each
+--- non-class section is toggleable via `opts`; disabling both yields just the
+--- class table and members (used by unit tests that assert on member fragments).
 ---@param opts? CodegenOptions
 ---@return string
 function Codegen:generate(opts)
@@ -66,15 +68,22 @@ function Codegen:generate(opts)
     local with_entry  = opts.entry  ~= false
     local class_name  = self.class_name
 
-    -- Collect member names so references to them can be qualified as `C.name`.
+    -- Collect member names so references to them can be qualified as `C.name`,
+    -- and the subset that are instance methods so `obj.m(...)` calls can lower to
+    -- receiver-passing dispatch `C.m(obj, ...)`.
     ---@type table<string, boolean>
     local members = {}
+    ---@type table<string, boolean>
+    local instance_methods = {}
     for _, stmt_node in ipairs(self.ast.body) do
         if stmt_node.type == "FunctionDecl" or stmt_node.type == "VariableDecl" then
             members[stmt_node.name] = true
+            if stmt_node.type == "FunctionDecl" and not stmt_node.is_static then
+                instance_methods[stmt_node.name] = true
+            end
         end
     end
-    Context.reset(class_name, members)
+    Context.reset(class_name, members, instance_methods)
 
     local member_lines = {}
     for _, stmt_node in ipairs(self.ast.body) do
@@ -92,12 +101,14 @@ function Codegen:generate(opts)
     end
     sections[#sections + 1] = class_block
     if with_entry then
-        local footer = {}
-        if self:_has_entry() then
-            footer[#footer + 1] = class_name .. ".main()"
+        -- The entry of a program is its constructor: the chunk constructs the
+        -- class and returns the instance, forwarding the launch arguments
+        -- (`...`) into the constructor. An entry program must have a constructor.
+        if not self:_has_constructor() then
+            Error.throw(Error.Type.MISSING_CONSTRUCTOR,
+                "The entry class '" .. class_name .. "' must define a constructor")
         end
-        footer[#footer + 1] = "return " .. class_name
-        sections[#sections + 1] = table.concat(footer, "\n")
+        sections[#sections + 1] = "return " .. class_name .. ".new(...)"
     end
 
     return table.concat(sections, "\n\n")

@@ -1,22 +1,19 @@
 private base  = 2 * 3 + 1
 private scale = (base + 3) * 2
 
-public mut answer = 0
-public mut label  = "none"
-
-fn square(n) {
+static square(n) {
     return n * n
 }
 
-fn step(v) {
+static step(v) {
     mut r = v
     r = r * 2
     r = r + base
     return r
 }
 
-fn compute(seed) {
-    fn bump(x) {
+static compute(seed) {
+    bump(x) {
         return x + base
     }
 
@@ -28,12 +25,16 @@ fn compute(seed) {
     return total
 }
 
-fn brand() {
+static brand() {
     return "lazarus"
 }
 
-fn main() {
-    answer = compute(4)
-    label  = brand()
-    return answer
+describe() {
+    return self.label ++ " = " ++ "ready"
+}
+
+constructor() {
+    self.answer  = compute(4)
+    self.label   = brand()
+    self.summary = self.describe()
 }

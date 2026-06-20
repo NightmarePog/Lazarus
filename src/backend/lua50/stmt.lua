@@ -176,9 +176,15 @@ local function emit_member(node)
 
     if node.type == "FunctionDecl" then
         ---@cast node FunctionDecl
-        local params = table.concat(node.params, ", ")
-        local header = "function " .. C .. "." .. node.name .. "(" .. params .. ")"
-        local body = emit_fn_body(node.params, node.body)
+        -- An instance method takes an implicit `self` as its first parameter;
+        -- a `static` method takes only its declared parameters.
+        local params = node.params
+        if not node.is_static then
+            params = { "self" }
+            for _, p in ipairs(node.params) do params[#params + 1] = p end
+        end
+        local header = "function " .. C .. "." .. node.name .. "(" .. table.concat(params, ", ") .. ")"
+        local body = emit_fn_body(params, node.body)
         if not body then return header .. "\nend" end
         return header .. "\n" .. body .. "\nend"
     end

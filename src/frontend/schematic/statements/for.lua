@@ -36,8 +36,8 @@ return StatementCheck.new("ForStmt", function(ctx, frame)
         ctx:expect_bool(stmt.condition, scope, "loop condition")
     end
     if stmt.step then
-        ctx:analyze_block({ stmt.step }, scope, frame.in_function, true, frame.return_type)
+        ctx:analyze_block({ stmt.step }, scope, frame.in_function, true, frame.return_type, frame.in_constructor)
     end
 
-    ctx:analyze_block(stmt.body, ctx:child_scope(scope), frame.in_function, true, frame.return_type)
+    ctx:analyze_block(stmt.body, ctx:child_scope(scope), frame.in_function, true, frame.return_type, frame.in_constructor)
 end)

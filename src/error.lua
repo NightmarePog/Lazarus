@@ -28,6 +28,8 @@ Error.Type = {
     SYNTAX_ERROR        = "SYNTAX_ERROR",
     SEMANTIC_ERROR      = "SEMANTIC_ERROR",
     TYPE_MISMATCH       = "TYPE_MISMATCH",
+    MISSING_CONSTRUCTOR = "MISSING_CONSTRUCTOR",
+    NOT_CALLABLE        = "NOT_CALLABLE",
 }
 
 --- Construct a new Error value. All positional fields are optional; when

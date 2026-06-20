@@ -2,9 +2,9 @@
 ---
 --- Must appear at the top level of a class (not nested in a function). Its
 --- parameters and the implicit `self` are bound in a child scope, then the body
---- is analysed. The body must not `return` a value — the instance is returned
---- implicitly — so it is analysed with `in_function = false`, which rejects a
---- bare `return` as "outside of a function".
+--- is analysed. A constructor body is a function-like scope (local bindings are
+--- allowed), but it must not `return` — the instance is returned implicitly — so
+--- it is analysed with `in_constructor = true`, which `return.lua` rejects.
 
 local Error          = require("error")
 local StatementCheck = require("frontend.schematic.statements.statement_check")
@@ -32,5 +32,5 @@ return StatementCheck.new("ConstructorDecl", function(ctx, frame)
     end
     scope["self"] = { kind = "variable", vtype = "any" }
 
-    ctx:analyze_block(stmt.body, scope, false, false)
+    ctx:analyze_block(stmt.body, scope, true, false, nil, true)
 end)

@@ -8,6 +8,10 @@ local Arithmetic = {}
 
 Arithmetic.base = 7
 Arithmetic.scaled = 20
-Arithmetic.total = 27
+function Arithmetic.new()
+    local self = {}
+    self.total = 27
+    return self
+end
 
-return Arithmetic
+return Arithmetic.new(...)

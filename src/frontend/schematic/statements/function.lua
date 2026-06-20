@@ -1,8 +1,10 @@
---- Semantic check for function declarations.
+--- Semantic check for method / function declarations.
 ---
 --- The name is bound in the enclosing scope *before* the body is walked, so a
 --- function may call itself (recursion). The body is checked in a child scope
---- that inherits the enclosing declarations and adds the parameters.
+--- that inherits the enclosing declarations and adds the parameters. A top-level
+--- **instance** method (not `static`, not nested in a function) also binds the
+--- implicit `self` receiver in its body scope.
 
 local Error          = require("error")
 local StatementCheck = require("frontend.schematic.statements.statement_check")
@@ -17,6 +19,14 @@ return StatementCheck.new("FunctionDecl", function(ctx, frame)
     Naming.check_type(stmt.return_type, ctx.source)
 
     local scope = ctx:child_scope(frame.symbols)
+
+    -- An instance method receives an implicit `self`. Static methods and nested
+    -- local functions do not. (`frame.in_function` is true for a nested
+    -- declaration, which is an ordinary local function with no receiver.)
+    if not stmt.is_static and not frame.in_function then
+        scope["self"] = { kind = "variable", vtype = "any" }
+    end
+
     for i, param in ipairs(stmt.params) do
         if rawget(scope, param) then
             Error.throw(Error.Type.SEMANTIC_ERROR,

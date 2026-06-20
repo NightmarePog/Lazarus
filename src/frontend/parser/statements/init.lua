@@ -9,6 +9,7 @@ local ExprStmt    = require("frontend.parser.nodes.expression_stmt")
 local FieldAssign = require("frontend.parser.nodes.field_assign")
 local BinaryExpr  = require("frontend.parser.nodes.binary")
 local binding     = require("frontend.parser.statements.binding")
+local Method      = require("frontend.parser.statements.method")
 
 --- All registered statement handlers, keyed by their trigger token type.
 --- Add new handlers here — the dispatcher builds the registry automatically.
@@ -17,7 +18,7 @@ local HANDLERS = {
     (require("frontend.parser.statements.private")),
     (require("frontend.parser.statements.public")),
     (require("frontend.parser.statements.mut")),
-    (require("frontend.parser.statements.function")),
+    (require("frontend.parser.statements.static")),
     (require("frontend.parser.statements.constructor")),
     (require("frontend.parser.statements.return")),
     (require("frontend.parser.statements.if")),
@@ -61,12 +62,20 @@ return {
             return handler.parse(self)
         end
 
-        -- Bare binding / reassignment: `<identifier> = <expr>` or a compound
-        -- assignment `<identifier> += <expr>`. The keyword is absent (no
-        -- visibility, immutable), so it is recognised by lookahead rather than
-        -- by the registry. Schematic resolves declaration vs reassignment by
-        -- scope.
         if tok.type == "IDENTIFIER" then
+            -- Method / function declaration without a modifier: `name(params) {`.
+            -- An instance method at the top level; a `local function` when
+            -- nested. Recognised by lookahead (`(` … `)` `{`) so a bare call
+            -- statement `name(args)` is not mistaken for one.
+            if Method.looks_like_decl(self) then
+                return Method.parse(self, nil, false)
+            end
+
+            -- Bare binding / reassignment: `<identifier> = <expr>` or a compound
+            -- assignment `<identifier> += <expr>`. The keyword is absent (no
+            -- visibility, immutable), so it is recognised by lookahead rather
+            -- than by the registry. Schematic resolves declaration vs
+            -- reassignment by scope.
             local nxt = self.token_table[self.pos + 1]
             -- `name =`, `name +=`, … or an annotated declaration `name : Type = …`.
             if nxt and (nxt.type == "ASSIGN" or nxt.type == "COLON" or binding.COMPOUND[nxt.type]) then

@@ -58,17 +58,17 @@ end
 --- Plain (non-pattern) substring search.
 local function has(haystack, needle) return haystack:find(needle, 1, true) ~= nil end
 
--- square(7) = 49; written to the public global `answer` by main().
+-- square(7) = 49; stored on the instance field `answer` by the constructor
+-- (the program entry point).
 local PROGRAM = [[
-public mut answer = 0
+private seed = 7
 
-fn square(n) {
+static square(n) {
     return n * n
 }
 
-fn main() {
-    answer = square(7)
-    return answer
+constructor() {
+    self.answer = square(seed)
 }
 ]]
 
@@ -81,8 +81,8 @@ describe("CLI", function()
 
             assert.equal(0, code)
             assert.is_true(has(out, "function Prog.square(n)"))
-            assert.is_true(has(out, "Prog.answer = Prog.square(7)"))
-            assert.is_true(has(out, "Prog.main()"))
+            assert.is_true(has(out, "self.answer = Prog.square(7)"))
+            assert.is_true(has(out, "return Prog.new(...)"))
         end)
 
         it("generates Lua that loads and runs to the right result", function()
@@ -91,9 +91,9 @@ describe("CLI", function()
             os.remove(laz)
 
             assert.equal(0, code)
-            -- The chunk runs main() and returns the class; read its public member.
-            local Prog = assert(load_chunk(out), "generated Lua failed to load")()
-            assert.equal(49, Prog.answer)
+            -- The chunk runs the constructor and returns the instance; read its field.
+            local inst = assert(load_chunk(out), "generated Lua failed to load")()
+            assert.equal(49, inst.answer)
         end)
 
         it("writes <file>.lua next to the source by default", function()
@@ -134,7 +134,7 @@ describe("CLI", function()
         end)
 
         it("fails (non-zero) on a syntax error", function()
-            local laz = tmp_laz("fn main( {\n")
+            local laz = tmp_laz("constructor( {\n")
             local _, code = run("check " .. laz)
             os.remove(laz)
             assert.is_true(code ~= 0)

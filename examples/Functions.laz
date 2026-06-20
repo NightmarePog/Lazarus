@@ -1,13 +1,13 @@
 private offset = 10
 
-fn double(n) {
+static double(n) {
     return n * 2
 }
 
-fn shift(n) {
+static shift(n) {
     return n + offset
 }
 
-fn main() {
-    return shift(double(5))
+constructor() {
+    self.result = shift(double(5))
 }

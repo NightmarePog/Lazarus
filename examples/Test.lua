@@ -9,17 +9,18 @@ local Test = {}
 function Test.test_func(a)
     return a + 1
 end
-function Test.main()
+function Test.new()
+    local self = {}
     local a = 0
-    local b = 2
     do
         local i = 0
         while i < 10 do
-            a = a(a)
+            a = Test.test_func(a)
             i = i + 1
         end
     end
+    self.result = a
+    return self
 end
 
-Test.main()
-return Test
+return Test.new(...)

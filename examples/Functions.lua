@@ -13,9 +13,10 @@ end
 function Functions.shift(n)
     return n + 10
 end
-function Functions.main()
-    return Functions.shift(Functions.double(5))
+function Functions.new()
+    local self = {}
+    self.result = Functions.shift(Functions.double(5))
+    return self
 end
 
-Functions.main()
-return Functions
+return Functions.new(...)

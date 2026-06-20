@@ -16,6 +16,7 @@
 ---@field in_function boolean                          True inside a function body
 ---@field in_loop     boolean                          True inside a loop body
 ---@field return_type string | nil                     Declared return type of the enclosing function
+---@field in_constructor boolean                        True inside a constructor body (`return` is illegal)
 
 ---@class StatementCheck
 ---@field type  string                                AST node `type` this rule handles

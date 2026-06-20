@@ -1,11 +1,13 @@
-fn test_func(a) {
-    return a+1
+static test_func(a) {
+    return a + 1
 }
 
-fn main() {
+constructor() {
     mut a = 0
-    b = 2
-    for i = 0; i<10;i = i+1 {
-        a = a(a)
+
+    for i = 0; i < 10; i = i + 1 {
+        a = test_func(a)
     }
+
+    self.result = a
 }

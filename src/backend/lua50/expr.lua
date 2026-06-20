@@ -58,6 +58,19 @@ emit_expr = function(node)
             return Context.class .. ".new(" .. table.concat(args, ", ") .. ")"
         end
 
+        -- Instance-method dispatch: `obj.m(args)` where `m` is one of the
+        -- class's instance methods lowers to receiver-passing `C.m(obj, args)`
+        -- (no metatables). A field call on a name that is *not* a class method
+        -- (e.g. an external object) is left as a plain `obj.m(args)`.
+        if node.callee.type == "MemberExpr" and Context.instance_methods[node.callee.field] then
+            local object = emit_expr(node.callee.object)
+            if node.callee.object.type == "BinaryExpr" or node.callee.object.type == "UnaryExpr" then
+                object = "(" .. object .. ")"
+            end
+            table.insert(args, 1, object)
+            return Context.class .. "." .. node.callee.field .. "(" .. table.concat(args, ", ") .. ")"
+        end
+
         local callee = emit_expr(node.callee)
         -- A binary expression is not directly callable in Lua; parenthesise it
         -- defensively so the emitted text stays syntactically valid.

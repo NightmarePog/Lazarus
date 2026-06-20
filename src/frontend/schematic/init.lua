@@ -104,18 +104,20 @@ end
 ---@param in_function boolean
 ---@param in_loop?    boolean   True inside a loop body (governs `break` legality)
 ---@param return_type? string   Declared return type of the enclosing function, threaded to `return`
-function SemContext:analyze_block(stmts, symbols, in_function, in_loop, return_type)
+---@param in_constructor? boolean  True inside a constructor body (locals allowed, but `return` is not)
+function SemContext:analyze_block(stmts, symbols, in_function, in_loop, return_type, in_constructor)
     for idx, stmt in ipairs(stmts) do
         local rule = statement_registry[stmt.type]
         if rule then
             rule.check(self, {
-                stmt        = stmt,
-                idx         = idx,
-                stmts       = stmts,
-                symbols     = symbols,
-                in_function = in_function,
-                in_loop     = in_loop or false,
-                return_type = return_type,
+                stmt           = stmt,
+                idx            = idx,
+                stmts          = stmts,
+                symbols        = symbols,
+                in_function    = in_function,
+                in_loop        = in_loop or false,
+                return_type    = return_type,
+                in_constructor = in_constructor or false,
             })
         end
     end

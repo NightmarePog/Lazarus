@@ -38,22 +38,21 @@ local PROGRAM = [[
 private base  = 2 * 3 + 1
 private scale = (base + 3) * 2
 
-public mut answer = 0
-public mut label  = "none"
+public mut hits = 0
 
-fn square(n) {
+static square(n) {
     return n * n
 }
 
-fn step(v) {
+static step(v) {
     mut r = v
     r = r * 2
     r = r + base
     return r
 }
 
-fn compute(seed) {
-    fn bump(x) {
+static compute(seed) {
+    bump(x) {
         return x + base
     }
 
@@ -65,14 +64,13 @@ fn compute(seed) {
     return total
 }
 
-fn brand() {
+static brand() {
     return "lazarus"
 }
 
-fn main() {
-    answer = compute(4)
-    label  = brand()
-    return answer
+constructor() {
+    self.answer = compute(4)
+    self.label  = brand()
 }
 ]]
 
@@ -98,8 +96,8 @@ describe("Integration", function ()
         end)
 
         it("lowers a public binding to a class member (no `local`)", function ()
-            assert.is_true(has(body, "Main.answer = 0"))
-            assert.is_false(has(body, "local answer"))
+            assert.is_true(has(body, "Main.hits = 0"))
+            assert.is_false(has(body, "local hits"))
         end)
 
         it("lowers a reassignment without `local`", function ()
@@ -123,17 +121,17 @@ describe("Integration", function ()
             --   total = step(20)        = 20*2 + 7 = 47
             --   total = bump(47)        = 47 + 7   = 54
             --   total = 54 + scale(20)            = 74
-            -- The chunk runs main() and returns the class table, whose public
-            -- members hold the results.
-            local Main = assert(load_chunk(compile(PROGRAM)))()
-            assert.equal(74, Main.answer)
-            assert.equal("lazarus", Main.label)
+            -- The chunk runs the constructor and returns the instance, whose
+            -- fields hold the results.
+            local inst = assert(load_chunk(compile(PROGRAM)))()
+            assert.equal(74, inst.answer)
+            assert.equal("lazarus", inst.label)
         end)
     end)
 
     describe("recursion (self-reference)", function ()
         it("compiles a function that refers to itself", function ()
-            local out = compile("fn recur() { return recur }\nfn main() { return recur }")
+            local out = compile("static recur() { return recur }\nconstructor() {}")
             assert.is_truthy(load_chunk(out), "self-referential function failed to load")
         end)
     end)
@@ -143,13 +141,7 @@ describe("Integration", function ()
         -- for with compound assignment, while, an explicit loop with break, plus
         -- comparison operators, booleans and `not`.
         local CF_PROGRAM = [[
-public mut total   = 0
-public mut steps   = 0
-public mut firsteven = 0
-public mut flag    = false
-public mut label   = "none"
-
-fn classify(n) {
+static classify(n) {
     if n < 0 {
         return "neg"
     } else if n == 0 {
@@ -159,7 +151,7 @@ fn classify(n) {
     }
 }
 
-fn sum_to(n) {
+static sum_to(n) {
     mut acc = 0
     for i = 1; i <= n; i += 1 {
         acc += i
@@ -167,7 +159,7 @@ fn sum_to(n) {
     return acc
 }
 
-fn count_down(n) {
+static count_down(n) {
     mut cnt = 0
     mut k   = n
     while k > 0 {
@@ -177,7 +169,7 @@ fn count_down(n) {
     return cnt
 }
 
-fn first_four() {
+static first_four() {
     mut i = 1
     loop {
         if i == 4 {
@@ -188,13 +180,12 @@ fn first_four() {
     return i
 }
 
-fn main() {
-    total     = sum_to(5)
-    steps     = count_down(7)
-    firsteven = first_four()
-    flag      = not (total == 0)
-    label     = classify(0 - 3)
-    return total
+constructor() {
+    self.total     = sum_to(5)
+    self.steps     = count_down(7)
+    self.firsteven = first_four()
+    self.flag      = not (self.total == 0)
+    self.label     = classify(0 - 3)
 }
 ]]
 
@@ -210,52 +201,53 @@ fn main() {
         end)
 
         it("produces the correct runtime results", function ()
-            local Main = assert(load_chunk(compile(CF_PROGRAM)))()
+            local inst = assert(load_chunk(compile(CF_PROGRAM)))()
 
-            assert.equal(15, Main.total)      -- 1+2+3+4+5
-            assert.equal(7,  Main.steps)      -- counted down from 7
-            assert.equal(4,  Main.firsteven)  -- loop breaks at i == 4
-            assert.equal(true, Main.flag)     -- not (15 == 0)
-            assert.equal("neg", Main.label)   -- classify(-3)
+            assert.equal(15, inst.total)      -- 1+2+3+4+5
+            assert.equal(7,  inst.steps)      -- counted down from 7
+            assert.equal(4,  inst.firsteven)  -- loop breaks at i == 4
+            assert.equal(true, inst.flag)     -- not (15 == 0)
+            assert.equal("neg", inst.label)   -- classify(-3)
         end)
     end)
 
     describe("constructor and instances", function ()
-        -- Class name defaults to "Main", so the program constructs `Main(...)`.
+        -- The constructor is the entry point: the chunk is `return Main.new(...)`,
+        -- so launch arguments flow into the constructor and the instance is
+        -- returned. `sum_coords` is a static helper; `bump` is an instance method
+        -- dispatched as `Main.bump(self)`.
         local PROG = [[
-public mut sum = 0
+static sum_coords(p) {
+    return p.x + p.y
+}
+
+bump() {
+    self.x = self.x + 10
+}
 
 constructor(x, y) {
     self.x = x
     self.y = y
-}
-
-fn add_coords(p) {
-    return p.x + p.y
-}
-
-fn main() {
-    mut p = Main(3, 4)
-    p.x = p.x + 10
-    sum = add_coords(p)
-    return sum
+    self.bump()
+    self.sum = sum_coords(self)
 }
 ]]
 
-        it("lowers the constructor to a plain-table C.new", function ()
+        it("lowers the constructor to a plain-table C.new and dispatches the instance method", function ()
             local body = compile(PROG, { header = false, entry = false })
             assert.is_true(has(body, "function Main.new(x, y)"))
             assert.is_true(has(body, "local self = {}"))
-            assert.is_true(has(body, "p = Main.new(3, 4)"))
+            assert.is_true(has(body, "function Main.bump(self)"))
+            assert.is_true(has(body, "Main.bump(self)"))       -- self.bump() dispatch
+            assert.is_true(has(body, "Main.sum_coords(self)")) -- static helper call
         end)
 
         it("constructs an instance and reads/writes its fields at runtime", function ()
-            local Main = assert(load_chunk(compile(PROG)))()
-            assert.equal(17, Main.sum) -- (3 + 10) + 4
-            -- The constructor is callable directly too.
-            local q = Main.new(1, 2)
-            assert.equal(1, q.x)
-            assert.equal(2, q.y)
+            -- Launch args 3, 4 flow into the constructor (return Main.new(...)).
+            local inst = assert(load_chunk(compile(PROG)))(3, 4)
+            assert.equal(13, inst.x)   -- 3, bumped by 10
+            assert.equal(4,  inst.y)
+            assert.equal(17, inst.sum) -- (3 + 10) + 4
         end)
     end)
 
@@ -264,19 +256,13 @@ fn main() {
         -- through the whole pipeline and at runtime.
         local PROG = [[
 // division, modulo, power, concat and compound /=
-public mut q = 0
-public mut r = 0
-public mut p = 0
-public mut greeting = "none"
-
-fn main() {
+constructor() {
     mut x = 20
     x /= 2          // x is now 10
-    q = x
-    r = x % 3       /* 10 mod 3 = 1 */
-    p = 2 ^ 4       // folds to 16
-    greeting = "hi, " ++ "laz"
-    return q
+    self.q = x
+    self.r = x % 3       /* 10 mod 3 = 1 */
+    self.p = 2 ^ 4       // folds to 16
+    self.greeting = "hi, " ++ "laz"
 }
 ]]
 
@@ -291,12 +277,12 @@ fn main() {
         end)
 
         it("produces the correct runtime results", function ()
-            local Main = assert(load_chunk(compile(PROG)))()
+            local inst = assert(load_chunk(compile(PROG)))()
 
-            assert.equal(10, Main.q)            -- 20 /= 2
-            assert.equal(1,  Main.r)            -- 10 % 3
-            assert.equal(16, Main.p)            -- 2 ^ 4
-            assert.equal("hi, laz", Main.greeting)
+            assert.equal(10, inst.q)            -- 20 /= 2
+            assert.equal(1,  inst.r)            -- 10 % 3
+            assert.equal(16, inst.p)            -- 2 ^ 4
+            assert.equal("hi, laz", inst.greeting)
         end)
     end)
 end)

@@ -11,6 +11,11 @@ local Context = {}
 Context.class = "Main"
 ---@type table<string, boolean>
 Context.members = {}
+-- Names of the class's instance methods (a subset of `members`). A call whose
+-- callee is `obj.<name>` where `<name>` is here lowers to receiver-passing
+-- dispatch `C.<name>(obj, …)`.
+---@type table<string, boolean>
+Context.instance_methods = {}
 
 -- Stack of local scopes; the top entry is the innermost. Each scope inherits
 -- visible locals from its parent via `__index`, mirroring Lua closure capture.
@@ -19,11 +24,13 @@ local scopes = { {} }
 local function current() return scopes[#scopes] end
 
 --- Reset for a fresh generation over class `class` with the given member names.
----@param class   string
----@param members table<string, boolean>
-function Context.reset(class, members)
-    Context.class   = class
-    Context.members = members
+---@param class            string
+---@param members          table<string, boolean>
+---@param instance_methods table<string, boolean>?
+function Context.reset(class, members, instance_methods)
+    Context.class            = class
+    Context.members          = members
+    Context.instance_methods = instance_methods or {}
     scopes = { {} }
 end
 

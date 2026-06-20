@@ -41,7 +41,7 @@ end
 describe("Functions", function ()
     describe("parser", function ()
         it("parses a no-parameter function with a return", function ()
-            local ast  = parse("fn f() { return 0 }")
+            local ast  = parse("static f() { return 0 }")
             local decl = ast.body[1] --[[@as FunctionDecl]]
             assert.equal("FunctionDecl", decl.type)
             assert.equal("f", decl.name)
@@ -51,30 +51,30 @@ describe("Functions", function ()
         end)
 
         it("parses a parameter list", function ()
-            local decl = parse("fn add(a, b) { return a + b }").body[1] --[[@as FunctionDecl]]
+            local decl = parse("static add(a, b) { return a + b }").body[1] --[[@as FunctionDecl]]
             assert.same({ "a", "b" }, decl.params)
         end)
 
         it("parses a bare return with no value", function ()
-            local decl = parse("fn f() { return }").body[1] --[[@as FunctionDecl]]
+            local decl = parse("static f() { return }").body[1] --[[@as FunctionDecl]]
             local ret  = decl.body[1] --[[@as ReturnStmt]]
             assert.equal("ReturnStmt", ret.type)
             assert.is_nil(ret.value)
         end)
 
         it("parses an empty body", function ()
-            local decl = parse("fn noop() {}").body[1] --[[@as FunctionDecl]]
+            local decl = parse("static noop() {}").body[1] --[[@as FunctionDecl]]
             assert.equal(0, #decl.body)
         end)
 
         it("errors on a missing '('", function ()
-            local ok, err = pcall(parse, "fn f { return 0 }")
+            local ok, err = pcall(parse, "static f { return 0 }")
             assert.is_false(ok)
             assert.matches("Expected '%('", err.message)
         end)
 
         it("errors on an unterminated body", function ()
-            local ok, err = pcall(parse, "fn f() { return 0")
+            local ok, err = pcall(parse, "static f() { return 0")
             assert.is_false(ok)
             assert.matches("Expected '}'", err.message)
         end)
@@ -82,15 +82,15 @@ describe("Functions", function ()
 
     describe("schematic", function ()
         it("accepts a parameter referenced in the body", function ()
-            assert.has_no.errors(function () analyze("fn f(a) { return a }") end)
+            assert.has_no.errors(function () analyze("static f(a) { return a }") end)
         end)
 
         it("accepts an outer constant referenced in the body", function ()
-            assert.has_no.errors(function () analyze("private k = 2\nfn f() { return k }") end)
+            assert.has_no.errors(function () analyze("private k = 2\nstatic f() { return k }") end)
         end)
 
         it("accepts a recursive self-reference", function ()
-            assert.has_no.errors(function () analyze("fn f() { return f }") end)
+            assert.has_no.errors(function () analyze("static f() { return f }") end)
         end)
 
         it("rejects 'return' outside a function", function ()
@@ -100,25 +100,25 @@ describe("Functions", function ()
         end)
 
         it("rejects 'return' that is not the last statement in a block", function ()
-            local ok, err = pcall(analyze, "fn f() { return 0\nprivate x = 1 }")
+            local ok, err = pcall(analyze, "static f() { return 0\nprivate x = 1 }")
             assert.is_false(ok)
             assert.matches("'return' must be the last statement", err.message)
         end)
 
         it("rejects a duplicate parameter", function ()
-            local ok, err = pcall(analyze, "fn f(a, a) { return a }")
+            local ok, err = pcall(analyze, "static f(a, a) { return a }")
             assert.is_false(ok)
             assert.matches("Duplicate parameter 'a'", err.message)
         end)
 
         it("rejects an undeclared identifier in the body", function ()
-            local ok, err = pcall(analyze, "fn f() { return nope }")
+            local ok, err = pcall(analyze, "static f() { return nope }")
             assert.is_false(ok)
             assert.matches("Undeclared identifier 'nope'", err.message)
         end)
 
         it("does not leak a parameter into the outer scope", function ()
-            local ok, err = pcall(analyze, "fn f(a) { return a }\nprivate x = a")
+            local ok, err = pcall(analyze, "static f(a) { return a }\nprivate x = a")
             assert.is_false(ok)
             assert.matches("Undeclared identifier 'a'", err.message)
         end)
@@ -126,21 +126,21 @@ describe("Functions", function ()
 
     describe("optimizer", function ()
         it("folds a constant return expression", function ()
-            local decl = optimize("fn f() { return 2 + 3 }").body[1] --[[@as FunctionDecl]]
+            local decl = optimize("static f() { return 2 + 3 }").body[1] --[[@as FunctionDecl]]
             local ret  = decl.body[1] --[[@as ReturnStmt]]
             assert.equal("LiteralExpr", ret.value.type)
             assert.equal(5, ret.value.value)
         end)
 
         it("propagates an outer constant into the body", function ()
-            local decl = optimize("private k = 2\nfn f() { return k + 1 }").body[2] --[[@as FunctionDecl]]
+            local decl = optimize("private k = 2\nstatic f() { return k + 1 }").body[2] --[[@as FunctionDecl]]
             local ret  = decl.body[1] --[[@as ReturnStmt]]
             assert.equal("LiteralExpr", ret.value.type)
             assert.equal(3, ret.value.value)
         end)
 
         it("does not fold a parameter that shadows an outer constant", function ()
-            local decl = optimize("private x = 9\nfn f(x) { return x + 1 }").body[2] --[[@as FunctionDecl]]
+            local decl = optimize("private x = 9\nstatic f(x) { return x + 1 }").body[2] --[[@as FunctionDecl]]
             local ret  = decl.body[1] --[[@as ReturnStmt]]
             -- `x` is the parameter, not the constant, so the sum must not fold.
             assert.equal("BinaryExpr", ret.value.type)
@@ -149,37 +149,37 @@ describe("Functions", function ()
 
     describe("codegen", function ()
         it("emits a no-parameter function as a static method", function ()
-            assert.equal("function Main.f()\n    return 0\nend", members("fn f() { return 0 }"))
+            assert.equal("function Main.f()\n    return 0\nend", members("static f() { return 0 }"))
         end)
 
         it("emits a parameter list", function ()
             assert.equal("function Main.add(a, b)\n    return a + b\nend",
-                members("fn add(a, b) { return a + b }"))
+                members("static add(a, b) { return a + b }"))
         end)
 
         it("emits an empty body", function ()
-            assert.equal("function Main.noop()\nend", members("fn noop() {}"))
+            assert.equal("function Main.noop()\nend", members("static noop() {}"))
         end)
 
         it("emits a bare return", function ()
-            assert.equal("function Main.f()\n    return\nend", members("fn f() { return }"))
+            assert.equal("function Main.f()\n    return\nend", members("static f() { return }"))
         end)
 
         it("indents a nested function as a local function", function ()
             assert.equal(
                 "function Main.outer()\n    local function inner()\n        return 1\n    end\nend",
-                members("fn outer() { fn inner() { return 1 } }"))
+                members("static outer() { static inner() { return 1 } }"))
         end)
     end)
 
     describe("output is valid Lua", function ()
         local cases = {
-            "fn f() { return 0 }",
-            "fn add(a, b) { return a + b }",
-            "fn noop() {}",
-            "fn f() { return }",
-            "fn outer() { fn inner() { return 1 } }",
-            "private k = 2\nfn f() { return k + 1 }",
+            "static f() { return 0 }",
+            "static add(a, b) { return a + b }",
+            "static noop() {}",
+            "static f() { return }",
+            "static outer() { static inner() { return 1 } }",
+            "private k = 2\nstatic f() { return k + 1 }",
         }
         for _, src in ipairs(cases) do
             it("loads: " .. src:gsub("\n", " "), function ()
@@ -237,12 +237,12 @@ describe("Function calls", function ()
 
     describe("schematic", function ()
         it("accepts a call to a previously declared function", function ()
-            assert.has_no.errors(function () analyze("fn f() { return 0 }\nf()") end)
+            assert.has_no.errors(function () analyze("static f() { return 0 }\nf()") end)
         end)
 
         it("accepts a call inside a function body", function ()
             assert.has_no.errors(function ()
-                analyze("fn id(a) { return a }\nfn use(a) { return id(a) }")
+                analyze("static id(a) { return a }\nstatic use(a) { return id(a) }")
             end)
         end)
 
@@ -253,7 +253,7 @@ describe("Function calls", function ()
         end)
 
         it("rejects an undeclared argument", function ()
-            local ok, err = pcall(analyze, "fn f(a) { return a }\nf(missing)")
+            local ok, err = pcall(analyze, "static f(a) { return a }\nf(missing)")
             assert.is_false(ok)
             assert.matches("Undeclared identifier 'missing'", err.message)
         end)
@@ -267,7 +267,7 @@ describe("Function calls", function ()
 
     describe("optimizer", function ()
         it("propagates a constant into a call argument", function ()
-            local call = optimize("private k = 2\nfn f(a) { return a }\nf(k + 1)").body[3].expression --[[@as CallExpr]]
+            local call = optimize("private k = 2\nstatic f(a) { return a }\nf(k + 1)").body[3].expression --[[@as CallExpr]]
             assert.equal("LiteralExpr", call.args[1].type)
             assert.equal(3, call.args[1].value)
         end)
@@ -276,20 +276,20 @@ describe("Function calls", function ()
     describe("codegen", function ()
         it("emits a no-argument call, qualifying the member callee", function ()
             assert.equal("function Main.f()\n    return 0\nend\nMain.f()",
-                members("fn f() { return 0 }\nf()"))
+                members("static f() { return 0 }\nf()"))
         end)
 
         it("emits a call with arguments", function ()
             assert.equal("function Main.add(a, b)\n    return a + b\nend\nMain.add(1, 2)",
-                members("fn add(a, b) { return a + b }\nadd(1, 2)"))
+                members("static add(a, b) { return a + b }\nadd(1, 2)"))
         end)
     end)
 
     describe("output is valid Lua", function ()
         local cases = {
-            "fn f() { return 0 }\nf()",
-            "fn add(a, b) { return a + b }\nadd(1, 2)",
-            "fn id(a) { return a }\nfn use(a) { return id(a) }",
+            "static f() { return 0 }\nf()",
+            "static add(a, b) { return a + b }\nadd(1, 2)",
+            "static id(a) { return a }\nstatic use(a) { return id(a) }",
         }
         for _, src in ipairs(cases) do
             it("loads: " .. src:gsub("\n", " "), function ()

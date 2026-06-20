@@ -6,5 +6,5 @@ local StatementCheck = require("frontend.schematic.statements.statement_check")
 return StatementCheck.new("LoopStmt", function(ctx, frame)
     local stmt = frame.stmt --[[@as LoopStmt]]
     ctx:analyze_block(stmt.body, ctx:child_scope(frame.symbols),
-        frame.in_function, true, frame.return_type)
+        frame.in_function, true, frame.return_type, frame.in_constructor)
 end)

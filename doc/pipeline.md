@@ -56,7 +56,7 @@ Single-pass scanner. Walks the source byte by byte and emits a flat list of toke
 | `PRIVATE` | `private` |
 | `PUBLIC` | `public` |
 | `MUTABLE` | `mut` |
-| `FUNCTION` | `fn` |
+| `STATIC` | `static` |
 | `CONSTRUCTOR` | `constructor` |
 | `RETURN` | `return` |
 | `IDENTIFIER` | any `[a-zA-Z_][a-zA-Z0-9_]*` not matched as a keyword |
@@ -90,7 +90,7 @@ Comments are skipped by the scanner and produce no tokens: `// …` runs to end 
 
 A number literal with a fractional part (`3.14`) is a float; the lexer leaves a `.` that is not followed by a digit as a separate token.
 
-**Type annotations.** Bindings (`name: Type`), function parameters (`p: Type`) and return types (`fn f(): Type`) carry an optional `TypeRef` (`{ name }`). They are parsed onto `VariableDecl.type_ann` and `FunctionDecl.param_types`/`return_type`. The type *checker* lives in Schematic; annotations are **erased** before codegen, so the emitted Lua is identical with or without them.
+**Type annotations.** Bindings (`name: Type`), function parameters (`p: Type`) and return types (`f(): Type`) carry an optional `TypeRef` (`{ name }`). They are parsed onto `VariableDecl.type_ann` and `FunctionDecl.param_types`/`return_type`. The type *checker* lives in Schematic; annotations are **erased** before codegen, so the emitted Lua is identical with or without them.
 
 ### Internal structure
 
@@ -131,7 +131,7 @@ Program
 | Node | Fields | Source |
 |---|---|---|
 | `VariableDecl` | `name: string`, `value: Expr \| nil`, `visibility: "private"\|"public"\|nil`, `mutable: bool` | `private x = e`, `public mut x = e`, `mut x = e`, `x = e` |
-| `FunctionDecl` | `name: string`, `params: string[]`, `body: Stmt[]` | `fn f(a, b) { ... }` |
+| `FunctionDecl` | `name: string`, `params: string[]`, `is_static: bool`, `visibility: "private"\|"public"\|nil`, `body: Stmt[]` | `greet() { ... }` (instance), `static helper() { ... }` (class), `public m() { ... }` |
 | `ReturnStmt` | `value: Expr \| nil` | `return expr` / bare `return` |
 | `ExpressionStmt` | `expression: Expr` | bare expression as statement |
 | `FieldAssign` | `target: MemberExpr`, `value: Expr` | `self.x = 3` (incl. compound `+=`) |
@@ -199,7 +199,8 @@ optimizer folds any binding with a foldable initialiser automatically.
 | `statements/init.lua` | `_statement` dispatcher + `_block` helper (`{ stmt* }`); bare `IDENT =`/`+=` lookahead |
 | `statements/statement_parser.lua` | `StatementParser` interface (keyword + parse fn) |
 | `statements/binding.lua` | `read_binding` / `read_assignment` — shared binding & assignment parsers (incl. compound `+=` desugaring) |
-| `statements/{private,public,mut,function,return}.lua` | One handler per statement keyword |
+| `statements/method.lua` | `Method.parse` / `Method.looks_like_decl` — shared method/function declaration parser + lookahead |
+| `statements/{private,public,mut,static,return}.lua` | One handler per statement keyword (`private`/`public` also dispatch to methods) |
 | `statements/{if,while,loop,for,break}.lua` | One handler per control-flow keyword |
 | `nodes/*.lua` | One file per AST node type |
 
@@ -231,8 +232,9 @@ Single-pass semantic checker. Walks the AST in source order maintaining a symbol
 | `IdentifierExpr` whose name is not visible in scope | `SEMANTIC_ERROR` — undeclared identifier |
 | `FunctionDecl` with two parameters sharing a name | `SEMANTIC_ERROR` — duplicate parameter |
 | `ConstructorDecl` nested inside a function (not top-level) | `SEMANTIC_ERROR` — `'constructor'` must be at the top level |
-| `ReturnStmt` inside a constructor (the instance is returned implicitly) | `SEMANTIC_ERROR` — `'return'` outside of a function |
+| `ReturnStmt` inside a constructor (the instance is returned implicitly) | `SEMANTIC_ERROR` — `'return'` is not allowed in a constructor |
 | `ReturnStmt` outside any function | `SEMANTIC_ERROR` — `'return'` outside of a function |
+| `CallExpr` whose callee is a binding of a known scalar type (`int`/`float`/`str`/`bool`) | `NOT_CALLABLE` — not callable; it is a `<type>`, not a function |
 | `ReturnStmt` that is not the last statement in its block | `SEMANTIC_ERROR` — `'return'` must be last (mirrors Lua) |
 | `ExpressionStmt` whose expression is not a call | `SEMANTIC_ERROR` — bare expressions are not valid statements |
 | `BreakStmt` outside any loop | `SEMANTIC_ERROR` — `'break'` outside of a loop |
@@ -358,16 +360,27 @@ plain table `C` (named after the file; the CLI uses the filename stem, default
 are emitted — `__index` lookups are avoided; members are accessed by direct
 indexing. Inside a body, a reference to a member is qualified as `C.member`, while
 locals and parameters stay bare (tracked by `backend/lua50/context.lua`). The
-chunk is `local C = {}`, the members, then — for a program — `C.main()` and
-finally `return C` (so importers and tests can read the class). See the memory
-`codegen-class-table-model` for the rationale and the planned locals optimization.
+chunk is `local C = {}`, the members, then — for a program — `return C.new(...)`:
+the **constructor is the entry point**, so the chunk constructs the class
+(forwarding the launch arguments `...`) and returns the instance. An entry program
+must define a constructor, else codegen raises `MISSING_CONSTRUCTOR`. See the
+memory `codegen-class-table-model` for the rationale and the planned locals
+optimization.
+
+**Methods.** A top-level `FunctionDecl` is a class method. An **instance** method
+(plain `name() {}`) takes an implicit `self` first parameter — `function C.name(self, …)`
+— and a call `obj.name(args)` lowers to receiver-passing dispatch `C.name(obj, args)`
+(the set of instance-method names is tracked on the context). A `static` method
+(`static name() {}`) takes only its declared parameters — `function C.name(…)` — and
+is called bare or qualified. The `fn` keyword has been removed.
 
 ### Emission rules
 
 | AST node | Lua output |
 |---|---|
 | Top-level `VariableDecl` (a static member) | `C.name = <expr>` (or `C.name = nil` when valueless) |
-| Top-level `FunctionDecl` (a static method) | `function C.name(params)` + indented body + `end` |
+| Top-level `FunctionDecl`, instance (`is_static=false`) | `function C.name(self, params)` + indented body + `end` |
+| Top-level `FunctionDecl`, `static` | `function C.name(params)` + indented body + `end` |
 | Nested `VariableDecl` (a `local` declaration) | `local name = <expr>` (or `local name` when valueless) |
 | `VariableDecl { reassign=true }` | `<target> = <expr>` (no `local`; `<target>` is `C.name` for a member, else bare) |
 | Nested `FunctionDecl` | `local function name(params)` + indented body + `end` |
@@ -387,13 +400,14 @@ finally `return C` (so importers and tests can read the class). See the memory
 | `IdentifierExpr { name }` | `name`, or `C.name` when it refers to a class member |
 | `BinaryExpr { op, left, right }` | `left op right` (`!=`→`~=`; inner `BinaryExpr` operands parenthesised) |
 | `UnaryExpr { op, operand }` | `not <operand>` (a `BinaryExpr` operand is parenthesised) |
+| `CallExpr` on `obj.m(args)` where `m` is an instance method | `C.m(obj, args)` (receiver-passing dispatch) |
 | `CallExpr { callee, args }` | `callee(arg, arg)` (a member callee is qualified, e.g. `C.f(...)`) |
 
 ### Internal structure
 
 | File | Role |
 |---|---|
-| `init.lua` | `Codegen` class — `Codegen.new(ast, class_name):generate()`; class table + members + `C.main()` + `return C` |
+| `init.lua` | `Codegen` class — `Codegen.new(ast, class_name):generate()`; class table + members + `return C.new(...)` (constructor entry) |
 | `stmt.lua` | `emit_stmt(node)` (nested) and `emit_member(node)` (top-level members) |
 | `expr.lua` | `emit_expr(node)` — expression → Lua string |
 | `context.lua` | per-generation class name, member set, and locals scope stack; `emit_name` qualifies members |

@@ -7,6 +7,12 @@ local StatementCheck = require("frontend.schematic.statements.statement_check")
 return StatementCheck.new("ReturnStmt", function(ctx, frame)
     local stmt = frame.stmt --[[@as ReturnStmt]]
 
+    if frame.in_constructor then
+        Error.throw(Error.Type.SEMANTIC_ERROR,
+            "'return' is not allowed in a constructor; the instance is returned implicitly",
+            stmt.line, stmt.col, ctx.source)
+    end
+
     if not frame.in_function then
         Error.throw(Error.Type.SEMANTIC_ERROR,
             "'return' outside of a function",

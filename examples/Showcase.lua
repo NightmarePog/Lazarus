@@ -8,8 +8,6 @@ local Showcase = {}
 
 Showcase.base = 7
 Showcase.scale = 20
-Showcase.answer = 0
-Showcase.label = "none"
 function Showcase.square(n)
     return n * n
 end
@@ -33,11 +31,15 @@ end
 function Showcase.brand()
     return "lazarus"
 end
-function Showcase.main()
-    Showcase.answer = Showcase.compute(4)
-    Showcase.label = Showcase.brand()
-    return Showcase.answer
+function Showcase.describe(self)
+    return (self.label .. " = ") .. "ready"
+end
+function Showcase.new()
+    local self = {}
+    self.answer = Showcase.compute(4)
+    self.label = Showcase.brand()
+    self.summary = Showcase.describe(self)
+    return self
 end
 
-Showcase.main()
-return Showcase
+return Showcase.new(...)

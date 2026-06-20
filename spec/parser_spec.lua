@@ -111,7 +111,7 @@ describe("Parser", function ()
         end)
 
         it("parses parameter and return type annotations on a function", function ()
-            local fn = parse("fn add(a: int, b: int): int { return a + b }").body[1] --[[@as FunctionDecl]]
+            local fn = parse("static add(a: int, b: int): int { return a + b }").body[1] --[[@as FunctionDecl]]
             assert.same({ "a", "b" }, fn.params)
             assert.equal("int", fn.param_types[1].name)
             assert.equal("int", fn.param_types[2].name)
@@ -119,7 +119,7 @@ describe("Parser", function ()
         end)
 
         it("allows a mix of annotated and unannotated parameters", function ()
-            local fn = parse("fn f(a: int, b) { return a }").body[1] --[[@as FunctionDecl]]
+            local fn = parse("static f(a: int, b) { return a }").body[1] --[[@as FunctionDecl]]
             assert.equal("int", fn.param_types[1].name)
             assert.is_nil(fn.param_types[2])
             assert.is_nil(fn.return_type)

@@ -6,17 +6,16 @@
 
 local Mutability = {}
 
-Mutability.counter = 0
 function Mutability.step(v)
     local total = v
     total = total + 1
     total = total * 2
     return total
 end
-function Mutability.main()
-    Mutability.counter = Mutability.step(4)
-    return Mutability.counter
+function Mutability.new()
+    local self = {}
+    self.counter = Mutability.step(4)
+    return self
 end
 
-Mutability.main()
-return Mutability
+return Mutability.new(...)
