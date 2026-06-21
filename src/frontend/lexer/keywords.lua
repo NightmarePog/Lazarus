@@ -50,6 +50,9 @@ local Keywords = {}
 --- | "COLON"
 --- | "DOT"
 --- | "SEMICOLON"
+--- | "LSQUARE"
+--- | "RSQUARE"
+--- | "IN"
 
 --- Maps source-text strings to their `TokenType`.
 --- Multi-character operators (`==`, `+=`, …) are matched by maximal munch in the
@@ -68,6 +71,7 @@ local TOKENS_DATA = {
     ["while"] = "WHILE",
     ["loop"] = "LOOP",
     ["for"] = "FOR",
+    ["in"] = "IN",
     ["break"] = "BREAK",
     ["true"] = "TRUE",
     ["false"] = "FALSE",
@@ -100,6 +104,8 @@ local TOKENS_DATA = {
     [":"] = "COLON",
     ["."] = "DOT",
     [";"] = "SEMICOLON",
+    ["["] = "LSQUARE",
+    ["]"] = "RSQUARE",
 }
 
 --- Truly read-only view of `TOKENS_DATA`. Because lookups go through an empty
@@ -137,6 +143,8 @@ local VALID_TYPES = {
     DOT = true,
     -- `self` is the receiver value (and begins `self.x` member access).
     SELF = true,
+    -- `[` opens a list / map literal (and, postfix, an index access).
+    LSQUARE = true,
     -- Tokens that can begin an expression: boolean literals and the `not` prefix.
     TRUE = true,
     FALSE = true,

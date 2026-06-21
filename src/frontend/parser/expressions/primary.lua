@@ -6,6 +6,55 @@ local LiteralExpr = require("frontend.parser.nodes.literal")
 local IdentifierExpr = require("frontend.parser.nodes.identifier")
 local MemberExpr = require("frontend.parser.nodes.member")
 local SelfExpr = require("frontend.parser.nodes.self")
+local ListExpr = require("frontend.parser.nodes.list")
+local MapExpr = require("frontend.parser.nodes.map")
+
+--- Parse a list or map literal once the opening `[` is current.
+---
+--- Disambiguated by content: `[]` is an empty list, `[:]` an empty map, and a
+--- non-empty literal is a map when its first element is followed by `:` (a
+--- `key: value` pair), otherwise a list.
+---@param self Parser
+---@return Expr
+local function _collection(self)
+    local open = self:_advance() --[[@as Token]] -- consume '['
+
+    -- Empty forms: `[]` (list) and `[:]` (map).
+    if self:_check("RSQUARE") then
+        self:_advance()
+        return ListExpr.new({}, open.line, open.column)
+    end
+    if self:_check("COLON") then
+        self:_advance()
+        self:_consume("RSQUARE", "Expected ']' to close empty map '[:]'")
+        return MapExpr.new({}, open.line, open.column)
+    end
+
+    local first = self:_expression()
+
+    -- A `:` after the first element makes this a map literal.
+    if self:_match("COLON") then
+        local value = self:_expression()
+        ---@type MapEntry[]
+        local entries = { { key = first, value = value } }
+        while self:_match("COMMA") do
+            local k = self:_expression()
+            self:_consume("COLON", "Expected ':' between a map key and its value")
+            local v = self:_expression()
+            entries[#entries + 1] = { key = k, value = v }
+        end
+        self:_consume("RSQUARE", "Expected ']' to close the map literal")
+        return MapExpr.new(entries, open.line, open.column)
+    end
+
+    -- Otherwise a list literal.
+    local elements = { first }
+    while self:_match("COMMA") do
+        elements[#elements + 1] = self:_expression()
+    end
+    self:_consume("RSQUARE", "Expected ']' to close the list literal")
+    return ListExpr.new(elements, open.line, open.column)
+end
 
 return {
     ---@param self Parser
@@ -61,6 +110,11 @@ return {
         if tok.type == "SELF" then
             self:_advance()
             return SelfExpr.new(tok.line, tok.column)
+        end
+
+        -- A list (`[…]`) or map (`["k": v]`) literal.
+        if tok.type == "LSQUARE" then
+            return _collection(self)
         end
 
         -- Leading dot: instance field of the implicit receiver (`.x`), shorthand

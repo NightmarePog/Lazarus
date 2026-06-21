@@ -7,6 +7,7 @@
 
 local CallExpr = require("frontend.parser.nodes.call")
 local MemberExpr = require("frontend.parser.nodes.member")
+local IndexExpr = require("frontend.parser.nodes.index")
 
 return {
     ---@param self Parser
@@ -40,6 +41,17 @@ return {
                 local dot = self:_advance() --[[@as Token]]
                 local field = self:_consume("IDENTIFIER", "Expected a field name after '.'")
                 expr = MemberExpr.new(expr, field.value, dot.line, dot.column)
+            elseif self:_check("LSQUARE") then
+                -- Postfix `[index]`. As with `.field`, a `[` that opens a new
+                -- source line is a fresh statement (a list literal), not an index
+                -- into the previous expression — so it must sit on the same line.
+                local prev = self.token_table[self.pos - 1]
+                local sq = self.token_table[self.pos]
+                if prev and sq and prev.line ~= sq.line then break end
+                self:_advance() -- consume '['
+                local index = self:_expression()
+                self:_consume("RSQUARE", "Expected ']' after an index expression")
+                expr = IndexExpr.new(expr, index, sq.line, sq.column)
             else
                 break
             end

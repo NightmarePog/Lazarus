@@ -12,6 +12,8 @@ local NON_FUNCTION = {
     LiteralExpr = true,
     BinaryExpr = true,
     UnaryExpr = true,
+    ListExpr = true,
+    MapExpr = true,
 }
 
 --- True when `node`'s value is statically known not to be a function.

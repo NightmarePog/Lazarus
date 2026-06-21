@@ -11,6 +11,7 @@
 
 local stmt = require("backend.lua50.stmt")
 local Context = require("backend.lua50.context")
+local Runtime = require("backend.lua50.runtime")
 local const = require("const")
 local Error = require("error")
 
@@ -114,6 +115,10 @@ function Codegen:generate(opts)
 
     local sections = {}
     if with_header then sections[#sections + 1] = HEADER end
+    -- The collection/Option runtime prelude is emitted (before the class) only
+    -- when the program actually used a list, map or Option construct — set on the
+    -- context during member emission above.
+    if Context.uses_collections then sections[#sections + 1] = Runtime end
     sections[#sections + 1] = class_block
     if with_entry then
         -- The entry of a program is its constructor: the chunk constructs the

@@ -26,6 +26,22 @@ local OP_MAP = {
 --- Lazarus unary operator token → Lua operator.
 local UNARY_OP_MAP = { NOT = "not" }
 
+--- Built-in collection / Option methods. A `<expr>.<name>(args)` call whose
+--- method name is here lowers to the runtime helper `__lz_<helper>(<expr>, args)`
+--- instead of class-method dispatch — so these names are reserved as built-ins.
+---@type table<string, string>
+local BUILTIN_METHODS = {
+    len = "__lz_len",
+    push = "__lz_push",
+    pop = "__lz_pop",
+    get = "__lz_get",
+    has = "__lz_has",
+    is_some = "__lz_is_some",
+    is_none = "__lz_is_none",
+    unwrap = "__lz_unwrap",
+    unwrap_or = "__lz_unwrap_or",
+}
+
 ---@type fun(node: Expr): string
 local emit_expr
 
@@ -56,11 +72,50 @@ emit_expr = function(node)
         return object .. "." .. node.field
     end
 
+    -- A list literal `[a, b, c]` lowers to a tagged value built by the runtime
+    -- helper `__lz_list(a, b, c)`.
+    if node.type == "ListExpr" then
+        ---@cast node ListExpr
+        Context.uses_collections = true
+        local parts = {}
+        for i, element in ipairs(node.elements) do
+            parts[i] = emit_expr(element)
+        end
+        return "__lz_list(" .. table.concat(parts, ", ") .. ")"
+    end
+
+    -- A map literal `["k": v, …]` lowers to `__lz_map({ [k] = v, … })`.
+    if node.type == "MapExpr" then
+        ---@cast node MapExpr
+        Context.uses_collections = true
+        local parts = {}
+        for i, entry in ipairs(node.entries) do
+            parts[i] = "[" .. emit_expr(entry.key) .. "] = " .. emit_expr(entry.value)
+        end
+        return "__lz_map({" .. table.concat(parts, ", ") .. "})"
+    end
+
+    -- An index read `c[i]` lowers to `__lz_idx_get(c, i)` (the helper applies the
+    -- 0-based→1-based offset for lists and uses the raw key for maps).
+    if node.type == "IndexExpr" then
+        ---@cast node IndexExpr
+        Context.uses_collections = true
+        return "__lz_idx_get(" .. emit_expr(node.object) .. ", " .. emit_expr(node.index) .. ")"
+    end
+
     if node.type == "CallExpr" then
         ---@cast node CallExpr
         local args = {}
         for i, arg in ipairs(node.args) do
             args[i] = emit_expr(arg)
+        end
+
+        -- Built-in collection / Option method: `c.len()`, `o.unwrap()`, … lower to
+        -- the matching runtime helper with the receiver as the first argument.
+        if node.callee.type == "MemberExpr" and BUILTIN_METHODS[node.callee.field] then
+            Context.uses_collections = true
+            table.insert(args, 1, emit_expr(node.callee.object))
+            return BUILTIN_METHODS[node.callee.field] .. "(" .. table.concat(args, ", ") .. ")"
         end
 
         -- Construction: calling the class by name lowers to `C.new(...)` (the

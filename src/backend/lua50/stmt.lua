@@ -73,6 +73,21 @@ function emit_stmt(node)
         return emit_expr(node.target) .. " = " .. emit_expr(node.value)
     end
 
+    -- `c[i] = v` lowers to `__lz_idx_set(c, i, v)` (the helper applies the
+    -- 0-based→1-based offset for lists and the raw key for maps).
+    if node.type == "IndexAssign" then
+        ---@cast node IndexAssign
+        Context.uses_collections = true
+        local target = node.target
+        return "__lz_idx_set("
+            .. emit_expr(target.object)
+            .. ", "
+            .. emit_expr(target.index)
+            .. ", "
+            .. emit_expr(node.value)
+            .. ")"
+    end
+
     if node.type == "ExpressionStmt" then
         ---@cast node ExpressionStmt
         return emit_expr(node.expression)
@@ -157,6 +172,27 @@ function emit_stmt(node)
         do_body[#do_body + 1] = table.concat(while_parts, "\n")
 
         return "do\n" .. indent(table.concat(do_body, "\n")) .. "\nend"
+    end
+
+    if node.type == "ForInStmt" then
+        ---@cast node ForInStmt
+        -- `for x in c` / `for k, v in c` lowers to a Lua generic-for over the
+        -- runtime iterator `__lz_each(c)`, which yields (0-based index, value) for
+        -- a list and (key, value) for a map. A single loop variable takes the
+        -- value, so a throwaway `_` holds the index/key.
+        Context.uses_collections = true
+        local iter = emit_expr(node.iter)
+        Context.push_scope()
+        for _, name in ipairs(node.vars) do
+            Context.declare_local(name)
+        end
+        local vars = (#node.vars == 1) and ("_, " .. node.vars[1]) or table.concat(node.vars, ", ")
+        local parts = { "for " .. vars .. " in __lz_each(" .. iter .. ") do" }
+        local body = emit_block(node.body)
+        if body then parts[#parts + 1] = body end
+        parts[#parts + 1] = "end"
+        Context.pop_scope()
+        return table.concat(parts, "\n")
     end
 
     error("emit_stmt: unknown node type: " .. tostring(node.type))

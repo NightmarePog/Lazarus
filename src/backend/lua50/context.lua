@@ -24,6 +24,11 @@ Context.instance_methods = {}
 ---@type { name: string, value: Expr | nil }[]
 Context.properties = {}
 
+-- Set once a list/map/Option construct is emitted, so the chunk knows to prepend
+-- the `__lz_*` runtime prelude (and omit it from collection-free programs).
+---@type boolean
+Context.uses_collections = false
+
 -- Stack of local scopes; the top entry is the innermost. Each scope inherits
 -- visible locals from its parent via `__index`, mirroring Lua closure capture.
 local scopes = { {} }
@@ -40,6 +45,7 @@ function Context.reset(class, members, instance_methods, properties)
     Context.members = members
     Context.instance_methods = instance_methods or {}
     Context.properties = properties or {}
+    Context.uses_collections = false
     scopes = { {} }
 end
 

@@ -7,6 +7,7 @@ local Error = require("error")
 local Keywords = require("frontend.lexer.keywords")
 local ExprStmt = require("frontend.parser.nodes.expression_stmt")
 local FieldAssign = require("frontend.parser.nodes.field_assign")
+local IndexAssign = require("frontend.parser.nodes.index_assign")
 local BinaryExpr = require("frontend.parser.nodes.binary")
 local binding = require("frontend.parser.statements.binding")
 local Method = require("frontend.parser.statements.method")
@@ -113,6 +114,24 @@ return {
                 local value =
                     BinaryExpr.new(binop --[[@as string]], expr, rhs, tok.line, tok.column)
                 return FieldAssign.new(expr --[[@as MemberExpr]], value, tok.line, tok.column)
+            end
+        end
+
+        -- Index assignment: `object[index] = value` (or compound `+=`), the write
+        -- form of a list element / map entry.
+        if expr.type == "IndexExpr" then
+            if self:_match("ASSIGN") then
+                local value = self:_expression()
+                return IndexAssign.new(expr --[[@as IndexExpr]], value, tok.line, tok.column)
+            end
+            local op = self:_current()
+            local binop = op and binding.COMPOUND[op.type]
+            if binop then
+                self:_advance()
+                local rhs = self:_expression()
+                local value =
+                    BinaryExpr.new(binop --[[@as string]], expr, rhs, tok.line, tok.column)
+                return IndexAssign.new(expr --[[@as IndexExpr]], value, tok.line, tok.column)
             end
         end
 
