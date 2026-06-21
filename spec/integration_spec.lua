@@ -268,6 +268,38 @@ constructor(x, y) {
         end)
     end)
 
+    describe("self as a value (passing the receiver)", function()
+        -- `self` is a real value: an instance method hands the whole receiver to a
+        -- static helper, and `self.x` is equivalent to `.x`. Proves the receiver
+        -- can cross an object boundary, not just be read field-by-field.
+        local PROG = [[
+private x
+private y
+private sum
+
+static add_coords(p) {
+    return p.x + p.y
+}
+
+recompute() {
+    self.sum = add_coords(self)
+}
+
+constructor(x, y) {
+    .x = x
+    self.y = y
+    .recompute()
+}
+]]
+
+        it("passes self to a static helper and reads the result at runtime", function()
+            local inst = assert(load_chunk(compile(PROG)))(3, 4)
+            assert.equal(3, inst.x)
+            assert.equal(4, inst.y)
+            assert.equal(7, inst.sum) -- add_coords(self) = self.x + self.y
+        end)
+    end)
+
     describe("arithmetic, concat and comments", function()
         -- Exercises /, %, ^, ++ and compound /=, plus both comment forms,
         -- through the whole pipeline and at runtime.

@@ -271,12 +271,34 @@ describe("Schematic", function()
             )
         end)
 
-        it("reserves the word 'self' with a pointed message", function()
+        it("accepts 'self' as a value passed to a helper", function()
+            -- `self` is a real receiver value: it can be passed around (closing
+            -- the receiver gap), and `self.x` is equivalent to `.x`.
+            assert.has_no.errors(
+                function()
+                    analyze("private x\nstatic id(p) { return p }\nwrap() { return id(self) }")
+                end
+            )
+        end)
+
+        it("treats self.x and .x as equivalent", function()
+            assert.has_no.errors(
+                function() analyze('private name\ngreet() { self.name = "x"\nreturn .name }') end
+            )
+        end)
+
+        it("rejects a bare 'self' outside an instance context (no receiver)", function()
             local ok, err = pcall(analyze, "static helper() { return self }")
             assert.is_false(ok)
             local err = err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
-            assert.matches("'self' is not a value", err.message)
+            assert.matches("no receiver", err.message)
+        end)
+
+        it("rejects an undeclared field via self.bogus, like .bogus", function()
+            local ok, err = pcall(analyze, "deposit() { self.bogus = 1 }")
+            assert.is_false(ok)
+            assert.matches("Unknown instance member '.bogus'", (err --[[@as Error]]).message)
         end)
     end)
 

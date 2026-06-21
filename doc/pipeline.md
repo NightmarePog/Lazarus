@@ -76,6 +76,7 @@ Single-pass scanner. Walks the source byte by byte and emits a flat list of toke
 | `BODY_END` | `}` |
 | `COMMA` | `,` |
 | `COLON` | `:` (reserved; the language is untyped, so no annotation syntax uses it) |
+| `SELF` | `self` (the receiver value; `self.x` ≡ leading-dot `.x`) |
 | `DOT` | `.` (field access / method call; a **leading** `.x` is an instance-field access) |
 | `SEMICOLON` | `;` (only used inside a `for` header) |
 | `IF` `ELSE` `WHILE` `LOOP` `FOR` `BREAK` | the control-flow keywords |
@@ -92,7 +93,7 @@ A number literal with a fractional part (`3.14`) is a float; the lexer leaves a 
 
 **No type annotations.** The language is **untyped**: there is no type-annotation syntax. A `:` after a binding name, parameter, or `)` is a syntax error. Bindings, parameters and returns carry no declared type, and there is no static type checker (see Schematic).
 
-**Instance fields (`.field`).** There is no `self` keyword. An instance field is written with a leading dot: `.balance`. The parser lowers a leading `.x` to a `MemberExpr` whose object is a `SelfExpr` (the implicit receiver); codegen emits the receiver name `self` for it, so `.x` becomes `self.x`. A `.field` that begins a new source line is a *new statement*, not a member-access continuation of the previous line (so `f()` ⏎ `.x = 1` is two statements). The word `self` is reserved with a pointed error.
+**The receiver `self` and `.field`.** `self` is a keyword naming the receiver value; it parses to a `SelfExpr`. `self.x` is `SelfExpr` followed by a postfix `.x`, which is the **same** node a leading-dot `.x` produces (`MemberExpr` over `SelfExpr`) — so `self.x` and `.x` are exactly equivalent. Codegen emits the name `self` for `SelfExpr`, so both become `self.x`. Because `self` is a real value it can be passed around (`f(self)`, `return self`, `reg.add(self)`) — instance methods can hand themselves to collaborators. A `.field` that begins a new source line is a *new statement*, not a member-access continuation of the previous line (so `f()` ⏎ `.x = 1` is two statements). `self` (and `.field`) is valid only inside an instance method or constructor; in a `static` method or at top level there is no receiver and it is an error.
 
 ### Internal structure
 
@@ -169,8 +170,8 @@ optimizer folds any binding with a foldable initialiser automatically.
 | `BinaryExpr` | `op: TokenType`, `left: Expr`, `right: Expr` | `a + b`, `a == b`, `a and b` |
 | `UnaryExpr` | `op: TokenType`, `operand: Expr` | `not done` |
 | `CallExpr` | `callee: Expr`, `args: Expr[]` | `f(a, b)` |
-| `MemberExpr` | `object: Expr`, `field: string` | `.x` (object is `SelfExpr`), `p.x.y`, `obj.m()` |
-| `SelfExpr` | — | the implicit receiver of a leading-dot `.x` |
+| `MemberExpr` | `object: Expr`, `field: string` | `.x` / `self.x` (object is `SelfExpr`), `p.x.y`, `obj.m()` |
+| `SelfExpr` | — | the receiver value (`self`, and the object of a leading-dot `.x`) |
 
 ### Operator precedence (low → high)
 
@@ -242,9 +243,8 @@ Single-pass semantic checker. Walks the AST in source order maintaining a symbol
 | `ExpressionStmt` whose expression is not a call | `SEMANTIC_ERROR` — bare expressions are not valid statements |
 | `BreakStmt` outside any loop | `SEMANTIC_ERROR` — `'break'` outside of a loop |
 | `BreakStmt` that is not the last statement in its block | `SEMANTIC_ERROR` — `'break'` must be last (Lua 5.0 requires it) |
-| `.field` (a `MemberExpr` over `SelfExpr`) outside an instance method/constructor | `SEMANTIC_ERROR` — no receiver |
-| `.field` that is not a declared property or instance method | `SEMANTIC_ERROR` — unknown instance member |
-| Use of the reserved word `self` | `SEMANTIC_ERROR` — `'self'` is not a value; use `.field` |
+| `self` / `.field` (a `SelfExpr`) outside an instance method/constructor | `SEMANTIC_ERROR` — no receiver |
+| `.field` / `self.field` that is not a declared property or instance method | `SEMANTIC_ERROR` — unknown instance member |
 | Value name (variable/function/parameter/loop var/property) not `snake_case` | `SEMANTIC_ERROR` |
 
 ### No type checking
@@ -298,7 +298,7 @@ scope creation, block recursion); the rules stay small.
 | `statements/{if,while,loop,for,break}.lua` | One check per control-flow node |
 | `expressions/init.lua` | `check_expr` dispatcher over expression rules (threads instance context) |
 | `expressions/expression_check.lua` | `ExpressionCheck` interface (`type` + `check`) |
-| `expressions/{identifier,binary,call,unary,member}.lua` | One check per expression node (`member` validates `.field`) |
+| `expressions/{identifier,binary,call,unary,member,self}.lua` | One check per expression node (`member` validates `.field`/`self.field`; `self` checks a bare receiver has a context) |
 | `callability.lua` | `is_noncallable(node)` — the lone static fact behind `NOT_CALLABLE` |
 
 ---

@@ -162,6 +162,24 @@ describe("Parser", function()
             assert.equal("x", s.target.field)
         end)
 
+        it("parses bare 'self' as a SelfExpr value", function()
+            local e = value_of("self") --[[@as SelfExpr]]
+            assert.equal("SelfExpr", e.type)
+        end)
+
+        it("parses 'self.x' to the same AST as '.x' (MemberExpr over SelfExpr)", function()
+            local m = value_of("self.x") --[[@as MemberExpr]]
+            assert.equal("MemberExpr", m.type)
+            assert.equal("x", m.field)
+            assert.equal("SelfExpr", m.object.type)
+        end)
+
+        it("parses 'self' passed as a call argument", function()
+            local c = value_of("f(self)") --[[@as CallExpr]]
+            assert.equal("CallExpr", c.type)
+            assert.equal("SelfExpr", c.args[1].type)
+        end)
+
         it("treats a '.field' beginning a new line as a new statement, not a chain", function()
             -- `f()` then a newline `.x = 1` must not parse as `f().x` — the dot
             -- starts a fresh leading-dot statement.

@@ -16,6 +16,7 @@ local Keywords = {}
 --- | "LEFT_BRACKET"
 --- | "RIGHT_BRACKET"
 --- | "STATIC"
+--- | "SELF"
 --- | "CONSTRUCTOR"
 --- | "RETURN"
 --- | "BODY_START"
@@ -59,6 +60,7 @@ local TOKENS_DATA = {
     ["public"] = "PUBLIC",
     ["mut"] = "MUTABLE",
     ["static"] = "STATIC",
+    ["self"] = "SELF",
     ["constructor"] = "CONSTRUCTOR",
     ["return"] = "RETURN",
     ["if"] = "IF",
@@ -133,6 +135,8 @@ local VALID_TYPES = {
     RIGHT_BRACKET = true,
     -- A leading dot begins an instance-field access (`.x`), the implicit receiver.
     DOT = true,
+    -- `self` is the receiver value (and begins `self.x` member access).
+    SELF = true,
     -- Tokens that can begin an expression: boolean literals and the `not` prefix.
     TRUE = true,
     FALSE = true,

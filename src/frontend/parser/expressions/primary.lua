@@ -55,9 +55,17 @@ return {
             return IdentifierExpr.new(tok.value, tok.line, tok.column)
         end
 
-        -- Leading dot: instance field of the implicit receiver (`.x`). There is
-        -- no `self` keyword; `.x` lowers to a MemberExpr over a SelfExpr, and the
-        -- postfix parser (`_call`) handles any further `.y` / `(...)` chain.
+        -- The receiver value. `self` is a SelfExpr; the postfix parser (`_call`)
+        -- turns `self.x` into a MemberExpr over it — the same node a leading-dot
+        -- `.x` produces, so `self.x` and `.x` are exactly equivalent.
+        if tok.type == "SELF" then
+            self:_advance()
+            return SelfExpr.new(tok.line, tok.column)
+        end
+
+        -- Leading dot: instance field of the implicit receiver (`.x`), shorthand
+        -- for `self.x`. Lowers to a MemberExpr over a SelfExpr; the postfix parser
+        -- (`_call`) handles any further `.y` / `(...)` chain.
         if tok.type == "DOT" then
             self:_advance()
             local field = self:_consume("IDENTIFIER", "Expected a field name after '.'")
