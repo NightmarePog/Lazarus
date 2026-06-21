@@ -7,7 +7,7 @@
 --- stay bare while references to class members are qualified as `C.member`.
 
 local emit_expr = require("backend.lua50.expr")
-local Context   = require("backend.lua50.context")
+local Context = require("backend.lua50.context")
 
 --- Indent every non-empty line of `text` by four spaces. Blank lines are left
 --- empty so the output stays lint-clean (no trailing whitespace).
@@ -44,7 +44,9 @@ end
 ---@return string?
 local function emit_fn_body(params, body)
     Context.push_scope()
-    for _, p in ipairs(params) do Context.declare_local(p) end
+    for _, p in ipairs(params) do
+        Context.declare_local(p)
+    end
     local out = emit_block(body)
     Context.pop_scope()
     return out
@@ -62,9 +64,7 @@ function emit_stmt(node)
             return Context.emit_name(node.name) .. " = " .. rhs
         end
         Context.declare_local(node.name)
-        if node.value then
-            return "local " .. node.name .. " = " .. emit_expr(node.value)
-        end
+        if node.value then return "local " .. node.name .. " = " .. emit_expr(node.value) end
         return "local " .. node.name
     end
 
@@ -91,9 +91,7 @@ function emit_stmt(node)
 
     if node.type == "ReturnStmt" then
         ---@cast node ReturnStmt
-        if node.value then
-            return "return " .. emit_expr(node.value)
-        end
+        if node.value then return "return " .. emit_expr(node.value) end
         return "return"
     end
 
@@ -133,9 +131,7 @@ function emit_stmt(node)
         return table.concat(parts, "\n")
     end
 
-    if node.type == "BreakStmt" then
-        return "break"
-    end
+    if node.type == "BreakStmt" then return "break" end
 
     if node.type == "ForStmt" then
         ---@cast node ForStmt
@@ -181,9 +177,17 @@ local function emit_member(node)
         local params = node.params
         if not node.is_static then
             params = { "self" }
-            for _, p in ipairs(node.params) do params[#params + 1] = p end
+            for _, p in ipairs(node.params) do
+                params[#params + 1] = p
+            end
         end
-        local header = "function " .. C .. "." .. node.name .. "(" .. table.concat(params, ", ") .. ")"
+        local header = "function "
+            .. C
+            .. "."
+            .. node.name
+            .. "("
+            .. table.concat(params, ", ")
+            .. ")"
         local body = emit_fn_body(params, node.body)
         if not body then return header .. "\nend" end
         return header .. "\n" .. body .. "\nend"
@@ -198,18 +202,34 @@ local function emit_member(node)
     if node.type == "ConstructorDecl" then
         ---@cast node ConstructorDecl
         -- Lowers to `function C.new(params) local self = {} <body> return self end`
-        -- — a plain table, no metatable.
+        -- — a plain table, no metatable. Instance properties with a default are
+        -- initialised first (`self.x = <default>`), before the constructor body,
+        -- so the body may override them.
         Context.push_scope()
-        for _, p in ipairs(node.params) do Context.declare_local(p) end
+        for _, p in ipairs(node.params) do
+            Context.declare_local(p)
+        end
         Context.declare_local("self")
         local lines = { "local self = {}" }
-        for _, s in ipairs(node.body) do lines[#lines + 1] = emit_stmt(s) end
+        for _, prop in ipairs(Context.properties) do
+            if prop.value then
+                lines[#lines + 1] = "self." .. prop.name .. " = " .. emit_expr(prop.value)
+            end
+        end
+        for _, s in ipairs(node.body) do
+            lines[#lines + 1] = emit_stmt(s)
+        end
         lines[#lines + 1] = "return self"
         Context.pop_scope()
 
         local params = table.concat(node.params, ", ")
-        return "function " .. C .. ".new(" .. params .. ")\n"
-            .. indent(table.concat(lines, "\n")) .. "\nend"
+        return "function "
+            .. C
+            .. ".new("
+            .. params
+            .. ")\n"
+            .. indent(table.concat(lines, "\n"))
+            .. "\nend"
     end
 
     return emit_stmt(node)

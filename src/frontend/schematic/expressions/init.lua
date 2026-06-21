@@ -26,11 +26,10 @@ end
 ---@param node    Expr
 ---@param symbols table<string, {kind: string}>
 ---@param source  string
-local function check_expr(node, symbols, source)
+---@param cx?     { properties: table<string, boolean>, in_instance: boolean }  Instance context for `.field` checks
+local function check_expr(node, symbols, source, cx)
     local rule = registry[node.type]
-    if rule then
-        rule.check(node, symbols, source, check_expr)
-    end
+    if rule then rule.check(node, symbols, source, check_expr, cx) end
 end
 
 return check_expr

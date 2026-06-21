@@ -61,14 +61,16 @@ local function has(haystack, needle) return haystack:find(needle, 1, true) ~= ni
 -- square(7) = 49; stored on the instance field `answer` by the constructor
 -- (the program entry point).
 local PROGRAM = [[
-private seed = 7
+private static seed = 7
+
+private answer
 
 static square(n) {
     return n * n
 }
 
 constructor() {
-    self.answer = square(seed)
+    .answer = square(seed)
 }
 ]]
 

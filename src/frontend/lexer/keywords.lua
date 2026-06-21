@@ -97,7 +97,7 @@ local TOKENS_DATA = {
     [","] = "COMMA",
     [":"] = "COLON",
     ["."] = "DOT",
-    [";"] = "SEMICOLON"
+    [";"] = "SEMICOLON",
 }
 
 --- Truly read-only view of `TOKENS_DATA`. Because lookups go through an empty
@@ -106,10 +106,10 @@ local TOKENS_DATA = {
 ---@type table<string, TokenType>
 local TOKENS = setmetatable({}, {
     __index = TOKENS_DATA,
-    __newindex = function (_, key)
+    __newindex = function(_, key)
         error("Attempt to modify read-only Keywords.TOKENS: " .. tostring(key))
     end,
-    __metatable = false
+    __metatable = false,
 })
 Keywords.TOKENS = TOKENS
 
@@ -131,26 +131,26 @@ local VALID_TYPES = {
     CONCAT = true,
     LEFT_BRACKET = true,
     RIGHT_BRACKET = true,
+    -- A leading dot begins an instance-field access (`.x`), the implicit receiver.
+    DOT = true,
     -- Tokens that can begin an expression: boolean literals and the `not` prefix.
     TRUE = true,
     FALSE = true,
-    NOT = true
+    NOT = true,
 }
 
 --- Return `true` when `token_type` cannot legally appear in expression
 --- position (i.e. it is a keyword-only or assignment-only token).
 ---@param token_type string
 ---@return boolean
-function Keywords.is_invalid_token_type(token_type)
-    return not VALID_TYPES[token_type]
-end
+function Keywords.is_invalid_token_type(token_type) return not VALID_TYPES[token_type] end
 
 setmetatable(Keywords, {
     __index = TOKENS,
 
-    __newindex = function (_, key)
+    __newindex = function(_, key)
         error("Attempt to modify read-only Keywords table: " .. tostring(key))
-    end
+    end,
 })
 
 return Keywords

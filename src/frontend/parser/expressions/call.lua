@@ -5,7 +5,7 @@
 --- `obj.method()`. These bind tighter than any infix operator, so they sit
 --- between `_binary` and `_primary`.
 
-local CallExpr   = require("frontend.parser.nodes.call")
+local CallExpr = require("frontend.parser.nodes.call")
 local MemberExpr = require("frontend.parser.nodes.member")
 
 return {
@@ -29,7 +29,15 @@ return {
                 self:_consume("RIGHT_BRACKET", "Expected ')' after arguments")
                 expr = CallExpr.new(expr, args, paren.line, paren.column)
             elseif self:_check("DOT") then
-                local dot   = self:_advance() --[[@as Token]]
+                -- A `.field` that begins a new source line is a *new statement* —
+                -- a leading-dot access on the implicit receiver — not a member
+                -- access continuing this expression. Only treat the dot as a
+                -- continuation when it sits on the same line as the token before
+                -- it (so `p.x.y` chains, but `f()` / newline / `.x` does not).
+                local prev = self.token_table[self.pos - 1]
+                local dot_tok = self.token_table[self.pos]
+                if prev and dot_tok and prev.line ~= dot_tok.line then break end
+                local dot = self:_advance() --[[@as Token]]
                 local field = self:_consume("IDENTIFIER", "Expected a field name after '.'")
                 expr = MemberExpr.new(expr, field.value, dot.line, dot.column)
             else

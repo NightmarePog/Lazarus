@@ -1,13 +1,13 @@
 --- Statement handler for a class constructor.
 ---
---- Grammar: `constructor ( [ <param> [: Type] { , <param> [: Type] } ] ) { <statement>* }`
+--- Grammar: `constructor ( [ <param> { , <param> } ] ) { <statement>* }`
 ---
---- Like a function but with no name and no return type — it implicitly returns
---- the new instance. The keyword is consumed by the dispatcher before this runs.
+--- Like a function but with no name and no return — it implicitly returns the new
+--- instance. The language is untyped, so parameters carry no annotations. The
+--- keyword is consumed by the dispatcher before this runs.
 
 local StatementParser = require("frontend.parser.statements.statement_parser")
 local ConstructorDecl = require("frontend.parser.nodes.constructor")
-local Types           = require("frontend.parser.types")
 
 return StatementParser.new("CONSTRUCTOR", function(parser)
     local keyword = parser:_previous()
@@ -16,13 +16,10 @@ return StatementParser.new("CONSTRUCTOR", function(parser)
 
     ---@type string[]
     local params = {}
-    ---@type (TypeRef | nil)[]
-    local param_types = {}
     if not parser:_check("RIGHT_BRACKET") then
         repeat
             local param = parser:_consume("IDENTIFIER", "Expected parameter name")
             params[#params + 1] = param.value
-            param_types[#params] = parser:_match("COLON") and Types.read_type(parser) or nil
         until not parser:_match("COMMA")
     end
 
@@ -30,5 +27,5 @@ return StatementParser.new("CONSTRUCTOR", function(parser)
 
     local body = parser:_block("constructor body")
 
-    return ConstructorDecl.new(params, body, keyword.line, keyword.column, param_types)
+    return ConstructorDecl.new(params, body, keyword.line, keyword.column)
 end)

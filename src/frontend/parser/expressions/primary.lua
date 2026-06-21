@@ -1,9 +1,11 @@
 --- Primary expressions: the atoms of the grammar — literals, identifiers, and
 --- parenthesised sub-expressions. This is the tightest-binding level.
 
-local Error          = require("error")
-local LiteralExpr    = require("frontend.parser.nodes.literal")
+local Error = require("error")
+local LiteralExpr = require("frontend.parser.nodes.literal")
 local IdentifierExpr = require("frontend.parser.nodes.identifier")
+local MemberExpr = require("frontend.parser.nodes.member")
+local SelfExpr = require("frontend.parser.nodes.self")
 
 return {
     ---@param self Parser
@@ -13,10 +15,13 @@ return {
 
         if not token then
             local prev = self:_previous()
-            Error.throw(Error.Type.UNEXPECTED_EOF, "Unexpected end of input",
-                (prev and prev.line)   --[[@as integer|nil]],
+            Error.throw(
+                Error.Type.UNEXPECTED_EOF,
+                "Unexpected end of input",
+                (prev and prev.line) --[[@as integer|nil]],
                 (prev and prev.column) --[[@as integer|nil]],
-                self.source)
+                self.source
+            )
         end
 
         local tok = token --[[@as Token]]
@@ -50,9 +55,28 @@ return {
             return IdentifierExpr.new(tok.value, tok.line, tok.column)
         end
 
-        Error.throw(Error.Type.UNEXPECTED_TOKEN,
+        -- Leading dot: instance field of the implicit receiver (`.x`). There is
+        -- no `self` keyword; `.x` lowers to a MemberExpr over a SelfExpr, and the
+        -- postfix parser (`_call`) handles any further `.y` / `(...)` chain.
+        if tok.type == "DOT" then
+            self:_advance()
+            local field = self:_consume("IDENTIFIER", "Expected a field name after '.'")
+            return MemberExpr.new(
+                SelfExpr.new(tok.line, tok.column),
+                field.value,
+                tok.line,
+                tok.column
+            )
+        end
+
+        Error.throw(
+            Error.Type.UNEXPECTED_TOKEN,
             "Unexpected token '" .. tok.value .. "'",
-            tok.line, tok.column, self.source, #tok.value)
+            tok.line,
+            tok.column,
+            self.source,
+            #tok.value
+        )
         error("unreachable")
     end,
 }

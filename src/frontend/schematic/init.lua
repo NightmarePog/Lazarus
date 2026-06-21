@@ -10,20 +10,25 @@
 --- expression checking, child-scope creation, recursion into nested blocks —
 --- live on the context so the individual rules stay small and focused.
 
-local Error              = require("error")
+local Error = require("error")
 local statement_registry = require("frontend.schematic.statements")
-local check_expr         = require("frontend.schematic.expressions")
-local TypeCheck          = require("frontend.schematic.types")
+local check_expr = require("frontend.schematic.expressions")
 
 ---@class SemContext
----@field source string
+---@field source      string
+---@field properties  table<string, boolean>  Declared instance-property names (valid `.field` targets)
+---@field methods     table<string, boolean>  Instance-method names (valid `.method()` targets on the receiver)
+---@field in_instance boolean                  True while analysing an instance method/constructor body (a receiver exists)
 local SemContext = {}
 SemContext.__index = SemContext
 
 ---@param source string
 ---@return SemContext
 function SemContext.new(source)
-    return setmetatable({ source = source }, SemContext)
+    return setmetatable(
+        { source = source, properties = {}, methods = {}, in_instance = false },
+        SemContext
+    )
 end
 
 --- Throw if `name` is already declared in the *current* scope. Reference
@@ -34,68 +39,50 @@ end
 ---@param node    Stmt
 function SemContext:check_duplicate(symbols, name, node)
     if rawget(symbols, name) then
-        Error.throw(Error.Type.SEMANTIC_ERROR,
+        Error.throw(
+            Error.Type.SEMANTIC_ERROR,
             "Duplicate declaration '" .. name .. "'",
-            node.line, node.col, self.source, #name)
+            node.line,
+            node.col,
+            self.source,
+            #name
+        )
     end
 end
 
 --- Bind a name in the given scope.
----@param symbols  table<string, {kind: string, mutable: boolean, vtype: string?}>
----@param name     string
----@param kind     string
----@param mutable? boolean  Whether the binding may be reassigned (default false)
----@param vtype?   string   The binding's static type ("int"/"float"/"str"/"bool"/"any")
-function SemContext:bind(symbols, name, kind, mutable, vtype)
-    symbols[name] = { kind = kind, mutable = mutable or false, vtype = vtype or "any" }
+---
+--- The language is untyped; the only static fact tracked about a value is whether
+--- it is provably **not** a function (`noncallable`), so a call on it can be
+--- rejected up front (see `expressions/call.lua`).
+---@param symbols      table<string, {kind: string, mutable: boolean, noncallable: boolean}>
+---@param name         string
+---@param kind         string
+---@param mutable?     boolean  Whether the binding may be reassigned (default false)
+---@param noncallable? boolean  True when the bound value is statically known not to be a function
+function SemContext:bind(symbols, name, kind, mutable, noncallable)
+    symbols[name] = { kind = kind, mutable = mutable or false, noncallable = noncallable or false }
 end
 
 --- Validate an expression (and its sub-expressions) against visible symbols.
+--- The instance context (`properties`, `in_instance`) is threaded so that a
+--- `.field` access can be checked for a receiver and a declared property.
 ---@param node    Expr
 ---@param symbols table<string, {kind: string}>
 function SemContext:check_expr(node, symbols)
-    check_expr(node, symbols, self.source)
-end
-
---- Infer an expression's type (and type-check its operators).
----@param node    Expr
----@param symbols table<string, {vtype: string?}>
----@return string
-function SemContext:infer(node, symbols)
-    return TypeCheck.infer(node, symbols, self.source)
-end
-
---- Require a condition expression to be `bool`.
----@param node    Expr
----@param symbols table
----@param what    string
-function SemContext:expect_bool(node, symbols, what)
-    TypeCheck.expect_bool(node, symbols, self.source, what)
-end
-
---- Resolve a parsed annotation to an internal type string.
----@param ref TypeRef | nil
----@return string
-function SemContext:resolve_type(ref)
-    return TypeCheck.resolve(ref)
-end
-
---- Require `actual` to be assignable to `expected` (gradual; `any` accepted).
----@param expected string
----@param actual   string
----@param node     Expr
----@param what     string
-function SemContext:expect_assignable(expected, actual, node, what)
-    TypeCheck.expect_assignable(expected, actual, node, self.source, what)
+    check_expr(
+        node,
+        symbols,
+        self.source,
+        { properties = self.properties, methods = self.methods, in_instance = self.in_instance }
+    )
 end
 
 --- Create a child scope that inherits visible declarations from `parent`.
 --- Declarations made in the child stay local to it.
 ---@param parent table<string, {kind: string}>
 ---@return table<string, {kind: string}>
-function SemContext:child_scope(parent)
-    return setmetatable({}, { __index = parent })
-end
+function SemContext:child_scope(parent) return setmetatable({}, { __index = parent }) end
 
 --- Walk a block in source order, dispatching each statement to its rule.
 --- Statement types with no registered rule are ignored.
@@ -110,13 +97,13 @@ function SemContext:analyze_block(stmts, symbols, in_function, in_loop, return_t
         local rule = statement_registry[stmt.type]
         if rule then
             rule.check(self, {
-                stmt           = stmt,
-                idx            = idx,
-                stmts          = stmts,
-                symbols        = symbols,
-                in_function    = in_function,
-                in_loop        = in_loop or false,
-                return_type    = return_type,
+                stmt = stmt,
+                idx = idx,
+                stmts = stmts,
+                symbols = symbols,
+                in_function = in_function,
+                in_loop = in_loop or false,
+                return_type = return_type,
                 in_constructor = in_constructor or false,
             })
         end
@@ -129,7 +116,30 @@ end
 local function analyze(ast, source, class_name)
     local root = {}
     root[class_name or "Main"] = { kind = "class", mutable = false, vtype = "any" }
-    SemContext.new(source):analyze_block(ast.body, root, false, false)
+
+    local ctx = SemContext.new(source)
+    -- Collect the class's instance properties and instance methods up front, so a
+    -- `.field` / `.method()` access on the receiver resolves regardless of whether
+    -- the member is declared before or after the code that uses it.
+    for _, stmt in ipairs(ast.body) do
+        if stmt.type == "VariableDecl" and stmt.visibility and not stmt.is_static then
+            if ctx.properties[stmt.name] then
+                Error.throw(
+                    Error.Type.SEMANTIC_ERROR,
+                    "Duplicate declaration '" .. stmt.name .. "'",
+                    stmt.line,
+                    stmt.col,
+                    source,
+                    #stmt.name
+                )
+            end
+            ctx.properties[stmt.name] = true
+        elseif stmt.type == "FunctionDecl" and not stmt.is_static then
+            ctx.methods[stmt.name] = true
+        end
+    end
+
+    ctx:analyze_block(ast.body, root, false, false)
 end
 
 return { analyze = analyze }

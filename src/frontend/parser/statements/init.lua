@@ -3,13 +3,13 @@
 --- To add a new statement type, create a `StatementParser` in its own file
 --- and add it to `HANDLERS`.  No other code needs to change.
 
-local Error       = require("error")
-local Keywords    = require("frontend.lexer.keywords")
-local ExprStmt    = require("frontend.parser.nodes.expression_stmt")
+local Error = require("error")
+local Keywords = require("frontend.lexer.keywords")
+local ExprStmt = require("frontend.parser.nodes.expression_stmt")
 local FieldAssign = require("frontend.parser.nodes.field_assign")
-local BinaryExpr  = require("frontend.parser.nodes.binary")
-local binding     = require("frontend.parser.statements.binding")
-local Method      = require("frontend.parser.statements.method")
+local BinaryExpr = require("frontend.parser.nodes.binary")
+local binding = require("frontend.parser.statements.binding")
+local Method = require("frontend.parser.statements.method")
 
 --- All registered statement handlers, keyed by their trigger token type.
 --- Add new handlers here — the dispatcher builds the registry automatically.
@@ -48,10 +48,13 @@ return {
 
         if not token then
             local prev = self:_previous()
-            Error.throw(Error.Type.UNEXPECTED_EOF, "Unexpected end of input",
-                (prev and prev.line)   --[[@as integer|nil]],
+            Error.throw(
+                Error.Type.UNEXPECTED_EOF,
+                "Unexpected end of input",
+                (prev and prev.line) --[[@as integer|nil]],
                 (prev and prev.column) --[[@as integer|nil]],
-                self.source)
+                self.source
+            )
         end
 
         local tok = token --[[@as Token]]
@@ -67,9 +70,7 @@ return {
             -- An instance method at the top level; a `local function` when
             -- nested. Recognised by lookahead (`(` … `)` `{`) so a bare call
             -- statement `name(args)` is not mistaken for one.
-            if Method.looks_like_decl(self) then
-                return Method.parse(self, nil, false)
-            end
+            if Method.looks_like_decl(self) then return Method.parse(self, nil, false) end
 
             -- Bare binding / reassignment: `<identifier> = <expr>` or a compound
             -- assignment `<identifier> += <expr>`. The keyword is absent (no
@@ -77,16 +78,21 @@ return {
             -- than by the registry. Schematic resolves declaration vs
             -- reassignment by scope.
             local nxt = self.token_table[self.pos + 1]
-            -- `name =`, `name +=`, … or an annotated declaration `name : Type = …`.
-            if nxt and (nxt.type == "ASSIGN" or nxt.type == "COLON" or binding.COMPOUND[nxt.type]) then
+            -- `name =`, `name +=`, … (the language is untyped, so no `name : Type`).
+            if nxt and (nxt.type == "ASSIGN" or binding.COMPOUND[nxt.type]) then
                 return binding.read_assignment(self, "Expected variable name")
             end
         end
 
         if Keywords.is_invalid_token_type(tok.type) then
-            Error.throw(Error.Type.UNEXPECTED_TOKEN,
+            Error.throw(
+                Error.Type.UNEXPECTED_TOKEN,
                 "Unexpected '" .. tok.value .. "' in statement",
-                tok.line, tok.column, self.source, #tok.value)
+                tok.line,
+                tok.column,
+                self.source,
+                #tok.value
+            )
         end
 
         local expr = self:_expression()
@@ -103,8 +109,9 @@ return {
             local binop = op and binding.COMPOUND[op.type]
             if binop then
                 self:_advance()
-                local rhs   = self:_expression()
-                local value = BinaryExpr.new(binop --[[@as string]], expr, rhs, tok.line, tok.column)
+                local rhs = self:_expression()
+                local value =
+                    BinaryExpr.new(binop --[[@as string]], expr, rhs, tok.line, tok.column)
                 return FieldAssign.new(expr --[[@as MemberExpr]], value, tok.line, tok.column)
             end
         end
@@ -124,9 +131,14 @@ return {
         local body = {}
         while not self:_check("BODY_END") do
             if self:_is_eof() then
-                Error.throw(Error.Type.SYNTAX_ERROR,
+                Error.throw(
+                    Error.Type.SYNTAX_ERROR,
                     "Expected '}' to close " .. context,
-                    open.line, open.column, self.source, #open.value)
+                    open.line,
+                    open.column,
+                    self.source,
+                    #open.value
+                )
             end
             body[#body + 1] = self:_statement()
         end

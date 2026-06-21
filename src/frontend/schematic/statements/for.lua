@@ -7,37 +7,39 @@
 --- so its declarations do not leak.
 
 local StatementCheck = require("frontend.schematic.statements.statement_check")
-local Naming         = require("frontend.schematic.naming")
+local Naming = require("frontend.schematic.naming")
+local Callability = require("frontend.schematic.callability")
 
 return StatementCheck.new("ForStmt", function(ctx, frame)
-    local stmt  = frame.stmt --[[@as ForStmt]]
+    local stmt = frame.stmt --[[@as ForStmt]]
     local scope = ctx:child_scope(frame.symbols)
 
     if stmt.init then
-        local init  = stmt.init --[[@as VariableDecl]]
+        local init = stmt.init --[[@as VariableDecl]]
         Naming.check_value(init.name, init, ctx.source, "Loop variable")
-        Naming.check_type(init.type_ann, ctx.source)
-        local vtype = ctx:resolve_type(init.type_ann)
-        if init.value then
-            ctx:check_expr(init.value, scope)
-            local value_type = ctx:infer(init.value, scope)
-            if vtype ~= "any" then
-                ctx:expect_assignable(vtype, value_type, init.value, "Loop variable '" .. init.name .. "'")
-            else
-                vtype = value_type
-            end
-        end
-        ctx:bind(scope, init.name, "variable", true, vtype)
+        if init.value then ctx:check_expr(init.value, scope) end
+        ctx:bind(scope, init.name, "variable", true, Callability.is_noncallable(init.value))
         init.reassign = false
     end
 
-    if stmt.condition then
-        ctx:check_expr(stmt.condition, scope)
-        ctx:expect_bool(stmt.condition, scope, "loop condition")
-    end
+    if stmt.condition then ctx:check_expr(stmt.condition, scope) end
     if stmt.step then
-        ctx:analyze_block({ stmt.step }, scope, frame.in_function, true, frame.return_type, frame.in_constructor)
+        ctx:analyze_block(
+            { stmt.step },
+            scope,
+            frame.in_function,
+            true,
+            frame.return_type,
+            frame.in_constructor
+        )
     end
 
-    ctx:analyze_block(stmt.body, ctx:child_scope(scope), frame.in_function, true, frame.return_type, frame.in_constructor)
+    ctx:analyze_block(
+        stmt.body,
+        ctx:child_scope(scope),
+        frame.in_function,
+        true,
+        frame.return_type,
+        frame.in_constructor
+    )
 end)

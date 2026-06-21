@@ -1,5 +1,9 @@
-private base  = 2 * 3 + 1
-private scale = (base + 3) * 2
+private static base  = 2 * 3 + 1
+private static scale = (base + 3) * 2
+
+private answer
+private label
+private summary
 
 static square(n) {
     return n * n
@@ -30,11 +34,11 @@ static brand() {
 }
 
 describe() {
-    return self.label ++ " = " ++ "ready"
+    return .label ++ " = " ++ "ready"
 }
 
 constructor() {
-    self.answer  = compute(4)
-    self.label   = brand()
-    self.summary = self.describe()
+    .answer  = compute(4)
+    .label   = brand()
+    .summary = .describe()
 }

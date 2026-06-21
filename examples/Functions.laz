@@ -1,4 +1,6 @@
-private offset = 10
+private static offset = 10
+
+private result
 
 static double(n) {
     return n * 2
@@ -9,5 +11,5 @@ static shift(n) {
 }
 
 constructor() {
-    self.result = shift(double(5))
+    .result = shift(double(5))
 }

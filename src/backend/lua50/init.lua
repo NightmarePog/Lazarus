@@ -9,10 +9,10 @@
 --- arguments `...`) and returns the instance. An entry program must define a
 --- constructor.
 
-local stmt      = require("backend.lua50.stmt")
-local Context   = require("backend.lua50.context")
-local const     = require("const")
-local Error     = require("error")
+local stmt = require("backend.lua50.stmt")
+local Context = require("backend.lua50.context")
+local const = require("const")
+local Error = require("error")
 
 local emit_member = stmt.emit_member
 
@@ -47,9 +47,7 @@ end
 ---@return boolean
 function Codegen:_has_constructor()
     for _, stmt_node in ipairs(self.ast.body) do
-        if stmt_node.type == "ConstructorDecl" then
-            return true
-        end
+        if stmt_node.type == "ConstructorDecl" then return true end
     end
     return false
 end
@@ -65,29 +63,48 @@ end
 function Codegen:generate(opts)
     opts = opts or {}
     local with_header = opts.header ~= false
-    local with_entry  = opts.entry  ~= false
-    local class_name  = self.class_name
+    local with_entry = opts.entry ~= false
+    local class_name = self.class_name
 
-    -- Collect member names so references to them can be qualified as `C.name`,
-    -- and the subset that are instance methods so `obj.m(...)` calls can lower to
-    -- receiver-passing dispatch `C.m(obj, ...)`.
+    -- Classify the top-level declarations:
+    --   • methods and `static` bindings are **members** (qualified `C.name`);
+    --     the instance-method subset drives `obj.m(...)` → `C.m(obj, ...)`.
+    --   • a non-static visibility binding is an **instance property**: it lives on
+    --     the instance (reached only via `.field`, never `C.name`), so it is kept
+    --     out of `members` and its default is injected at the top of `C.new`.
     ---@type table<string, boolean>
     local members = {}
     ---@type table<string, boolean>
     local instance_methods = {}
+    ---@type { name: string, value: Expr | nil }[]
+    local properties = {}
     for _, stmt_node in ipairs(self.ast.body) do
-        if stmt_node.type == "FunctionDecl" or stmt_node.type == "VariableDecl" then
+        if stmt_node.type == "FunctionDecl" then
             members[stmt_node.name] = true
-            if stmt_node.type == "FunctionDecl" and not stmt_node.is_static then
-                instance_methods[stmt_node.name] = true
+            if not stmt_node.is_static then instance_methods[stmt_node.name] = true end
+        elseif stmt_node.type == "VariableDecl" then
+            if stmt_node.visibility and not stmt_node.is_static then
+                properties[#properties + 1] = { name = stmt_node.name, value = stmt_node.value }
+            else
+                members[stmt_node.name] = true
             end
         end
     end
-    Context.reset(class_name, members, instance_methods)
+    Context.reset(class_name, members, instance_methods, properties)
 
+    -- Instance-property declarations emit nothing here; their defaults are written
+    -- into `C.new` (see `emit_member` for `ConstructorDecl`).
     local member_lines = {}
     for _, stmt_node in ipairs(self.ast.body) do
-        member_lines[#member_lines + 1] = emit_member(stmt_node)
+        if
+            not (
+                stmt_node.type == "VariableDecl"
+                and stmt_node.visibility
+                and not stmt_node.is_static
+            )
+        then
+            member_lines[#member_lines + 1] = emit_member(stmt_node)
+        end
     end
 
     local class_block = "local " .. class_name .. " = {}"
@@ -96,17 +113,17 @@ function Codegen:generate(opts)
     end
 
     local sections = {}
-    if with_header then
-        sections[#sections + 1] = HEADER
-    end
+    if with_header then sections[#sections + 1] = HEADER end
     sections[#sections + 1] = class_block
     if with_entry then
         -- The entry of a program is its constructor: the chunk constructs the
         -- class and returns the instance, forwarding the launch arguments
         -- (`...`) into the constructor. An entry program must have a constructor.
         if not self:_has_constructor() then
-            Error.throw(Error.Type.MISSING_CONSTRUCTOR,
-                "The entry class '" .. class_name .. "' must define a constructor")
+            Error.throw(
+                Error.Type.MISSING_CONSTRUCTOR,
+                "The entry class '" .. class_name .. "' must define a constructor"
+            )
         end
         sections[#sections + 1] = "return " .. class_name .. ".new(...)"
     end

@@ -7,11 +7,20 @@ local Context = require("backend.lua50.context")
 --- words are identical. `MODULO` is absent on purpose — Lua 5.0 has no `%`, so it
 --- is synthesised in `emit_expr` instead.
 local OP_MAP = {
-    PLUS = "+", MINUS = "-", MULTIPLY = "*", DIVIDE = "/", POWER = "^",
+    PLUS = "+",
+    MINUS = "-",
+    MULTIPLY = "*",
+    DIVIDE = "/",
+    POWER = "^",
     CONCAT = "..",
-    EQ = "==", NEQ = "~=",
-    LESS = "<", LESS_EQUAL = "<=", GREATER = ">", GREATER_EQUAL = ">=",
-    AND = "and", OR = "or",
+    EQ = "==",
+    NEQ = "~=",
+    LESS = "<",
+    LESS_EQUAL = "<=",
+    GREATER = ">",
+    GREATER_EQUAL = ">=",
+    AND = "and",
+    OR = "or",
 }
 
 --- Lazarus unary operator token → Lua operator.
@@ -23,9 +32,7 @@ local emit_expr
 emit_expr = function(node)
     if node.type == "LiteralExpr" then
         ---@cast node LiteralExpr
-        if node.kind == "string" then
-            return string.format("%q", node.value)
-        end
+        if node.kind == "string" then return string.format("%q", node.value) end
         return tostring(node.value)
     end
 
@@ -33,6 +40,11 @@ emit_expr = function(node)
         ---@cast node IdentifierExpr
         return Context.emit_name(node.name)
     end
+
+    -- The implicit receiver of a `.field` access. There is no `self` keyword in
+    -- the source; it lowers to the receiver name codegen passes to every instance
+    -- member (`self`), so `.x` (a MemberExpr over this) becomes `self.x`.
+    if node.type == "SelfExpr" then return "self" end
 
     if node.type == "MemberExpr" then
         ---@cast node MemberExpr
@@ -64,19 +76,25 @@ emit_expr = function(node)
         -- (e.g. an external object) is left as a plain `obj.m(args)`.
         if node.callee.type == "MemberExpr" and Context.instance_methods[node.callee.field] then
             local object = emit_expr(node.callee.object)
-            if node.callee.object.type == "BinaryExpr" or node.callee.object.type == "UnaryExpr" then
+            if
+                node.callee.object.type == "BinaryExpr"
+                or node.callee.object.type == "UnaryExpr"
+            then
                 object = "(" .. object .. ")"
             end
             table.insert(args, 1, object)
-            return Context.class .. "." .. node.callee.field .. "(" .. table.concat(args, ", ") .. ")"
+            return Context.class
+                .. "."
+                .. node.callee.field
+                .. "("
+                .. table.concat(args, ", ")
+                .. ")"
         end
 
         local callee = emit_expr(node.callee)
         -- A binary expression is not directly callable in Lua; parenthesise it
         -- defensively so the emitted text stays syntactically valid.
-        if node.callee.type == "BinaryExpr" then
-            callee = "(" .. callee .. ")"
-        end
+        if node.callee.type == "BinaryExpr" then callee = "(" .. callee .. ")" end
 
         return callee .. "(" .. table.concat(args, ", ") .. ")"
     end
@@ -98,7 +116,7 @@ emit_expr = function(node)
         local l = emit_expr(node.left)
         local r = emit_expr(node.right)
 
-        if node.left.type  == "BinaryExpr" then l = "(" .. l .. ")" end
+        if node.left.type == "BinaryExpr" then l = "(" .. l .. ")" end
         if node.right.type == "BinaryExpr" then r = "(" .. r .. ")" end
 
         -- Lua 5.0 has no `%`; synthesise `a % b` as `(a - math.floor(a / b) * b)`.

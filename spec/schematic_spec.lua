@@ -1,7 +1,7 @@
-local Lexer     = require("frontend.lexer")
-local Parser    = require("frontend.parser")
+local Lexer = require("frontend.lexer")
+local Parser = require("frontend.parser")
 local Schematic = require("frontend.schematic")
-local Error     = require("error")
+local Error = require("error")
 
 local function analyze(source)
     local ast = Parser.new(Lexer.new(source):scan(), source):parse()
@@ -9,29 +9,29 @@ local function analyze(source)
     return ast
 end
 
-describe("Schematic", function ()
-    describe("valid programs", function ()
-        it("accepts a declaration and a later reference to it", function ()
-            assert.has_no.errors(function ()
-                analyze("private x = 1\nprivate y = x")
-            end)
+describe("Schematic", function()
+    describe("valid programs", function()
+        it("accepts a static member and a later reference to it", function()
+            assert.has_no.errors(
+                function() analyze("private static x = 1\nprivate static y = x") end
+            )
         end)
 
-        it("accepts an immutable binding referenced in a later expression", function ()
-            assert.has_no.errors(function ()
-                analyze("private foo = 3\nprivate bar = foo + 1")
-            end)
+        it("accepts an immutable static member referenced in a later expression", function()
+            assert.has_no.errors(
+                function() analyze("private static foo = 3\nprivate static bar = foo + 1") end
+            )
         end)
 
-        it("accepts reassignment of a mutable binding inside a function", function ()
-            assert.has_no.errors(function ()
-                analyze("static f() { mut n = 0\nn = 1\nreturn n }")
-            end)
+        it("accepts reassignment of a mutable binding inside a function", function()
+            assert.has_no.errors(
+                function() analyze("static f() { mut n = 0\nn = 1\nreturn n }") end
+            )
         end)
     end)
 
-    describe("mutability", function ()
-        it("rejects reassignment of an immutable binding", function ()
+    describe("mutability", function()
+        it("rejects reassignment of an immutable binding", function()
             local ok, err = pcall(analyze, "static f() { a = 1\na = 2\nreturn a }")
             assert.is_false(ok)
             local err = err --[[@as Error]]
@@ -39,7 +39,7 @@ describe("Schematic", function ()
             assert.matches("Cannot assign to immutable binding 'a'", err.message)
         end)
 
-        it("rejects reassignment of a function parameter", function ()
+        it("rejects reassignment of a function parameter", function()
             local ok, err = pcall(analyze, "static f(a) { a = 2\nreturn a }")
             assert.is_false(ok)
             local err = err --[[@as Error]]
@@ -47,8 +47,8 @@ describe("Schematic", function ()
         end)
     end)
 
-    describe("visibility", function ()
-        it("rejects a top-level binding with no visibility modifier", function ()
+    describe("visibility", function()
+        it("rejects a top-level binding with no visibility modifier", function()
             local ok, err = pcall(analyze, "x = 1")
             assert.is_false(ok)
             local err = err --[[@as Error]]
@@ -56,16 +56,14 @@ describe("Schematic", function ()
             assert.matches("must declare visibility", err.message)
         end)
 
-        it("accepts a bare binding inside a function", function ()
-            assert.has_no.errors(function ()
-                analyze("static f() { a = 1\nreturn a }")
-            end)
+        it("accepts a bare binding inside a function", function()
+            assert.has_no.errors(function() analyze("static f() { a = 1\nreturn a }") end)
         end)
     end)
 
-    describe("duplicate declarations", function ()
-        it("rejects a redeclared name with SEMANTIC_ERROR and a position", function ()
-            local ok, err = pcall(analyze, "private x = 1\nprivate x = 2")
+    describe("duplicate declarations", function()
+        it("rejects a redeclared static member with SEMANTIC_ERROR and a position", function()
+            local ok, err = pcall(analyze, "private static x = 1\nprivate static x = 2")
             assert.is_false(ok)
             local err = err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
@@ -73,55 +71,61 @@ describe("Schematic", function ()
             assert.equal(2, err.line)
             assert.is_number(err.col)
         end)
+
+        it("rejects a redeclared instance property", function()
+            local ok, err = pcall(analyze, "private x\nprivate x")
+            assert.is_false(ok)
+            assert.matches("Duplicate declaration 'x'", (err --[[@as Error]]).message)
+        end)
     end)
 
-    describe("undeclared identifiers", function ()
-        it("rejects a reference to an unknown name with a source position", function ()
-            local ok, err = pcall(analyze, "private y = nope")
+    describe("undeclared identifiers", function()
+        it("rejects a reference to an unknown name with a source position", function()
+            local ok, err = pcall(analyze, "private static y = nope")
             assert.is_false(ok)
             local err = err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
             assert.matches("Undeclared identifier 'nope'", err.message)
             assert.equal(1, err.line)
-            assert.equal(13, err.col)
+            assert.equal(20, err.col)
         end)
 
-        it("rejects self-reference in an initialiser", function ()
-            local ok, err = pcall(analyze, "private x = x")
+        it("rejects self-reference in an initialiser", function()
+            local ok, err = pcall(analyze, "private static x = x")
             assert.is_false(ok)
             local err = err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
         end)
     end)
 
-    describe("control flow", function ()
-        it("accepts if / else if / else referencing visible names", function ()
-            assert.has_no.errors(function ()
-                analyze("static f(a, b) { if a { x = 1 } else if b { x = 2 } else { x = 3 } }")
-            end)
+    describe("control flow", function()
+        it("accepts if / else if / else referencing visible names", function()
+            assert.has_no.errors(
+                function()
+                    analyze("static f(a, b) { if a { x = 1 } else if b { x = 2 } else { x = 3 } }")
+                end
+            )
         end)
 
-        it("accepts a while loop mutating an outer mutable binding", function ()
-            assert.has_no.errors(function ()
-                analyze("static f(n) { mut i = 0\n while i < n { i = i + 1 } }")
-            end)
+        it("accepts a while loop mutating an outer mutable binding", function()
+            assert.has_no.errors(
+                function() analyze("static f(n) { mut i = 0\n while i < n { i = i + 1 } }") end
+            )
         end)
 
-        it("accepts an infinite loop containing break", function ()
-            assert.has_no.errors(function ()
-                analyze("static f() { loop { break } }")
-            end)
+        it("accepts an infinite loop containing break", function()
+            assert.has_no.errors(function() analyze("static f() { loop { break } }") end)
         end)
 
-        it("accepts a C-style for whose step mutates the loop variable", function ()
+        it("accepts a C-style for whose step mutates the loop variable", function()
             -- the loop variable `i` is a fresh, implicitly-mutable binding, so the
             -- `i += 1` step must be legal even though it was not declared `mut`.
-            assert.has_no.errors(function ()
-                analyze("static f(n) { for i = 0; i < n; i += 1 { x = i } }")
-            end)
+            assert.has_no.errors(
+                function() analyze("static f(n) { for i = 0; i < n; i += 1 { x = i } }") end
+            )
         end)
 
-        it("rejects an undeclared identifier in a condition", function ()
+        it("rejects an undeclared identifier in a condition", function()
             local ok, err = pcall(analyze, "static f() { while nope { x = 1 } }")
             assert.is_false(ok)
             local err = err --[[@as Error]]
@@ -129,14 +133,14 @@ describe("Schematic", function ()
             assert.matches("Undeclared identifier 'nope'", err.message)
         end)
 
-        it("does not leak a binding declared inside an if body", function ()
+        it("does not leak a binding declared inside an if body", function()
             local ok, err = pcall(analyze, "static f(a) { if a { y = 1 }\n return y }")
             assert.is_false(ok)
             local err = err --[[@as Error]]
             assert.matches("Undeclared identifier 'y'", err.message)
         end)
 
-        it("rejects break outside any loop", function ()
+        it("rejects break outside any loop", function()
             local ok, err = pcall(analyze, "static f() { break }")
             assert.is_false(ok)
             local err = err --[[@as Error]]
@@ -144,30 +148,30 @@ describe("Schematic", function ()
             assert.matches("'break' outside", err.message)
         end)
 
-        it("rejects break that is not the last statement in its block", function ()
+        it("rejects break that is not the last statement in its block", function()
             local ok, err = pcall(analyze, "static f() { loop { break\n x = 1 } }")
             assert.is_false(ok)
             local err = err --[[@as Error]]
             assert.matches("'break' must be the last statement", err.message)
         end)
 
-        it("checks operands of a unary expression", function ()
-            local ok, err = pcall(analyze, "private x = not nope")
+        it("checks operands of a unary expression", function()
+            local ok, err = pcall(analyze, "private static x = not nope")
             assert.is_false(ok)
             local err = err --[[@as Error]]
             assert.matches("Undeclared identifier 'nope'", err.message)
         end)
 
-        it("accepts a unary expression over a visible name", function ()
-            assert.has_no.errors(function ()
-                analyze("private p = true\nprivate q = not p")
-            end)
+        it("accepts a unary expression over a visible name", function()
+            assert.has_no.errors(
+                function() analyze("private static p = true\nprivate static q = not p") end
+            )
         end)
     end)
 
-    describe("bare expression statements", function ()
-        it("rejects a bare expression as a statement", function ()
-            local ok, err = pcall(analyze, "private x = 1\nx + x")
+    describe("bare expression statements", function()
+        it("rejects a bare expression as a statement", function()
+            local ok, err = pcall(analyze, "private static x = 1\nx + x")
             assert.is_false(ok)
             local err = err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
@@ -175,232 +179,164 @@ describe("Schematic", function ()
         end)
     end)
 
-    describe("type checking", function ()
-        local function bad(source)
-            local ok, err = pcall(analyze, source)
-            assert.is_false(ok, "expected a type error for: " .. source)
-            return err --[[@as Error]]
-        end
-
-        describe("gradual (un-annotated code still type-checks)", function ()
-            it("accepts un-annotated functions and bindings", function ()
-                assert.has_no.errors(function ()
-                    analyze("static double(n) { return n * 2 }\nprivate x = double(3)")
-                end)
-            end)
+    describe("constructor", function()
+        it("accepts a constructor whose body sets declared properties from params", function()
+            assert.has_no.errors(
+                function() analyze("private x\nprivate y\nconstructor(x, y) { .x = x\n.y = y }") end
+            )
         end)
 
-        describe("annotation vs initialiser", function ()
-            it("accepts a matching annotation", function ()
-                assert.has_no.errors(function () analyze("private x: int = 5") end)
-            end)
-
-            it("rejects an int annotation initialised with a float", function ()
-                local err = bad("private x: int = 3.5")
-                assert.equal(Error.Type.TYPE_MISMATCH, err.type)
-                assert.matches("Binding 'x'", err.message)
-            end)
-
-            it("rejects a str annotation initialised with a number", function ()
-                assert.equal(Error.Type.TYPE_MISMATCH, bad("private s: str = 1").type)
-            end)
+        it("accepts construction of the class by name", function()
+            assert.has_no.errors(
+                function()
+                    analyze(
+                        "private x\nconstructor(x) { .x = x }\nstatic main() { mut p = Main(5)\nreturn p.x }"
+                    )
+                end
+            )
         end)
 
-        describe("int / float strictness", function ()
-            it("accepts int + int", function ()
-                assert.has_no.errors(function () analyze("private a: int = 1\nprivate b = a + 2") end)
-            end)
-
-            it("rejects mixing int and float in arithmetic", function ()
-                local err = bad("private a: int = 1\nprivate b: float = 2.0\nprivate c = a + b")
-                assert.equal(Error.Type.TYPE_MISMATCH, err.type)
-                assert.matches("int and float do not convert", err.message)
-            end)
-        end)
-
-        describe("operator operand types", function ()
-            it("rejects arithmetic on a string", function ()
-                assert.equal(Error.Type.TYPE_MISMATCH, bad('private s: str = "x"\nprivate n = s * 2').type)
-            end)
-
-            it("rejects ++ on numbers", function ()
-                assert.equal(Error.Type.TYPE_MISMATCH, bad("private a: int = 1\nprivate b = a ++ a").type)
-            end)
-
-            it("accepts ++ on strings", function ()
-                assert.has_no.errors(function ()
-                    analyze('private a: str = "x"\nprivate b = a ++ a')
-                end)
-            end)
-
-            it("rejects 'and' on non-bool operands", function ()
-                assert.equal(Error.Type.TYPE_MISMATCH, bad("private a: int = 1\nprivate b = a and a").type)
-            end)
-        end)
-
-        describe("conditions must be bool", function ()
-            it("accepts a bool condition", function ()
-                assert.has_no.errors(function ()
-                    analyze("private flag: bool = true\nif flag { private mut x = 1 }")
-                end)
-            end)
-
-            it("rejects a non-bool if condition", function ()
-                local err = bad("private n: int = 5\nif n { private mut x = 1 }")
-                assert.equal(Error.Type.TYPE_MISMATCH, err.type)
-                assert.matches("must be 'bool'", err.message)
-            end)
-
-            it("rejects a non-bool while condition", function ()
-                assert.equal(Error.Type.TYPE_MISMATCH,
-                    bad("private n: int = 5\nwhile n { private mut x = 1 }").type)
-            end)
-        end)
-
-        describe("return type", function ()
-            it("accepts a return matching the declared type", function ()
-                assert.has_no.errors(function ()
-                    analyze("static two(): int { return 2 }")
-                end)
-            end)
-
-            it("rejects a return that violates the declared type", function ()
-                local err = bad('static two(): int { return "two" }')
-                assert.equal(Error.Type.TYPE_MISMATCH, err.type)
-                assert.matches("Function return", err.message)
-            end)
-
-            it("checks a typed parameter flows into the return check", function ()
-                assert.has_no.errors(function ()
-                    analyze("static id(n: int): int { return n }")
-                end)
-            end)
-        end)
-
-        describe("typed mutable reassignment", function ()
-            it("rejects assigning the wrong type to a typed mutable", function ()
-                local err = bad('public mut count: int = 0\nstatic f() { count = "no" }')
-                assert.equal(Error.Type.TYPE_MISMATCH, err.type)
-            end)
-        end)
-    end)
-
-    describe("constructor", function ()
-        it("accepts a constructor whose body uses self and params", function ()
-            assert.has_no.errors(function ()
-                analyze("constructor(x, y) { self.x = x\nself.y = y }")
-            end)
-        end)
-
-        it("accepts construction of the class by name", function ()
-            assert.has_no.errors(function ()
-                analyze("constructor(x) { self.x = x }\nstatic main() { mut p = Main(5)\nreturn p.x }")
-            end)
-        end)
-
-        it("rejects a constructor nested inside a function", function ()
+        it("rejects a constructor nested inside a function", function()
             local ok, err = pcall(analyze, "static f() { constructor() {} }")
             assert.is_false(ok)
             assert.matches("must be at the top level", (err --[[@as Error]]).message)
         end)
 
-        it("rejects a return inside a constructor", function ()
+        it("rejects a return inside a constructor", function()
             local ok, err = pcall(analyze, "constructor() { return 1 }")
             assert.is_false(ok)
-            assert.matches("'return' is not allowed in a constructor", (err --[[@as Error]]).message)
+            assert.matches(
+                "'return' is not allowed in a constructor",
+                (err --[[@as Error]]).message
+            )
         end)
     end)
 
-    describe("field access", function ()
-        it("accepts field read and assignment on a declared object", function ()
-            assert.has_no.errors(function ()
-                analyze("static f(p) { p.x = 1\nreturn p.x }")
-            end)
+    describe("field access", function()
+        it("accepts field read and assignment on a declared object", function()
+            assert.has_no.errors(function() analyze("static f(p) { p.x = 1\nreturn p.x }") end)
         end)
 
-        it("rejects field assignment on an undeclared object", function ()
+        it("rejects field assignment on an undeclared object", function()
             local ok, err = pcall(analyze, "static f() { nope.x = 1 }")
             assert.is_false(ok)
             assert.matches("Undeclared identifier 'nope'", (err --[[@as Error]]).message)
         end)
     end)
 
-    describe("methods", function ()
-        it("binds an implicit self in an instance method body", function ()
-            assert.has_no.errors(function ()
-                analyze("greet() { self.name = \"x\"\nreturn self.name }")
-            end)
+    describe("instance fields (.field on the implicit receiver)", function()
+        it("accepts a declared property read and written via .field in a method", function()
+            assert.has_no.errors(
+                function() analyze('private name\nset_name() { .name = "x"\nreturn .name }') end
+            )
         end)
 
-        it("does not bind self in a static method body", function ()
-            local ok, err = pcall(analyze, "static helper() { return self }")
+        it("lets a constructor param and a property share a name", function()
+            assert.has_no.errors(
+                function() analyze("private balance\nconstructor(balance) { .balance = balance }") end
+            )
+        end)
+
+        it("rejects an undeclared instance field", function()
+            local ok, err = pcall(analyze, "deposit() { .bogus = 1 }")
             assert.is_false(ok)
-            assert.matches("Undeclared identifier 'self'", (err --[[@as Error]]).message)
+            local err = err --[[@as Error]]
+            assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
+            assert.matches("Unknown instance member '.bogus'", err.message)
+        end)
+
+        it("rejects .field in a static method (no receiver)", function()
+            local ok, err = pcall(analyze, "private x\nstatic helper() { return .x }")
+            assert.is_false(ok)
+            local err = err --[[@as Error]]
+            assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
+            assert.matches("no receiver", err.message)
+        end)
+
+        it("allows calling an instance method on the receiver via .method()", function()
+            assert.has_no.errors(
+                function()
+                    analyze(
+                        "private label\ndescribe() { return .label }\nbuild() { return .describe() }"
+                    )
+                end
+            )
         end)
     end)
 
-    describe("callability", function ()
-        it("rejects calling a non-function scalar binding", function ()
+    describe("methods", function()
+        it("accepts an instance method using its receiver's declared fields", function()
+            assert.has_no.errors(
+                function() analyze('private name\ngreet() { .name = "x"\nreturn .name }') end
+            )
+        end)
+
+        it("reserves the word 'self' with a pointed message", function()
+            local ok, err = pcall(analyze, "static helper() { return self }")
+            assert.is_false(ok)
+            local err = err --[[@as Error]]
+            assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
+            assert.matches("'self' is not a value", err.message)
+        end)
+    end)
+
+    describe("callability", function()
+        it("rejects calling a non-function value binding", function()
             local ok, err = pcall(analyze, "static f() { mut a = 0\na = a(a) }")
             assert.is_false(ok)
             assert.equal(Error.Type.NOT_CALLABLE, (err --[[@as Error]]).type)
             assert.matches("not callable", (err --[[@as Error]]).message)
         end)
 
-        it("accepts calling a declared function", function ()
-            assert.has_no.errors(function ()
-                analyze("static g() { return 0 }\nstatic f() { return g() }")
-            end)
+        it("accepts calling a declared function", function()
+            assert.has_no.errors(
+                function() analyze("static g() { return 0 }\nstatic f() { return g() }") end
+            )
         end)
 
-        it("allows calling an `any`-typed parameter (gradual)", function ()
-            assert.has_no.errors(function ()
-                analyze("static f(cb) { return cb() }")
-            end)
+        it("allows calling a parameter that might hold a function", function()
+            assert.has_no.errors(function() analyze("static f(cb) { return cb() }") end)
         end)
     end)
 
-    describe("casing", function ()
-        it("accepts snake_case values and scalar / PascalCase types", function ()
-            assert.has_no.errors(function ()
-                analyze("private my_var: int = 1\nstatic do_thing(a_b: int): int { return a_b }")
-            end)
+    describe("casing", function()
+        it("accepts snake_case values", function()
+            assert.has_no.errors(
+                function() analyze("private static my_var = 1\nstatic do_thing(a_b) { return a_b }") end
+            )
         end)
 
-        it("rejects a non-snake_case binding name", function ()
-            local ok, err = pcall(analyze, "private myVar = 1")
+        it("rejects a non-snake_case property name", function()
+            local ok, err = pcall(analyze, "private myVar")
             assert.is_false(ok)
             local err = err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
             assert.matches("must be snake_case", err.message)
         end)
 
-        it("rejects a non-snake_case function name", function ()
+        it("rejects a non-snake_case static member name", function()
+            local ok, err = pcall(analyze, "private static myVar = 1")
+            assert.is_false(ok)
+            assert.matches("must be snake_case", (err --[[@as Error]]).message)
+        end)
+
+        it("rejects a non-snake_case function name", function()
             local ok, err = pcall(analyze, "static DoThing() { return 1 }")
             assert.is_false(ok)
             assert.matches("must be snake_case", (err --[[@as Error]]).message)
         end)
 
-        it("rejects a non-snake_case parameter name", function ()
+        it("rejects a non-snake_case parameter name", function()
             local ok, err = pcall(analyze, "static f(myArg) { return myArg }")
             assert.is_false(ok)
             assert.matches("must be snake_case", (err --[[@as Error]]).message)
         end)
 
-        it("rejects a non-snake_case loop variable", function ()
-            local ok, err = pcall(analyze, "static f() { for Idx = 0; Idx < 3; Idx += 1 { x = Idx } }")
+        it("rejects a non-snake_case loop variable", function()
+            local ok, err =
+                pcall(analyze, "static f() { for Idx = 0; Idx < 3; Idx += 1 { x = Idx } }")
             assert.is_false(ok)
             assert.matches("must be snake_case", (err --[[@as Error]]).message)
-        end)
-
-        it("rejects a lower-case (non-scalar) type name", function ()
-            local ok, err = pcall(analyze, "private x: foo = 1")
-            assert.is_false(ok)
-            assert.matches("must be PascalCase", (err --[[@as Error]]).message)
-        end)
-
-        it("accepts a PascalCase type name (treated as any for now)", function ()
-            assert.has_no.errors(function () analyze("private mut x: Widget") end)
         end)
     end)
 end)

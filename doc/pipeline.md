@@ -75,8 +75,8 @@ Single-pass scanner. Walks the source byte by byte and emits a flat list of toke
 | `BODY_START` | `{` |
 | `BODY_END` | `}` |
 | `COMMA` | `,` |
-| `COLON` | `:` (introduces a type annotation) |
-| `DOT` | `.` (field access / method call) |
+| `COLON` | `:` (reserved; the language is untyped, so no annotation syntax uses it) |
+| `DOT` | `.` (field access / method call; a **leading** `.x` is an instance-field access) |
 | `SEMICOLON` | `;` (only used inside a `for` header) |
 | `IF` `ELSE` `WHILE` `LOOP` `FOR` `BREAK` | the control-flow keywords |
 | `TRUE` `FALSE` | boolean literals |
@@ -90,7 +90,9 @@ Comments are skipped by the scanner and produce no tokens: `// …` runs to end 
 
 A number literal with a fractional part (`3.14`) is a float; the lexer leaves a `.` that is not followed by a digit as a separate token.
 
-**Type annotations.** Bindings (`name: Type`), function parameters (`p: Type`) and return types (`f(): Type`) carry an optional `TypeRef` (`{ name }`). They are parsed onto `VariableDecl.type_ann` and `FunctionDecl.param_types`/`return_type`. The type *checker* lives in Schematic; annotations are **erased** before codegen, so the emitted Lua is identical with or without them.
+**No type annotations.** The language is **untyped**: there is no type-annotation syntax. A `:` after a binding name, parameter, or `)` is a syntax error. Bindings, parameters and returns carry no declared type, and there is no static type checker (see Schematic).
+
+**Instance fields (`.field`).** There is no `self` keyword. An instance field is written with a leading dot: `.balance`. The parser lowers a leading `.x` to a `MemberExpr` whose object is a `SelfExpr` (the implicit receiver); codegen emits the receiver name `self` for it, so `.x` becomes `self.x`. A `.field` that begins a new source line is a *new statement*, not a member-access continuation of the previous line (so `f()` ⏎ `.x = 1` is two statements). The word `self` is reserved with a pointed error.
 
 ### Internal structure
 
@@ -130,12 +132,12 @@ Program
 
 | Node | Fields | Source |
 |---|---|---|
-| `VariableDecl` | `name: string`, `value: Expr \| nil`, `visibility: "private"\|"public"\|nil`, `mutable: bool` | `private x = e`, `public mut x = e`, `mut x = e`, `x = e` |
+| `VariableDecl` | `name: string`, `value: Expr \| nil`, `visibility: "private"\|"public"\|nil`, `mutable: bool`, `is_static: bool` | `private x` (instance property), `private static x = e` (class member), `mut x = e`, `x = e` |
 | `FunctionDecl` | `name: string`, `params: string[]`, `is_static: bool`, `visibility: "private"\|"public"\|nil`, `body: Stmt[]` | `greet() { ... }` (instance), `static helper() { ... }` (class), `public m() { ... }` |
 | `ReturnStmt` | `value: Expr \| nil` | `return expr` / bare `return` |
 | `ExpressionStmt` | `expression: Expr` | bare expression as statement |
-| `FieldAssign` | `target: MemberExpr`, `value: Expr` | `self.x = 3` (incl. compound `+=`) |
-| `ConstructorDecl` | `params: string[]`, `param_types`, `body: Stmt[]` | `constructor(x) { self.x = x }` |
+| `FieldAssign` | `target: MemberExpr`, `value: Expr` | `.x = 3`, `p.x = 3` (incl. compound `+=`) |
+| `ConstructorDecl` | `params: string[]`, `body: Stmt[]` | `constructor(x) { .x = x }` |
 | `IfStmt` | `clauses: {condition, body}[]`, `else_body: Stmt[] \| nil` | `if c { } else if d { } else { }` |
 | `WhileStmt` | `condition: Expr`, `body: Stmt[]` | `while c { ... }` |
 | `LoopStmt` | `body: Stmt[]` | `loop { ... }` |
@@ -147,7 +149,7 @@ C-style `for` is written **without parentheses** (`for i = 0; i < n; i += 1 { }`
 — a deliberate deviation from `doc/design/05-control-flow.md`. Its `init`/`step`
 are assignment statements and any clause may be empty. **Compound assignment**
 (`i += 1`) is desugared by the parser into a plain reassignment (`i = i + 1`), so
-no node type represents it. There is no type system yet, so a condition is any
+no node type represents it. The language is untyped, so a condition is any
 expression (Lua truthiness applies at runtime) rather than a checked `bool`.
 
 **Bindings.** A single `VariableDecl` covers every binding form. Bindings are
@@ -167,7 +169,8 @@ optimizer folds any binding with a foldable initialiser automatically.
 | `BinaryExpr` | `op: TokenType`, `left: Expr`, `right: Expr` | `a + b`, `a == b`, `a and b` |
 | `UnaryExpr` | `op: TokenType`, `operand: Expr` | `not done` |
 | `CallExpr` | `callee: Expr`, `args: Expr[]` | `f(a, b)` |
-| `MemberExpr` | `object: Expr`, `field: string` | `self.x`, `p.x.y`, `obj.m()` |
+| `MemberExpr` | `object: Expr`, `field: string` | `.x` (object is `SelfExpr`), `p.x.y`, `obj.m()` |
+| `SelfExpr` | — | the implicit receiver of a leading-dot `.x` |
 
 ### Operator precedence (low → high)
 
@@ -188,7 +191,7 @@ optimizer folds any binding with a foldable initialiser automatically.
 | File | Role |
 |---|---|
 | `init.lua` | `Parser` class — cursor, `_advance`, `_match`, `_consume`, `parse()` |
-| `types.lua` | `Expr` and `Stmt` base class annotations |
+| `types.lua` | `Expr` and `Stmt` base class annotations (`TypeRef` is vestigial; the language is untyped) |
 | `ast.lua` | `AST` (Program) node |
 | `expressions/init.lua` | Collects expression rules and mixes them into `Parser` |
 | `expressions/operators.lua` | Infix operator → precedence table (add an operator here) |
@@ -234,29 +237,32 @@ Single-pass semantic checker. Walks the AST in source order maintaining a symbol
 | `ConstructorDecl` nested inside a function (not top-level) | `SEMANTIC_ERROR` — `'constructor'` must be at the top level |
 | `ReturnStmt` inside a constructor (the instance is returned implicitly) | `SEMANTIC_ERROR` — `'return'` is not allowed in a constructor |
 | `ReturnStmt` outside any function | `SEMANTIC_ERROR` — `'return'` outside of a function |
-| `CallExpr` whose callee is a binding of a known scalar type (`int`/`float`/`str`/`bool`) | `NOT_CALLABLE` — not callable; it is a `<type>`, not a function |
+| `CallExpr` whose callee is a binding that provably holds a value, not a function | `NOT_CALLABLE` — not callable; it holds a value, not a function |
 | `ReturnStmt` that is not the last statement in its block | `SEMANTIC_ERROR` — `'return'` must be last (mirrors Lua) |
 | `ExpressionStmt` whose expression is not a call | `SEMANTIC_ERROR` — bare expressions are not valid statements |
 | `BreakStmt` outside any loop | `SEMANTIC_ERROR` — `'break'` outside of a loop |
 | `BreakStmt` that is not the last statement in its block | `SEMANTIC_ERROR` — `'break'` must be last (Lua 5.0 requires it) |
-| Binding/return value not assignable to its declared type | `TYPE_MISMATCH` |
-| Mixing `int` and `float`, or non-numeric arithmetic operand | `TYPE_MISMATCH` |
-| `++` on non-`str`, `and`/`or`/`not` on non-`bool`, equality across types | `TYPE_MISMATCH` |
-| `if`/`while`/`for` condition that is not `bool` | `TYPE_MISMATCH` |
-| Value name (variable/function/parameter/loop var) not `snake_case` | `SEMANTIC_ERROR` |
-| Type name not `PascalCase` (built-in scalars exempt) | `SEMANTIC_ERROR` |
+| `.field` (a `MemberExpr` over `SelfExpr`) outside an instance method/constructor | `SEMANTIC_ERROR` — no receiver |
+| `.field` that is not a declared property or instance method | `SEMANTIC_ERROR` — unknown instance member |
+| Use of the reserved word `self` | `SEMANTIC_ERROR` — `'self'` is not a value; use `.field` |
+| Value name (variable/function/parameter/loop var/property) not `snake_case` | `SEMANTIC_ERROR` |
 
-### Type checking
+### No type checking
 
-Schematic also runs a **gradual** static type check (`schematic/types.lua`).
-Each scope entry carries a `vtype` (`int`/`float`/`str`/`bool`/`any`); an
-annotation sets it, otherwise it is inferred from the initialiser. Anything
-unknown is `any` and flows without error, so un-annotated code still checks.
-`int` and `float` are **distinct** and never convert implicitly. Types are
-**erased** after this pass — Optimizer and Codegen see a plain AST. Call results
-are `any` for now (call-site argument checking arrives with class/function
-signatures later). User type names (non-scalars) are treated as `any` until
-classes exist.
+The language is **untyped** — there is no static type checker. The one static
+fact recorded per binding is `noncallable` (`schematic/callability.lua`): true
+when the bound value is provably not a function (a literal, or an arithmetic /
+comparison / logical / concat result). That alone powers the `NOT_CALLABLE`
+guard; a name that might hold a function (a parameter, a call result) is allowed
+through. There are no `int`/`float`/`str`/`bool` operand, assignment, return or
+condition checks, and no type annotations to resolve.
+
+**Instance members.** The class's instance **properties** (top-level non-static
+visibility bindings) and instance **method** names are collected up front. A
+leading-dot `.field` (a `MemberExpr` over `SelfExpr`) is valid only inside an
+instance method or constructor (`in_instance`), and must name one of those
+members. Properties are *not* bound as bare names — they are reached only via
+`.field`; `static` members are bound bare (`local → static member` resolution).
 
 Control-flow bodies (`if`/`while`/`loop`/`for`) are checked in **child scopes**
 that inherit the enclosing declarations; bindings made inside a body stay local.
@@ -274,7 +280,7 @@ parameters bind as immutable, so reassigning a parameter is rejected.
 ### Symbol table entry
 
 ```lua
-{ kind = "variable" | "constant" | "function", mutable = boolean }
+{ kind = "variable" | "constant" | "function", mutable = boolean, noncallable = boolean }
 ```
 
 ### Internal structure
@@ -290,9 +296,10 @@ scope creation, block recursion); the rules stay small.
 | `statements/statement_check.lua` | `StatementCheck` interface (`type` + `check`) |
 | `statements/{variable,function,return,expression}.lua` | One check per statement node |
 | `statements/{if,while,loop,for,break}.lua` | One check per control-flow node |
-| `expressions/init.lua` | `check_expr` dispatcher over expression rules |
+| `expressions/init.lua` | `check_expr` dispatcher over expression rules (threads instance context) |
 | `expressions/expression_check.lua` | `ExpressionCheck` interface (`type` + `check`) |
-| `expressions/{identifier,binary,call,unary}.lua` | One check per expression node |
+| `expressions/{identifier,binary,call,unary,member}.lua` | One check per expression node (`member` validates `.field`) |
+| `callability.lua` | `is_noncallable(node)` — the lone static fact behind `NOT_CALLABLE` |
 
 ---
 
@@ -369,16 +376,25 @@ optimization.
 
 **Methods.** A top-level `FunctionDecl` is a class method. An **instance** method
 (plain `name() {}`) takes an implicit `self` first parameter — `function C.name(self, …)`
-— and a call `obj.name(args)` lowers to receiver-passing dispatch `C.name(obj, args)`
-(the set of instance-method names is tracked on the context). A `static` method
-(`static name() {}`) takes only its declared parameters — `function C.name(…)` — and
-is called bare or qualified. The `fn` keyword has been removed.
+— and a call `obj.name(args)` (or `.name(args)` on the receiver) lowers to
+receiver-passing dispatch `C.name(obj, args)` (the set of instance-method names is
+tracked on the context). A `static` method (`static name() {}`) takes only its
+declared parameters — `function C.name(…)` — and is called bare or qualified.
+
+**Properties vs static members.** A top-level non-static visibility binding
+(`private x = e`) is an **instance property**: it emits *no* `C.x` member; instead
+its default is assigned on `self` at the top of `C.new` (`self.x = e`), and it is
+reached only via `.x` (which emits `self.x`). A `static` binding
+(`private static x = e`) is a class member emitted as `C.x = e`. The implicit
+receiver `SelfExpr` (`.x`) emits the name `self`.
 
 ### Emission rules
 
 | AST node | Lua output |
 |---|---|
-| Top-level `VariableDecl` (a static member) | `C.name = <expr>` (or `C.name = nil` when valueless) |
+| Top-level `VariableDecl`, `static` member | `C.name = <expr>` (or `C.name = nil` when valueless) |
+| Top-level `VariableDecl`, instance property (non-static, visible) | no member emitted; default assigned in `C.new` as `self.name = <expr>` |
+| `SelfExpr` (the implicit receiver of `.field`) | `self` |
 | Top-level `FunctionDecl`, instance (`is_static=false`) | `function C.name(self, params)` + indented body + `end` |
 | Top-level `FunctionDecl`, `static` | `function C.name(params)` + indented body + `end` |
 | Nested `VariableDecl` (a `local` declaration) | `local name = <expr>` (or `local name` when valueless) |

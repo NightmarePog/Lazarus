@@ -1,3 +1,5 @@
+private counter
+
 static step(v) {
     mut total = v
     total = total + 1
@@ -6,5 +8,5 @@ static step(v) {
 }
 
 constructor() {
-    self.counter = step(4)
+    .counter = step(4)
 }

@@ -1,6 +1,8 @@
-private base   = 2 * 3 + 1
-private scaled = (base + 3) * 2
+private static base   = 2 * 3 + 1
+private static scaled = (base + 3) * 2
+
+private total
 
 constructor() {
-    self.total = base + scaled
+    .total = base + scaled
 }

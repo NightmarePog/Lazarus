@@ -17,6 +17,13 @@ Context.members = {}
 ---@type table<string, boolean>
 Context.instance_methods = {}
 
+-- Instance properties in declaration order: each `{ name, value }` where `value`
+-- is the default-initialiser Expr (or `nil`). These are *not* members (they live
+-- on the instance, reached only via `.field`); their defaults are emitted at the
+-- top of `C.new`.
+---@type { name: string, value: Expr | nil }[]
+Context.properties = {}
+
 -- Stack of local scopes; the top entry is the innermost. Each scope inherits
 -- visible locals from its parent via `__index`, mirroring Lua closure capture.
 local scopes = { {} }
@@ -27,29 +34,25 @@ local function current() return scopes[#scopes] end
 ---@param class            string
 ---@param members          table<string, boolean>
 ---@param instance_methods table<string, boolean>?
-function Context.reset(class, members, instance_methods)
-    Context.class            = class
-    Context.members          = members
+---@param properties       { name: string, value: Expr | nil }[]?
+function Context.reset(class, members, instance_methods, properties)
+    Context.class = class
+    Context.members = members
     Context.instance_methods = instance_methods or {}
+    Context.properties = properties or {}
     scopes = { {} }
 end
 
 --- Enter a new local scope (a function body), inheriting outer locals.
-function Context.push_scope()
-    scopes[#scopes + 1] = setmetatable({}, { __index = current() })
-end
+function Context.push_scope() scopes[#scopes + 1] = setmetatable({}, { __index = current() }) end
 
 --- Leave the innermost local scope.
-function Context.pop_scope()
-    scopes[#scopes] = nil
-end
+function Context.pop_scope() scopes[#scopes] = nil end
 
 --- Declare a local name (parameter, `local` binding, loop variable) in the
 --- current scope so later references to it are not mistaken for a member.
 ---@param name string
-function Context.declare_local(name)
-    current()[name] = true
-end
+function Context.declare_local(name) current()[name] = true end
 
 --- Emit an identifier: qualified as `C.name` when it names a member that is not
 --- shadowed by a local, otherwise the bare name (locals, params, globals).

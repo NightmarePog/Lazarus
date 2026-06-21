@@ -1,15 +1,15 @@
 --- Shared parser for method / function declarations.
 ---
---- Grammar: `[visibility] [static] <identifier> ( [params] ) [: T] { body }`
+--- Grammar: `[visibility] [static] <identifier> ( [params] ) { body }`
 ---
 --- A top-level declaration is a class method — instance (implicit `self`) unless
 --- `static`. A declaration nested inside a body is an ordinary `local function`.
 --- The visibility/`static` keywords are consumed by the caller; this module
 --- parses from the method *name* onward and records `is_static`/`visibility` on
---- the `FunctionDecl`.
+--- the `FunctionDecl`. The language is untyped — parameters and returns carry no
+--- annotations.
 
 local FunctionDecl = require("frontend.parser.nodes.function")
-local Types = require("frontend.parser.types")
 
 local Method = {}
 
@@ -55,19 +55,14 @@ function Method.parse(parser, visibility, is_static)
 
     ---@type string[]
     local params = {}
-    ---@type (TypeRef | nil)[]
-    local param_types = {}
     if not parser:_check("RIGHT_BRACKET") then
         repeat
             local param = parser:_consume("IDENTIFIER", "Expected parameter name")
             params[#params + 1] = param.value
-            param_types[#params] = parser:_match("COLON") and Types.read_type(parser) or nil
         until not parser:_match("COMMA")
     end
 
     parser:_consume("RIGHT_BRACKET", "Expected ')' after parameters")
-
-    local return_type = parser:_match("COLON") and Types.read_type(parser) or nil
 
     local body = parser:_block("method body")
 
@@ -77,8 +72,8 @@ function Method.parse(parser, visibility, is_static)
         body,
         name_token.line,
         name_token.column,
-        param_types,
-        return_type,
+        nil,
+        nil,
         is_static,
         visibility
     )

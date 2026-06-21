@@ -1,3 +1,5 @@
+private result
+
 static test_func(a) {
     return a + 1
 }
@@ -9,5 +11,5 @@ constructor() {
         a = test_func(a)
     }
 
-    self.result = a
+    .result = a
 }

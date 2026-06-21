@@ -1,15 +1,15 @@
-local Lexer  = require("frontend.lexer")
+local Lexer = require("frontend.lexer")
 local Parser = require("frontend.parser")
-local Error  = require("error")
+local Error = require("error")
 
 local function parse(source)
     local tokens = Lexer.new(source):scan()
     return Parser.new(tokens, source):parse()
 end
 
-describe("Parser", function ()
-    describe("valid programs", function ()
-        it("parses a simple variable declaration", function ()
+describe("Parser", function()
+    describe("valid programs", function()
+        it("parses a simple variable declaration", function()
             local ast = parse("private x = 1")
             local decl = ast.body[1] --[[@as VariableDecl]]
             assert.equal("Program", ast.type)
@@ -18,7 +18,7 @@ describe("Parser", function ()
             assert.equal("x", decl.name)
         end)
 
-        it("parses a mutable declaration without an initialiser", function ()
+        it("parses a mutable declaration without an initialiser", function()
             local ast = parse("private mut x")
             local decl = ast.body[1] --[[@as VariableDecl]]
             assert.equal("VariableDecl", decl.type)
@@ -26,152 +26,120 @@ describe("Parser", function ()
             assert.is_nil(decl.value)
         end)
 
-        it("rejects an immutable declaration without an initialiser", function ()
-            local ok, err = pcall(function () parse("private x") end)
+        it("allows an instance property without an initialiser", function()
+            -- `private x` (no `static`) is an instance property; it may be
+            -- declared without a value and defaults to nil.
+            local decl = parse("private x").body[1] --[[@as VariableDecl]]
+            assert.equal("VariableDecl", decl.type)
+            assert.is_nil(decl.value)
+            assert.is_false(decl.is_static)
+        end)
+
+        it("rejects an immutable static member without an initialiser", function()
+            local ok, err = pcall(function() parse("private static x") end)
             assert.is_false(ok)
             local err = err --[[@as Error]]
             assert.equal(Error.Type.SYNTAX_ERROR, err.type)
             assert.matches("must be initialised", err.message)
         end)
 
-        it("parses a public binding", function ()
+        it("parses a public binding", function()
             local decl = parse("public x = 1").body[1] --[[@as VariableDecl]]
             assert.equal("public", decl.visibility)
             assert.is_false(decl.mutable)
         end)
 
-        it("parses a bare local binding as a VariableDecl", function ()
+        it("parses a bare local binding as a VariableDecl", function()
             local decl = parse("x = 1").body[1] --[[@as VariableDecl]]
             assert.equal("VariableDecl", decl.type)
             assert.is_nil(decl.visibility)
             assert.is_false(decl.mutable)
         end)
 
-        it("parses multiple statements", function ()
+        it("parses multiple statements", function()
             local ast = parse("private x = 1\nprivate y = 2")
             assert.equal(2, #ast.body)
         end)
 
-        it("parses nested arithmetic", function ()
+        it("parses nested arithmetic", function()
             local ast = parse("private x = (1 + 2) * 3")
-            local decl  = ast.body[1]  --[[@as VariableDecl]]
-            local value = decl.value   --[[@as BinaryExpr]]
+            local decl = ast.body[1] --[[@as VariableDecl]]
+            local value = decl.value --[[@as BinaryExpr]]
             assert.equal("VariableDecl", decl.type)
-            assert.equal("BinaryExpr",   value.type)
+            assert.equal("BinaryExpr", value.type)
         end)
 
-        it("parses a string literal initialiser", function ()
+        it("parses a string literal initialiser", function()
             local ast = parse('private msg = "hello"')
             local decl = ast.body[1] --[[@as VariableDecl]]
-            local lit  = decl.value  --[[@as LiteralExpr]]
+            local lit = decl.value --[[@as LiteralExpr]]
             assert.equal("VariableDecl", decl.type)
-            assert.equal("LiteralExpr",  lit.type)
-            assert.equal("string",       lit.kind)
-            assert.equal("hello",        lit.value)
+            assert.equal("LiteralExpr", lit.type)
+            assert.equal("string", lit.kind)
+            assert.equal("hello", lit.value)
         end)
 
-        it("parses an identifier reference in an expression", function ()
-            local ast  = parse("private x = 1\nprivate y = x")
-            local y    = ast.body[2]  --[[@as VariableDecl]]
-            local ident = y.value     --[[@as IdentifierExpr]]
+        it("parses an identifier reference in an expression", function()
+            local ast = parse("private x = 1\nprivate y = x")
+            local y = ast.body[2] --[[@as VariableDecl]]
+            local ident = y.value --[[@as IdentifierExpr]]
             assert.equal("IdentifierExpr", ident.type)
-            assert.equal("x",              ident.name)
+            assert.equal("x", ident.name)
         end)
 
-        it("parses an empty program", function ()
+        it("parses an empty program", function()
             local ast = parse("")
             assert.equal("Program", ast.type)
             assert.equal(0, #ast.body)
         end)
     end)
 
-    describe("type annotations", function ()
-        it("parses a type annotation on a binding", function ()
-            local decl = parse("private x: int = 1").body[1] --[[@as VariableDecl]]
-            assert.equal("x", decl.name)
-            assert.is_table(decl.type_ann)
-            assert.equal("int", decl.type_ann.name)
-        end)
-
-        it("parses an annotation on a mut binding without initialiser", function ()
-            local decl = parse("private mut x: float").body[1] --[[@as VariableDecl]]
-            assert.equal("float", decl.type_ann.name)
-            assert.is_nil(decl.value)
-        end)
-
-        it("parses an annotation on a bare local declaration", function ()
-            local decl = parse("x: bool = true").body[1] --[[@as VariableDecl]]
-            assert.is_nil(decl.visibility)
-            assert.equal("bool", decl.type_ann.name)
-        end)
-
-        it("leaves type_ann nil when no annotation is given", function ()
-            local decl = parse("private x = 1").body[1] --[[@as VariableDecl]]
-            assert.is_nil(decl.type_ann)
-        end)
-
-        it("parses parameter and return type annotations on a function", function ()
-            local fn = parse("static add(a: int, b: int): int { return a + b }").body[1] --[[@as FunctionDecl]]
-            assert.same({ "a", "b" }, fn.params)
-            assert.equal("int", fn.param_types[1].name)
-            assert.equal("int", fn.param_types[2].name)
-            assert.equal("int", fn.return_type.name)
-        end)
-
-        it("allows a mix of annotated and unannotated parameters", function ()
-            local fn = parse("static f(a: int, b) { return a }").body[1] --[[@as FunctionDecl]]
-            assert.equal("int", fn.param_types[1].name)
-            assert.is_nil(fn.param_types[2])
-            assert.is_nil(fn.return_type)
-        end)
-
-        it("marks a fractional number literal as a float", function ()
+    describe("number literals", function()
+        it("marks a fractional number literal as a float", function()
             local lit = parse("private x = 3.5").body[1].value --[[@as LiteralExpr]]
             assert.equal("number", lit.kind)
             assert.equal("float", lit.numeric)
             assert.equal(3.5, lit.value)
         end)
 
-        it("marks an integer number literal as an int", function ()
+        it("marks an integer number literal as an int", function()
             local lit = parse("private x = 42").body[1].value --[[@as LiteralExpr]]
             assert.equal("int", lit.numeric)
         end)
 
-        it("errors on a missing type name after ':'", function ()
-            local ok, err = pcall(function () parse("private x: = 1") end)
+        it("rejects a type annotation — the language is untyped", function()
+            local ok, err = pcall(function() parse("private x: int = 1") end)
             assert.is_false(ok)
-            local err = err --[[@as Error]]
-            assert.matches("Expected a type name", err.message)
+            assert.equal(Error.Type.UNEXPECTED_TOKEN, (err --[[@as Error]]).type)
         end)
     end)
 
-    describe("constructor", function ()
-        it("parses a constructor with parameters", function ()
-            local c = parse("constructor(x, y) { self.x = x }").body[1] --[[@as ConstructorDecl]]
+    describe("constructor", function()
+        it("parses a constructor with parameters", function()
+            local c = parse("constructor(x, y) { .x = x }").body[1] --[[@as ConstructorDecl]]
             assert.equal("ConstructorDecl", c.type)
             assert.same({ "x", "y" }, c.params)
             assert.equal("FieldAssign", c.body[1].type)
         end)
 
-        it("parses an empty constructor", function ()
+        it("parses an empty constructor", function()
             local c = parse("constructor() {}").body[1] --[[@as ConstructorDecl]]
             assert.equal("ConstructorDecl", c.type)
             assert.equal(0, #c.params)
             assert.equal(0, #c.body)
         end)
 
-        it("parses typed constructor parameters", function ()
-            local c = parse("constructor(x: int) { self.x = x }").body[1] --[[@as ConstructorDecl]]
-            assert.equal("int", c.param_types[1].name)
+        it("rejects a typed constructor parameter — the language is untyped", function()
+            local ok, err = pcall(function() parse("constructor(x: int) { .x = x }") end)
+            assert.is_false(ok)
+            assert.equal(Error.Type.SYNTAX_ERROR, (err --[[@as Error]]).type)
         end)
     end)
 
-    describe("field access", function ()
-        local function value_of(src)
-            return parse("private x = " .. src).body[1].value
-        end
+    describe("field access", function()
+        local function value_of(src) return parse("private x = " .. src).body[1].value end
 
-        it("parses 'p.x' as a MemberExpr", function ()
+        it("parses 'p.x' as a MemberExpr", function()
             local m = value_of("p.x") --[[@as MemberExpr]]
             assert.equal("MemberExpr", m.type)
             assert.equal("x", m.field)
@@ -179,21 +147,46 @@ describe("Parser", function ()
             assert.equal("p", m.object.name)
         end)
 
-        it("parses chained access 'p.x.y' left-associatively", function ()
+        it("parses a leading-dot '.x' as a MemberExpr over the implicit receiver", function()
+            local m = value_of(".x") --[[@as MemberExpr]]
+            assert.equal("MemberExpr", m.type)
+            assert.equal("x", m.field)
+            assert.equal("SelfExpr", m.object.type)
+        end)
+
+        it("parses a leading-dot field assignment '.x = 3' as a FieldAssign", function()
+            local s = parse(".x = 3").body[1] --[[@as FieldAssign]]
+            assert.equal("FieldAssign", s.type)
+            assert.equal("MemberExpr", s.target.type)
+            assert.equal("SelfExpr", s.target.object.type)
+            assert.equal("x", s.target.field)
+        end)
+
+        it("treats a '.field' beginning a new line as a new statement, not a chain", function()
+            -- `f()` then a newline `.x = 1` must not parse as `f().x` — the dot
+            -- starts a fresh leading-dot statement.
+            local body = parse("f()\n.x = 1").body
+            assert.equal(2, #body)
+            assert.equal("ExpressionStmt", body[1].type)
+            assert.equal("FieldAssign", body[2].type)
+            assert.equal("SelfExpr", body[2].target.object.type)
+        end)
+
+        it("parses chained access 'p.x.y' left-associatively", function()
             local m = value_of("p.x.y") --[[@as MemberExpr]]
             assert.equal("y", m.field)
             assert.equal("MemberExpr", m.object.type)
             assert.equal("x", m.object.field)
         end)
 
-        it("parses a method call 'p.m()' as a CallExpr over a MemberExpr", function ()
+        it("parses a method call 'p.m()' as a CallExpr over a MemberExpr", function()
             local c = value_of("p.m()") --[[@as CallExpr]]
             assert.equal("CallExpr", c.type)
             assert.equal("MemberExpr", c.callee.type)
             assert.equal("m", c.callee.field)
         end)
 
-        it("parses a field assignment as a FieldAssign statement", function ()
+        it("parses a field assignment as a FieldAssign statement", function()
             local s = parse("p.x = 3").body[1] --[[@as FieldAssign]]
             assert.equal("FieldAssign", s.type)
             assert.equal("MemberExpr", s.target.type)
@@ -201,7 +194,7 @@ describe("Parser", function ()
             assert.equal("LiteralExpr", s.value.type)
         end)
 
-        it("desugars a compound field assignment 'p.x += 1'", function ()
+        it("desugars a compound field assignment 'p.x += 1'", function()
             local s = parse("p.x += 1").body[1] --[[@as FieldAssign]]
             assert.equal("FieldAssign", s.type)
             local v = s.value --[[@as BinaryExpr]]
@@ -210,32 +203,30 @@ describe("Parser", function ()
             assert.equal("MemberExpr", v.left.type)
         end)
 
-        it("errors on a missing field name after '.'", function ()
-            local ok, err = pcall(function () parse("private x = p.") end)
+        it("errors on a missing field name after '.'", function()
+            local ok, err = pcall(function() parse("private x = p.") end)
             assert.is_false(ok)
             assert.matches("Expected a field name", (err --[[@as Error]]).message)
         end)
     end)
 
-    describe("boolean / unary / comparison / logical expressions", function ()
-        local function value_of(src)
-            return parse("private x = " .. src).body[1].value
-        end
+    describe("boolean / unary / comparison / logical expressions", function()
+        local function value_of(src) return parse("private x = " .. src).body[1].value end
 
-        it("parses 'true' as a boolean literal", function ()
+        it("parses 'true' as a boolean literal", function()
             local lit = value_of("true") --[[@as LiteralExpr]]
             assert.equal("LiteralExpr", lit.type)
             assert.equal("boolean", lit.kind)
             assert.equal(true, lit.value)
         end)
 
-        it("parses 'false' as a boolean literal", function ()
+        it("parses 'false' as a boolean literal", function()
             local lit = value_of("false") --[[@as LiteralExpr]]
             assert.equal("boolean", lit.kind)
             assert.equal(false, lit.value)
         end)
 
-        it("parses 'not a' as a UnaryExpr", function ()
+        it("parses 'not a' as a UnaryExpr", function()
             local u = value_of("not a") --[[@as UnaryExpr]]
             assert.equal("UnaryExpr", u.type)
             assert.equal("NOT", u.op)
@@ -243,11 +234,15 @@ describe("Parser", function ()
         end)
 
         local comparisons = {
-            { "a == b", "EQ" }, { "a != b", "NEQ" }, { "a < b", "LESS" },
-            { "a <= b", "LESS_EQUAL" }, { "a > b", "GREATER" }, { "a >= b", "GREATER_EQUAL" },
+            { "a == b", "EQ" },
+            { "a != b", "NEQ" },
+            { "a < b", "LESS" },
+            { "a <= b", "LESS_EQUAL" },
+            { "a > b", "GREATER" },
+            { "a >= b", "GREATER_EQUAL" },
         }
         for _, case in ipairs(comparisons) do
-            it("parses '" .. case[1] .. "' as BinaryExpr " .. case[2], function ()
+            it("parses '" .. case[1] .. "' as BinaryExpr " .. case[2], function()
                 local b = value_of(case[1]) --[[@as BinaryExpr]]
                 assert.equal("BinaryExpr", b.type)
                 assert.equal(case[2], b.op)
@@ -255,18 +250,20 @@ describe("Parser", function ()
         end
 
         local arithmetic = {
-            { "a / b", "DIVIDE" }, { "a % b", "MODULO" },
-            { "a ^ b", "POWER" }, { "a ++ b", "CONCAT" },
+            { "a / b", "DIVIDE" },
+            { "a % b", "MODULO" },
+            { "a ^ b", "POWER" },
+            { "a ++ b", "CONCAT" },
         }
         for _, case in ipairs(arithmetic) do
-            it("parses '" .. case[1] .. "' as BinaryExpr " .. case[2], function ()
+            it("parses '" .. case[1] .. "' as BinaryExpr " .. case[2], function()
                 local b = value_of(case[1]) --[[@as BinaryExpr]]
                 assert.equal("BinaryExpr", b.type)
                 assert.equal(case[2], b.op)
             end)
         end
 
-        it("binds '/' at the multiplicative level (tighter than '+')", function ()
+        it("binds '/' at the multiplicative level (tighter than '+')", function()
             -- a + b / c  ->  a + (b / c)
             local top = value_of("a + b / c") --[[@as BinaryExpr]]
             assert.equal("PLUS", top.op)
@@ -274,7 +271,7 @@ describe("Parser", function ()
             assert.equal("DIVIDE", top.right.op)
         end)
 
-        it("binds '^' tighter than '*'", function ()
+        it("binds '^' tighter than '*'", function()
             -- a * b ^ c  ->  a * (b ^ c)
             local top = value_of("a * b ^ c") --[[@as BinaryExpr]]
             assert.equal("MULTIPLY", top.op)
@@ -282,17 +279,17 @@ describe("Parser", function ()
             assert.equal("POWER", top.right.op)
         end)
 
-        it("parses 'a and b' as BinaryExpr AND", function ()
+        it("parses 'a and b' as BinaryExpr AND", function()
             local b = value_of("a and b") --[[@as BinaryExpr]]
             assert.equal("AND", b.op)
         end)
 
-        it("parses 'a or b' as BinaryExpr OR", function ()
+        it("parses 'a or b' as BinaryExpr OR", function()
             local b = value_of("a or b") --[[@as BinaryExpr]]
             assert.equal("OR", b.op)
         end)
 
-        it("binds 'and' tighter than 'or'", function ()
+        it("binds 'and' tighter than 'or'", function()
             -- a or b and c  ->  a or (b and c)
             local top = value_of("a or b and c") --[[@as BinaryExpr]]
             assert.equal("OR", top.op)
@@ -300,7 +297,7 @@ describe("Parser", function ()
             assert.equal("AND", top.right.op)
         end)
 
-        it("binds arithmetic tighter than comparison", function ()
+        it("binds arithmetic tighter than comparison", function()
             -- a + b == c  ->  (a + b) == c
             local top = value_of("a + b == c") --[[@as BinaryExpr]]
             assert.equal("EQ", top.op)
@@ -308,7 +305,7 @@ describe("Parser", function ()
             assert.equal("PLUS", top.left.op)
         end)
 
-        it("binds unary 'not' tighter than comparison (Lua semantics)", function ()
+        it("binds unary 'not' tighter than comparison (Lua semantics)", function()
             -- not a == b  ->  (not a) == b
             local top = value_of("not a == b") --[[@as BinaryExpr]]
             assert.equal("EQ", top.op)
@@ -316,8 +313,8 @@ describe("Parser", function ()
         end)
     end)
 
-    describe("control-flow statements", function ()
-        it("parses an if statement into a single clause", function ()
+    describe("control-flow statements", function()
+        it("parses an if statement into a single clause", function()
             local s = parse("if a { x = 1 }").body[1] --[[@as IfStmt]]
             assert.equal("IfStmt", s.type)
             assert.equal(1, #s.clauses)
@@ -326,7 +323,7 @@ describe("Parser", function ()
             assert.is_nil(s.else_body)
         end)
 
-        it("parses if / else if / else", function ()
+        it("parses if / else if / else", function()
             local s = parse("if a { x = 1 } else if b { x = 2 } else { x = 3 }").body[1] --[[@as IfStmt]]
             assert.equal(2, #s.clauses)
             assert.equal("IdentifierExpr", s.clauses[2].condition.type)
@@ -334,31 +331,31 @@ describe("Parser", function ()
             assert.equal(1, #s.else_body)
         end)
 
-        it("parses a plain else (no else-if)", function ()
+        it("parses a plain else (no else-if)", function()
             local s = parse("if a { x = 1 } else { x = 2 }").body[1] --[[@as IfStmt]]
             assert.equal(1, #s.clauses)
             assert.equal(1, #s.else_body)
         end)
 
-        it("parses a while loop", function ()
+        it("parses a while loop", function()
             local s = parse("while a { x = 1 }").body[1] --[[@as WhileStmt]]
             assert.equal("WhileStmt", s.type)
             assert.equal("IdentifierExpr", s.condition.type)
             assert.equal(1, #s.body)
         end)
 
-        it("parses an infinite loop", function ()
+        it("parses an infinite loop", function()
             local s = parse("loop { x = 1 }").body[1] --[[@as LoopStmt]]
             assert.equal("LoopStmt", s.type)
             assert.equal(1, #s.body)
         end)
 
-        it("parses break inside a loop", function ()
+        it("parses break inside a loop", function()
             local s = parse("loop { break }").body[1] --[[@as LoopStmt]]
             assert.equal("BreakStmt", s.body[1].type)
         end)
 
-        it("parses a C-style for without parens", function ()
+        it("parses a C-style for without parens", function()
             local s = parse("for i = 0; i < n; i = i + 1 { x = 1 }").body[1] --[[@as ForStmt]]
             assert.equal("ForStmt", s.type)
             assert.equal("VariableDecl", s.init.type)
@@ -369,7 +366,7 @@ describe("Parser", function ()
             assert.equal(1, #s.body)
         end)
 
-        it("allows empty for clauses", function ()
+        it("allows empty for clauses", function()
             local s = parse("for ; ; { break }").body[1] --[[@as ForStmt]]
             assert.equal("ForStmt", s.type)
             assert.is_nil(s.init)
@@ -377,7 +374,7 @@ describe("Parser", function ()
             assert.is_nil(s.step)
         end)
 
-        it("accepts compound assignment as the for step", function ()
+        it("accepts compound assignment as the for step", function()
             local s = parse("for i = 0; i < n; i += 1 { x = 1 }").body[1] --[[@as ForStmt]]
             assert.equal("VariableDecl", s.step.type)
             assert.equal("BinaryExpr", s.step.value.type)
@@ -385,8 +382,8 @@ describe("Parser", function ()
         end)
     end)
 
-    describe("compound assignment", function ()
-        it("desugars 'i += 1' to 'i = i + 1'", function ()
+    describe("compound assignment", function()
+        it("desugars 'i += 1' to 'i = i + 1'", function()
             local s = parse("i += 1").body[1] --[[@as VariableDecl]]
             assert.equal("VariableDecl", s.type)
             assert.equal("i", s.name)
@@ -397,53 +394,53 @@ describe("Parser", function ()
             assert.equal("i", v.left.name)
         end)
 
-        it("desugars '*=' to a MULTIPLY reassignment", function ()
+        it("desugars '*=' to a MULTIPLY reassignment", function()
             local v = parse("i *= 2").body[1].value --[[@as BinaryExpr]]
             assert.equal("MULTIPLY", v.op)
         end)
 
-        it("desugars '-=' to a MINUS reassignment", function ()
+        it("desugars '-=' to a MINUS reassignment", function()
             local v = parse("i -= 2").body[1].value --[[@as BinaryExpr]]
             assert.equal("MINUS", v.op)
         end)
 
-        it("desugars '/=' to a DIVIDE reassignment", function ()
+        it("desugars '/=' to a DIVIDE reassignment", function()
             local v = parse("i /= 2").body[1].value --[[@as BinaryExpr]]
             assert.equal("DIVIDE", v.op)
         end)
     end)
 
-    describe("error paths", function ()
-        it("throws SYNTAX_ERROR for a missing identifier after 'private'", function ()
-            local ok, err = pcall(function () parse("private = 5") end)
+    describe("error paths", function()
+        it("throws SYNTAX_ERROR for a missing identifier after 'private'", function()
+            local ok, err = pcall(function() parse("private = 5") end)
             assert.is_false(ok)
             local err = err --[[@as Error]]
             assert.equal(Error.Type.SYNTAX_ERROR, err.type)
-            assert.matches("Expected variable name after 'private'", err.message)
+            assert.matches("Expected property name after 'private'", err.message)
         end)
 
-        it("throws SYNTAX_ERROR for an unclosed parenthesis", function ()
-            local ok, err = pcall(function () parse("private x = (1 + 2") end)
+        it("throws SYNTAX_ERROR for an unclosed parenthesis", function()
+            local ok, err = pcall(function() parse("private x = (1 + 2") end)
             assert.is_false(ok)
             local err = err --[[@as Error]]
             assert.equal(Error.Type.SYNTAX_ERROR, err.type)
         end)
 
-        it("throws UNEXPECTED_TOKEN for '=' in statement position", function ()
-            local ok, err = pcall(function () parse("= 5") end)
+        it("throws UNEXPECTED_TOKEN for '=' in statement position", function()
+            local ok, err = pcall(function() parse("= 5") end)
             assert.is_false(ok)
             -- ASSIGN is a keyword-only token; the dispatcher rejects it
             local err = err --[[@as Error]]
             assert.equal(Error.Type.UNEXPECTED_TOKEN, err.type)
         end)
 
-        it("throws on an empty grouped expression '()'", function ()
-            local ok, err = pcall(function () parse("private x = ()") end)
+        it("throws on an empty grouped expression '()'", function()
+            local ok, err = pcall(function() parse("private x = ()") end)
             assert.is_false(ok)
         end)
 
-        it("attaches source position to SYNTAX_ERROR from _consume", function ()
-            local ok, err = pcall(function () parse("private 42") end)
+        it("attaches source position to SYNTAX_ERROR from _consume", function()
+            local ok, err = pcall(function() parse("private 42") end)
             assert.is_false(ok)
             local err = err --[[@as Error]]
             assert.equal(Error.Type.SYNTAX_ERROR, err.type)
@@ -451,8 +448,8 @@ describe("Parser", function ()
             assert.is_number(err.col)
         end)
 
-        it("throws UNEXPECTED_EOF when input ends mid-expression", function ()
-            local ok, err = pcall(function () parse("private x = 1 +") end)
+        it("throws UNEXPECTED_EOF when input ends mid-expression", function()
+            local ok, err = pcall(function() parse("private x = 1 +") end)
             assert.is_false(ok)
             -- parser runs out of tokens inside _primary
             local err = err --[[@as Error]]
