@@ -1,0 +1,100 @@
+// Char — character classification by ASCII byte code.
+//
+// Lazarus has no Lua-style patterns (`%a`, `%d`, `%s`), so the lexer classifies
+// characters through these static predicates. Each takes a one-character string
+// (or the empty string at EOF) and inspects its byte via the `string.byte`
+// extern. The empty string has no first byte, so every predicate answers `false`
+// for it — callers can probe the current character without guarding EOF first.
+//
+// Byte codes used: 0-9 = 48..57, A-Z = 65..90, a-z = 97..122, '_' = 95,
+// '"' = 34, newline = 10, and 9..13/32 cover the ASCII whitespace run.
+
+import std.Str
+
+// The byte at position 1, or None when the string is empty.
+static code_of(c) {
+    return Str.byte(c, 1)
+}
+
+static is_digit(c) {
+    mut b = Char.code_of(c)
+    if b.is_none() {
+        return false
+    }
+    mut code = b.unwrap()
+    return code >= 48 and code <= 57
+}
+
+static is_alpha(c) {
+    mut b = Char.code_of(c)
+    if b.is_none() {
+        return false
+    }
+    mut code = b.unwrap()
+    mut lower = code >= 97 and code <= 122
+    mut upper = code >= 65 and code <= 90
+    return lower or upper
+}
+
+static is_underscore(c) {
+    mut b = Char.code_of(c)
+    if b.is_none() {
+        return false
+    }
+    return b.unwrap() == 95
+}
+
+// A character that may begin an identifier: a letter or underscore.
+static is_ident_start(c) {
+    mut b = Char.code_of(c)
+    if b.is_none() {
+        return false
+    }
+    mut code = b.unwrap()
+    mut lower = code >= 97 and code <= 122
+    mut upper = code >= 65 and code <= 90
+    mut under = code == 95
+    return lower or upper or under
+}
+
+// A character that may continue an identifier: a letter, digit, or underscore.
+static is_ident_char(c) {
+    mut b = Char.code_of(c)
+    if b.is_none() {
+        return false
+    }
+    mut code = b.unwrap()
+    mut lower = code >= 97 and code <= 122
+    mut upper = code >= 65 and code <= 90
+    mut digit = code >= 48 and code <= 57
+    mut under = code == 95
+    return lower or upper or digit or under
+}
+
+static is_space(c) {
+    mut b = Char.code_of(c)
+    if b.is_none() {
+        return false
+    }
+    mut code = b.unwrap()
+    if code == 32 {
+        return true
+    }
+    return code >= 9 and code <= 13
+}
+
+static is_newline(c) {
+    mut b = Char.code_of(c)
+    if b.is_none() {
+        return false
+    }
+    return b.unwrap() == 10
+}
+
+static is_quote(c) {
+    mut b = Char.code_of(c)
+    if b.is_none() {
+        return false
+    }
+    return b.unwrap() == 34
+}

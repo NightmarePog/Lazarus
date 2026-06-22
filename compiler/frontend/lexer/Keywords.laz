@@ -1,0 +1,72 @@
+// Source spellings to token-kind tags. `ops2` is checked before `ops1` so
+// two-character operators win over their leading character (maximal munch).
+
+private static words = [
+    "import": "IMPORT",
+    "extern": "EXTERN",
+    "private": "PRIVATE",
+    "public": "PUBLIC",
+    "mut": "MUTABLE",
+    "static": "STATIC",
+    "self": "SELF",
+    "constructor": "CONSTRUCTOR",
+    "return": "RETURN",
+    "if": "IF",
+    "else": "ELSE",
+    "while": "WHILE",
+    "loop": "LOOP",
+    "for": "FOR",
+    "in": "IN",
+    "break": "BREAK",
+    "true": "TRUE",
+    "false": "FALSE",
+    "and": "AND",
+    "or": "OR",
+    "not": "NOT"
+]
+
+private static ops2 = [
+    "++": "CONCAT",
+    "==": "EQ",
+    "!=": "NEQ",
+    "<=": "LESS_EQUAL",
+    ">=": "GREATER_EQUAL",
+    "+=": "PLUS_ASSIGN",
+    "-=": "MINUS_ASSIGN",
+    "*=": "STAR_ASSIGN",
+    "/=": "SLASH_ASSIGN"
+]
+
+private static ops1 = [
+    "=": "ASSIGN",
+    "+": "PLUS",
+    "-": "MINUS",
+    "*": "MULTIPLY",
+    "/": "DIVIDE",
+    "%": "MODULO",
+    "^": "POWER",
+    "<": "LESS",
+    ">": "GREATER",
+    "(": "LEFT_BRACKET",
+    ")": "RIGHT_BRACKET",
+    "{": "BODY_START",
+    "}": "BODY_END",
+    ",": "COMMA",
+    ":": "COLON",
+    ".": "DOT",
+    ";": "SEMICOLON",
+    "[": "LSQUARE",
+    "]": "RSQUARE"
+]
+
+public static word_kind(word) {
+    return Keywords.words.get(word).unwrap_or("IDENTIFIER")
+}
+
+public static two(pair) {
+    return Keywords.ops2.get(pair)
+}
+
+public static one(ch) {
+    return Keywords.ops1.get(ch)
+}

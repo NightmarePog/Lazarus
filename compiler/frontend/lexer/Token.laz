@@ -1,0 +1,20 @@
+// A lexical token: its `kind` tag (e.g. "IDENTIFIER", "PLUS"), the raw `value`
+// text, and the 1-based position where it began. An immutable value object.
+
+import std.Str
+
+public kind
+public value
+public line
+public column
+
+constructor(kind, value, line, column) {
+    .kind = kind
+    .value = value
+    .line = line
+    .column = column
+}
+
+public to_string() {
+    return Str.format("%s('%s', %d:%d)", .kind, .value, .line, .column).unwrap_or("<token>")
+}
