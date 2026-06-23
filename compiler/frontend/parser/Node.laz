@@ -1,0 +1,50 @@
+// Node — a generic AST node: a kind tag plus a map of named attributes.
+//
+// Every parsed construct is one Node. `kind` is its tag (e.g. "BinaryExpr",
+// "IfStmt"); `attrs` maps attribute names to children — a scalar, another Node,
+// or a list of Nodes. An optional attribute is simply absent from the map, so
+// `get` returns a None for it (the language has no `nil`).
+
+public kind
+private attrs
+
+constructor(kind, attrs) {
+    .kind = kind
+    .attrs = attrs
+}
+
+// The value bound to `name`, or a None when the attribute is absent. Not named
+// `get`, which is a reserved built-in collection method (it would never dispatch
+// here).
+public attr(name) {
+    return .attrs.get(name)
+}
+
+// A required attribute, unwrapped. An absent key means a malformed node — a
+// compiler bug, not a user error — so the unwrap is intentional.
+public child(name) {
+    return .attrs.get(name).unwrap()
+}
+
+// Source position, defaulting to 0 for synthesised nodes that carry none.
+public line() {
+    return .attrs.get("line").unwrap_or(0)
+}
+
+public col() {
+    return .attrs.get("col").unwrap_or(0)
+}
+
+// Attach a derived attribute (e.g. schematic's `reassign` annotation).
+public set(name, value) {
+    .attrs[name] = value
+}
+
+// A short one-line description: the kind, plus the `name` attribute when present.
+public summary() {
+    mut named = .attrs.get("name")
+    if named.is_some() {
+        return .kind ++ " " ++ named.unwrap()
+    }
+    return .kind
+}

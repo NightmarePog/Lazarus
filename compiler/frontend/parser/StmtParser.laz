@@ -1,0 +1,391 @@
+// StmtParser — the statement and block grammar, over a shared TokenCursor.
+//
+// Holds the cursor and an ExprParser; statements embed expressions but never the
+// reverse, so the dependency is one-way. Nodes are built through the `Ast`
+// factory, except the four kinds with optional attributes (VariableDecl,
+// ReturnStmt, IfStmt, ForStmt), whose attrs map is assembled here and handed to
+// `Ast.node` — an absent optional is simply a missing key (the language has no
+// `nil`).
+//
+// Grammar methods are named `parse_*`: a method whose name matches one of the
+// `Ast` factory's node constructors (e.g. `import_decl`, `while_stmt`) would be
+// mis-compiled into a self-call, since method dispatch resolves a call's field
+// name against the current class before considering the receiver.
+
+import frontend.parser.Ast
+
+private static compounds = [
+    "PLUS_ASSIGN": "PLUS",
+    "MINUS_ASSIGN": "MINUS",
+    "STAR_ASSIGN": "MULTIPLY",
+    "SLASH_ASSIGN": "DIVIDE"
+]
+
+private cursor
+private exprs
+
+constructor(cursor, exprs) {
+    .cursor = cursor
+    .exprs = exprs
+}
+
+// Parse the whole stream into a `Program` node whose `body` is the statement list.
+public parse_program() {
+    mut body = []
+    loop {
+        if .cursor.at_end() {
+            break
+        }
+        body.push(.parse_statement())
+    }
+    return Ast.program(body)
+}
+
+private parse_statement() {
+    mut tok = .cursor.current()
+    mut k = tok.kind
+
+    if k == "IMPORT" {
+        .cursor.advance()
+        return .parse_import(tok)
+    }
+    if k == "EXTERN" {
+        .cursor.advance()
+        return .parse_extern(tok)
+    }
+    if k == "PRIVATE" {
+        .cursor.advance()
+        return .parse_member("private")
+    }
+    if k == "PUBLIC" {
+        .cursor.advance()
+        return .parse_member("public")
+    }
+    if k == "MUTABLE" {
+        .cursor.advance()
+        return .parse_binding("", true, "Expected variable name after 'mut'", false)
+    }
+    if k == "STATIC" {
+        .cursor.advance()
+        return .parse_static()
+    }
+    if k == "CONSTRUCTOR" {
+        .cursor.advance()
+        return .parse_constructor(tok)
+    }
+    if k == "RETURN" {
+        .cursor.advance()
+        return .parse_return(tok)
+    }
+    if k == "IF" {
+        .cursor.advance()
+        return .parse_if(tok)
+    }
+    if k == "WHILE" {
+        .cursor.advance()
+        return .parse_while(tok)
+    }
+    if k == "LOOP" {
+        .cursor.advance()
+        return .parse_loop(tok)
+    }
+    if k == "FOR" {
+        .cursor.advance()
+        return .parse_for(tok)
+    }
+    if k == "BREAK" {
+        .cursor.advance()
+        return .parse_break(tok)
+    }
+
+    if k == "IDENTIFIER" {
+        if .looks_like_decl() {
+            return .parse_method("", false)
+        }
+        mut nk = .cursor.peek_next().kind
+        if nk == "ASSIGN" or .compound(nk).is_some() {
+            return .parse_assignment("Expected variable name")
+        }
+    }
+
+    return .parse_expr_statement(tok)
+}
+
+// A braced block `{ <statement>* }`; `context` names it for error messages.
+private parse_block(context) {
+    mut open = .cursor.consume("BODY_START", "Expected '{' to open " ++ context)
+    mut body = []
+    loop {
+        if .cursor.check("BODY_END") {
+            break
+        }
+        if .cursor.at_end() {
+            .cursor.fail_at("Expected '}' to close " ++ context, open.line, open.column, 1)
+        }
+        body.push(.parse_statement())
+    }
+    .cursor.consume("BODY_END", "Expected '}' to close " ++ context)
+    return body
+}
+
+private parse_import(tok) {
+    mut first = .cursor.consume("IDENTIFIER", "Expected a name after 'import'")
+    mut segments = [first.value]
+    mut last = first.value
+    loop {
+        if not .cursor.match("DOT") {
+            break
+        }
+        mut seg = .cursor.consume("IDENTIFIER", "Expected a name after '.' in an import path")
+        segments.push(seg.value)
+        last = seg.value
+    }
+    return Ast.import_decl(segments, last, tok.line, tok.column)
+}
+
+private parse_extern(tok) {
+    mut name = .cursor.consume("IDENTIFIER", "Expected a name after 'extern'")
+    .cursor.consume("LEFT_BRACKET", "Expected '(' after extern name")
+    mut params = .parse_params()
+    .cursor.consume("RIGHT_BRACKET", "Expected ')' after extern parameters")
+    .cursor.consume("ASSIGN", "Expected '=' after extern parameters")
+    mut target = .cursor.consume("STRING", "Expected a quoted Lua target after '='")
+    return Ast.extern_decl(name.value, params, target.value, tok.line, tok.column)
+}
+
+// A `private`/`public` declaration: a property, a class member, or a method.
+private parse_member(visibility) {
+    if .cursor.match("STATIC") {
+        if .cursor.check("IDENTIFIER") and .looks_like_decl() {
+            return .parse_method(visibility, true)
+        }
+        mut static_mut = .cursor.match("MUTABLE")
+        return .parse_binding(visibility, static_mut, "Expected member name", true)
+    }
+    if .cursor.check("IDENTIFIER") and .looks_like_decl() {
+        return .parse_method(visibility, false)
+    }
+    mut mutable = .cursor.match("MUTABLE")
+    return .parse_binding(visibility, mutable, "Expected property name", false)
+}
+
+// A bare `static` declaration (no visibility): a static method or member.
+private parse_static() {
+    if .cursor.check("IDENTIFIER") and .looks_like_decl() {
+        return .parse_method("", true)
+    }
+    mut static_mut = .cursor.match("MUTABLE")
+    return .parse_binding("", static_mut, "Expected member name after 'static'", true)
+}
+
+// One binding once visibility/mutability are known. An immutable binding must be
+// initialised, except an instance property (a non-static visibility binding),
+// which may be set later in the constructor.
+private parse_binding(visibility, mutable, name_err, is_static) {
+    mut name = .cursor.consume("IDENTIFIER", name_err)
+    mut is_property = visibility != "" and not is_static
+    mut attrs = ["name": name.value, "visibility": visibility, "mutable": mutable, "is_static": is_static, "line": name.line, "col": name.column]
+    if .cursor.match("ASSIGN") {
+        attrs["value"] = .exprs.expression()
+    } else if not mutable and not is_property {
+        .cursor.fail("Immutable binding '" ++ name.value ++ "' must be initialised: expected '='")
+    }
+    return Ast.node("VariableDecl", attrs)
+}
+
+// A bare assignment `<name> = <expr>` or compound `<name> += <expr>`; the latter
+// desugars to a plain reassignment with a `BinaryExpr` value.
+private parse_assignment(name_err) {
+    mut name = .cursor.consume("IDENTIFIER", name_err)
+    if .cursor.match("ASSIGN") {
+        return .local_binding(name, .exprs.expression())
+    }
+    mut binop = .compound(.cursor.current_kind())
+    if binop.is_some() {
+        .cursor.advance()
+        mut target = Ast.identifier(name.value, name.line, name.column)
+        mut value = Ast.binary(binop.unwrap(), target, .exprs.expression(), name.line, name.column)
+        return .local_binding(name, value)
+    }
+    .cursor.fail("Expected '=' or a compound assignment after '" ++ name.value ++ "'")
+    return Ast.node("VariableDecl", ["name": name.value, "visibility": "", "mutable": false, "is_static": false])
+}
+
+// A function-local immutable binding `<name> = <value>` (no visibility).
+private local_binding(name, value) {
+    return Ast.node("VariableDecl", ["name": name.value, "value": value, "visibility": "", "mutable": false, "is_static": false, "line": name.line, "col": name.column])
+}
+
+private parse_method(visibility, is_static) {
+    mut name = .cursor.consume("IDENTIFIER", "Expected method name")
+    .cursor.consume("LEFT_BRACKET", "Expected '(' after method name")
+    mut params = .parse_params()
+    .cursor.consume("RIGHT_BRACKET", "Expected ')' after parameters")
+    mut body = .parse_block("method body")
+    return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column)
+}
+
+private parse_constructor(tok) {
+    .cursor.consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
+    mut params = .parse_params()
+    .cursor.consume("RIGHT_BRACKET", "Expected ')' after parameters")
+    mut body = .parse_block("constructor body")
+    return Ast.constructor_decl(params, body, tok.line, tok.column)
+}
+
+// A comma-separated parameter-name list, the opening `(` already consumed.
+private parse_params() {
+    mut params = []
+    if not .cursor.check("RIGHT_BRACKET") {
+        loop {
+            mut p = .cursor.consume("IDENTIFIER", "Expected parameter name")
+            params.push(p.value)
+            if not .cursor.match("COMMA") {
+                break
+            }
+        }
+    }
+    return params
+}
+
+// Lookahead: does the current `IDENTIFIER` begin a declaration `name(params) {`?
+// True when a `(` follows, its matching `)` is found, and a `{` comes next —
+// which separates a method declaration from a call statement `name(args)`.
+private looks_like_decl() {
+    if .cursor.peek_next().kind != "LEFT_BRACKET" {
+        return false
+    }
+    mut depth = 0
+    mut i = .cursor.position() + 1
+    loop {
+        mut kind = .cursor.token_at(i).kind
+        if kind == "EOF" {
+            return false
+        } else if kind == "LEFT_BRACKET" {
+            depth = depth + 1
+        } else if kind == "RIGHT_BRACKET" {
+            depth = depth - 1
+            if depth == 0 {
+                return .cursor.token_at(i + 1).kind == "BODY_START"
+            }
+        }
+        i = i + 1
+    }
+}
+
+private parse_return(tok) {
+    mut attrs = ["line": tok.line, "col": tok.column]
+    if not .cursor.check("BODY_END") and not .cursor.at_end() {
+        attrs["value"] = .exprs.expression()
+    }
+    return Ast.node("ReturnStmt", attrs)
+}
+
+private parse_if(tok) {
+    mut clauses = [Ast.if_clause(.exprs.expression(), .parse_block("if body"))]
+    mut attrs = ["clauses": clauses, "line": tok.line, "col": tok.column]
+    loop {
+        if not .cursor.match("ELSE") {
+            break
+        }
+        if .cursor.match("IF") {
+            clauses.push(Ast.if_clause(.exprs.expression(), .parse_block("else if body")))
+        } else {
+            attrs["else_body"] = .parse_block("else body")
+            break
+        }
+    }
+    return Ast.node("IfStmt", attrs)
+}
+
+private parse_while(tok) {
+    mut condition = .exprs.expression()
+    mut body = .parse_block("while body")
+    return Ast.while_stmt(condition, body, tok.line, tok.column)
+}
+
+private parse_loop(tok) {
+    return Ast.loop_stmt(.parse_block("loop body"), tok.line, tok.column)
+}
+
+private parse_break(tok) {
+    return Ast.break_stmt(tok.line, tok.column)
+}
+
+// The two `for` forms, told apart by lookahead: `for x in …` / `for k, v in …`
+// (for-in) versus the C-style `for <init>; <cond>; <step> { … }`.
+private parse_for(tok) {
+    if .looks_like_for_in() {
+        return .parse_for_in(tok)
+    }
+    return .parse_for_c(tok)
+}
+
+private parse_for_in(tok) {
+    mut first = .cursor.consume("IDENTIFIER", "Expected a loop variable after 'for'")
+    mut vars = [first.value]
+    if .cursor.match("COMMA") {
+        mut second = .cursor.consume("IDENTIFIER", "Expected a second loop variable after ','")
+        vars.push(second.value)
+    }
+    .cursor.consume("IN", "Expected 'in' after the for-in loop variable(s)")
+    mut iter = .exprs.expression()
+    mut body = .parse_block("for body")
+    return Ast.for_in(vars, iter, body, tok.line, tok.column)
+}
+
+private parse_for_c(tok) {
+    mut attrs = ["line": tok.line, "col": tok.column]
+    if not .cursor.check("SEMICOLON") {
+        attrs["init"] = .parse_assignment("Expected loop variable in for-init")
+    }
+    .cursor.consume("SEMICOLON", "Expected ';' after for-init")
+    if not .cursor.check("SEMICOLON") {
+        attrs["condition"] = .exprs.expression()
+    }
+    .cursor.consume("SEMICOLON", "Expected ';' after for-condition")
+    if not .cursor.check("BODY_START") {
+        attrs["step"] = .parse_assignment("Expected statement in for-step")
+    }
+    attrs["body"] = .parse_block("for body")
+    return Ast.node("ForStmt", attrs)
+}
+
+private looks_like_for_in() {
+    if not .cursor.check("IDENTIFIER") {
+        return false
+    }
+    mut k = .cursor.peek_next().kind
+    return k == "IN" or k == "COMMA"
+}
+
+// A bare expression used as a statement — or, when it is a field/index access
+// followed by `=` (or a compound `+=`), an assignment to that target.
+private parse_expr_statement(tok) {
+    mut expr = .exprs.expression()
+    mut assignable = expr.kind == "MemberExpr" or expr.kind == "IndexExpr"
+    if not assignable {
+        return Ast.expression_stmt(expr, tok.line, tok.column)
+    }
+    if .cursor.match("ASSIGN") {
+        return .make_assign(expr, .exprs.expression(), tok)
+    }
+    mut binop = .compound(.cursor.current_kind())
+    if binop.is_some() {
+        .cursor.advance()
+        mut value = Ast.binary(binop.unwrap(), expr, .exprs.expression(), tok.line, tok.column)
+        return .make_assign(expr, value, tok)
+    }
+    return Ast.expression_stmt(expr, tok.line, tok.column)
+}
+
+private make_assign(target, value, tok) {
+    if target.kind == "MemberExpr" {
+        return Ast.field_assign(target, value, tok.line, tok.column)
+    }
+    return Ast.index_assign(target, value, tok.line, tok.column)
+}
+
+private compound(kind) {
+    return StmtParser.compounds.get(kind)
+}

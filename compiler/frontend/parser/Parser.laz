@@ -1,0 +1,24 @@
+// Parser — the façade over the parsing collaborators.
+//
+// A flat token list in, an AST (a tree of `Node`) out. The work is split across
+// a shared `TokenCursor` (navigation + located errors), an `ExprParser` (the
+// expression grammar) and a `StmtParser` (statements and blocks). The cursor is
+// constructed once and handed to both parsers, so they advance a single shared
+// position. Lazarus has no inheritance, so this composition — not a class
+// hierarchy — is how the grammar is divided into focused units.
+
+import frontend.parser.TokenCursor
+import frontend.parser.ExprParser
+import frontend.parser.StmtParser
+
+private stmts
+
+constructor(tokens, source) {
+    mut cursor = TokenCursor(tokens, source)
+    mut exprs = ExprParser(cursor)
+    .stmts = StmtParser(cursor, exprs)
+}
+
+public parse() {
+    return .stmts.parse_program()
+}
