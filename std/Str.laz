@@ -1,0 +1,17 @@
+// Str — extern bindings to Lua's `string` library.
+//
+// Extern calls forward their args (no arity check) and wrap their result at the
+// Option boundary. `find` binds to a single-return runtime shim (`__lz_str_find`)
+// rather than `string.find` directly, because the language has no multiple return
+// values: the shim returns the 1-based match start, or nil (→ None) when absent.
+// More multi-return string functions (match, gmatch) follow the same shim pattern.
+
+extern upper(s) = "string.upper"
+extern lower(s) = "string.lower"
+extern len(s) = "string.len"
+extern sub(s, i, j) = "string.sub"
+extern byte(s, i) = "string.byte"
+extern char(n) = "string.char"
+extern rep(s, n) = "string.rep"
+extern format(fmt) = "string.format"
+extern find(s, sub) = "__lz_str_find"
