@@ -1,0 +1,19 @@
+// Frame — the control-flow context of a block: whether we are inside a function,
+// a loop, and/or a constructor. Threaded through the statement walk so the
+// placement of `return` / `break` / `self` can be judged against it. Immutable —
+// a nested context derives a fresh Frame.
+
+public in_function
+public in_loop
+public in_constructor
+
+constructor(in_function, in_loop, in_constructor) {
+    .in_function = in_function
+    .in_loop = in_loop
+    .in_constructor = in_constructor
+}
+
+// The frame for a loop body: like this one, but with `break` now legal.
+public in_loop_body() {
+    return Frame(.in_function, true, .in_constructor)
+}

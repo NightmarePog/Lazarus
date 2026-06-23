@@ -1,0 +1,21 @@
+// Callability — the one static fact the untyped checker tracks about a value:
+// whether it is provably **not** a function. A binding initialised with such a
+// value can never be called, so a later `f()` on it can be rejected.
+//
+// Literals, arithmetic/comparison/logical/concat results, `not`, and collection
+// literals are always scalars, booleans or collections — never functions.
+// Anything else (a call result, another name, a field access) is unknown and
+// treated as possibly callable.
+
+private static non_function = [
+    "LiteralExpr": true,
+    "BinaryExpr": true,
+    "UnaryExpr": true,
+    "ListExpr": true,
+    "MapExpr": true
+]
+
+// True when `node`'s value is statically known not to be a function.
+static is_noncallable(node) {
+    return Callability.non_function.has(node.kind)
+}

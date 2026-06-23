@@ -1,0 +1,296 @@
+// StmtChecker — semantic validation of statements and blocks.
+//
+// Walks a block in source order, dispatching each statement to its rule and
+// threading the control-flow `Frame` (in-function / in-loop / in-constructor) and
+// a lexical `Scope`. Expression validation is delegated to the held ExprChecker;
+// entering an instance method or constructor toggles its receiver flag so
+// `.field` accesses inside resolve.
+
+import std.Str
+import Error
+import frontend.schematic.Symbol
+import frontend.schematic.Frame
+import frontend.schematic.Naming
+import frontend.schematic.Callability
+
+private source
+private exprs
+
+constructor(source, exprs) {
+    .source = source
+    .exprs = exprs
+}
+
+// Walk a block, marking each statement with whether it is the block's last (the
+// placement rule for `return` / `break`).
+public check_block(stmts, scope, frame) {
+    mut n = stmts.len()
+    for i, stmt in stmts {
+        .check_statement(stmt, scope, frame, i == n - 1)
+    }
+}
+
+private check_statement(stmt, scope, frame, is_last) {
+    mut k = stmt.kind
+    if k == "VariableDecl" {
+        .check_variable(stmt, scope, frame)
+    } else if k == "FunctionDecl" {
+        .check_function(stmt, scope, frame)
+    } else if k == "ConstructorDecl" {
+        .check_constructor(stmt, scope, frame)
+    } else if k == "ReturnStmt" {
+        .check_return(stmt, scope, frame, is_last)
+    } else if k == "ExpressionStmt" {
+        .check_expr_statement(stmt, scope)
+    } else if k == "FieldAssign" {
+        .check_assign(stmt, scope)
+    } else if k == "IndexAssign" {
+        .check_assign(stmt, scope)
+    } else if k == "IfStmt" {
+        .check_if(stmt, scope, frame)
+    } else if k == "WhileStmt" {
+        .check_while(stmt, scope, frame)
+    } else if k == "LoopStmt" {
+        .check_loop(stmt, scope, frame)
+    } else if k == "ForStmt" {
+        .check_for(stmt, scope, frame)
+    } else if k == "ForInStmt" {
+        .check_for_in(stmt, scope, frame)
+    } else if k == "BreakStmt" {
+        .check_break(stmt, frame, is_last)
+    }
+    // ImportDecl / ExternDecl are metadata for the linker — nothing to check.
+}
+
+// A binding is a declaration (first sight, or any visibility/`mut` form) or a
+// reassignment (a bare name already in scope). A top-level visibility binding is
+// an instance property: validated, but not bound as a bare name.
+private check_variable(stmt, scope, frame) {
+    mut name = stmt.child("name")
+    mut visibility = stmt.attr("visibility").unwrap_or("")
+    mut is_static = stmt.attr("is_static").unwrap_or(false)
+    mut is_property = not frame.in_function and visibility != "" and not is_static
+
+    if is_property {
+        Naming.check_value(name, stmt.line(), stmt.col(), .source, "Property")
+        .check_optional_value(stmt, scope)
+        stmt.set("reassign", false)
+    } else {
+        mut forced_decl = visibility != "" or stmt.attr("mutable").unwrap_or(false)
+        mut existing = scope.lookup(name)
+        if forced_decl or existing.is_none() {
+            .declare_binding(stmt, scope, frame, name, visibility)
+        } else {
+            .reassign_binding(stmt, scope, name, existing.unwrap())
+        }
+    }
+}
+
+private declare_binding(stmt, scope, frame, name, visibility) {
+    if not frame.in_function and visibility == "" {
+        .fail(stmt, "Top-level binding '" ++ name ++ "' must declare visibility ('private' or 'public')", Str.len(name).unwrap_or(1))
+    }
+    if scope.declared_here(name) {
+        .fail(stmt, "Duplicate declaration '" ++ name ++ "'", Str.len(name).unwrap_or(1))
+    }
+    Naming.check_value(name, stmt.line(), stmt.col(), .source, "Binding")
+    .check_optional_value(stmt, scope)
+
+    mut mutable = stmt.attr("mutable").unwrap_or(false)
+    mut kind = "constant"
+    if mutable {
+        kind = "variable"
+    }
+    scope.declare(name, Symbol(kind, mutable, .value_noncallable(stmt)))
+    stmt.set("reassign", false)
+}
+
+private reassign_binding(stmt, scope, name, existing) {
+    if not existing.mutable {
+        .fail(stmt, "Cannot assign to immutable binding '" ++ name ++ "'", Str.len(name).unwrap_or(1))
+    }
+    mut value = stmt.attr("value")
+    if value.is_some() {
+        .exprs.check(value.unwrap(), scope)
+        existing.set_noncallable(Callability.is_noncallable(value.unwrap()))
+    }
+    stmt.set("reassign", true)
+}
+
+// Validate a binding's initialiser when present (a `mut` binding may omit it).
+private check_optional_value(stmt, scope) {
+    mut value = stmt.attr("value")
+    if value.is_some() {
+        .exprs.check(value.unwrap(), scope)
+    }
+}
+
+private value_noncallable(stmt) {
+    mut value = stmt.attr("value")
+    if value.is_none() {
+        return false
+    }
+    return Callability.is_noncallable(value.unwrap())
+}
+
+// The name is bound before the body is walked, so a function may recurse. The
+// body runs in a child scope holding the parameters; a top-level instance method
+// (not static, not nested) is analysed with a receiver in scope.
+private check_function(stmt, scope, frame) {
+    mut name = stmt.child("name")
+    if scope.declared_here(name) {
+        .fail(stmt, "Duplicate declaration '" ++ name ++ "'", Str.len(name).unwrap_or(1))
+    }
+    Naming.check_value(name, stmt.line(), stmt.col(), .source, "Function")
+    scope.declare(name, Symbol("function", false, false))
+
+    mut is_static = stmt.attr("is_static").unwrap_or(false)
+    mut is_instance = not is_static and not frame.in_function
+    .check_callable_body(stmt, scope, Frame(true, false, false), is_instance)
+}
+
+// A constructor is class-level (not nested), has a receiver, and must not
+// `return` — analysed with `in_constructor` so `return` is rejected.
+private check_constructor(stmt, scope, frame) {
+    if frame.in_function {
+        .fail(stmt, "'constructor' must be at the top level of a class", 11)
+    }
+    .check_callable_body(stmt, scope, Frame(true, false, true), true)
+}
+
+// Shared body analysis for a method / constructor: bind params in a child scope,
+// then walk the body with the receiver flag set for an instance context.
+private check_callable_body(stmt, scope, frame, is_instance) {
+    mut inner = scope.child()
+    .bind_params(stmt, inner)
+    mut outer = .exprs.instance_flag()
+    .exprs.set_instance(is_instance)
+    .check_block(stmt.child("body"), inner, frame)
+    .exprs.set_instance(outer)
+}
+
+private bind_params(stmt, scope) {
+    for param in stmt.child("params") {
+        if scope.declared_here(param) {
+            .fail(stmt, "Duplicate parameter '" ++ param ++ "'", Str.len(param).unwrap_or(1))
+        }
+        Naming.check_value(param, stmt.line(), stmt.col(), .source, "Parameter")
+        scope.declare(param, Symbol("variable", false, false))
+    }
+}
+
+private check_return(stmt, scope, frame, is_last) {
+    if frame.in_constructor {
+        .fail(stmt, "'return' is not allowed in a constructor; the instance is returned implicitly", 6)
+    }
+    if not frame.in_function {
+        .fail(stmt, "'return' outside of a function", 6)
+    }
+    if not is_last {
+        .fail(stmt, "'return' must be the last statement in a block", 6)
+    }
+    mut value = stmt.attr("value")
+    if value.is_some() {
+        .exprs.check(value.unwrap(), scope)
+    }
+}
+
+private check_break(stmt, frame, is_last) {
+    if not frame.in_loop {
+        .fail(stmt, "'break' outside of a loop", 5)
+    }
+    if not is_last {
+        .fail(stmt, "'break' must be the last statement in a block", 5)
+    }
+}
+
+// A call is the only expression valid as a statement; anything else has no effect.
+private check_expr_statement(stmt, scope) {
+    mut expr = stmt.child("expression")
+    .exprs.check(expr, scope)
+    if expr.kind != "CallExpr" {
+        .fail(stmt, "Bare expressions are not valid statements", 1)
+    }
+}
+
+private check_assign(stmt, scope) {
+    .exprs.check(stmt.child("target"), scope)
+    .exprs.check(stmt.child("value"), scope)
+}
+
+// Each clause condition is validated; each branch is a child scope so a binding
+// in one neither leaks nor collides with another. The frame is inherited so
+// `return` / `break` inside a branch are judged by the enclosing context.
+private check_if(stmt, scope, frame) {
+    for clause in stmt.child("clauses") {
+        .exprs.check_condition(clause.child("condition"), scope)
+        .check_block(clause.child("body"), scope.child(), frame)
+    }
+    mut else_body = stmt.attr("else_body")
+    if else_body.is_some() {
+        .check_block(else_body.unwrap(), scope.child(), frame)
+    }
+}
+
+private check_while(stmt, scope, frame) {
+    .exprs.check_condition(stmt.child("condition"), scope)
+    .check_block(stmt.child("body"), scope.child(), frame.in_loop_body())
+}
+
+private check_loop(stmt, scope, frame) {
+    .check_block(stmt.child("body"), scope.child(), frame.in_loop_body())
+}
+
+// The loop variable bound by `init` is loop-local and implicitly mutable (so the
+// step may reassign it); condition, step and body all see it, and the body runs
+// in a further child scope so its own declarations do not leak.
+private check_for(stmt, scope, frame) {
+    mut inner = scope.child()
+    mut loop_frame = frame.in_loop_body()
+
+    mut init = stmt.attr("init")
+    if init.is_some() {
+        .check_for_init(init.unwrap(), inner)
+    }
+    mut condition = stmt.attr("condition")
+    if condition.is_some() {
+        .exprs.check_condition(condition.unwrap(), inner)
+    }
+    mut step = stmt.attr("step")
+    if step.is_some() {
+        .check_statement(step.unwrap(), inner, loop_frame, true)
+    }
+    .check_block(stmt.child("body"), inner.child(), loop_frame)
+}
+
+private check_for_init(init, scope) {
+    mut name = init.child("name")
+    Naming.check_value(name, init.line(), init.col(), .source, "Loop variable")
+    mut value = init.attr("value")
+    mut noncallable = false
+    if value.is_some() {
+        .exprs.check(value.unwrap(), scope)
+        noncallable = Callability.is_noncallable(value.unwrap())
+    }
+    scope.declare(name, Symbol("variable", true, noncallable))
+    init.set("reassign", false)
+}
+
+// The iterated value is checked in the enclosing scope; the body sees the fresh,
+// immutable loop variable(s) — one (value) or two (key/index and value).
+private check_for_in(stmt, scope, frame) {
+    .exprs.check(stmt.child("iter"), scope)
+    mut inner = scope.child()
+    for name in stmt.child("vars") {
+        if inner.declared_here(name) {
+            .fail(stmt, "Duplicate loop variable '" ++ name ++ "'", Str.len(name).unwrap_or(1))
+        }
+        Naming.check_value(name, stmt.line(), stmt.col(), .source, "Loop variable")
+        inner.declare(name, Symbol("variable", false, false))
+    }
+    .check_block(stmt.child("body"), inner, frame.in_loop_body())
+}
+
+private fail(node, message, span) {
+    Error("SemanticError", message, node.line(), node.col(), .source, span).raise()
+}

@@ -1,0 +1,56 @@
+// Booleanity — best-effort "is this expression provably **not** a boolean?".
+//
+// The language has no truthiness, so a condition must be an actual boolean.
+// Without types the check is conservative: it fires only on a value that *cannot*
+// be a boolean (a number/string literal, a collection, an arithmetic/concat
+// result, or a built-in returning a number/Option) and stays silent on anything
+// that might be one (a name, a field, a call, a comparison). `non_bool_reason`
+// returns a short reason string, or "" when the expression is allowed.
+
+private static arithmetic = [
+    "PLUS": true,
+    "MINUS": true,
+    "MULTIPLY": true,
+    "DIVIDE": true,
+    "MODULO": true,
+    "POWER": true
+]
+
+private static non_bool_builtin = [
+    "len": "a number (the result of '.len()')",
+    "get": "an Option (the result of '.get()')",
+    "pop": "an Option (the result of '.pop()')"
+]
+
+static non_bool_reason(node) {
+    mut k = node.kind
+    if k == "LiteralExpr" {
+        mut lit_kind = node.child("lit_kind")
+        if lit_kind == "number" {
+            return "a number"
+        }
+        if lit_kind == "string" {
+            return "a string"
+        }
+        return ""
+    } else if k == "ListExpr" {
+        return "a list"
+    } else if k == "MapExpr" {
+        return "a map"
+    } else if k == "BinaryExpr" {
+        mut op = node.child("op")
+        if Booleanity.arithmetic.has(op) {
+            return "an arithmetic value"
+        }
+        if op == "CONCAT" {
+            return "a string"
+        }
+        return ""
+    } else if k == "CallExpr" {
+        mut callee = node.child("callee")
+        if callee.kind == "MemberExpr" {
+            return Booleanity.non_bool_builtin.get(callee.child("field")).unwrap_or("")
+        }
+    }
+    return ""
+}
