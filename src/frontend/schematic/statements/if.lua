@@ -12,7 +12,7 @@ return StatementCheck.new("IfStmt", function(ctx, frame)
     local stmt = frame.stmt --[[@as IfStmt]]
 
     for _, clause in ipairs(stmt.clauses) do
-        ctx:check_expr(clause.condition, frame.symbols)
+        ctx:check_condition(clause.condition, frame.symbols)
         ctx:analyze_block(
             clause.body,
             ctx:child_scope(frame.symbols),

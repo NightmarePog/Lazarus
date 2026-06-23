@@ -78,7 +78,7 @@ function emit_stmt(node)
     if node.type == "IndexAssign" then
         ---@cast node IndexAssign
         Context.uses_collections = true
-        local target = node.target
+        local target = node.target --[[@as IndexExpr]]
         return "__lz_idx_set("
             .. emit_expr(target.object)
             .. ", "
@@ -238,15 +238,27 @@ local function emit_member(node)
     if node.type == "ConstructorDecl" then
         ---@cast node ConstructorDecl
         -- Lowers to `function C.new(params) local self = {} <body> return self end`
-        -- — a plain table, no metatable. Instance properties with a default are
-        -- initialised first (`self.x = <default>`), before the constructor body,
-        -- so the body may override them.
+        -- — a plain table, no metatable. Each instance method is copied onto the
+        -- instance (`self.m = C.m`) so an external caller can invoke it with Lua's
+        -- colon (`obj:m(...)`), which passes the receiver as `self` — that is how
+        -- cross-class instance dispatch works without metatables or type info.
+        -- Then instance properties with a default are initialised (`self.x =
+        -- <default>`), before the constructor body, so the body may override them.
         Context.push_scope()
         for _, p in ipairs(node.params) do
             Context.declare_local(p)
         end
         Context.declare_local("self")
         local lines = { "local self = {}" }
+        -- Sorted for reproducible output (the method set is unordered).
+        local method_names = {}
+        for name in pairs(Context.instance_methods) do
+            method_names[#method_names + 1] = name
+        end
+        table.sort(method_names)
+        for _, name in ipairs(method_names) do
+            lines[#lines + 1] = "self." .. name .. " = " .. C .. "." .. name
+        end
         for _, prop in ipairs(Context.properties) do
             if prop.value then
                 lines[#lines + 1] = "self." .. prop.name .. " = " .. emit_expr(prop.value)

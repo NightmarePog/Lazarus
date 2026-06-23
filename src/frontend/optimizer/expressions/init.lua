@@ -16,7 +16,7 @@ local HANDLERS = {
     (require("frontend.optimizer.expressions.member")),
 }
 
----@type table<string, FoldExpression>
+---@type table<string, FoldExpression?>
 local registry = {}
 for _, handler in ipairs(HANDLERS) do
     registry[handler.type] = handler

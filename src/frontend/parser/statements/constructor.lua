@@ -10,7 +10,9 @@ local StatementParser = require("frontend.parser.statements.statement_parser")
 local ConstructorDecl = require("frontend.parser.nodes.constructor")
 
 return StatementParser.new("CONSTRUCTOR", function(parser)
-    local keyword = parser:_previous()
+    -- The dispatcher consumes the `constructor` keyword before this runs, so
+    -- `_previous()` is guaranteed to return it (never nil) at this point.
+    local keyword = assert(parser:_previous())
 
     parser:_consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
 

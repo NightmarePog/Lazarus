@@ -6,7 +6,7 @@
 
 ---@class ForStmt: Stmt
 ---@field type      "ForStmt"
----@field init      Stmt | nil
+---@field init      VariableDecl | nil
 ---@field condition Expr | nil
 ---@field step      Stmt | nil
 ---@field body      Stmt[]
@@ -15,7 +15,7 @@
 local ForStmt = {}
 ForStmt.__index = ForStmt
 
----@param init      Stmt | nil
+---@param init      VariableDecl | nil
 ---@param condition Expr | nil
 ---@param step      Stmt | nil
 ---@param body      Stmt[]

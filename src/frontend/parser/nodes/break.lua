@@ -15,7 +15,7 @@ function BreakStmt.new(line, col)
 end
 
 ---@return string
-function BreakStmt:__tostring()
+function BreakStmt.__tostring()
     return "BreakStmt"
 end
 

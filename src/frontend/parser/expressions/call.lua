@@ -51,6 +51,8 @@ return {
                 self:_advance() -- consume '['
                 local index = self:_expression()
                 self:_consume("RSQUARE", "Expected ']' after an index expression")
+                -- `_check("LSQUARE")` succeeded, so the current token (`sq`) exists.
+                assert(sq)
                 expr = IndexExpr.new(expr, index, sq.line, sq.column)
             else
                 break

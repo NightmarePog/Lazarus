@@ -20,7 +20,7 @@ local HANDLERS = {
     (require("frontend.schematic.statements.break")),
 }
 
----@type table<string, StatementCheck>
+---@type table<string, StatementCheck?>
 local registry = {}
 for _, handler in ipairs(HANDLERS) do
     registry[handler.type] = handler

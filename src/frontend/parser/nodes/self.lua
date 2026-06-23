@@ -20,6 +20,6 @@ function SelfExpr.new(line, col)
 end
 
 ---@return string
-function SelfExpr:__tostring() return "SelfExpr(.)" end
+function SelfExpr.__tostring() return "SelfExpr(.)" end
 
 return SelfExpr

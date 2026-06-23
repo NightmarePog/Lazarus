@@ -22,7 +22,7 @@ return StatementCheck.new("ForStmt", function(ctx, frame)
         init.reassign = false
     end
 
-    if stmt.condition then ctx:check_expr(stmt.condition, scope) end
+    if stmt.condition then ctx:check_condition(stmt.condition, scope) end
     if stmt.step then
         ctx:analyze_block(
             { stmt.step },
