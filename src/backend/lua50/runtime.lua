@@ -27,6 +27,10 @@ end
 local function __lz_none()
     return { kind = "none" }
 end
+local function __lz_wrap(v)
+    if v == nil then return __lz_none() end
+    return __lz_some(v)
+end
 local function __lz_len(c)
     if c.kind == "list" then return #c.items end
     local n = 0
@@ -75,6 +79,20 @@ end
 local function __lz_unwrap_or(o, d)
     if o.kind == "some" then return o.value end
     return d
+end
+local function __lz_str_find(s, sub)
+    return (string.find(s, sub, 1, true))
+end
+local function __lz_argv(i)
+    if arg == nil then return nil end
+    return arg[i]
+end
+local function __lz_readfile(path)
+    local f = io.open(path, "r")
+    if f == nil then return nil end
+    local data = f:read("*a")
+    f:close()
+    return data
 end
 local function __lz_each(c)
     if c.kind == "list" then
