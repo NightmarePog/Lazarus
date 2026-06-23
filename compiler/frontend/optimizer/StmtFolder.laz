@@ -1,0 +1,115 @@
+// StmtFolder — folds statements and blocks, mutating the AST in place.
+//
+// Each statement's expressions are folded through the held ExprFolder; an
+// immutable binding (not `mut`, not a reassignment) whose initialiser folded to a
+// literal is recorded so later statements in the block substitute it inline. A
+// nested block runs in a child constant scope so its locals do not leak out, and
+// parameters / loop variables are shadowed out so their runtime values survive.
+// Runs after schematic, which sets the `reassign` annotation this relies on.
+
+private exprs
+
+constructor(exprs) {
+    .exprs = exprs
+}
+
+public fold_block(stmts, constants) {
+    for stmt in stmts {
+        .fold_statement(stmt, constants)
+    }
+}
+
+private fold_statement(stmt, constants) {
+    mut k = stmt.kind
+    if k == "VariableDecl" {
+        .fold_variable(stmt, constants)
+    } else if k == "FunctionDecl" {
+        .fold_block(stmt.child("body"), constants.child(stmt.child("params")))
+    } else if k == "ConstructorDecl" {
+        .fold_block(stmt.child("body"), constants.child(stmt.child("params")))
+    } else if k == "ReturnStmt" {
+        .fold_optional(stmt, "value", constants)
+    } else if k == "ExpressionStmt" {
+        stmt.set("expression", .exprs.fold(stmt.child("expression"), constants))
+    } else if k == "FieldAssign" {
+        .fold_assign(stmt, constants)
+    } else if k == "IndexAssign" {
+        .fold_assign(stmt, constants)
+    } else if k == "IfStmt" {
+        .fold_if(stmt, constants)
+    } else if k == "WhileStmt" {
+        stmt.set("condition", .exprs.fold(stmt.child("condition"), constants))
+        .fold_block(stmt.child("body"), constants.child([]))
+    } else if k == "LoopStmt" {
+        .fold_block(stmt.child("body"), constants.child([]))
+    } else if k == "ForStmt" {
+        .fold_for(stmt, constants)
+    } else if k == "ForInStmt" {
+        .fold_for_in(stmt, constants)
+    }
+    // ImportDecl / ExternDecl / BreakStmt carry nothing to fold.
+}
+
+private fold_variable(stmt, constants) {
+    .fold_optional(stmt, "value", constants)
+    mut mutable = stmt.attr("mutable").unwrap_or(false)
+    mut reassign = stmt.attr("reassign").unwrap_or(false)
+    if not mutable and not reassign {
+        mut value = stmt.attr("value")
+        if value.is_some() and value.unwrap().kind == "LiteralExpr" {
+            constants.record(stmt.child("name"), value.unwrap())
+        }
+    }
+}
+
+// Fold an optional expression attribute (a `return`/`init` value) in place.
+private fold_optional(stmt, key, constants) {
+    mut value = stmt.attr(key)
+    if value.is_some() {
+        stmt.set(key, .exprs.fold(value.unwrap(), constants))
+    }
+}
+
+private fold_assign(stmt, constants) {
+    stmt.set("target", .exprs.fold(stmt.child("target"), constants))
+    stmt.set("value", .exprs.fold(stmt.child("value"), constants))
+}
+
+private fold_if(stmt, constants) {
+    for clause in stmt.child("clauses") {
+        clause.set("condition", .exprs.fold(clause.child("condition"), constants))
+        .fold_block(clause.child("body"), constants.child([]))
+    }
+    mut else_body = stmt.attr("else_body")
+    if else_body.is_some() {
+        .fold_block(else_body.unwrap(), constants.child([]))
+    }
+}
+
+// The loop variable is mutable across iterations, so it is never recorded as a
+// constant: its initialiser folds against the outer scope, and its name is
+// shadowed out of the child scope used for the condition, step and body.
+private fold_for(stmt, constants) {
+    mut shadowed = []
+    mut init = stmt.attr("init")
+    if init.is_some() {
+        mut init_node = init.unwrap()
+        shadowed.push(init_node.child("name"))
+        .fold_optional(init_node, "value", constants)
+    }
+    mut inner = constants.child(shadowed)
+    mut condition = stmt.attr("condition")
+    if condition.is_some() {
+        stmt.set("condition", .exprs.fold(condition.unwrap(), inner))
+    }
+    mut step = stmt.attr("step")
+    if step.is_some() {
+        .fold_statement(step.unwrap(), inner)
+    }
+    .fold_block(stmt.child("body"), inner)
+}
+
+private fold_for_in(stmt, constants) {
+    stmt.set("iter", .exprs.fold(stmt.child("iter"), constants))
+    .fold_block(stmt.child("body"), constants.child(stmt.child("vars")))
+}
