@@ -1,0 +1,291 @@
+// StmtEmitter — lowers statements and class members to Lua source text.
+//
+// `emit_member` lowers a top-level declaration: a method to `function C.name` (an
+// instance method gains an implicit `self` first parameter), a binding to a
+// static field `C.name = value`, a constructor to `function C.new` (which builds
+// a plain table, copies each instance method onto it for colon dispatch, seeds
+// property defaults, runs the body, and returns it). `emit_stmt` lowers ordinary
+// statements inside a body, declaring locals in the context so member references
+// stay qualified while locals stay bare.
+
+import backend.Text
+
+private ctx
+private exprs
+
+constructor(ctx, exprs) {
+    .ctx = ctx
+    .exprs = exprs
+}
+
+public emit_member(node) {
+    mut k = node.kind
+    if k == "FunctionDecl" {
+        return .emit_method(node)
+    }
+    if k == "VariableDecl" {
+        return .emit_static_field(node)
+    }
+    if k == "ConstructorDecl" {
+        return .emit_constructor(node)
+    }
+    return .emit_stmt(node)
+}
+
+public emit_stmt(node) {
+    mut k = node.kind
+    if k == "VariableDecl" {
+        return .emit_variable(node)
+    }
+    if k == "FieldAssign" {
+        return .exprs.emit(node.child("target")) ++ " = " ++ .exprs.emit(node.child("value"))
+    }
+    if k == "IndexAssign" {
+        return .emit_index_assign(node)
+    }
+    if k == "ExpressionStmt" {
+        return .exprs.emit(node.child("expression"))
+    }
+    if k == "FunctionDecl" {
+        return .emit_local_function(node)
+    }
+    if k == "ReturnStmt" {
+        return .emit_return(node)
+    }
+    if k == "IfStmt" {
+        return .emit_if(node)
+    }
+    if k == "WhileStmt" {
+        return .emit_while(node)
+    }
+    if k == "LoopStmt" {
+        return .emit_loop(node)
+    }
+    if k == "BreakStmt" {
+        return "break"
+    }
+    if k == "ForStmt" {
+        return .emit_for(node)
+    }
+    if k == "ForInStmt" {
+        return .emit_for_in(node)
+    }
+    return ""
+}
+
+// A statement list as an indented block, or "" when empty.
+private emit_block(stmts) {
+    if stmts.len() == 0 {
+        return ""
+    }
+    mut lines = []
+    for stmt in stmts {
+        lines.push(.emit_stmt(stmt))
+    }
+    return Text.indent(Text.lines(lines))
+}
+
+// A function body with its parameters declared as locals in a fresh scope.
+private emit_fn_body(params, body) {
+    .ctx.push_scope()
+    for param in params {
+        .ctx.declare_local(param)
+    }
+    mut out = .emit_block(body)
+    .ctx.pop_scope()
+    return out
+}
+
+private emit_variable(node) {
+    mut name = node.child("name")
+    mut value = node.attr("value")
+    if node.attr("reassign").unwrap_or(false) {
+        mut rhs = "nil"
+        if value.is_some() {
+            rhs = .exprs.emit(value.unwrap())
+        }
+        return .ctx.emit_name(name) ++ " = " ++ rhs
+    }
+    .ctx.declare_local(name)
+    if value.is_some() {
+        return "local " ++ name ++ " = " ++ .exprs.emit(value.unwrap())
+    }
+    return "local " ++ name
+}
+
+private emit_index_assign(node) {
+    .ctx.mark_collections()
+    mut target = node.child("target")
+    return "__lz_idx_set(" ++ .exprs.emit(target.child("object")) ++ ", " ++ .exprs.emit(target.child("index")) ++ ", " ++ .exprs.emit(node.child("value")) ++ ")"
+}
+
+private emit_local_function(node) {
+    .ctx.declare_local(node.child("name"))
+    mut header = "local function " ++ node.child("name") ++ "(" ++ Text.join(node.child("params"), ", ") ++ ")"
+    return .wrap_body(header, .emit_fn_body(node.child("params"), node.child("body")))
+}
+
+private emit_return(node) {
+    mut value = node.attr("value")
+    if value.is_some() {
+        return "return " ++ .exprs.emit(value.unwrap())
+    }
+    return "return"
+}
+
+private emit_if(node) {
+    mut parts = []
+    for i, clause in node.child("clauses") {
+        mut keyword = "elseif "
+        if i == 0 {
+            keyword = "if "
+        }
+        parts.push(keyword ++ .exprs.emit(clause.child("condition")) ++ " then")
+        .push_block(parts, clause.child("body"))
+    }
+    mut else_body = node.attr("else_body")
+    if else_body.is_some() {
+        parts.push("else")
+        .push_block(parts, else_body.unwrap())
+    }
+    parts.push("end")
+    return Text.lines(parts)
+}
+
+private emit_while(node) {
+    mut parts = ["while " ++ .exprs.emit(node.child("condition")) ++ " do"]
+    .push_block(parts, node.child("body"))
+    parts.push("end")
+    return Text.lines(parts)
+}
+
+private emit_loop(node) {
+    mut parts = ["while true do"]
+    .push_block(parts, node.child("body"))
+    parts.push("end")
+    return Text.lines(parts)
+}
+
+// The C-style `for` lowers to a `while` wrapped in `do ... end` so the loop
+// variable stays scoped; the step runs at the end of each iteration.
+private emit_for(node) {
+    mut loop_body = []
+    for stmt in node.child("body") {
+        loop_body.push(stmt)
+    }
+    mut step = node.attr("step")
+    if step.is_some() {
+        loop_body.push(step.unwrap())
+    }
+
+    mut do_body = []
+    mut init = node.attr("init")
+    if init.is_some() {
+        do_body.push(.emit_stmt(init.unwrap()))
+    }
+
+    mut cond = "true"
+    mut condition = node.attr("condition")
+    if condition.is_some() {
+        cond = .exprs.emit(condition.unwrap())
+    }
+    mut while_parts = ["while " ++ cond ++ " do"]
+    .push_block(while_parts, loop_body)
+    while_parts.push("end")
+    do_body.push(Text.lines(while_parts))
+
+    return Text.lines(["do", Text.indent(Text.lines(do_body)), "end"])
+}
+
+// `for x in c` / `for k, v in c` lowers to a generic-for over `__lz_each(c)`,
+// which yields (0-based index, value) for a list and (key, value) for a map. A
+// single loop variable takes the value, so a throwaway `_` holds the index/key.
+private emit_for_in(node) {
+    .ctx.mark_collections()
+    mut iter = .exprs.emit(node.child("iter"))
+    .ctx.push_scope()
+    mut vars = node.child("vars")
+    for name in vars {
+        .ctx.declare_local(name)
+    }
+    mut header = ""
+    if vars.len() == 1 {
+        header = "for _, " ++ vars.get(1).unwrap() ++ " in __lz_each(" ++ iter ++ ") do"
+    } else {
+        header = "for " ++ Text.join(vars, ", ") ++ " in __lz_each(" ++ iter ++ ") do"
+    }
+    mut parts = [header]
+    .push_block(parts, node.child("body"))
+    parts.push("end")
+    .ctx.pop_scope()
+    return Text.lines(parts)
+}
+
+private emit_method(node) {
+    mut params = node.child("params")
+    if not node.attr("is_static").unwrap_or(false) {
+        params = .with_self(params)
+    }
+    mut header = "function " ++ .ctx.name() ++ "." ++ node.child("name") ++ "(" ++ Text.join(params, ", ") ++ ")"
+    return .wrap_body(header, .emit_fn_body(params, node.child("body")))
+}
+
+private emit_static_field(node) {
+    mut value = node.attr("value")
+    mut rhs = "nil"
+    if value.is_some() {
+        rhs = .exprs.emit(value.unwrap())
+    }
+    return .ctx.name() ++ "." ++ node.child("name") ++ " = " ++ rhs
+}
+
+private emit_constructor(node) {
+    .ctx.push_scope()
+    for param in node.child("params") {
+        .ctx.declare_local(param)
+    }
+    .ctx.declare_local("self")
+
+    mut lines = ["local self = {}"]
+    for method in .ctx.instance_method_names() {
+        lines.push("self." ++ method ++ " = " ++ .ctx.name() ++ "." ++ method)
+    }
+    for prop in .ctx.property_decls() {
+        mut value = prop.attr("value")
+        if value.is_some() {
+            lines.push("self." ++ prop.child("name") ++ " = " ++ .exprs.emit(value.unwrap()))
+        }
+    }
+    for stmt in node.child("body") {
+        lines.push(.emit_stmt(stmt))
+    }
+    lines.push("return self")
+    .ctx.pop_scope()
+
+    mut header = "function " ++ .ctx.name() ++ ".new(" ++ Text.join(node.child("params"), ", ") ++ ")"
+    return Text.lines([header, Text.indent(Text.lines(lines)), "end"])
+}
+
+// A header plus a (possibly empty) indented body, closed with `end`.
+private wrap_body(header, body) {
+    if body == "" {
+        return Text.lines([header, "end"])
+    }
+    return Text.lines([header, body, "end"])
+}
+
+// Append a block's emitted text to `parts` when it is non-empty.
+private push_block(parts, stmts) {
+    mut body = .emit_block(stmts)
+    if body != "" {
+        parts.push(body)
+    }
+}
+
+private with_self(params) {
+    mut out = ["self"]
+    for param in params {
+        out.push(param)
+    }
+    return out
+}

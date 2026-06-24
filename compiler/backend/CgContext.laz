@@ -1,0 +1,113 @@
+// CgContext — per-generation codegen state for the file = class model.
+//
+// A file lowers to a class table `C`; its top-level functions and bindings are
+// members emitted as `function C.name(...)` / `C.name = value`. Inside a body, a
+// reference to another member must be qualified (`C.other`) while locals and
+// parameters stay bare — `emit_name` makes that call using the member set and a
+// stack of local scopes (Lazarus has no metatables, so the scope chain is an
+// explicit list searched outward).
+
+private cls
+private members
+private instance_methods
+private instance_order
+private properties
+private known_classes
+private externs
+private scopes
+private collections
+
+constructor(cls, members, instance_methods, instance_order, properties, known_classes, externs) {
+    .cls = cls
+    .members = members
+    .instance_methods = instance_methods
+    .instance_order = instance_order
+    .properties = properties
+    .known_classes = known_classes
+    .externs = externs
+    .scopes = [[:]]
+    .collections = false
+}
+
+public name() {
+    return .cls
+}
+
+// Instance-method names in declaration order (for the `self.m = C.m` copies).
+public instance_method_names() {
+    return .instance_order
+}
+
+// The instance-property declarations, whose defaults seed `C.new`.
+public property_decls() {
+    return .properties
+}
+
+public is_member(name) {
+    return .members.has(name)
+}
+
+public is_instance_method(name) {
+    return .instance_methods.has(name)
+}
+
+// Whether `name` names a class (this one or an import) — so `name(...)` is
+// construction `name.new(...)` and `name.m(...)` is a static, not a colon, call.
+public is_construction(name) {
+    if name == .cls {
+        return true
+    }
+    return .known_classes.has(name)
+}
+
+// The raw Lua target an extern member lowers to, or a None when `ns`.`member` is
+// not an extern binding in scope.
+public extern_target(ns, member) {
+    mut table = .externs.get(ns)
+    if table.is_none() {
+        return table
+    }
+    return table.unwrap().get(member)
+}
+
+public mark_collections() {
+    .collections = true
+}
+
+public used_collections() {
+    return .collections
+}
+
+public push_scope() {
+    .scopes.push([:])
+}
+
+public pop_scope() {
+    .scopes.pop()
+}
+
+public declare_local(name) {
+    mut top = .scopes.get(.scopes.len()).unwrap()
+    top[name] = true
+}
+
+public is_local(name) {
+    for scope in .scopes {
+        if scope.has(name) {
+            return true
+        }
+    }
+    return false
+}
+
+// Qualify a member reference as `C.name`; leave locals, parameters and globals
+// (imports, builtins) bare.
+public emit_name(name) {
+    if .is_local(name) {
+        return name
+    }
+    if .is_member(name) {
+        return .cls ++ "." ++ name
+    }
+    return name
+}
