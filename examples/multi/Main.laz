@@ -1,0 +1,11 @@
+import Box
+
+private result
+private from_static
+
+constructor() {
+    mut b = Box(7)
+    .result = b.read()
+    mut u = Box.unit()
+    .from_static = u.read()
+}

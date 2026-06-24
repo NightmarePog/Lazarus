@@ -1,0 +1,104 @@
+// The Lazarus compiler: lex, parse, analyse, optimise and emit Lua 5.1 source,
+// printed to stdout. The source comes from a file-path argument, else stdin, else
+// a built-in sample.
+//
+//   lua Main.lua some.laz       # compile a named file
+//   lua Main.lua < some.laz     # compile stdin
+//   lua Main.lua                # compile the built-in sample
+
+import std.Str
+import std.Sys
+import frontend.lexer.Lexer
+import frontend.parser.Parser
+import frontend.schematic.Schematic
+import frontend.optimizer.Optimizer
+import backend.Codegen
+
+constructor() {
+    mut src = Main.load_source()
+    mut class_name = Main.class_name()
+
+    mut tokens = Lexer(src).scan()
+    mut program = Parser(tokens, src).parse()
+    mut imports = Main.collect_imports(program)
+    Schematic.analyze(program, src, class_name, imports)
+    Optimizer().optimize(program)
+
+    mut codegen = Codegen(class_name, imports, [:])
+    Sys.print(codegen.generate(program))
+}
+
+// The imported class names, gathered from the program's `import` declarations and
+// bound so references to them resolve during analysis.
+static collect_imports(program) {
+    mut names = []
+    for stmt in program.child("body") {
+        if stmt.kind == "ImportDecl" {
+            names.push(stmt.child("name"))
+        }
+    }
+    return names
+}
+
+// The enclosing class name — the file stem of the path argument (one class per
+// file), or "Main" for stdin / the built-in sample.
+static class_name() {
+    mut path = Sys.argv(1)
+    if path.is_some() {
+        return Main.class_from_path(path.unwrap())
+    }
+    return "Main"
+}
+
+// The class name in `dir/Name.laz`: the segment after the last '/', before the
+// last '.'.
+static class_from_path(path) {
+    mut n = Str.len(path).unwrap_or(0)
+    mut start = 1
+    mut dot = n + 1
+    mut i = 1
+    loop {
+        if i > n {
+            break
+        }
+        mut ch = Str.sub(path, i, i).unwrap_or("")
+        if ch == "/" {
+            start = i + 1
+        }
+        if ch == "." {
+            dot = i
+        }
+        i = i + 1
+    }
+    return Str.sub(path, start, dot - 1).unwrap_or("Main")
+}
+
+static load_source() {
+    mut path = Sys.argv(1)
+    if path.is_some() {
+        mut name = path.unwrap()
+        mut content = Sys.read_file(name)
+        if content.is_some() {
+            return content.unwrap()
+        }
+        Sys.print("error: cannot open file '" ++ name ++ "'")
+        Sys.exit(1)
+    }
+
+    mut stdin = Sys.read_all("*a").unwrap_or("")
+    if Str.len(stdin).unwrap_or(0) == 0 {
+        return Main.sample()
+    }
+    return stdin
+}
+
+static sample() {
+    mut nl = Str.char(10).unwrap_or("")
+    mut q = Str.char(34).unwrap_or("")
+    mut s = "static greet(name) {" ++ nl
+    s = s ++ "    mut msg = " ++ q ++ "hi " ++ q ++ " ++ name" ++ nl
+    s = s ++ "    if name == 0 { return name }" ++ nl
+    s = s ++ "    return msg // done" ++ nl
+    s = s ++ "}"
+    return s
+}

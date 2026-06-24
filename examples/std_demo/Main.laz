@@ -1,0 +1,29 @@
+// Demonstrates the stdlib: an extern namespace (Str) and a typed Result.
+//
+// ⚠️ BROKEN / TODO: imports are now resolved from the project root (the entry
+// file's directory) and there is no `../` form. This demo lives in a subfolder
+// but needs the repo-root `std/`, which it cannot reach. To run it, `std/` must
+// sit at this file's root (e.g. examples/std_demo/std/...) and the imports below
+// become `import std.Str` etc. Kept as a marker until examples are reorganized.
+
+import Str from "../../std/Str"
+import Sys from "../../std/Sys"
+import ResultString from "../../std/ResultString"
+
+private shout
+private safe
+private fallback
+
+constructor() {
+    // Str.upper goes through the extern boundary, so it returns the untyped
+    // runtime Option — unwrap it with the builtin `.unwrap()`.
+    .shout = Str.upper("hello").unwrap()
+
+    // Typed Result: construct with ok/err, consume with take/take_or.
+    mut good = ResultString.ok("yay")
+    .safe = good.take()
+
+    mut bad = ResultString.err("nope")
+    .fallback = bad.take_or("default")
+    Sys.print(.safe)
+}
