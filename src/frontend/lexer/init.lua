@@ -54,6 +54,8 @@ function Lexer:_read_identifier()
         self:_advance()
     end
 
+    -- self.pos has advanced past the identifier; not equal to `start`.
+    ---@diagnostic disable-next-line: preferred-local-alias
     local value    = self.source:sub(start, self.pos - 1)
     local tok_type = (Keywords.TOKENS[value] or "IDENTIFIER") --[[@as TokenType]]
     -- Only identifiers carry a meaningful literal (the name itself).
@@ -81,6 +83,8 @@ function Lexer:_read_number()
     -- Optional fractional part: a `.` must be followed by at least one digit to
     -- be part of the number (otherwise it is a separate token).
     if self.current == "." then
+        -- self.pos has advanced past the digits; not equal to `start`.
+        ---@diagnostic disable-next-line: preferred-local-alias
         local after = self.pos < #self.source and self.source:sub(self.pos + 1, self.pos + 1) or ""
         if after:match("%d") then
             self:_advance()  -- consume '.'
@@ -93,9 +97,13 @@ function Lexer:_read_number()
     if self.current ~= "" and self.current:match("[%a_]") then
         Error.throw(Error.Type.INVALID_NUMBER,
             "Unexpected character '" .. self.current .. "' after number literal",
+            -- self.line/self.col are the current position; not equal to captured `line`/`col`.
+            ---@diagnostic disable-next-line: preferred-local-alias
             self.line, self.col, self.source, 1)
     end
 
+    -- self.pos has advanced past the number; not equal to `start`.
+    ---@diagnostic disable-next-line: preferred-local-alias
     local raw = self.source:sub(start, self.pos - 1)
     return Token.new("NUMBER", raw, line, col, tonumber(raw))
 end
@@ -128,6 +136,8 @@ function Lexer:_read_string()
     end
 
     self:_advance()  -- consume closing "
+    -- self.pos has advanced past the closing quote; not equal to `start`.
+    ---@diagnostic disable-next-line: preferred-local-alias
     local raw     = self.source:sub(start, self.pos - 1)  -- includes surrounding quotes
     local literal = table.concat(chars, "")               -- content only
     return Token.new("STRING", raw, line, col, literal)
@@ -171,7 +181,11 @@ end
 ---@private
 ---@return boolean
 function Lexer:_skip_comment()
-    if self.current ~= "/" then return false end
+    -- Read into a local for the guard so EmmyLua doesn't narrow the field
+    -- `self.current` to the literal "/" for the rest of the method. `self:_advance()`
+    -- reassigns `self.current` each loop iteration, which the narrowing ignores.
+    local lead = self.current
+    if lead ~= "/" then return false end
     local next_char = self.pos < #self.source and self.source:sub(self.pos + 1, self.pos + 1) or ""
 
     if next_char == "/" then
@@ -179,6 +193,8 @@ function Lexer:_skip_comment()
         self:_advance()  -- second '/'
         -- Consume to end of line; leave the newline for the whitespace pass so
         -- line/column bookkeeping stays in one place.
+        -- self.current has advanced past the leading `//`; not equal to `lead`.
+        ---@diagnostic disable-next-line: preferred-local-alias
         while self.current ~= "" and self.current ~= "\n" do
             self:_advance()
         end
@@ -190,11 +206,15 @@ function Lexer:_skip_comment()
         self:_advance()  -- '/'
         self:_advance()  -- '*'
         while true do
+            -- self.current has advanced past the leading `/*`; not equal to `lead`.
+            ---@diagnostic disable-next-line: preferred-local-alias
             if self.current == "" then
                 Error.throw(Error.Type.UNTERMINATED_COMMENT,
                     "Unterminated block comment",
                     line, col, self.source, 2)
             end
+            -- self.current has advanced past the leading `/*`; not equal to `lead`.
+            ---@diagnostic disable-next-line: preferred-local-alias
             if self.current == "*" and self.source:sub(self.pos + 1, self.pos + 1) == "/" then
                 self:_advance()  -- '*'
                 self:_advance()  -- '/'

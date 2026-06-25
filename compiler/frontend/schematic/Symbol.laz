@@ -1,0 +1,19 @@
+// Symbol — a scope entry. The language is untyped, so the only facts tracked
+// about a binding are its kind ("constant"/"variable"/"function"/"class"),
+// whether it may be reassigned, and whether its value is provably **not** a
+// function (so a later call on it can be rejected up front).
+
+public kind
+public mutable
+public noncallable
+
+constructor(kind, mutable, noncallable) {
+    .kind = kind
+    .mutable = mutable
+    .noncallable = noncallable
+}
+
+// Refresh the callability fact after a reassignment changes the bound value.
+public set_noncallable(flag) {
+    .noncallable = flag
+}

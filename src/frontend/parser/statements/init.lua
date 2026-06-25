@@ -16,6 +16,8 @@ local Method = require("frontend.parser.statements.method")
 --- Add new handlers here — the dispatcher builds the registry automatically.
 ---@type StatementParser[]
 local HANDLERS = {
+    (require("frontend.parser.statements.import")),
+    (require("frontend.parser.statements.extern")),
     (require("frontend.parser.statements.private")),
     (require("frontend.parser.statements.public")),
     (require("frontend.parser.statements.mut")),

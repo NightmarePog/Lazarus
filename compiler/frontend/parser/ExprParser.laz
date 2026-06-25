@@ -1,0 +1,238 @@
+// ExprParser — the expression grammar, over a shared TokenCursor.
+//
+// Precedence (low -> high): infix operators (precedence climbing), prefix `not`,
+// postfix call / member / index, then the primary atoms. Operands of an infix
+// operator are parsed by the next-tighter level, so the table below is the one
+// place precedence is defined. Nodes are built through the `Ast` factory.
+//
+// Grammar methods are named `parse_*`: a method whose name matches one of the
+// `Ast` factory's node constructors (e.g. `binary`) would be mis-compiled into a
+// self-call, since method dispatch resolves a call's field name against the
+// current class before considering the receiver.
+
+import frontend.parser.Ast
+
+private static precedences = [
+    "OR": 1,
+    "AND": 2,
+    "EQ": 3,
+    "NEQ": 3,
+    "LESS": 3,
+    "LESS_EQUAL": 3,
+    "GREATER": 3,
+    "GREATER_EQUAL": 3,
+    "CONCAT": 4,
+    "PLUS": 4,
+    "MINUS": 4,
+    "MULTIPLY": 5,
+    "DIVIDE": 5,
+    "MODULO": 5,
+    "POWER": 6
+]
+
+private cursor
+
+constructor(cursor) {
+    .cursor = cursor
+}
+
+// Entry point: a full expression (lowest precedence).
+public expression() {
+    return .parse_binary(1)
+}
+
+// Left-associative precedence climbing: operators of precedence >= `min_prec`,
+// recursing with `prec + 1` on the right so equal precedences group leftward.
+// A non-operator (including end of input) has no precedence, which ends the loop.
+private parse_binary(min_prec) {
+    mut left = .parse_unary()
+    loop {
+        mut p = .precedence(.cursor.current_kind())
+        if p.is_none() {
+            break
+        }
+        mut prec = p.unwrap()
+        if prec < min_prec {
+            break
+        }
+        mut op = .cursor.advance()
+        mut right = .parse_binary(prec + 1)
+        left = Ast.binary(op.kind, left, right, op.line, op.column)
+    }
+    return left
+}
+
+// Prefix `not`: binds tighter than infix operators, looser than calls.
+private parse_unary() {
+    if .cursor.check("NOT") {
+        mut op = .cursor.advance()
+        mut operand = .parse_unary()
+        return Ast.unary(op.kind, operand, op.line, op.column)
+    }
+    return .parse_call()
+}
+
+// Postfix chain: a primary followed by calls `(...)`, member `.x` and index
+// `[i]`. A `.x` or `[i]` that opens a new source line is a fresh statement, not
+// a continuation, so it must share the previous token's line to chain.
+private parse_call() {
+    mut expr = .parse_primary()
+    loop {
+        mut k = .cursor.current_kind()
+        if k == "LEFT_BRACKET" {
+            expr = .finish_call(expr)
+        } else if k == "DOT" and .continues_line() {
+            expr = .finish_member(expr)
+        } else if k == "LSQUARE" and .continues_line() {
+            expr = .finish_index(expr)
+        } else {
+            break
+        }
+    }
+    return expr
+}
+
+private finish_call(callee) {
+    mut paren = .cursor.advance()
+    mut args = .parse_arguments()
+    return Ast.call(callee, args, paren.line, paren.column)
+}
+
+private finish_member(object) {
+    mut dot = .cursor.advance()
+    mut field = .cursor.consume("IDENTIFIER", "Expected a field name after '.'")
+    return Ast.member(object, field.value, dot.line, dot.column)
+}
+
+private finish_index(object) {
+    mut bracket = .cursor.advance()
+    mut index = .expression()
+    .cursor.consume("RSQUARE", "Expected ']' after an index expression")
+    return Ast.index(object, index, bracket.line, bracket.column)
+}
+
+// Whether the current token sits on the same source line as the previous one —
+// the rule that tells a continuing `.x` / `[i]` from one starting a statement.
+private continues_line() {
+    return .cursor.previous().line == .cursor.current().line
+}
+
+// Call arguments after the opening `(`, up to and including the closing `)`.
+private parse_arguments() {
+    mut args = []
+    if not .cursor.check("RIGHT_BRACKET") {
+        loop {
+            args.push(.expression())
+            if not .cursor.match("COMMA") {
+                break
+            }
+        }
+    }
+    .cursor.consume("RIGHT_BRACKET", "Expected ')' after arguments")
+    return args
+}
+
+// The grammar atoms: literals, identifiers, `self`, leading-dot fields,
+// collection literals, and parenthesised sub-expressions.
+private parse_primary() {
+    mut tok = .cursor.current()
+    mut k = tok.kind
+
+    if k == "LEFT_BRACKET" {
+        .cursor.advance()
+        mut inner = .expression()
+        .cursor.consume("RIGHT_BRACKET", "Expected ')' after expression")
+        return inner
+    }
+    if k == "NUMBER" {
+        .cursor.advance()
+        return Ast.literal("number", tok.value, tok.line, tok.column)
+    }
+    if k == "STRING" {
+        .cursor.advance()
+        return Ast.literal("string", tok.value, tok.line, tok.column)
+    }
+    if k == "TRUE" {
+        .cursor.advance()
+        return Ast.literal("boolean", true, tok.line, tok.column)
+    }
+    if k == "FALSE" {
+        .cursor.advance()
+        return Ast.literal("boolean", false, tok.line, tok.column)
+    }
+    if k == "IDENTIFIER" {
+        .cursor.advance()
+        return Ast.identifier(tok.value, tok.line, tok.column)
+    }
+    if k == "SELF" {
+        .cursor.advance()
+        return Ast.self_expr(tok.line, tok.column)
+    }
+    if k == "LSQUARE" {
+        return .parse_collection()
+    }
+    if k == "DOT" {
+        .cursor.advance()
+        mut field = .cursor.consume("IDENTIFIER", "Expected a field name after '.'")
+        return Ast.member(Ast.self_expr(tok.line, tok.column), field.value, tok.line, tok.column)
+    }
+
+    if k == "EOF" {
+        .cursor.fail("Unexpected end of input")
+    } else {
+        .cursor.fail("Unexpected token '" ++ tok.value ++ "'")
+    }
+    return Ast.literal("string", "", 0, 0)
+}
+
+// A list `[a, b]` or map `["k": v]` literal, the opening `[` current. Empty
+// forms are `[]` (list) and `[:]` (map); otherwise a `:` after the first
+// element marks a map, and anything else is a list.
+private parse_collection() {
+    mut open = .cursor.advance()
+    if .cursor.check("RSQUARE") {
+        .cursor.advance()
+        return Ast.list([], open.line, open.column)
+    }
+    if .cursor.check("COLON") {
+        .cursor.advance()
+        .cursor.consume("RSQUARE", "Expected ']' to close empty map '[:]'")
+        return Ast.map([], open.line, open.column)
+    }
+
+    mut first = .expression()
+    if .cursor.match("COLON") {
+        return .parse_map_rest(first, open)
+    }
+    return .parse_list_rest(first, open)
+}
+
+private parse_map_rest(first, open) {
+    mut entries = [Ast.map_entry(first, .expression())]
+    loop {
+        if not .cursor.match("COMMA") {
+            break
+        }
+        mut key = .expression()
+        .cursor.consume("COLON", "Expected ':' between a map key and its value")
+        entries.push(Ast.map_entry(key, .expression()))
+    }
+    .cursor.consume("RSQUARE", "Expected ']' to close the map literal")
+    return Ast.map(entries, open.line, open.column)
+}
+
+private parse_list_rest(first, open) {
+    mut elements = [first]
+    loop {
+        if not .cursor.match("COMMA") {
+            break
+        }
+        elements.push(.expression())
+    }
+    .cursor.consume("RSQUARE", "Expected ']' to close the list literal")
+    return Ast.list(elements, open.line, open.column)
+}
+
+private precedence(kind) {
+    return ExprParser.precedences.get(kind)
+}

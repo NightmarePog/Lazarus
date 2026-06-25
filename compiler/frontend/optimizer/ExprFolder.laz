@@ -1,0 +1,134 @@
+// ExprFolder — constant folding and constant propagation for expressions.
+//
+// `fold` returns the possibly-replaced node (folding may collapse a subtree to a
+// single literal), so callers assign the result back. Two real rewrites: a name
+// known to be a compile-time constant is replaced with its literal, and a binary
+// op on two numeric literals is evaluated now. Only `+` / `-` / `*` fold — `/`,
+// `%` and `^` would synthesise a non-integer literal, and floats/division are
+// deferred in this subset. Everything else only recurses so constants propagate
+// inward. A running `folds` count makes the pass's effect observable.
+
+import frontend.parser.Ast
+import std.Num
+
+private folds
+
+constructor() {
+    .folds = 0
+}
+
+public fold_count() {
+    return .folds
+}
+
+public fold(node, constants) {
+    mut k = node.kind
+    if k == "IdentifierExpr" {
+        return .fold_identifier(node, constants)
+    }
+    if k == "BinaryExpr" {
+        return .fold_binary(node, constants)
+    }
+    if k == "CallExpr" {
+        return .fold_call(node, constants)
+    }
+    if k == "ListExpr" {
+        return .fold_list(node, constants)
+    }
+    if k == "MapExpr" {
+        return .fold_map(node, constants)
+    }
+    if k == "UnaryExpr" {
+        node.set("operand", .fold(node.child("operand"), constants))
+        return node
+    }
+    if k == "MemberExpr" {
+        node.set("object", .fold(node.child("object"), constants))
+        return node
+    }
+    if k == "IndexExpr" {
+        node.set("object", .fold(node.child("object"), constants))
+        node.set("index", .fold(node.child("index"), constants))
+        return node
+    }
+    return node
+}
+
+// Constant propagation: replace a reference with its recorded literal.
+private fold_identifier(node, constants) {
+    mut hit = constants.lookup(node.child("name"))
+    if hit.is_some() {
+        .folds = .folds + 1
+        return hit.unwrap()
+    }
+    return node
+}
+
+// Constant folding: a `+`/`-`/`*` over two numeric literals is evaluated now.
+private fold_binary(node, constants) {
+    mut left = .fold(node.child("left"), constants)
+    mut right = .fold(node.child("right"), constants)
+    mut op = node.child("op")
+    if .foldable(op, left, right) {
+        mut lv = Num.to_number(left.child("value")).unwrap_or(0)
+        mut rv = Num.to_number(right.child("value")).unwrap_or(0)
+        mut result = .apply(op, lv, rv)
+        .folds = .folds + 1
+        return Ast.literal("number", Num.to_text(result).unwrap_or("0"), node.line(), node.col())
+    }
+    node.set("left", left)
+    node.set("right", right)
+    return node
+}
+
+private foldable(op, left, right) {
+    return .can_fold(op) and .is_number(left) and .is_number(right)
+}
+
+private can_fold(op) {
+    return op == "PLUS" or op == "MINUS" or op == "MULTIPLY"
+}
+
+private is_number(node) {
+    if node.kind != "LiteralExpr" {
+        return false
+    }
+    return node.child("lit_kind") == "number"
+}
+
+private apply(op, a, b) {
+    if op == "PLUS" {
+        return a + b
+    }
+    if op == "MINUS" {
+        return a - b
+    }
+    return a * b
+}
+
+private fold_call(node, constants) {
+    node.set("callee", .fold(node.child("callee"), constants))
+    mut folded = []
+    for arg in node.child("args") {
+        folded.push(.fold(arg, constants))
+    }
+    node.set("args", folded)
+    return node
+}
+
+private fold_list(node, constants) {
+    mut folded = []
+    for element in node.child("elements") {
+        folded.push(.fold(element, constants))
+    }
+    node.set("elements", folded)
+    return node
+}
+
+private fold_map(node, constants) {
+    for entry in node.child("entries") {
+        entry.set("key", .fold(entry.child("key"), constants))
+        entry.set("value", .fold(entry.child("value"), constants))
+    }
+    return node
+}

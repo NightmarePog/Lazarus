@@ -1,0 +1,27 @@
+// Optimizer — the constant-folding / constant-propagation façade.
+//
+// Walks the program with a statement folder over a fresh (empty) constant scope,
+// mutating the AST in place and returning it. The number of rewrites performed is
+// exposed via `fold_count` so the pass's effect is observable.
+
+import frontend.optimizer.Constants
+import frontend.optimizer.ExprFolder
+import frontend.optimizer.StmtFolder
+
+private folds
+
+constructor() {
+    .folds = 0
+}
+
+public optimize(program) {
+    mut exprs = ExprFolder()
+    mut stmts = StmtFolder(exprs)
+    stmts.fold_block(program.child("body"), Constants.empty())
+    .folds = exprs.fold_count()
+    return program
+}
+
+public fold_count() {
+    return .folds
+}

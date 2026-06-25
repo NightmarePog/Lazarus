@@ -1,0 +1,111 @@
+// Ast — the factory for AST nodes: one named constructor per node kind.
+//
+// Every `Node` in the compiler is built here and nowhere else, so the shape of
+// each kind (its attribute names) is documented in a single place and the parser
+// stays free of stringly-typed map literals. Nodes with optional attributes
+// (VariableDecl, ReturnStmt, IfStmt, ForStmt) are assembled by the parser and
+// passed through `node`, which is the sole call site of the `Node` constructor.
+
+import frontend.parser.Node
+
+// The generic escape hatch: build a node from a kind and a ready-made attrs map.
+// Used for the few node kinds whose optional attributes are set conditionally.
+static node(kind, attrs) {
+    return Node(kind, attrs)
+}
+
+static program(body) {
+    return Node("Program", ["body": body])
+}
+
+static import_decl(segments, name, line, col) {
+    return Node("ImportDecl", ["segments": segments, "name": name, "line": line, "col": col])
+}
+
+static extern_decl(name, params, target, line, col) {
+    return Node("ExternDecl", ["name": name, "params": params, "target": target, "line": line, "col": col])
+}
+
+static function_decl(name, params, body, is_static, visibility, line, col) {
+    return Node("FunctionDecl", ["name": name, "params": params, "body": body, "is_static": is_static, "visibility": visibility, "line": line, "col": col])
+}
+
+static constructor_decl(params, body, line, col) {
+    return Node("ConstructorDecl", ["params": params, "body": body, "line": line, "col": col])
+}
+
+static expression_stmt(expression, line, col) {
+    return Node("ExpressionStmt", ["expression": expression, "line": line, "col": col])
+}
+
+static field_assign(target, value, line, col) {
+    return Node("FieldAssign", ["target": target, "value": value, "line": line, "col": col])
+}
+
+static index_assign(target, value, line, col) {
+    return Node("IndexAssign", ["target": target, "value": value, "line": line, "col": col])
+}
+
+static while_stmt(condition, body, line, col) {
+    return Node("WhileStmt", ["condition": condition, "body": body, "line": line, "col": col])
+}
+
+static loop_stmt(body, line, col) {
+    return Node("LoopStmt", ["body": body, "line": line, "col": col])
+}
+
+static break_stmt(line, col) {
+    return Node("BreakStmt", ["line": line, "col": col])
+}
+
+static for_in(vars, iter, body, line, col) {
+    return Node("ForInStmt", ["vars": vars, "iter": iter, "body": body, "line": line, "col": col])
+}
+
+static if_clause(condition, body) {
+    return Node("IfClause", ["condition": condition, "body": body])
+}
+
+static map_entry(key, value) {
+    return Node("MapEntry", ["key": key, "value": value])
+}
+
+static binary(op, left, right, line, col) {
+    return Node("BinaryExpr", ["op": op, "left": left, "right": right, "line": line, "col": col])
+}
+
+static unary(op, operand, line, col) {
+    return Node("UnaryExpr", ["op": op, "operand": operand, "line": line, "col": col])
+}
+
+static call(callee, args, line, col) {
+    return Node("CallExpr", ["callee": callee, "args": args, "line": line, "col": col])
+}
+
+static member(object, field, line, col) {
+    return Node("MemberExpr", ["object": object, "field": field, "line": line, "col": col])
+}
+
+static index(object, index, line, col) {
+    return Node("IndexExpr", ["object": object, "index": index, "line": line, "col": col])
+}
+
+static self_expr(line, col) {
+    return Node("SelfExpr", ["line": line, "col": col])
+}
+
+static identifier(name, line, col) {
+    return Node("IdentifierExpr", ["name": name, "line": line, "col": col])
+}
+
+static literal(lit_kind, value, line, col) {
+    return Node("LiteralExpr", ["lit_kind": lit_kind, "value": value, "line": line, "col": col])
+}
+
+static list(elements, line, col) {
+    return Node("ListExpr", ["elements": elements, "line": line, "col": col])
+}
+
+static map(entries, line, col) {
+    return Node("MapExpr", ["entries": entries, "line": line, "col": col])
+}

@@ -1,0 +1,58 @@
+// Schematic — the semantic-analysis façade.
+//
+// Collects the class's instance properties and methods up front (so a `.field` /
+// `.method()` access resolves regardless of declaration order), binds the class
+// name and imports into a root scope (so construction `Class(...)` and
+// `Other.static()` resolve), then walks the top-level block with a fresh
+// statement checker. The first violation raises and aborts.
+
+import std.Str
+import Error
+import frontend.schematic.Symbol
+import frontend.schematic.Scope
+import frontend.schematic.Frame
+import frontend.schematic.ExprChecker
+import frontend.schematic.StmtChecker
+
+static analyze(program, source, class_name, imports) {
+    mut properties = [:]
+    mut methods = [:]
+    Schematic.collect_members(program, properties, methods, source)
+
+    mut root = Scope.root()
+    root.declare(class_name, Symbol("class", false, false))
+    for name in imports {
+        root.declare(name, Symbol("class", false, false))
+    }
+
+    mut exprs = ExprChecker(source, properties, methods)
+    mut stmts = StmtChecker(source, exprs)
+    stmts.check_block(program.child("body"), root, Frame(false, false, false))
+}
+
+// Gather instance properties (top-level visible non-static bindings) and instance
+// methods (non-static functions), rejecting duplicate properties.
+private static collect_members(program, properties, methods, source) {
+    for stmt in program.child("body") {
+        mut k = stmt.kind
+        if k == "VariableDecl" {
+            Schematic.collect_property(stmt, properties, source)
+        } else if k == "FunctionDecl" {
+            if not stmt.attr("is_static").unwrap_or(false) {
+                methods[stmt.child("name")] = true
+            }
+        }
+    }
+}
+
+private static collect_property(stmt, properties, source) {
+    mut visibility = stmt.attr("visibility").unwrap_or("")
+    mut is_static = stmt.attr("is_static").unwrap_or(false)
+    if visibility != "" and not is_static {
+        mut name = stmt.child("name")
+        if properties.has(name) {
+            Error("SemanticError", "Duplicate declaration '" ++ name ++ "'", stmt.line(), stmt.col(), source, Str.len(name).unwrap_or(1)).raise()
+        }
+        properties[name] = true
+    }
+}

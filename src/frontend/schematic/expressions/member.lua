@@ -29,6 +29,7 @@ return ExpressionCheck.new("MemberExpr", function(node, symbols, source, recurse
                 #node.field + 1
             )
         end
+        ---@cast cx -nil  the guard above throws (noreturn) when cx is nil
         local known = (cx.properties and cx.properties[node.field])
             or (cx.methods and cx.methods[node.field])
         if not known then

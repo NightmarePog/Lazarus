@@ -3,6 +3,8 @@
 local Keywords = {}
 
 ---@alias TokenType
+--- | "IMPORT"
+--- | "EXTERN"
 --- | "PRIVATE"
 --- | "PUBLIC"
 --- | "MUTABLE"
@@ -59,6 +61,8 @@ local Keywords = {}
 --- lexer, which tries the two-character key before the single-character one.
 ---@type table<string, TokenType>
 local TOKENS_DATA = {
+    ["import"] = "IMPORT",
+    ["extern"] = "EXTERN",
     ["private"] = "PRIVATE",
     ["public"] = "PUBLIC",
     ["mut"] = "MUTABLE",

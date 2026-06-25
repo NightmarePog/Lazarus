@@ -1,0 +1,39 @@
+// Naming — identifier casing rules. Values (functions, variables, parameters,
+// loop variables, properties) are snake_case. The language is untyped, so there
+// are no type names to case-check.
+
+import std.Str
+import Error
+
+// Enforce snake_case on a value name, raising at (line, col) otherwise. `what`
+// names the kind of binding for the message (e.g. "Function", "Binding").
+static check_value(name, line, col, source, what) {
+    if not Naming.is_snake(name) {
+        Error("SemanticError", what ++ " name '" ++ name ++ "' must be snake_case", line, col, source, Str.len(name).unwrap_or(1)).raise()
+    }
+}
+
+// A snake_case name starts with a lowercase letter or underscore, and continues
+// with lowercase letters, digits or underscores.
+private static is_snake(name) {
+    mut n = Str.len(name).unwrap_or(0)
+    if n == 0 {
+        return false
+    }
+    mut i = 1
+    loop {
+        if i > n {
+            break
+        }
+        mut ch = Str.sub(name, i, i).unwrap_or("")
+        mut ok = (ch >= "a" and ch <= "z") or ch == "_"
+        if i > 1 {
+            ok = ok or (ch >= "0" and ch <= "9")
+        }
+        if not ok {
+            return false
+        }
+        i = i + 1
+    }
+    return true
+}

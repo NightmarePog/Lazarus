@@ -29,6 +29,20 @@ Context.properties = {}
 ---@type boolean
 Context.uses_collections = false
 
+-- Names of imported classes. Calling one by name is construction, lowered to
+-- `Name.new(...)` (the class table is not callable) — exactly like the current
+-- class itself. Static-method calls and field reads on an imported class need no
+-- special handling: `Name.zero(...)` / `Name.field` are already valid Lua.
+---@type table<string, boolean>
+Context.known_classes = {}
+
+-- Extern namespaces in scope: `<Namespace> -> { <member> = "<lua.target>" }`. A
+-- call `Ns.member(args)` whose `Ns`/`member` is here lowers to the raw Lua target
+-- applied to the forwarded args, wrapped at the Option boundary:
+-- `__lz_wrap(<target>(<args>))`. Populated from the bundle's `extern` files.
+---@type table<string, table<string, string>>
+Context.extern_namespaces = {}
+
 -- Stack of local scopes; the top entry is the innermost. Each scope inherits
 -- visible locals from its parent via `__index`, mirroring Lua closure capture.
 local scopes = { {} }
@@ -40,11 +54,15 @@ local function current() return scopes[#scopes] end
 ---@param members          table<string, boolean>
 ---@param instance_methods table<string, boolean>?
 ---@param properties       { name: string, value: Expr | nil }[]?
-function Context.reset(class, members, instance_methods, properties)
+---@param known_classes    table<string, boolean>?
+---@param extern_namespaces table<string, table<string, string>>?
+function Context.reset(class, members, instance_methods, properties, known_classes, extern_namespaces)
     Context.class = class
     Context.members = members
     Context.instance_methods = instance_methods or {}
     Context.properties = properties or {}
+    Context.known_classes = known_classes or {}
+    Context.extern_namespaces = extern_namespaces or {}
     Context.uses_collections = false
     scopes = { {} }
 end

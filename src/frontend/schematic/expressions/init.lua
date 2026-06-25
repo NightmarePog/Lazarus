@@ -20,7 +20,7 @@ local HANDLERS = {
     (require("frontend.schematic.expressions.index")),
 }
 
----@type table<string, ExpressionCheck>
+---@type table<string, ExpressionCheck?>
 local registry = {}
 for _, handler in ipairs(HANDLERS) do
     registry[handler.type] = handler
@@ -28,9 +28,9 @@ end
 
 --- Validate an expression (and, recursively, its sub-expressions).
 ---@param node    Expr
----@param symbols table<string, {kind: string}>
+---@param symbols SymbolTable
 ---@param source  string
----@param cx?     { properties: table<string, boolean>, in_instance: boolean }  Instance context for `.field` checks
+---@param cx?     ExprContext  Instance context for `.field` / `self` checks
 local function check_expr(node, symbols, source, cx)
     local rule = registry[node.type]
     if rule then rule.check(node, symbols, source, check_expr, cx) end

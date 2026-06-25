@@ -5,7 +5,7 @@ local StatementCheck = require("frontend.schematic.statements.statement_check")
 
 return StatementCheck.new("WhileStmt", function(ctx, frame)
     local stmt = frame.stmt --[[@as WhileStmt]]
-    ctx:check_expr(stmt.condition, frame.symbols)
+    ctx:check_condition(stmt.condition, frame.symbols)
     ctx:analyze_block(
         stmt.body,
         ctx:child_scope(frame.symbols),

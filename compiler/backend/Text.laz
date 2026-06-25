@@ -1,0 +1,61 @@
+// Text — string assembly helpers for the code generator: newline-joining and
+// block indentation. The Lazarus lexer does not process escapes, so a literal
+// newline is obtained from `Str.char(10)` rather than a `\n` escape.
+
+import std.Str
+
+// A single newline character.
+static nl() {
+    return Str.char(10).unwrap_or("")
+}
+
+// Join `parts` with `sep`.
+static join(parts, sep) {
+    mut out = ""
+    mut first = true
+    for part in parts {
+        if first {
+            out = part
+            first = false
+        } else {
+            out = out ++ sep ++ part
+        }
+    }
+    return out
+}
+
+// Join `parts` as separate lines.
+static lines(parts) {
+    return Text.join(parts, Text.nl())
+}
+
+// Indent every non-empty line of `text` by four spaces; blank lines stay empty
+// so the output carries no trailing whitespace.
+static indent(text) {
+    mut newline = Text.nl()
+    mut n = Str.len(text).unwrap_or(0)
+    mut out = ""
+    mut line = ""
+    mut i = 1
+    loop {
+        if i > n {
+            break
+        }
+        mut ch = Str.sub(text, i, i).unwrap_or("")
+        if ch == newline {
+            out = out ++ Text.prefix(line) ++ newline
+            line = ""
+        } else {
+            line = line ++ ch
+        }
+        i = i + 1
+    }
+    return out ++ Text.prefix(line)
+}
+
+private static prefix(line) {
+    if line == "" {
+        return ""
+    }
+    return "    " ++ line
+}

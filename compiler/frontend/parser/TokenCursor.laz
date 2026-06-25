@@ -1,0 +1,122 @@
+// TokenCursor — navigation over the flat token list, shared by the parsers.
+//
+// Past-the-end reads return an EOF *null-object* token (kind "EOF") rather than a
+// None, so callers never juggle Options: `current().kind`, `check`, `at_end` and
+// the lookahead helpers all work uniformly whether or not a token is there. The
+// lexer never emits an "EOF" kind, so the sentinel is unambiguous. The cursor
+// also owns error raising, since it alone holds the source text and the position
+// to point a caret at.
+
+import std.Str
+import Error
+import frontend.lexer.Token
+
+private tokens
+private source
+private pos
+
+constructor(tokens, source) {
+    .tokens = tokens
+    .source = source
+    .pos = 1
+}
+
+// The current 1-based index — used by declaration lookahead.
+public position() {
+    return .pos
+}
+
+// The token at an absolute index, or the EOF sentinel when out of range.
+public token_at(i) {
+    mut t = .tokens.get(i)
+    if t.is_none() {
+        return .eof()
+    }
+    return t.unwrap()
+}
+
+public current() {
+    return .token_at(.pos)
+}
+
+public current_kind() {
+    return .current().kind
+}
+
+public peek_next() {
+    return .token_at(.pos + 1)
+}
+
+public previous() {
+    return .token_at(.pos - 1)
+}
+
+public at_end() {
+    return .current().kind == "EOF"
+}
+
+public check(kind) {
+    return .current().kind == kind
+}
+
+// Consume and return the current token; raises at end of input.
+public advance() {
+    if .at_end() {
+        .fail("Unexpected end of input")
+    }
+    mut tok = .current()
+    .pos = .pos + 1
+    return tok
+}
+
+// Consume the current token when it has `kind`, reporting whether it did.
+public match(kind) {
+    if .check(kind) {
+        .advance()
+        return true
+    }
+    return false
+}
+
+// Consume a token of the expected kind, or raise `message` at its position.
+public consume(kind, message) {
+    if .check(kind) {
+        return .advance()
+    }
+    .fail(message)
+    return .eof()
+}
+
+// Raise a syntax error at the current token (else the last consumed one).
+public fail(message) {
+    mut t = .error_pos()
+    mut span = Str.len(t.value).unwrap_or(1)
+    if span < 1 {
+        span = 1
+    }
+    .fail_at(message, t.line, t.column, span)
+}
+
+// Raise a syntax error at an explicit position (e.g. an unclosed block's `{`).
+public fail_at(message, line, col, span) {
+    Error("SyntaxError", message, line, col, .source, span).raise()
+}
+
+// The token an error should point at: the current one, else the last consumed,
+// else the sentinel (an empty source).
+private error_pos() {
+    mut cur = .current()
+    if cur.kind != "EOF" {
+        return cur
+    }
+    mut prev = .previous()
+    if prev.kind != "EOF" {
+        return prev
+    }
+    return cur
+}
+
+// The shared end-of-input null object.
+private eof() {
+    return Token("EOF", "", 0, 0)
+}

@@ -1,0 +1,111 @@
+// A located compiler error rendered as a coloured diagnostic box, mirroring the
+// reference `src/error.lua`: a type label, a `unknown:line:col` location, the
+// message, and a source snippet with a caret under the offending column.
+//
+// The subset has no exceptions, so `raise()` prints the box and exits — it never
+// returns. Construct with the source text and a caret `span` so the snippet can
+// be drawn.
+
+import std.Str
+import std.Sys
+
+public kind
+public message
+public line
+public column
+public source
+public span
+
+constructor(kind, message, line, column, source, span) {
+    .kind = kind
+    .message = message
+    .line = line
+    .column = column
+    .source = source
+    .span = span
+}
+
+public to_string() {
+    return .format()
+}
+
+public raise() {
+    Sys.print(.format())
+    Sys.exit(1)
+}
+
+public format() {
+    mut esc = Str.char(27).unwrap_or("")
+    mut red = esc ++ "[31m"
+    mut bold = esc ++ "[1m"
+    mut reset = esc ++ "[0m"
+    mut nl = Str.char(10).unwrap_or("")
+
+    mut prefix = Str.format("   %d │ ", .line).unwrap_or("")
+    mut pad = Str.rep(" ", Error.display_width(prefix) + .column - 1).unwrap_or("")
+    mut carets = red ++ Str.rep("^", .span).unwrap_or("^") ++ reset
+
+    mut out = ""
+    out = out ++ nl
+    out = out ++ red ++ "╭─ Error ──────────────────────────────" ++ reset ++ nl
+    out = out ++ "│ Type: " ++ bold ++ .kind ++ reset ++ nl
+    out = out ++ Str.format("│ Location: unknown:%d:%d", .line, .column).unwrap_or("│ Location: unknown") ++ nl
+    out = out ++ "│" ++ nl
+    out = out ++ "│ " ++ .message ++ nl
+    out = out ++ "│" ++ nl
+    out = out ++ "│ " ++ prefix ++ Error.source_line(.source, .line) ++ nl
+    out = out ++ "│ " ++ pad ++ carets ++ nl
+    out = out ++ red ++ "╰──────────────────────────────────────" ++ reset
+    return out
+}
+
+// The 1-based `target` line of `source`, without its trailing newline.
+static source_line(source, target) {
+    mut nl = Str.char(10).unwrap_or("")
+    mut len = Str.len(source).unwrap_or(0)
+    mut cur = 1
+    mut out = ""
+    mut i = 1
+    loop {
+        if i > len {
+            break
+        }
+        mut c = Str.sub(source, i, i).unwrap_or("")
+        if c == nl {
+            if cur == target {
+                break
+            }
+            cur = cur + 1
+            out = ""
+        } else {
+            if cur == target {
+                out = out ++ c
+            }
+        }
+        i = i + 1
+    }
+    return out
+}
+
+// Display width in codepoints: UTF-8 continuation bytes (0x80..0xBF) don't count,
+// so the multibyte `│` in the line prefix aligns the caret correctly.
+static display_width(s) {
+    mut len = Str.len(s).unwrap_or(0)
+    mut w = 0
+    mut i = 1
+    loop {
+        if i > len {
+            break
+        }
+        mut b = Str.byte(s, i).unwrap_or(0)
+        if b < 128 {
+            w = w + 1
+        } else {
+            if b >= 192 {
+                w = w + 1
+            }
+        }
+        i = i + 1
+    }
+    return w
+}

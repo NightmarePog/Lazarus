@@ -110,40 +110,93 @@ emit_expr = function(node)
             args[i] = emit_expr(arg)
         end
 
-        -- Built-in collection / Option method: `c.len()`, `o.unwrap()`, … lower to
-        -- the matching runtime helper with the receiver as the first argument.
-        if node.callee.type == "MemberExpr" and BUILTIN_METHODS[node.callee.field] then
-            Context.uses_collections = true
-            table.insert(args, 1, emit_expr(node.callee.object))
-            return BUILTIN_METHODS[node.callee.field] .. "(" .. table.concat(args, ", ") .. ")"
+        -- Extern call: `Ns.member(args)` where `Ns` is an imported extern
+        -- namespace and `member` is one of its bindings lowers to the raw Lua
+        -- target applied to the forwarded args, wrapped at the Option boundary
+        -- (`__lz_wrap` turns a Lua `nil` into `none`, any other value into `some`).
+        -- Checked before built-in methods so an extern member named like a
+        -- built-in (e.g. `len`) still resolves as an extern.
+        if node.callee.type == "MemberExpr" then
+            local callee = node.callee
+            ---@cast callee MemberExpr
+            if callee.object.type == "IdentifierExpr" then
+                local obj = callee.object
+                ---@cast obj IdentifierExpr
+                local ns = Context.extern_namespaces[obj.name]
+                local target = ns and ns[callee.field]
+                if target then
+                    Context.uses_collections = true
+                    return "__lz_wrap(" .. target .. "(" .. table.concat(args, ", ") .. "))"
+                end
+            end
         end
 
-        -- Construction: calling the class by name lowers to `C.new(...)` (the
-        -- class table itself is not callable). The class name is the only
-        -- PascalCase identifier in call position; locals are snake_case.
-        if node.callee.type == "IdentifierExpr" and node.callee.name == Context.class then
-            return Context.class .. ".new(" .. table.concat(args, ", ") .. ")"
+        -- Built-in collection / Option method: `c.len()`, `o.unwrap()`, … lower to
+        -- the matching runtime helper with the receiver as the first argument.
+        if node.callee.type == "MemberExpr" then
+            local callee = node.callee
+            ---@cast callee MemberExpr
+            local builtin = BUILTIN_METHODS[callee.field]
+            if builtin ~= nil then
+                Context.uses_collections = true
+                table.insert(args, 1, emit_expr(callee.object))
+                return builtin .. "(" .. table.concat(args, ", ") .. ")"
+            end
+        end
+
+        -- Construction: calling a class by name lowers to `Name.new(...)` (the
+        -- class table itself is not callable). A class name is the only PascalCase
+        -- identifier in call position; locals are snake_case. This covers the
+        -- current class and any imported class.
+        if node.callee.type == "IdentifierExpr" then
+            local callee = node.callee
+            ---@cast callee IdentifierExpr
+            if callee.name == Context.class or Context.known_classes[callee.name] then
+                return callee.name .. ".new(" .. table.concat(args, ", ") .. ")"
+            end
         end
 
         -- Instance-method dispatch: `obj.m(args)` where `m` is one of the
         -- class's instance methods lowers to receiver-passing `C.m(obj, args)`
         -- (no metatables). A field call on a name that is *not* a class method
         -- (e.g. an external object) is left as a plain `obj.m(args)`.
-        if node.callee.type == "MemberExpr" and Context.instance_methods[node.callee.field] then
-            local object = emit_expr(node.callee.object)
-            if
-                node.callee.object.type == "BinaryExpr"
-                or node.callee.object.type == "UnaryExpr"
-            then
-                object = "(" .. object .. ")"
+        if node.callee.type == "MemberExpr" then
+            local callee = node.callee
+            ---@cast callee MemberExpr
+            if Context.instance_methods[callee.field] then
+                local object = emit_expr(callee.object)
+                if callee.object.type == "BinaryExpr" or callee.object.type == "UnaryExpr" then
+                    object = "(" .. object .. ")"
+                end
+                table.insert(args, 1, object)
+                return Context.class .. "." .. callee.field .. "(" .. table.concat(args, ", ") .. ")"
             end
-            table.insert(args, 1, object)
-            return Context.class
-                .. "."
-                .. node.callee.field
-                .. "("
-                .. table.concat(args, ", ")
-                .. ")"
+        end
+
+        -- Cross-class / external instance-method dispatch: `obj.m(args)` where the
+        -- receiver is *not* a class name lowers to Lua's colon `obj:m(args)`. The
+        -- colon passes the receiver as `self`, matching the methods each instance
+        -- carries (copied onto it in its constructor) — so this works across
+        -- classes with no metatables and no type information. A receiver that *is*
+        -- a class name (`Other.static()`) is a static call and falls through to the
+        -- plain qualified form below.
+        if node.callee.type == "MemberExpr" then
+            local callee = node.callee
+            ---@cast callee MemberExpr
+            local obj_node = callee.object
+            local class_receiver = false
+            if obj_node.type == "IdentifierExpr" then
+                local id = obj_node
+                ---@cast id IdentifierExpr
+                class_receiver = id.name == Context.class or Context.known_classes[id.name] ~= nil
+            end
+            if not class_receiver then
+                local object = emit_expr(obj_node)
+                if obj_node.type == "BinaryExpr" or obj_node.type == "UnaryExpr" then
+                    object = "(" .. object .. ")"
+                end
+                return object .. ":" .. callee.field .. "(" .. table.concat(args, ", ") .. ")"
+            end
         end
 
         local callee = emit_expr(node.callee)

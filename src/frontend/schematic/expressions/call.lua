@@ -15,15 +15,17 @@ return ExpressionCheck.new("CallExpr", function(node, symbols, source, recurse, 
     recurse(node.callee, symbols, source, cx)
 
     if node.callee.type == "IdentifierExpr" then
-        local entry = symbols[node.callee.name]
+        local callee = node.callee
+        ---@cast callee IdentifierExpr
+        local entry = symbols[callee.name]
         if entry and entry.noncallable then
             Error.throw(
                 Error.Type.NOT_CALLABLE,
-                "'" .. node.callee.name .. "' is not callable; it holds a value, not a function",
-                node.callee.line,
-                node.callee.col,
+                "'" .. callee.name .. "' is not callable; it holds a value, not a function",
+                callee.line,
+                callee.col,
                 source,
-                #node.callee.name
+                #callee.name
             )
         end
     end

@@ -12,7 +12,7 @@
 ---@field stmt        Stmt                            The statement being checked
 ---@field idx         integer                         Its 1-based index within `stmts`
 ---@field stmts       Stmt[]                          The enclosing block
----@field symbols     table<string, {kind: string}>   Symbols visible in this scope
+---@field symbols     SymbolTable                     Symbols visible in this scope
 ---@field in_function boolean                          True inside a function body
 ---@field in_loop     boolean                          True inside a loop body
 ---@field return_type string | nil                     Declared return type of the enclosing function

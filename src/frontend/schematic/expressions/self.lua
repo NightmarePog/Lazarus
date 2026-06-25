@@ -11,6 +11,7 @@ local Error = require("error")
 local ExpressionCheck = require("frontend.schematic.expressions.expression_check")
 
 return ExpressionCheck.new("SelfExpr", function(node, _symbols, source, _recurse, cx)
+    ---@cast node SelfExpr
     if not (cx and cx.in_instance) then
         Error.throw(
             Error.Type.SEMANTIC_ERROR,

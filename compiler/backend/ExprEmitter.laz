@@ -1,0 +1,220 @@
+// ExprEmitter — lowers an expression AST node to a Lua source string.
+//
+// The interesting work is call dispatch, checked in order: an extern namespace
+// call lowers to its raw Lua target wrapped at the Option boundary; a built-in
+// collection/Option method to its `__lz_*` helper; a class name in call position
+// to construction `C.new(...)`; an instance method to receiver-passing
+// `C.m(obj, ...)`; any other field call to Lua's colon `obj:m(...)`; everything
+// else to a plain call.
+
+import std.Str
+import backend.Text
+
+private static op_map = [
+    "PLUS": "+",
+    "MINUS": "-",
+    "MULTIPLY": "*",
+    "DIVIDE": "/",
+    "POWER": "^",
+    "CONCAT": "..",
+    "EQ": "==",
+    "NEQ": "~=",
+    "LESS": "<",
+    "LESS_EQUAL": "<=",
+    "GREATER": ">",
+    "GREATER_EQUAL": ">=",
+    "AND": "and",
+    "OR": "or"
+]
+
+private static builtins = [
+    "len": "__lz_len",
+    "push": "__lz_push",
+    "pop": "__lz_pop",
+    "get": "__lz_get",
+    "has": "__lz_has",
+    "is_some": "__lz_is_some",
+    "is_none": "__lz_is_none",
+    "unwrap": "__lz_unwrap",
+    "unwrap_or": "__lz_unwrap_or"
+]
+
+private ctx
+
+constructor(ctx) {
+    .ctx = ctx
+}
+
+public emit(node) {
+    mut k = node.kind
+    if k == "LiteralExpr" {
+        return .emit_literal(node)
+    }
+    if k == "IdentifierExpr" {
+        return .ctx.emit_name(node.child("name"))
+    }
+    if k == "SelfExpr" {
+        return "self"
+    }
+    if k == "MemberExpr" {
+        return .emit_field(node)
+    }
+    if k == "ListExpr" {
+        return .emit_list(node)
+    }
+    if k == "MapExpr" {
+        return .emit_map(node)
+    }
+    if k == "IndexExpr" {
+        return .emit_index(node)
+    }
+    if k == "CallExpr" {
+        return .emit_call(node)
+    }
+    if k == "UnaryExpr" {
+        return .emit_unary(node)
+    }
+    if k == "BinaryExpr" {
+        return .emit_binary(node)
+    }
+    return ""
+}
+
+private emit_literal(node) {
+    mut lit_kind = node.child("lit_kind")
+    mut value = node.child("value")
+    if lit_kind == "string" {
+        return Str.format("%q", value).unwrap_or("''")
+    }
+    if lit_kind == "boolean" {
+        if value {
+            return "true"
+        }
+        return "false"
+    }
+    return value
+}
+
+private emit_field(node) {
+    return .emit_operand(node.child("object")) ++ "." ++ node.child("field")
+}
+
+private emit_list(node) {
+    .ctx.mark_collections()
+    return "__lz_list(" ++ Text.join(.emit_args(node.child("elements")), ", ") ++ ")"
+}
+
+private emit_map(node) {
+    .ctx.mark_collections()
+    mut parts = []
+    for entry in node.child("entries") {
+        parts.push("[" ++ .emit(entry.child("key")) ++ "] = " ++ .emit(entry.child("value")))
+    }
+    return "__lz_map({" ++ Text.join(parts, ", ") ++ "})"
+}
+
+private emit_index(node) {
+    .ctx.mark_collections()
+    return "__lz_idx_get(" ++ .emit(node.child("object")) ++ ", " ++ .emit(node.child("index")) ++ ")"
+}
+
+private emit_unary(node) {
+    return "not " ++ .emit_operand(node.child("operand"))
+}
+
+private emit_binary(node) {
+    mut left = .emit_operand(node.child("left"))
+    mut right = .emit_operand(node.child("right"))
+    mut op = node.child("op")
+    if op == "MODULO" {
+        return "(" ++ left ++ " - math.floor(" ++ left ++ " / " ++ right ++ ") * " ++ right ++ ")"
+    }
+    return left ++ " " ++ ExprEmitter.op_map.get(op).unwrap_or(op) ++ " " ++ right
+}
+
+private emit_call(node) {
+    mut callee = node.child("callee")
+    mut args = .emit_args(node.child("args"))
+
+    if callee.kind == "MemberExpr" {
+        mut object = callee.child("object")
+        mut field = callee.child("field")
+
+        if object.kind == "IdentifierExpr" {
+            mut target = .ctx.extern_target(object.child("name"), field)
+            if target.is_some() {
+                .ctx.mark_collections()
+                return "__lz_wrap(" ++ target.unwrap() ++ "(" ++ Text.join(args, ", ") ++ "))"
+            }
+        }
+
+        mut helper = ExprEmitter.builtins.get(field)
+        if helper.is_some() {
+            .ctx.mark_collections()
+            return helper.unwrap() ++ "(" ++ Text.join(.with_receiver(object, args), ", ") ++ ")"
+        }
+    }
+
+    if callee.kind == "IdentifierExpr" {
+        mut name = callee.child("name")
+        if .ctx.is_construction(name) {
+            return name ++ ".new(" ++ Text.join(args, ", ") ++ ")"
+        }
+    }
+
+    if callee.kind == "MemberExpr" {
+        mut object = callee.child("object")
+        mut field = callee.child("field")
+        if .ctx.is_instance_method(field) {
+            return .ctx.name() ++ "." ++ field ++ "(" ++ Text.join(.with_receiver(object, args), ", ") ++ ")"
+        }
+        if not .receiver_is_class(object) {
+            return .emit_operand(object) ++ ":" ++ field ++ "(" ++ Text.join(args, ", ") ++ ")"
+        }
+    }
+
+    mut callee_src = .emit(callee)
+    if callee.kind == "BinaryExpr" {
+        callee_src = "(" ++ callee_src ++ ")"
+    }
+    return callee_src ++ "(" ++ Text.join(args, ", ") ++ ")"
+}
+
+// Emit an operand, parenthesising a binary/unary expression that would otherwise
+// bind wrongly as an indexed/called/operated value.
+private emit_operand(node) {
+    mut src = .emit(node)
+    if .needs_parens(node) {
+        return "(" ++ src ++ ")"
+    }
+    return src
+}
+
+private needs_parens(node) {
+    return node.kind == "BinaryExpr" or node.kind == "UnaryExpr"
+}
+
+private receiver_is_class(object) {
+    if object.kind != "IdentifierExpr" {
+        return false
+    }
+    return .ctx.is_construction(object.child("name"))
+}
+
+// The argument list with the receiver expression prepended (built-in and
+// instance-method calls pass the receiver as the first argument).
+private with_receiver(object, args) {
+    mut out = [.emit_operand(object)]
+    for arg in args {
+        out.push(arg)
+    }
+    return out
+}
+
+private emit_args(nodes) {
+    mut out = []
+    for node in nodes {
+        out.push(.emit(node))
+    }
+    return out
+}

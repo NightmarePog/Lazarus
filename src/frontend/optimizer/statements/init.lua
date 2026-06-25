@@ -17,7 +17,7 @@ local HANDLERS = {
     (require("frontend.optimizer.statements.for")),
 }
 
----@type table<string, FoldStatement>
+---@type table<string, FoldStatement?>
 local registry = {}
 for _, handler in ipairs(HANDLERS) do
     registry[handler.type] = handler

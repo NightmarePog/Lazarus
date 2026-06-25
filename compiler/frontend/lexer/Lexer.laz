@@ -1,0 +1,198 @@
+// Single-pass scanner from source text to a flat token list.
+//
+// `current` is the character at `pos`, or "" at end of source. Every `Char`
+// predicate is false for "", so the scan loops stop at the end without a guard.
+
+import std.Str
+import Error
+import frontend.lexer.Char
+import frontend.lexer.Keywords
+import frontend.lexer.Token
+
+private source
+private pos
+private line
+private col
+private current
+
+constructor(source) {
+    .source = source
+    .pos = 1
+    .line = 1
+    .col = 1
+    .current = .char_at(1)
+}
+
+public scan() {
+    mut tokens = []
+    loop {
+        .skip_trivia()
+        if .at_end() {
+            break
+        }
+        tokens.push(.next_token())
+    }
+    return tokens
+}
+
+// "" when `i` is past the end; out-of-range indices are safe in `string.sub`.
+private char_at(i) {
+    return Str.sub(.source, i, i).unwrap_or("")
+}
+
+private peek() {
+    return .char_at(.pos + 1)
+}
+
+private at_end() {
+    return .current == ""
+}
+
+private advance() {
+    if Char.is_newline(.current) {
+        .line = .line + 1
+        .col = 1
+    } else {
+        .col = .col + 1
+    }
+    .pos = .pos + 1
+    .current = .char_at(.pos)
+}
+
+// Whitespace and comments may alternate, so loop until neither remains.
+private skip_trivia() {
+    loop {
+        while Char.is_space(.current) {
+            .advance()
+        }
+        if not .skip_comment() {
+            break
+        }
+    }
+}
+
+// True when a `// ...` or `/* ... */` comment was consumed; false for a lone `/`.
+private skip_comment() {
+    if .current != "/" {
+        return false
+    }
+    mut nxt = .peek()
+    if nxt == "/" {
+        .advance()
+        .advance()
+        loop {
+            if .at_end() {
+                break
+            }
+            if Char.is_newline(.current) {
+                break
+            }
+            .advance()
+        }
+        return true
+    }
+    if nxt == "*" {
+        mut line = .line
+        mut col = .col
+        .advance()
+        .advance()
+        loop {
+            if .at_end() {
+                Error("UnterminatedComment", "unterminated block comment", line, col, .source, 2).raise()
+            }
+            if .current == "*" {
+                if .peek() == "/" {
+                    .advance()
+                    .advance()
+                    return true
+                }
+            }
+            .advance()
+        }
+    }
+    return false
+}
+
+private next_token() {
+    if Char.is_ident_start(.current) {
+        return .read_identifier()
+    }
+    if Char.is_digit(.current) {
+        return .read_number()
+    }
+    if Char.is_quote(.current) {
+        return .read_string()
+    }
+    return .read_symbol()
+}
+
+private read_identifier() {
+    mut start = .pos
+    mut line = .line
+    mut col = .col
+    while Char.is_ident_char(.current) {
+        .advance()
+    }
+    mut text = Str.sub(.source, start, .pos - 1).unwrap_or("")
+    return Token(Keywords.word_kind(text), text, line, col)
+}
+
+// Integer literals only; a `.` after the digits is left to become its own token.
+// A letter right after the digits (`123abc`) is an error, not two tokens.
+private read_number() {
+    mut start = .pos
+    mut line = .line
+    mut col = .col
+    while Char.is_digit(.current) {
+        .advance()
+    }
+    if Char.is_ident_start(.current) {
+        Error("InvalidNumber", "unexpected character after number literal", .line, .col, .source, 1).raise()
+    }
+    mut text = Str.sub(.source, start, .pos - 1).unwrap_or("")
+    return Token("NUMBER", text, line, col)
+}
+
+// `value` holds the content between the quotes.
+private read_string() {
+    mut line = .line
+    mut col = .col
+    .advance()
+    mut start = .pos
+    loop {
+        if .at_end() {
+            Error("UnterminatedString", "unterminated string literal", line, col, .source, 1).raise()
+        }
+        if Char.is_newline(.current) {
+            Error("UnterminatedString", "unterminated string literal", line, col, .source, 1).raise()
+        }
+        if Char.is_quote(.current) {
+            break
+        }
+        .advance()
+    }
+    mut text = Str.sub(.source, start, .pos - 1).unwrap_or("")
+    .advance()
+    return Token("STRING", text, line, col)
+}
+
+// Maximal munch: a two-character operator wins when the source matches one.
+private read_symbol() {
+    mut line = .line
+    mut col = .col
+    mut ch = .current
+    mut pair = ch ++ .peek()
+    mut two = Keywords.two(pair)
+    if two.is_some() {
+        .advance()
+        .advance()
+        return Token(two.unwrap(), pair, line, col)
+    }
+    mut one = Keywords.one(ch)
+    if one.is_some() {
+        .advance()
+        return Token(one.unwrap(), ch, line, col)
+    }
+    Error("UnexpectedChar", "unexpected character '" ++ ch ++ "'", line, col, .source, 1).raise()
+    return Token("ERROR", ch, line, col)
+}

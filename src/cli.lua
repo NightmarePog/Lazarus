@@ -18,11 +18,10 @@ package.path = table.concat({
     package.path,
 }, ";")
 
-local Lexer = require("frontend.lexer")
-local Parser = require("frontend.parser")
 local Schematic = require("frontend.schematic")
 local Optimizer = require("frontend.optimizer")
 local Codegen = require("backend")
+local Linker = require("linker")
 local const = require("const")
 
 local PROG = "lazarus"
@@ -62,15 +61,14 @@ Set LAZARUS_DEBUG=1 to append an internal stack trace to errors.]]):format(
     )
 end
 
---- Read a whole file, or exit with a clean error if it cannot be opened.
+--- Read a whole file. Returns `nil, err` on failure rather than exiting, so the
+--- linker can turn a missing import into a positioned compile error.
 ---@param path string
----@return string source
-local function read_file(path)
+---@return string | nil source
+---@return string | nil err
+local function read_source(path)
     local fh, err = io.open(path, "r")
-    if not fh then
-        eprint(PROG .. ": cannot open '" .. path .. "': " .. (err or "unknown error"))
-        os.exit(1)
-    end
+    if not fh then return nil, err or "file not found" end
     local contents = fh:read("*a")
     fh:close()
     return contents
@@ -84,6 +82,7 @@ local function write_file(path, contents)
     if not fh then
         eprint(PROG .. ": cannot write '" .. path .. "': " .. (err or "unknown error"))
         os.exit(1)
+        return
     end
     fh:write(contents)
     fh:close()
@@ -98,25 +97,32 @@ local function default_output(path)
     return stem .. ".lua"
 end
 
---- Derive the class name from a source path: the basename without its extension
---- (a file *is* a class, named after the file). e.g. `src/Main.laz` -> `Main`.
----@param path string
----@return string
-local function class_name_from_path(path)
-    local base = path:match("([^/\\]+)$") or path
-    return (base:gsub("%.[^.]*$", ""))
+--- Forward declaration: `run_stage` is defined below but captured by the
+--- closures in `link`/`analyze_modules` above it.
+---@type fun(fn: fun(): any...): any...
+local run_stage
+
+--- Resolve the program reachable from `entry`: lex + parse every file, follow
+--- imports, and return the modules **dependencies-first** plus the entry class.
+--- Any compile error is an `Error` object; `run_stage` renders it.
+---@param entry string
+---@return { path: string, class_name: string, source: string, ast: AST, imports: string[] }[] modules
+---@return string entry_class
+local function link(entry)
+    local modules, entry_class = run_stage(function() return Linker.link(entry, read_source) end)
+    return modules, entry_class
 end
 
---- Run the front end (lexer → parser → schematic) and the optimizer, returning
---- the AST ready for codegen. Any compile error is an `Error` object thrown by
---- a stage; `run_stage` is responsible for catching it.
----@param source      string
----@param class_name? string
----@return AST
-local function front_end(source, class_name)
-    local ast = Parser.new(Lexer.new(source):scan(), source):parse()
-    Schematic.analyze(ast, source, class_name)
-    return Optimizer.optimize(ast)
+--- Run schematic analysis + the optimizer over each linked module in place.
+--- Imported class names are passed so cross-class references resolve.
+---@param modules { class_name: string, source: string, ast: AST, imports: string[] }[]
+local function analyze_modules(modules)
+    run_stage(function()
+        for _, m in ipairs(modules) do
+            Schematic.analyze(m.ast, m.source, m.class_name, m.imports)
+            Optimizer.optimize(m.ast)
+        end
+    end)
 end
 
 --- Render any value as an indented tree (used by the `ast` command).
@@ -127,7 +133,7 @@ local function dump(val, indent)
     indent = indent or 0
     local pad = string.rep("  ", indent)
 
-    if type(val) ~= "table" then return tostring(val) end
+    if type(val) ~= "table" then return tostring(val) or "" end
 
     local lines = { "{" }
     for k, v in pairs(val) do
@@ -142,14 +148,18 @@ end
 --- into a clean diagnostic + non-zero exit. `Error` objects render their own
 --- coloured box via `tostring`; anything else is an internal compiler bug.
 ---@generic T
----@param fn fun(): T
----@return T
-local function run_stage(fn)
-    local ok, result = pcall(fn)
-    if ok then return result end
-    -- `result` is the thrown value: an Error object (table with __tostring) or
+---@param fn fun(): T...
+---@return T...
+function run_stage(fn)
+    -- Capture *all* return values: some stages (the linker) return more than one.
+    ---@type any[]
+    local results = { pcall(fn) }
+    -- selene: allow(incorrect_standard_library_use)
+    if results[1] then return (table.unpack or unpack)(results, 2, #results) end
+    -- `results[2]` is the thrown value: an Error object (table with __tostring) or
     -- a raw string for an unexpected internal failure.
-    eprint(tostring(result))
+    local thrown = results[2]
+    eprint(tostring(thrown) or "")
     os.exit(1)
 end
 
@@ -181,11 +191,12 @@ function commands.build(args)
     if not input then
         eprint(PROG .. ": build requires an input file")
         os.exit(1)
+        return
     end
 
-    local source = read_file(input)
-    local class_name = class_name_from_path(input)
-    local lua = run_stage(function() return Codegen.new(front_end(source, class_name), class_name):generate() end)
+    local modules, entry_class = link(input)
+    analyze_modules(modules)
+    local lua = run_stage(function() return Codegen.bundle(modules, entry_class) end)
 
     if output == "-" then
         print(lua)
@@ -203,10 +214,11 @@ function commands.check(args)
     if not input then
         eprint(PROG .. ": check requires an input file")
         os.exit(1)
+        return
     end
 
-    local source = read_file(input)
-    run_stage(function() return front_end(source, class_name_from_path(input)) end)
+    local modules = link(input)
+    analyze_modules(modules)
     eprint(PROG .. ": " .. input .. " — no errors")
 end
 
@@ -217,11 +229,15 @@ function commands.ast(args)
     if not input then
         eprint(PROG .. ": ast requires an input file")
         os.exit(1)
+        return
     end
 
-    local source = read_file(input)
-    local ast = run_stage(function() return front_end(source, class_name_from_path(input)) end)
-    print(dump(ast))
+    local modules, entry_class = link(input)
+    analyze_modules(modules)
+    -- Dump the entry class's optimised AST (it is the last, dependencies-first).
+    for _, m in ipairs(modules) do
+        if m.class_name == entry_class then print(dump(m.ast)) end
+    end
 end
 
 function commands.help() usage() end
@@ -242,6 +258,7 @@ local function main()
         eprint(PROG .. ": unknown command '" .. command .. "'")
         eprint("Run '" .. PROG .. " help' for usage.")
         os.exit(1)
+        return
     end
 
     -- Pass the remaining arguments (everything after the command word).

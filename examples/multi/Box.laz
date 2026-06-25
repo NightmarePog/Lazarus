@@ -1,0 +1,13 @@
+private value
+
+static unit() {
+    return Box(1)
+}
+
+read() {
+    return .value
+}
+
+constructor(v) {
+    .value = v
+}

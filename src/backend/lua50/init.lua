@@ -28,20 +28,28 @@ local HEADER = table.concat({
 }, "\n")
 
 ---@class CodegenOptions
----@field header? boolean  Emit the banner comment (default: true)
----@field entry?  boolean  Append the `return C.new(...)` entry footer (default: true)
+---@field header?  boolean  Emit the banner comment (default: true)
+---@field entry?   boolean  Append the `return C.new(...)` entry footer (default: true)
+---@field runtime? boolean  Emit the `__lz_*` runtime prelude when used (default: true). The bundler disables this and emits the prelude once for the whole bundle.
 
 ---@class Codegen
----@field ast        AST
----@field class_name string
+---@field ast           AST
+---@field class_name    string
+---@field known_classes table<string, boolean>
 local Codegen = {}
 Codegen.__index = Codegen
 
 --- @param ast         AST
 --- @param class_name? string  The class name (defaults to "Main"); the CLI derives it from the filename.
+--- @param opts?       { known_classes?: table<string, boolean> }  Imported class names, so construction `Other(...)` lowers to `Other.new(...)`.
 ---@return Codegen
-function Codegen.new(ast, class_name)
-    return setmetatable({ ast = ast, class_name = class_name or "Main" }, Codegen)
+function Codegen.new(ast, class_name, opts)
+    return setmetatable({
+        ast = ast,
+        class_name = class_name or "Main",
+        known_classes = (opts and opts.known_classes) or {},
+        extern_namespaces = (opts and opts.extern_namespaces) or {},
+    }, Codegen)
 end
 
 --- True when the class declares a constructor — the program entry point.
@@ -65,6 +73,7 @@ function Codegen:generate(opts)
     opts = opts or {}
     local with_header = opts.header ~= false
     local with_entry = opts.entry ~= false
+    local with_runtime = opts.runtime ~= false
     local class_name = self.class_name
 
     -- Classify the top-level declarations:
@@ -91,19 +100,25 @@ function Codegen:generate(opts)
             end
         end
     end
-    Context.reset(class_name, members, instance_methods, properties)
+    Context.reset(
+        class_name,
+        members,
+        instance_methods,
+        properties,
+        self.known_classes,
+        self.extern_namespaces
+    )
 
     -- Instance-property declarations emit nothing here; their defaults are written
     -- into `C.new` (see `emit_member` for `ConstructorDecl`).
     local member_lines = {}
     for _, stmt_node in ipairs(self.ast.body) do
-        if
-            not (
-                stmt_node.type == "VariableDecl"
-                and stmt_node.visibility
-                and not stmt_node.is_static
-            )
-        then
+        -- `extern` declarations emit no code (they are collected by the bundler);
+        -- instance-property declarations emit their default into `C.new`, not here.
+        local is_instance_property = stmt_node.type == "VariableDecl"
+            and stmt_node.visibility
+            and not stmt_node.is_static
+        if stmt_node.type ~= "ExternDecl" and not is_instance_property then
             member_lines[#member_lines + 1] = emit_member(stmt_node)
         end
     end
@@ -118,7 +133,7 @@ function Codegen:generate(opts)
     -- The collection/Option runtime prelude is emitted (before the class) only
     -- when the program actually used a list, map or Option construct — set on the
     -- context during member emission above.
-    if Context.uses_collections then sections[#sections + 1] = Runtime end
+    if with_runtime and Context.uses_collections then sections[#sections + 1] = Runtime end
     sections[#sections + 1] = class_block
     if with_entry then
         -- The entry of a program is its constructor: the chunk constructs the
@@ -132,6 +147,90 @@ function Codegen:generate(opts)
         end
         sections[#sections + 1] = "return " .. class_name .. ".new(...)"
     end
+
+    return table.concat(sections, "\n\n")
+end
+
+--- Bundle several classes into one self-contained Lua chunk.
+---
+--- The linker hands us the modules **dependencies-first** (so a class is emitted
+--- before anything that uses it). Each is generated as a bare class block (no
+--- header, no entry footer); the bundle then prepends the banner and — only if
+--- *any* class used a collection/Option construct — the `__lz_*` runtime once,
+--- and appends a single entry footer `return <Entry>.new(...)`. A single-file
+--- program is just the one-module case, so this is the sole build path.
+---@param modules { ast: AST, class_name: string, imports: string[] }[]
+---@param entry_class string  Class name of the entry module (must define a constructor)
+---@param opts? { header?: boolean }
+---@return string
+function Codegen.bundle(modules, entry_class, opts)
+    opts = opts or {}
+    local with_header = opts.header ~= false
+
+    -- First pass: collect extern namespaces. An `extern` file (its body is only
+    -- `extern` declarations) defines a namespace `<class_name> -> { member = target }`
+    -- and emits no class of its own.
+    ---@type table<string, table<string, string>>
+    local extern_namespaces = {}
+    ---@type table<table, boolean>  module -> is an extern namespace file
+    local is_extern_module = {}
+    for _, module in ipairs(modules) do
+        local binds = {}
+        local has_extern, has_other = false, false
+        for _, node in ipairs(module.ast.body) do
+            if node.type == "ExternDecl" then
+                has_extern = true
+                binds[node.name] = node.target
+            else
+                has_other = true
+            end
+        end
+        if has_extern and not has_other then
+            extern_namespaces[module.class_name] = binds
+            is_extern_module[module] = true
+        end
+    end
+
+    local blocks = {}
+    local uses_collections = false
+    local entry_has_constructor = false
+
+    for _, module in ipairs(modules) do
+        -- Extern namespace files emit no class block; their bindings were collected
+        -- above and are threaded into every other module's codegen.
+        if not is_extern_module[module] then
+            local known = {}
+            for _, name in ipairs(module.imports or {}) do
+                known[name] = true
+            end
+
+            local cg = Codegen.new(
+                module.ast,
+                module.class_name,
+                { known_classes = known, extern_namespaces = extern_namespaces }
+            )
+            blocks[#blocks + 1] = cg:generate({ header = false, entry = false, runtime = false })
+            -- `generate` reset the context, then set this flag during emission; read
+            -- it now, before the next module's `generate` resets it again.
+            if Context.uses_collections then uses_collections = true end
+            if module.class_name == entry_class then entry_has_constructor = cg:_has_constructor() end
+        end
+    end
+
+    if not entry_has_constructor then
+        Error.throw(
+            Error.Type.MISSING_CONSTRUCTOR,
+            "The entry class '" .. entry_class .. "' must define a constructor"
+        )
+    end
+
+    local sections = {}
+    if with_header then sections[#sections + 1] = HEADER end
+    if uses_collections then sections[#sections + 1] = Runtime end
+    for _, block in ipairs(blocks) do
+        sections[#sections + 1] = block
+    end
+    sections[#sections + 1] = "return " .. entry_class .. ".new(...)"
 
     return table.concat(sections, "\n\n")
 end

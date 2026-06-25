@@ -1,0 +1,133 @@
+// ExprChecker — semantic validation of expressions against the visible scope.
+//
+// Recurses through every sub-expression. The two non-structural rules: a bare
+// identifier must be declared, and a bare-name call must not target a value
+// provably not a function. The instance context (`in_instance` plus the class's
+// declared `properties` / `methods`) is held here so a `.field` / `self` access
+// can be checked for a receiver; the statement checker toggles `in_instance` as
+// it enters and leaves instance method / constructor bodies.
+
+import std.Str
+import Error
+import frontend.schematic.Booleanity
+
+private source
+private properties
+private methods
+private in_instance
+
+constructor(source, properties, methods) {
+    .source = source
+    .properties = properties
+    .methods = methods
+    .in_instance = false
+}
+
+public set_instance(flag) {
+    .in_instance = flag
+}
+
+public instance_flag() {
+    return .in_instance
+}
+
+// Validate an expression and, recursively, its sub-expressions. Kinds with
+// nothing to check (literals) fall through.
+public check(node, scope) {
+    mut k = node.kind
+    if k == "IdentifierExpr" {
+        .check_identifier(node, scope)
+    } else if k == "BinaryExpr" {
+        .check(node.child("left"), scope)
+        .check(node.child("right"), scope)
+    } else if k == "UnaryExpr" {
+        .check(node.child("operand"), scope)
+    } else if k == "CallExpr" {
+        .check_call(node, scope)
+    } else if k == "MemberExpr" {
+        .check_member(node, scope)
+    } else if k == "SelfExpr" {
+        .check_self(node)
+    } else if k == "ListExpr" {
+        .check_list(node, scope)
+    } else if k == "MapExpr" {
+        .check_map(node, scope)
+    } else if k == "IndexExpr" {
+        .check(node.child("object"), scope)
+        .check(node.child("index"), scope)
+    }
+}
+
+// Validate an expression used as a condition: it must not be provably non-boolean
+// (the language has no truthiness).
+public check_condition(node, scope) {
+    .check(node, scope)
+    mut reason = Booleanity.non_bool_reason(node)
+    if reason != "" {
+        .fail(node, "Condition must be a boolean, but this is " ++ reason ++ "; the language has no truthiness, so use an explicit comparison or a boolean method (e.g. '.is_some()')", 1)
+    }
+}
+
+private check_identifier(node, scope) {
+    mut name = node.child("name")
+    if scope.lookup(name).is_none() {
+        .fail(node, "Undeclared identifier '" ++ name ++ "'", Str.len(name).unwrap_or(1))
+    }
+}
+
+private check_call(node, scope) {
+    mut callee = node.child("callee")
+    .check(callee, scope)
+    if callee.kind == "IdentifierExpr" {
+        mut name = callee.child("name")
+        mut entry = scope.lookup(name)
+        if entry.is_some() and entry.unwrap().noncallable {
+            .fail(callee, "'" ++ name ++ "' is not callable; it holds a value, not a function", Str.len(name).unwrap_or(1))
+        }
+    }
+    for arg in node.child("args") {
+        .check(arg, scope)
+    }
+}
+
+// A leading-dot access `.field` parses to a member over `self`. It is valid only
+// where a receiver exists and must name a declared instance property or method.
+// Any other object's field is a dynamic key, so only the object is validated.
+private check_member(node, scope) {
+    mut object = node.child("object")
+    if object.kind == "SelfExpr" {
+        mut field = node.child("field")
+        if not .in_instance {
+            .fail(node, "'." ++ field ++ "' refers to an instance field, but there is no receiver here; it is valid only inside an instance method or constructor", Str.len(field).unwrap_or(1) + 1)
+        }
+        mut known = .properties.has(field) or .methods.has(field)
+        if not known {
+            .fail(node, "Unknown instance member '." ++ field ++ "'; declare it as a 'private'/'public' property or an instance method", Str.len(field).unwrap_or(1) + 1)
+        }
+    } else {
+        .check(object, scope)
+    }
+}
+
+private check_self(node) {
+    if not .in_instance {
+        .fail(node, "'self' has no receiver here; it is valid only inside an instance method or constructor", 4)
+    }
+}
+
+private check_list(node, scope) {
+    for element in node.child("elements") {
+        .check(element, scope)
+    }
+}
+
+private check_map(node, scope) {
+    for entry in node.child("entries") {
+        .check(entry.child("key"), scope)
+        .check(entry.child("value"), scope)
+    }
+}
+
+private fail(node, message, span) {
+    Error("SemanticError", message, node.line(), node.col(), .source, span).raise()
+}

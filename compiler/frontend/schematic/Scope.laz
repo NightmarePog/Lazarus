@@ -1,0 +1,51 @@
+// Scope — a lexical symbol table linked to its parent.
+//
+// A lookup walks the parent chain outward; a declaration stays in the scope it
+// is made (so `declared_here` answers the narrower "declared *here*?" used for
+// duplicate detection). Lazarus has no metatables, so the chain is followed
+// explicitly. The root scope has no real parent: it carries an `is_root` flag and
+// a placeholder parent, so a miss at the root returns a None without ever
+// dereferencing it — the Null Object idea applied to the chain's end.
+
+private names
+private parent
+private is_root
+
+constructor(parent, is_root) {
+    .names = [:]
+    .parent = parent
+    .is_root = is_root
+}
+
+// The root of a fresh chain. Its `parent` is never read (lookups stop at the
+// root), so a placeholder is passed.
+static root() {
+    return Scope(0, true)
+}
+
+// A child scope that inherits this scope's visible declarations.
+public child() {
+    return Scope(self, false)
+}
+
+// Bind `name` to `symbol` in this scope.
+public declare(name, symbol) {
+    .names[name] = symbol
+}
+
+// Whether `name` is declared in *this* scope (not a parent) — the duplicate guard.
+public declared_here(name) {
+    return .names.has(name)
+}
+
+// The symbol bound to `name`, searching outward, or a None when unbound.
+public lookup(name) {
+    mut here = .names.get(name)
+    if here.is_some() {
+        return here
+    }
+    if .is_root {
+        return here
+    }
+    return .parent.lookup(name)
+}
