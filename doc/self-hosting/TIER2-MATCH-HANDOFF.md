@@ -15,18 +15,19 @@ what is done, the rules you must follow, and what is left.
 1. **`src/` is FROZEN legacy.** Never edit it. `compiler/` (the `.laz`
    self-hosted compiler) is canonical. All language work goes in `compiler/`.
 
-2. **New syntax is grown with the bootstrap ladder, not by editing `src/`:**
-   - Implement the feature in `compiler/` using only **today's** syntax.
-   - Build `compiler/` once with the seed: `lua src/cli.lua build compiler/Main.laz -o /tmp/lazc.lua`.
-     The resulting `/tmp/lazc.lua` now *understands* the new feature.
-   - Only then may `compiler/`'s own source *use* the feature, compiled by that
-     new binary (not `src/`).
-   - **Consequence to respect:** the instant any `compiler/*.laz` source *uses*
-     new syntax, `src/` can no longer seed the build (it can't parse its own
-     input). At that point you MUST commit a prebuilt self-host binary
-     (`compiler.lua`) as the new seed and update the build process. **Do not
-     cross this line without the user's explicit go-ahead.** As of this handoff,
-     no `compiler/` source uses `match`, so `src/` still seeds.
+2. **The `src/` cord is CUT (done 2026-06-25). Build via `bin/`, never `src/`.**
+   - The committed prebuilt self-host binary is **`bin/lazarusc.lua`** (the
+     fixpoint binary). `src/` is frozen legacy and no longer in the build path.
+   - After ANY change to `compiler/*.laz`, run **`make selfhost`** (= `bin/build-compiler`):
+     it recompiles `compiler/` with the current `bin/` seed, verifies a
+     stage1==stage2 fixpoint, then installs the new `bin/lazarusc.lua`. Commit
+     the refreshed binary alongside the source.
+   - **`compiler/` source MAY now use `match`/`enum`** — `bin/lazarusc.lua`
+     understands them. (The bootstrap ladder is only needed for a *brand-new*
+     syntax: implement it in old syntax, `make selfhost` once so the binary
+     learns it, then start using it.)
+   - Compile a program: `make selfbuild FILE=x.laz` or `lua bin/lazarusc.lua
+     x.laz` (writes `./Main.lua`).
 
 3. **Always verify with the same four checks** (this is how Phase 1 was signed
    off):
@@ -175,25 +176,26 @@ Touch the same seven files as Phase 1, plus wherever top-level declarations are
 gathered (`Schematic` instance/property collection; `Codegen` member
 classification; `Bundler` if enums become their own emitted unit).
 
-### 2b. Migrate the `if k == "..."` ladders to `match` (DEFER — cuts the cord)
+### 2b. Migrate the `if k == "..."` ladders to `match` (the visible comment-kill)
 
-This is the visible comment removal: rewrite the dispatch ladders in
-`backend/ExprEmitter.laz`, `backend/StmtEmitter.laz`,
-`frontend/schematic/StmtChecker.laz` / `ExprChecker.laz`,
-`frontend/optimizer/StmtFolder.laz` / `ExprFolder.laz`, and ideally replace the
-stringly-typed `Node{kind, attrs}` with enum variants.
+This is the payoff: rewrite the dispatch ladders in `backend/ExprEmitter.laz`,
+`backend/StmtEmitter.laz`, `frontend/schematic/StmtChecker.laz` /
+`ExprChecker.laz`, `frontend/optimizer/StmtFolder.laz` / `ExprFolder.laz`, and
+ideally introduce a `NodeKind` enum and `match node.kind { LiteralExpr => ... }`
+in place of the stringly-typed `if k == "..."` chains — deleting the "everything
+else falls through" comments in favour of compiler-checked exhaustiveness.
 
-**STOP before doing this without explicit user sign-off:** the moment these files
-use `match`, `lua src/cli.lua build compiler/Main.laz` stops working (frozen
-`src/` can't parse `match`). You must:
-1. Commit a prebuilt self-host binary (e.g. `bin/compiler.lua`) built by the
-   last `src/`-seeded, match-aware compiler.
-2. Update `makefile` / `bin/lazarus` so the build seeds from that binary, not
-   `src/`.
-3. Re-establish the fixpoint from the new seed.
+**The bootstrap groundwork is already done** (`bin/lazarusc.lua` + `make
+selfhost`), so this is now a normal change, not a milestone: edit the source, run
+`make selfhost` to refresh + fixpoint-check the binary, run `busted`, commit the
+source and the refreshed `bin/lazarusc.lua` together.
 
-This is a deliberate, one-way self-hosting milestone — it's the user's call when
-to take it.
+Recommended approach: migrate ONE ladder at a time (e.g. `StmtEmitter.emit_stmt`
+first), `make selfhost` + `busted` after each, so a regression is easy to
+localise. Note `match node.kind` needs `NodeKind` declared as an enum and
+imported wherever it's matched; the cross-module enum registry
+(`Main.collect_enums`) already makes an imported enum's variants visible to the
+exhaustiveness check.
 
 ---
 
