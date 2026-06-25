@@ -108,6 +108,9 @@ private parse_statement() {
             .cursor.advance()
             return .parse_match(tok)
         }
+        if .cursor.peek_next().kind == "COLON" {
+            return .parse_typed_local(tok)
+        }
         if .looks_like_decl() {
             return .parse_method("", false)
         }
@@ -156,6 +159,7 @@ private parse_import(tok) {
 // or an optional comma. Lowers (in the backend) to `Name.A = 'A'`, ….
 private parse_enum(tok) {
     mut name = .cursor.consume("IDENTIFIER", "Expected an enum name after 'enum'")
+    mut type_params = .parse_type_params()
     mut open = .cursor.consume("BODY_START", "Expected '{' to open enum body")
     mut variants = []
     loop {
@@ -170,13 +174,13 @@ private parse_enum(tok) {
         .cursor.match("COMMA")
     }
     .cursor.consume("BODY_END", "Expected '}' to close enum body")
-    return Ast.enum_decl(name.value, variants, tok.line, tok.column)
+    return Ast.enum_decl(name.value, variants, tok.line, tok.column, type_params)
 }
 
 private parse_extern(tok) {
     mut name = .cursor.consume("IDENTIFIER", "Expected a name after 'extern'")
     .cursor.consume("LEFT_BRACKET", "Expected '(' after extern name")
-    mut params = .parse_params()
+    mut params = .parse_params([])
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after extern parameters")
     .cursor.consume("ASSIGN", "Expected '=' after extern parameters")
     mut target = .cursor.consume("STRING", "Expected a quoted Lua target after '='")
@@ -215,6 +219,9 @@ private parse_binding(visibility, mutable, name_err, is_static) {
     mut name = .cursor.consume("IDENTIFIER", name_err)
     mut is_property = visibility != "" and not is_static
     mut attrs = ["name": name.value, "visibility": visibility, "mutable": mutable, "is_static": is_static, "line": name.line, "col": name.column]
+    if .cursor.match("COLON") {
+        attrs["type"] = .parse_type()
+    }
     if .cursor.match("ASSIGN") {
         attrs["value"] = .exprs.expression()
     } else if not mutable and not is_property {
@@ -249,27 +256,33 @@ private local_binding(name, value) {
 private parse_method(visibility, is_static) {
     mut name = .cursor.consume("IDENTIFIER", "Expected method name")
     .cursor.consume("LEFT_BRACKET", "Expected '(' after method name")
-    mut params = .parse_params()
+    mut param_types = []
+    mut params = .parse_params(param_types)
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after parameters")
+    mut return_type = .parse_return_type()
     mut body = .parse_block("method body")
-    return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column)
+    return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column, param_types, return_type)
 }
 
 private parse_constructor(tok) {
     .cursor.consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
-    mut params = .parse_params()
+    mut param_types = []
+    mut params = .parse_params(param_types)
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after parameters")
     mut body = .parse_block("constructor body")
-    return Ast.constructor_decl(params, body, tok.line, tok.column)
+    return Ast.constructor_decl(params, body, tok.line, tok.column, param_types)
 }
 
-// A comma-separated parameter-name list, the opening `(` already consumed.
-private parse_params() {
+// A comma-separated parameter list, the opening `(` already consumed. Names are
+// returned; each name's optional `: Type` (or `dynamic` when absent) is pushed
+// onto `out_types`, kept aligned with the names.
+private parse_params(out_types) {
     mut params = []
     if not .cursor.check("RIGHT_BRACKET") {
         loop {
             mut p = .cursor.consume("IDENTIFIER", "Expected parameter name")
             params.push(p.value)
+            out_types.push(.param_type(p))
             if not .cursor.match("COMMA") {
                 break
             }
@@ -278,9 +291,89 @@ private parse_params() {
     return params
 }
 
+private param_type(name_tok) {
+    if .cursor.match("COLON") {
+        return .parse_type()
+    }
+    return Ast.type_name("dynamic", [], name_tok.line, name_tok.column)
+}
+
+// The optional `: Type` return annotation; an unannotated function is `dynamic`
+// for now (Phase 1 parses and ignores types; mandatory typing comes later).
+private parse_return_type() {
+    if .cursor.match("COLON") {
+        return .parse_type()
+    }
+    return Ast.type_name("dynamic", [], 0, 0)
+}
+
+// A typed immutable local `<name>: <Type> = <value>`.
+private parse_typed_local(tok) {
+    mut name = .cursor.consume("IDENTIFIER", "Expected variable name")
+    .cursor.consume("COLON", "Expected ':' before the type")
+    mut ty = .parse_type()
+    .cursor.consume("ASSIGN", "Expected '=' after the type annotation")
+    mut value = .exprs.expression()
+    return Ast.node("VariableDecl", ["name": name.value, "value": value, "type": ty, "visibility": "", "mutable": false, "is_static": false, "line": name.line, "col": name.column])
+}
+
+// Optional generic parameters `<T, U>` after an enum (or class) name.
+private parse_type_params() {
+    mut params = []
+    if .cursor.match("LESS") {
+        loop {
+            mut t = .cursor.consume("IDENTIFIER", "Expected a type parameter name")
+            params.push(t.value)
+            if not .cursor.match("COMMA") {
+                break
+            }
+        }
+        .cursor.consume("GREATER", "Expected '>' to close type parameters")
+    }
+    return params
+}
+
+// A type expression: a named/generic type `Name<...>`, or a function type
+// `(T, ...) -> R`. Used by parameter, return, field and local annotations.
+private parse_type() {
+    if .cursor.check("LEFT_BRACKET") {
+        return .parse_type_fn()
+    }
+    mut name = .cursor.consume("IDENTIFIER", "Expected a type name")
+    mut args = []
+    if .cursor.match("LESS") {
+        loop {
+            args.push(.parse_type())
+            if not .cursor.match("COMMA") {
+                break
+            }
+        }
+        .cursor.consume("GREATER", "Expected '>' to close type arguments")
+    }
+    return Ast.type_name(name.value, args, name.line, name.column)
+}
+
+private parse_type_fn() {
+    mut open = .cursor.consume("LEFT_BRACKET", "Expected '(' to open a function type")
+    mut params = []
+    if not .cursor.check("RIGHT_BRACKET") {
+        loop {
+            params.push(.parse_type())
+            if not .cursor.match("COMMA") {
+                break
+            }
+        }
+    }
+    .cursor.consume("RIGHT_BRACKET", "Expected ')' in the function type")
+    .cursor.consume("ARROW", "Expected '->' in the function type")
+    mut result = .parse_type()
+    return Ast.type_fn(params, result, open.line, open.column)
+}
+
 // Lookahead: does the current `IDENTIFIER` begin a declaration `name(params) {`?
-// True when a `(` follows, its matching `)` is found, and a `{` comes next —
-// which separates a method declaration from a call statement `name(args)`.
+// True when a `(` follows, its matching `)` is found, and either a `{` or a `:`
+// (a return-type annotation) comes next — which separates a method declaration
+// from a call statement `name(args)`.
 private looks_like_decl() {
     if .cursor.peek_next().kind != "LEFT_BRACKET" {
         return false
@@ -296,7 +389,8 @@ private looks_like_decl() {
         } else if kind == "RIGHT_BRACKET" {
             depth = depth - 1
             if depth == 0 {
-                return .cursor.token_at(i + 1).kind == "BODY_START"
+                mut after = .cursor.token_at(i + 1).kind
+                return after == "BODY_START" or after == "COLON"
             }
         }
         i = i + 1

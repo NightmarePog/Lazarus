@@ -268,7 +268,7 @@ end
 local Keywords = {}
 
 Keywords.words = __lz_map({["import"] = "IMPORT", ["extern"] = "EXTERN", ["enum"] = "ENUM", ["private"] = "PRIVATE", ["public"] = "PUBLIC", ["mut"] = "MUTABLE", ["static"] = "STATIC", ["self"] = "SELF", ["constructor"] = "CONSTRUCTOR", ["return"] = "RETURN", ["if"] = "IF", ["else"] = "ELSE", ["while"] = "WHILE", ["loop"] = "LOOP", ["for"] = "FOR", ["in"] = "IN", ["break"] = "BREAK", ["true"] = "TRUE", ["false"] = "FALSE", ["and"] = "AND", ["or"] = "OR", ["not"] = "NOT"})
-Keywords.ops2 = __lz_map({["++"] = "CONCAT", ["=>"] = "FAT_ARROW", ["=="] = "EQ", ["!="] = "NEQ", ["<="] = "LESS_EQUAL", [">="] = "GREATER_EQUAL", ["+="] = "PLUS_ASSIGN", ["-="] = "MINUS_ASSIGN", ["*="] = "STAR_ASSIGN", ["/="] = "SLASH_ASSIGN"})
+Keywords.ops2 = __lz_map({["++"] = "CONCAT", ["=>"] = "FAT_ARROW", ["->"] = "ARROW", ["=="] = "EQ", ["!="] = "NEQ", ["<="] = "LESS_EQUAL", [">="] = "GREATER_EQUAL", ["+="] = "PLUS_ASSIGN", ["-="] = "MINUS_ASSIGN", ["*="] = "STAR_ASSIGN", ["/="] = "SLASH_ASSIGN"})
 Keywords.ops1 = __lz_map({["="] = "ASSIGN", ["+"] = "PLUS", ["-"] = "MINUS", ["*"] = "MULTIPLY", ["/"] = "DIVIDE", ["%"] = "MODULO", ["^"] = "POWER", ["<"] = "LESS", [">"] = "GREATER", ["("] = "LEFT_BRACKET", [")"] = "RIGHT_BRACKET", ["{"] = "BODY_START", ["}"] = "BODY_END", [","] = "COMMA", [":"] = "COLON", ["."] = "DOT", [";"] = "SEMICOLON", ["["] = "LSQUARE", ["]"] = "RSQUARE"})
 function Keywords.word_kind(word)
     return __lz_unwrap_or(__lz_get(Keywords.words, word), "IDENTIFIER")
@@ -625,11 +625,11 @@ end
 function Ast.extern_decl(name, params, target, line, col)
     return Node.new("ExternDecl", __lz_map({["name"] = name, ["params"] = params, ["target"] = target, ["line"] = line, ["col"] = col}))
 end
-function Ast.function_decl(name, params, body, is_static, visibility, line, col)
-    return Node.new("FunctionDecl", __lz_map({["name"] = name, ["params"] = params, ["body"] = body, ["is_static"] = is_static, ["visibility"] = visibility, ["line"] = line, ["col"] = col}))
+function Ast.function_decl(name, params, body, is_static, visibility, line, col, param_types, return_type)
+    return Node.new("FunctionDecl", __lz_map({["name"] = name, ["params"] = params, ["body"] = body, ["is_static"] = is_static, ["visibility"] = visibility, ["line"] = line, ["col"] = col, ["param_types"] = param_types, ["return_type"] = return_type}))
 end
-function Ast.constructor_decl(params, body, line, col)
-    return Node.new("ConstructorDecl", __lz_map({["params"] = params, ["body"] = body, ["line"] = line, ["col"] = col}))
+function Ast.constructor_decl(params, body, line, col, param_types)
+    return Node.new("ConstructorDecl", __lz_map({["params"] = params, ["body"] = body, ["line"] = line, ["col"] = col, ["param_types"] = param_types}))
 end
 function Ast.expression_stmt(expression, line, col)
     return Node.new("ExpressionStmt", __lz_map({["expression"] = expression, ["line"] = line, ["col"] = col}))
@@ -655,8 +655,14 @@ end
 function Ast.if_clause(condition, body)
     return Node.new("IfClause", __lz_map({["condition"] = condition, ["body"] = body}))
 end
-function Ast.enum_decl(name, variants, line, col)
-    return Node.new("EnumDecl", __lz_map({["name"] = name, ["variants"] = variants, ["line"] = line, ["col"] = col}))
+function Ast.enum_decl(name, variants, line, col, type_params)
+    return Node.new("EnumDecl", __lz_map({["name"] = name, ["variants"] = variants, ["line"] = line, ["col"] = col, ["type_params"] = type_params}))
+end
+function Ast.type_name(name, args, line, col)
+    return Node.new("TypeName", __lz_map({["name"] = name, ["args"] = args, ["line"] = line, ["col"] = col}))
+end
+function Ast.type_fn(params, result, line, col)
+    return Node.new("TypeFn", __lz_map({["params"] = params, ["result"] = result, ["line"] = line, ["col"] = col}))
 end
 function Ast.match_stmt(scrutinee, arms, line, col)
     return Node.new("MatchStmt", __lz_map({["scrutinee"] = scrutinee, ["arms"] = arms, ["line"] = line, ["col"] = col}))
@@ -914,6 +920,12 @@ function StmtParser.new(cursor, exprs)
     self.parse_method = StmtParser.parse_method
     self.parse_constructor = StmtParser.parse_constructor
     self.parse_params = StmtParser.parse_params
+    self.param_type = StmtParser.param_type
+    self.parse_return_type = StmtParser.parse_return_type
+    self.parse_typed_local = StmtParser.parse_typed_local
+    self.parse_type_params = StmtParser.parse_type_params
+    self.parse_type = StmtParser.parse_type
+    self.parse_type_fn = StmtParser.parse_type_fn
     self.looks_like_decl = StmtParser.looks_like_decl
     self.parse_return = StmtParser.parse_return
     self.parse_if = StmtParser.parse_if
@@ -1009,6 +1021,9 @@ function StmtParser.parse_statement(self)
             self.cursor:advance()
             return StmtParser.parse_match(self, tok)
         end
+        if self.cursor:peek_next().kind == "COLON" then
+            return StmtParser.parse_typed_local(self, tok)
+        end
         if StmtParser.looks_like_decl(self) then
             return StmtParser.parse_method(self, "", false)
         end
@@ -1050,6 +1065,7 @@ function StmtParser.parse_import(self, tok)
 end
 function StmtParser.parse_enum(self, tok)
     local name = self.cursor:consume("IDENTIFIER", "Expected an enum name after 'enum'")
+    local type_params = StmtParser.parse_type_params(self)
     local open = self.cursor:consume("BODY_START", "Expected '{' to open enum body")
     local variants = __lz_list()
     while true do
@@ -1064,12 +1080,12 @@ function StmtParser.parse_enum(self, tok)
         self.cursor:match("COMMA")
     end
     self.cursor:consume("BODY_END", "Expected '}' to close enum body")
-    return Ast.enum_decl(name.value, variants, tok.line, tok.column)
+    return Ast.enum_decl(name.value, variants, tok.line, tok.column, type_params)
 end
 function StmtParser.parse_extern(self, tok)
     local name = self.cursor:consume("IDENTIFIER", "Expected a name after 'extern'")
     self.cursor:consume("LEFT_BRACKET", "Expected '(' after extern name")
-    local params = StmtParser.parse_params(self)
+    local params = StmtParser.parse_params(self, __lz_list())
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after extern parameters")
     self.cursor:consume("ASSIGN", "Expected '=' after extern parameters")
     local target = self.cursor:consume("STRING", "Expected a quoted Lua target after '='")
@@ -1100,6 +1116,9 @@ function StmtParser.parse_binding(self, visibility, mutable, name_err, is_static
     local name = self.cursor:consume("IDENTIFIER", name_err)
     local is_property = (visibility ~= "") and (not is_static)
     local attrs = __lz_map({["name"] = name.value, ["visibility"] = visibility, ["mutable"] = mutable, ["is_static"] = is_static, ["line"] = name.line, ["col"] = name.column})
+    if self.cursor:match("COLON") then
+        __lz_idx_set(attrs, "type", StmtParser.parse_type(self))
+    end
     if self.cursor:match("ASSIGN") then
         __lz_idx_set(attrs, "value", self.exprs:expression())
     elseif (not mutable) and (not is_property) then
@@ -1128,30 +1147,101 @@ end
 function StmtParser.parse_method(self, visibility, is_static)
     local name = self.cursor:consume("IDENTIFIER", "Expected method name")
     self.cursor:consume("LEFT_BRACKET", "Expected '(' after method name")
-    local params = StmtParser.parse_params(self)
+    local param_types = __lz_list()
+    local params = StmtParser.parse_params(self, param_types)
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after parameters")
+    local return_type = StmtParser.parse_return_type(self)
     local body = StmtParser.parse_block(self, "method body")
-    return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column)
+    return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column, param_types, return_type)
 end
 function StmtParser.parse_constructor(self, tok)
     self.cursor:consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
-    local params = StmtParser.parse_params(self)
+    local param_types = __lz_list()
+    local params = StmtParser.parse_params(self, param_types)
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after parameters")
     local body = StmtParser.parse_block(self, "constructor body")
-    return Ast.constructor_decl(params, body, tok.line, tok.column)
+    return Ast.constructor_decl(params, body, tok.line, tok.column, param_types)
 end
-function StmtParser.parse_params(self)
+function StmtParser.parse_params(self, out_types)
     local params = __lz_list()
     if not self.cursor:check("RIGHT_BRACKET") then
         while true do
             local p = self.cursor:consume("IDENTIFIER", "Expected parameter name")
             __lz_push(params, p.value)
+            __lz_push(out_types, StmtParser.param_type(self, p))
             if not self.cursor:match("COMMA") then
                 break
             end
         end
     end
     return params
+end
+function StmtParser.param_type(self, name_tok)
+    if self.cursor:match("COLON") then
+        return StmtParser.parse_type(self)
+    end
+    return Ast.type_name("dynamic", __lz_list(), name_tok.line, name_tok.column)
+end
+function StmtParser.parse_return_type(self)
+    if self.cursor:match("COLON") then
+        return StmtParser.parse_type(self)
+    end
+    return Ast.type_name("dynamic", __lz_list(), 0, 0)
+end
+function StmtParser.parse_typed_local(self, tok)
+    local name = self.cursor:consume("IDENTIFIER", "Expected variable name")
+    self.cursor:consume("COLON", "Expected ':' before the type")
+    local ty = StmtParser.parse_type(self)
+    self.cursor:consume("ASSIGN", "Expected '=' after the type annotation")
+    local value = self.exprs:expression()
+    return Ast.node("VariableDecl", __lz_map({["name"] = name.value, ["value"] = value, ["type"] = ty, ["visibility"] = "", ["mutable"] = false, ["is_static"] = false, ["line"] = name.line, ["col"] = name.column}))
+end
+function StmtParser.parse_type_params(self)
+    local params = __lz_list()
+    if self.cursor:match("LESS") then
+        while true do
+            local t = self.cursor:consume("IDENTIFIER", "Expected a type parameter name")
+            __lz_push(params, t.value)
+            if not self.cursor:match("COMMA") then
+                break
+            end
+        end
+        self.cursor:consume("GREATER", "Expected '>' to close type parameters")
+    end
+    return params
+end
+function StmtParser.parse_type(self)
+    if self.cursor:check("LEFT_BRACKET") then
+        return StmtParser.parse_type_fn(self)
+    end
+    local name = self.cursor:consume("IDENTIFIER", "Expected a type name")
+    local args = __lz_list()
+    if self.cursor:match("LESS") then
+        while true do
+            __lz_push(args, StmtParser.parse_type(self))
+            if not self.cursor:match("COMMA") then
+                break
+            end
+        end
+        self.cursor:consume("GREATER", "Expected '>' to close type arguments")
+    end
+    return Ast.type_name(name.value, args, name.line, name.column)
+end
+function StmtParser.parse_type_fn(self)
+    local open = self.cursor:consume("LEFT_BRACKET", "Expected '(' to open a function type")
+    local params = __lz_list()
+    if not self.cursor:check("RIGHT_BRACKET") then
+        while true do
+            __lz_push(params, StmtParser.parse_type(self))
+            if not self.cursor:match("COMMA") then
+                break
+            end
+        end
+    end
+    self.cursor:consume("RIGHT_BRACKET", "Expected ')' in the function type")
+    self.cursor:consume("ARROW", "Expected '->' in the function type")
+    local result = StmtParser.parse_type(self)
+    return Ast.type_fn(params, result, open.line, open.column)
 end
 function StmtParser.looks_like_decl(self)
     if self.cursor:peek_next().kind ~= "LEFT_BRACKET" then
@@ -1168,7 +1258,8 @@ function StmtParser.looks_like_decl(self)
         elseif kind == "RIGHT_BRACKET" then
             depth = depth - 1
             if depth == 0 then
-                return self.cursor:token_at(i + 1).kind == "BODY_START"
+                local after = self.cursor:token_at(i + 1).kind
+                return (after == "BODY_START") or (after == "COLON")
             end
         end
         i = i + 1

@@ -29,6 +29,7 @@ private static words = [
 private static ops2 = [
     "++": "CONCAT",
     "=>": "FAT_ARROW",
+    "->": "ARROW",
     "==": "EQ",
     "!=": "NEQ",
     "<=": "LESS_EQUAL",

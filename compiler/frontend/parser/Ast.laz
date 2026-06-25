@@ -26,12 +26,15 @@ static extern_decl(name, params, target, line, col) {
     return Node("ExternDecl", ["name": name, "params": params, "target": target, "line": line, "col": col])
 }
 
-static function_decl(name, params, body, is_static, visibility, line, col) {
-    return Node("FunctionDecl", ["name": name, "params": params, "body": body, "is_static": is_static, "visibility": visibility, "line": line, "col": col])
+// `param_types` is a list of Type nodes aligned with `params`; `return_type` is
+// a Type node (both default to `dynamic` when unannotated). Phase 1 stores them;
+// the checker consumes them later.
+static function_decl(name, params, body, is_static, visibility, line, col, param_types, return_type) {
+    return Node("FunctionDecl", ["name": name, "params": params, "body": body, "is_static": is_static, "visibility": visibility, "line": line, "col": col, "param_types": param_types, "return_type": return_type])
 }
 
-static constructor_decl(params, body, line, col) {
-    return Node("ConstructorDecl", ["params": params, "body": body, "line": line, "col": col])
+static constructor_decl(params, body, line, col, param_types) {
+    return Node("ConstructorDecl", ["params": params, "body": body, "line": line, "col": col, "param_types": param_types])
 }
 
 static expression_stmt(expression, line, col) {
@@ -68,8 +71,21 @@ static if_clause(condition, body) {
 
 // A nullary enum `enum Name { A, B }`: `variants` is a list of variant-name
 // strings. Lowers to `Name.A = 'A'`, … ; a variant value is its own name string.
-static enum_decl(name, variants, line, col) {
-    return Node("EnumDecl", ["name": name, "variants": variants, "line": line, "col": col])
+// `type_params` holds any generic parameters (e.g. `enum Option<T>`).
+static enum_decl(name, variants, line, col, type_params) {
+    return Node("EnumDecl", ["name": name, "variants": variants, "line": line, "col": col, "type_params": type_params])
+}
+
+// A named (optionally generic) type: `int`, `dynamic`, `Result<int>`. `args` is
+// the list of type arguments (empty when not generic).
+static type_name(name, args, line, col) {
+    return Node("TypeName", ["name": name, "args": args, "line": line, "col": col])
+}
+
+// A function type `(P1, P2) -> R`: `params` are the parameter types, `result`
+// the return type.
+static type_fn(params, result, line, col) {
+    return Node("TypeFn", ["params": params, "result": result, "line": line, "col": col])
 }
 
 static match_stmt(scrutinee, arms, line, col) {
