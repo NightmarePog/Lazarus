@@ -17,12 +17,14 @@ private source
 private exprs
 private variant_owner
 private enums
+private variant_arity
 
-constructor(source, exprs, variant_owner, enums) {
+constructor(source, exprs, variant_owner, enums, variant_arity) {
     .source = source
     .exprs = exprs
     .variant_owner = variant_owner
     .enums = enums
+    .variant_arity = variant_arity
 }
 
 // Walk a block, marking each statement with whether it is the block's last (the
@@ -308,14 +310,16 @@ private check_match(stmt, scope, frame) {
     mut covered = [:]
     mut has_wildcard = false
     for arm in stmt.child("arms") {
+        mut arm_scope = scope.child()
         if arm.attr("is_wildcard").unwrap_or(false) {
             has_wildcard = true
         } else if arm.attr("is_variant").unwrap_or(false) {
             enum_name = .check_variant_arm(stmt, arm, enum_name, covered)
+            .declare_bindings(arm, arm_scope)
         } else {
             .exprs.check(arm.child("pattern"), scope)
         }
-        .check_block(arm.child("body"), scope.child(), frame)
+        .check_block(arm.child("body"), arm_scope, frame)
     }
     if enum_name != "" and not has_wildcard {
         .check_exhaustive(stmt, enum_name, covered)
@@ -336,8 +340,22 @@ private check_variant_arm(stmt, arm, enum_name, covered) {
     if covered.has(v) {
         .fail(stmt, "Duplicate match arm for variant '" ++ v ++ "'", Str.len(v).unwrap_or(1))
     }
+    mut arity = .variant_arity.get(v).unwrap_or(0)
+    mut bound = arm.child("bindings").len()
+    if bound != arity {
+        .fail(stmt, "Variant '" ++ v ++ "' carries " ++ arity ++ " value(s), but the pattern binds " ++ bound, Str.len(v).unwrap_or(1))
+    }
     covered[v] = true
     return owner.unwrap()
+}
+
+// Bind a payload pattern's field names in the arm scope (`_` ignores a field).
+private declare_bindings(arm, scope) {
+    for name in arm.child("bindings") {
+        if name != "_" {
+            scope.declare(name, Symbol("variable", false, false))
+        }
+    }
 }
 
 private check_exhaustive(stmt, enum_name, covered) {

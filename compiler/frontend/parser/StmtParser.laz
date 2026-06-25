@@ -155,8 +155,8 @@ private parse_import(tok) {
     return Ast.import_decl(segments, last, tok.line, tok.column)
 }
 
-// `enum Name { A, B, C }` — variant names are PascalCase, separated by a newline
-// or an optional comma. Lowers (in the backend) to `Name.A = 'A'`, ….
+// `enum Name { A, B(T), C }` — PascalCase variant names, optionally carrying
+// payload types `B(T, U)`, separated by a newline or an optional comma.
 private parse_enum(tok) {
     mut name = .cursor.consume("IDENTIFIER", "Expected an enum name after 'enum'")
     mut type_params = .parse_type_params()
@@ -169,12 +169,29 @@ private parse_enum(tok) {
         if .cursor.at_end() {
             .cursor.fail_at("Expected '}' to close enum body", open.line, open.column, 1)
         }
-        mut v = .cursor.consume("IDENTIFIER", "Expected a variant name in the enum body")
-        variants.push(v.value)
+        variants.push(.parse_enum_variant())
         .cursor.match("COMMA")
     }
     .cursor.consume("BODY_END", "Expected '}' to close enum body")
     return Ast.enum_decl(name.value, variants, tok.line, tok.column, type_params)
+}
+
+// One variant: a name, plus an optional `( Type, ... )` payload.
+private parse_enum_variant() {
+    mut v = .cursor.consume("IDENTIFIER", "Expected a variant name in the enum body")
+    mut fields = []
+    if .cursor.match("LEFT_BRACKET") {
+        if not .cursor.check("RIGHT_BRACKET") {
+            loop {
+                fields.push(.parse_type())
+                if not .cursor.match("COMMA") {
+                    break
+                }
+            }
+        }
+        .cursor.consume("RIGHT_BRACKET", "Expected ')' after the variant payload types")
+    }
+    return Ast.enum_variant(v.value, fields, v.line, v.column)
 }
 
 private parse_extern(tok) {
@@ -476,14 +493,41 @@ private parse_match_arm() {
         .cursor.consume("FAT_ARROW", "Expected '=>' after match pattern")
         return Ast.match_default(.parse_block("match arm body"))
     }
-    if tok.kind == "IDENTIFIER" and .is_variant_name(tok.value) and .cursor.peek_next().kind == "FAT_ARROW" {
+    if tok.kind == "IDENTIFIER" and .is_variant_name(tok.value) and .variant_pattern_ahead() {
         .cursor.advance()
+        mut bindings = .parse_variant_bindings()
         .cursor.consume("FAT_ARROW", "Expected '=>' after match pattern")
-        return Ast.match_variant(tok.value, .parse_block("match arm body"))
+        return Ast.match_variant(tok.value, bindings, .parse_block("match arm body"))
     }
     mut pattern = .exprs.expression()
     .cursor.consume("FAT_ARROW", "Expected '=>' after match pattern")
     return Ast.match_arm(pattern, .parse_block("match arm body"))
+}
+
+// A variant pattern is a PascalCase name followed by `=>` (nullary) or `(`
+// (payload bindings).
+private variant_pattern_ahead() {
+    mut nk = .cursor.peek_next().kind
+    return nk == "FAT_ARROW" or nk == "LEFT_BRACKET"
+}
+
+// The optional `( a, b )` binding names after a payload variant pattern; `_`
+// ignores a field.
+private parse_variant_bindings() {
+    mut bindings = []
+    if .cursor.match("LEFT_BRACKET") {
+        if not .cursor.check("RIGHT_BRACKET") {
+            loop {
+                mut b = .cursor.consume("IDENTIFIER", "Expected a binding name in the variant pattern")
+                bindings.push(b.value)
+                if not .cursor.match("COMMA") {
+                    break
+                }
+            }
+        }
+        .cursor.consume("RIGHT_BRACKET", "Expected ')' after the variant pattern bindings")
+    }
+    return bindings
 }
 
 // A PascalCase name (leading uppercase letter) marks an enum-variant pattern,

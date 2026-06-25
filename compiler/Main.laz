@@ -33,12 +33,13 @@ static build_file(path) {
 
     mut variant_owner = [:]
     mut enums = [:]
+    mut variant_arity = [:]
     for m in modules {
-        Main.collect_enums(m.ast, variant_owner, enums)
+        Main.collect_enums(m.ast, variant_owner, enums, variant_arity)
     }
 
     for m in modules {
-        Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums)
+        Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity)
         Optimizer().optimize(m.ast)
     }
     file = Sys.open("Main.lua", "w").unwrap()
@@ -49,15 +50,18 @@ static build_file(path) {
 // Gather every module's enum declarations into a program-wide registry so a
 // `match` can be checked for exhaustiveness against an enum imported from any
 // file: `enums[name]` is the variant list, `variant_owner[variant]` its enum.
-static collect_enums(ast, variant_owner, enums) {
+static collect_enums(ast, variant_owner, enums, variant_arity) {
     for stmt in ast.child("body") {
         if stmt.kind == "EnumDecl" {
             mut name = stmt.child("name")
-            mut variants = stmt.child("variants")
-            enums[name] = variants
-            for v in variants {
-                variant_owner[v] = name
+            mut names = []
+            for v in stmt.child("variants") {
+                mut vn = v.child("name")
+                names.push(vn)
+                variant_owner[vn] = name
+                variant_arity[vn] = v.child("fields").len()
             }
+            enums[name] = names
         }
     }
 }

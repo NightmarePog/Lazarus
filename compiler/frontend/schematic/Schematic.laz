@@ -18,7 +18,7 @@ import frontend.schematic.StmtChecker
 // maps each variant name back to its enum — both gathered across all modules by
 // the driver, so an enum imported from another file is still known here (each
 // module is analysed independently). They drive `match` exhaustiveness checking.
-static analyze(program, source, class_name, imports, variant_owner, enums) {
+static analyze(program, source, class_name, imports, variant_owner, enums, variant_arity) {
     mut properties = [:]
     mut methods = [:]
     Schematic.collect_members(program, properties, methods, source)
@@ -30,7 +30,7 @@ static analyze(program, source, class_name, imports, variant_owner, enums) {
     }
 
     mut exprs = ExprChecker(source, properties, methods)
-    mut stmts = StmtChecker(source, exprs, variant_owner, enums)
+    mut stmts = StmtChecker(source, exprs, variant_owner, enums, variant_arity)
     stmts.check_block(program.child("body"), root, Frame(false, false, false))
 }
 

@@ -666,6 +666,9 @@ end
 function Ast.enum_decl(name, variants, line, col, type_params)
     return Node.new("EnumDecl", __lz_map({["name"] = name, ["variants"] = variants, ["line"] = line, ["col"] = col, ["type_params"] = type_params}))
 end
+function Ast.enum_variant(name, fields, line, col)
+    return Node.new("EnumVariant", __lz_map({["name"] = name, ["fields"] = fields, ["line"] = line, ["col"] = col}))
+end
 function Ast.type_name(name, args, line, col)
     return Node.new("TypeName", __lz_map({["name"] = name, ["args"] = args, ["line"] = line, ["col"] = col}))
 end
@@ -678,8 +681,8 @@ end
 function Ast.match_arm(pattern, body)
     return Node.new("MatchArm", __lz_map({["pattern"] = pattern, ["is_wildcard"] = false, ["is_variant"] = false, ["body"] = body}))
 end
-function Ast.match_variant(variant, body)
-    return Node.new("MatchArm", __lz_map({["variant"] = variant, ["is_wildcard"] = false, ["is_variant"] = true, ["body"] = body}))
+function Ast.match_variant(variant, bindings, body)
+    return Node.new("MatchArm", __lz_map({["variant"] = variant, ["bindings"] = bindings, ["is_wildcard"] = false, ["is_variant"] = true, ["body"] = body}))
 end
 function Ast.match_default(body)
     return Node.new("MatchArm", __lz_map({["is_wildcard"] = true, ["is_variant"] = false, ["body"] = body}))
@@ -923,6 +926,7 @@ function StmtParser.new(cursor, exprs)
     self.parse_block = StmtParser.parse_block
     self.parse_import = StmtParser.parse_import
     self.parse_enum = StmtParser.parse_enum
+    self.parse_enum_variant = StmtParser.parse_enum_variant
     self.parse_extern = StmtParser.parse_extern
     self.parse_member = StmtParser.parse_member
     self.parse_static = StmtParser.parse_static
@@ -947,6 +951,8 @@ function StmtParser.new(cursor, exprs)
     self.starts_match = StmtParser.starts_match
     self.parse_match = StmtParser.parse_match
     self.parse_match_arm = StmtParser.parse_match_arm
+    self.variant_pattern_ahead = StmtParser.variant_pattern_ahead
+    self.parse_variant_bindings = StmtParser.parse_variant_bindings
     self.is_variant_name = StmtParser.is_variant_name
     self.parse_for = StmtParser.parse_for
     self.parse_for_in = StmtParser.parse_for_in
@@ -1087,12 +1093,27 @@ function StmtParser.parse_enum(self, tok)
         if self.cursor:at_end() then
             self.cursor:fail_at("Expected '}' to close enum body", open.line, open.column, 1)
         end
-        local v = self.cursor:consume("IDENTIFIER", "Expected a variant name in the enum body")
-        __lz_push(variants, v.value)
+        __lz_push(variants, StmtParser.parse_enum_variant(self))
         self.cursor:match("COMMA")
     end
     self.cursor:consume("BODY_END", "Expected '}' to close enum body")
     return Ast.enum_decl(name.value, variants, tok.line, tok.column, type_params)
+end
+function StmtParser.parse_enum_variant(self)
+    local v = self.cursor:consume("IDENTIFIER", "Expected a variant name in the enum body")
+    local fields = __lz_list()
+    if self.cursor:match("LEFT_BRACKET") then
+        if not self.cursor:check("RIGHT_BRACKET") then
+            while true do
+                __lz_push(fields, StmtParser.parse_type(self))
+                if not self.cursor:match("COMMA") then
+                    break
+                end
+            end
+        end
+        self.cursor:consume("RIGHT_BRACKET", "Expected ')' after the variant payload types")
+    end
+    return Ast.enum_variant(v.value, fields, v.line, v.column)
 end
 function StmtParser.parse_extern(self, tok)
     local name = self.cursor:consume("IDENTIFIER", "Expected a name after 'extern'")
@@ -1341,14 +1362,35 @@ function StmtParser.parse_match_arm(self)
         self.cursor:consume("FAT_ARROW", "Expected '=>' after match pattern")
         return Ast.match_default(StmtParser.parse_block(self, "match arm body"))
     end
-    if ((tok.kind == "IDENTIFIER") and StmtParser.is_variant_name(self, tok.value)) and (self.cursor:peek_next().kind == "FAT_ARROW") then
+    if ((tok.kind == "IDENTIFIER") and StmtParser.is_variant_name(self, tok.value)) and StmtParser.variant_pattern_ahead(self) then
         self.cursor:advance()
+        local bindings = StmtParser.parse_variant_bindings(self)
         self.cursor:consume("FAT_ARROW", "Expected '=>' after match pattern")
-        return Ast.match_variant(tok.value, StmtParser.parse_block(self, "match arm body"))
+        return Ast.match_variant(tok.value, bindings, StmtParser.parse_block(self, "match arm body"))
     end
     local pattern = self.exprs:expression()
     self.cursor:consume("FAT_ARROW", "Expected '=>' after match pattern")
     return Ast.match_arm(pattern, StmtParser.parse_block(self, "match arm body"))
+end
+function StmtParser.variant_pattern_ahead(self)
+    local nk = self.cursor:peek_next().kind
+    return (nk == "FAT_ARROW") or (nk == "LEFT_BRACKET")
+end
+function StmtParser.parse_variant_bindings(self)
+    local bindings = __lz_list()
+    if self.cursor:match("LEFT_BRACKET") then
+        if not self.cursor:check("RIGHT_BRACKET") then
+            while true do
+                local b = self.cursor:consume("IDENTIFIER", "Expected a binding name in the variant pattern")
+                __lz_push(bindings, b.value)
+                if not self.cursor:match("COMMA") then
+                    break
+                end
+            end
+        end
+        self.cursor:consume("RIGHT_BRACKET", "Expected ')' after the variant pattern bindings")
+    end
+    return bindings
 end
 function StmtParser.is_variant_name(self, name)
     local first = __lz_unwrap_or(__lz_wrap(string.sub(name, 1, 1)), "")
@@ -1689,7 +1731,7 @@ end
 
 local StmtChecker = {}
 
-function StmtChecker.new(source, exprs, variant_owner, enums)
+function StmtChecker.new(source, exprs, variant_owner, enums, variant_arity)
     local self = {}
     self.check_block = StmtChecker.check_block
     self.check_statement = StmtChecker.check_statement
@@ -1714,12 +1756,14 @@ function StmtChecker.new(source, exprs, variant_owner, enums)
     self.check_for_in = StmtChecker.check_for_in
     self.check_match = StmtChecker.check_match
     self.check_variant_arm = StmtChecker.check_variant_arm
+    self.declare_bindings = StmtChecker.declare_bindings
     self.check_exhaustive = StmtChecker.check_exhaustive
     self.fail = StmtChecker.fail
     self.source = source
     self.exprs = exprs
     self.variant_owner = variant_owner
     self.enums = enums
+    self.variant_arity = variant_arity
     return self
 end
 function StmtChecker.check_block(self, stmts, scope, frame)
@@ -1952,14 +1996,16 @@ function StmtChecker.check_match(self, stmt, scope, frame)
     local covered = __lz_map({})
     local has_wildcard = false
     for _, arm in __lz_each(stmt:child("arms")) do
+        local arm_scope = scope:child()
         if __lz_unwrap_or(arm:attr("is_wildcard"), false) then
             has_wildcard = true
         elseif __lz_unwrap_or(arm:attr("is_variant"), false) then
             enum_name = StmtChecker.check_variant_arm(self, stmt, arm, enum_name, covered)
+            StmtChecker.declare_bindings(self, arm, arm_scope)
         else
             self.exprs:check(arm:child("pattern"), scope)
         end
-        StmtChecker.check_block(self, arm:child("body"), scope:child(), frame)
+        StmtChecker.check_block(self, arm:child("body"), arm_scope, frame)
     end
     if (enum_name ~= "") and (not has_wildcard) then
         StmtChecker.check_exhaustive(self, stmt, enum_name, covered)
@@ -1977,8 +2023,20 @@ function StmtChecker.check_variant_arm(self, stmt, arm, enum_name, covered)
     if __lz_has(covered, v) then
         StmtChecker.fail(self, stmt, ("Duplicate match arm for variant '" .. v) .. "'", __lz_unwrap_or(__lz_wrap(string.len(v)), 1))
     end
+    local arity = __lz_unwrap_or(__lz_get(self.variant_arity, v), 0)
+    local bound = __lz_len(arm:child("bindings"))
+    if bound ~= arity then
+        StmtChecker.fail(self, stmt, (((("Variant '" .. v) .. "' carries ") .. arity) .. " value(s), but the pattern binds ") .. bound, __lz_unwrap_or(__lz_wrap(string.len(v)), 1))
+    end
     __lz_idx_set(covered, v, true)
     return __lz_unwrap(owner)
+end
+function StmtChecker.declare_bindings(self, arm, scope)
+    for _, name in __lz_each(arm:child("bindings")) do
+        if name ~= "_" then
+            scope:declare(name, Symbol.new("variable", false, false))
+        end
+    end
 end
 function StmtChecker.check_exhaustive(self, stmt, enum_name, covered)
     for _, variant in __lz_each(__lz_unwrap(__lz_get(self.enums, enum_name))) do
@@ -1993,7 +2051,7 @@ end
 
 local Schematic = {}
 
-function Schematic.analyze(program, source, class_name, imports, variant_owner, enums)
+function Schematic.analyze(program, source, class_name, imports, variant_owner, enums, variant_arity)
     local properties = __lz_map({})
     local methods = __lz_map({})
     Schematic.collect_members(program, properties, methods, source)
@@ -2003,7 +2061,7 @@ function Schematic.analyze(program, source, class_name, imports, variant_owner, 
         root:declare(name, Symbol.new("class", false, false))
     end
     local exprs = ExprChecker.new(source, properties, methods)
-    local stmts = StmtChecker.new(source, exprs, variant_owner, enums)
+    local stmts = StmtChecker.new(source, exprs, variant_owner, enums, variant_arity)
     stmts:check_block(program:child("body"), root, Frame.new(false, false, false))
 end
 function Schematic.collect_members(program, properties, methods, source)
@@ -2667,9 +2725,12 @@ function StmtEmitter.new(ctx, exprs)
     local self = {}
     self.emit_member = StmtEmitter.emit_member
     self.emit_enum = StmtEmitter.emit_enum
+    self.emit_variant_ctor = StmtEmitter.emit_variant_ctor
     self.emit_stmt = StmtEmitter.emit_stmt
     self.emit_match = StmtEmitter.emit_match
-    self.match_test = StmtEmitter.match_test
+    self.match_condition = StmtEmitter.match_condition
+    self.has_bindings = StmtEmitter.has_bindings
+    self.push_payload_body = StmtEmitter.push_payload_body
     self.emit_block = StmtEmitter.emit_block
     self.emit_fn_body = StmtEmitter.emit_fn_body
     self.emit_variable = StmtEmitter.emit_variable
@@ -2710,9 +2771,26 @@ end
 function StmtEmitter.emit_enum(self, node)
     local lines = __lz_list()
     for _, variant in __lz_each(node:child("variants")) do
-        __lz_push(lines, ((((self.ctx:name() .. ".") .. variant) .. " = '") .. variant) .. "'")
+        local name = variant:child("name")
+        if __lz_len(variant:child("fields")) == 0 then
+            __lz_push(lines, ((((self.ctx:name() .. ".") .. name) .. " = '") .. name) .. "'")
+        else
+            __lz_push(lines, StmtEmitter.emit_variant_ctor(self, name, variant:child("fields")))
+        end
     end
     return Text.lines(lines)
+end
+function StmtEmitter.emit_variant_ctor(self, name, fields)
+    local params = __lz_list()
+    local assigns = __lz_list(("kind = '" .. name) .. "'")
+    local i = 1
+    for _, field in __lz_each(fields) do
+        __lz_push(params, "_" .. i)
+        __lz_push(assigns, (("_" .. i) .. " = _") .. i)
+        i = i + 1
+    end
+    local header = ((((("function " .. self.ctx:name()) .. ".") .. name) .. "(") .. Text.join(params, ", ")) .. ")"
+    return Text.lines(__lz_list(header, Text.indent(("return { " .. Text.join(assigns, ", ")) .. " }"), "end"))
 end
 function StmtEmitter.emit_stmt(self, node)
     local k = node.kind
@@ -2773,8 +2851,12 @@ function StmtEmitter.emit_match(self, node)
                 keyword = "if "
             end
             first = false
-            __lz_push(parts, (((keyword .. temp) .. " == ") .. StmtEmitter.match_test(self, arm)) .. " then")
-            StmtEmitter.push_block(self, parts, arm:child("body"))
+            __lz_push(parts, (keyword .. StmtEmitter.match_condition(self, temp, arm)) .. " then")
+            if StmtEmitter.has_bindings(self, arm) then
+                StmtEmitter.push_payload_body(self, parts, temp, arm)
+            else
+                StmtEmitter.push_block(self, parts, arm:child("body"))
+            end
         end
     end
     if first then
@@ -2792,11 +2874,36 @@ function StmtEmitter.emit_match(self, node)
     __lz_push(parts, "end")
     return Text.lines(parts)
 end
-function StmtEmitter.match_test(self, arm)
+function StmtEmitter.match_condition(self, temp, arm)
     if __lz_unwrap_or(arm:attr("is_variant"), false) then
-        return ("'" .. arm:child("variant")) .. "'"
+        if StmtEmitter.has_bindings(self, arm) then
+            return ((temp .. ".kind == '") .. arm:child("variant")) .. "'"
+        end
+        return ((temp .. " == '") .. arm:child("variant")) .. "'"
     end
-    return self.exprs:emit(arm:child("pattern"))
+    return (temp .. " == ") .. self.exprs:emit(arm:child("pattern"))
+end
+function StmtEmitter.has_bindings(self, arm)
+    return __lz_unwrap_or(arm:attr("is_variant"), false) and (__lz_len(arm:child("bindings")) > 0)
+end
+function StmtEmitter.push_payload_body(self, parts, temp, arm)
+    self.ctx:push_scope()
+    local lines = __lz_list()
+    local i = 1
+    for _, name in __lz_each(arm:child("bindings")) do
+        if name ~= "_" then
+            self.ctx:declare_local(name)
+            __lz_push(lines, (((("local " .. name) .. " = ") .. temp) .. "._") .. i)
+        end
+        i = i + 1
+    end
+    for _, stmt in __lz_each(arm:child("body")) do
+        __lz_push(lines, StmtEmitter.emit_stmt(self, stmt))
+    end
+    self.ctx:pop_scope()
+    if __lz_len(lines) > 0 then
+        __lz_push(parts, Text.indent(Text.lines(lines)))
+    end
 end
 function StmtEmitter.emit_block(self, stmts)
     if __lz_len(stmts) == 0 then
@@ -3299,26 +3406,30 @@ function Main.build_file(path)
     local modules = linker:link()
     local variant_owner = __lz_map({})
     local enums = __lz_map({})
+    local variant_arity = __lz_map({})
     for _, m in __lz_each(modules) do
-        Main.collect_enums(m.ast, variant_owner, enums)
+        Main.collect_enums(m.ast, variant_owner, enums, variant_arity)
     end
     for _, m in __lz_each(modules) do
-        Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums)
+        Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity)
         Optimizer.new():optimize(m.ast)
     end
     local file = __lz_unwrap(__lz_wrap(io.open("Main.lua", "w")))
     file:write(Bundler.new(modules, linker:entry_class()):bundle())
     file:close()
 end
-function Main.collect_enums(ast, variant_owner, enums)
+function Main.collect_enums(ast, variant_owner, enums, variant_arity)
     for _, stmt in __lz_each(ast:child("body")) do
         if stmt.kind == "EnumDecl" then
             local name = stmt:child("name")
-            local variants = stmt:child("variants")
-            __lz_idx_set(enums, name, variants)
-            for _, v in __lz_each(variants) do
-                __lz_idx_set(variant_owner, v, name)
+            local names = __lz_list()
+            for _, v in __lz_each(stmt:child("variants")) do
+                local vn = v:child("name")
+                __lz_push(names, vn)
+                __lz_idx_set(variant_owner, vn, name)
+                __lz_idx_set(variant_arity, vn, __lz_len(v:child("fields")))
             end
+            __lz_idx_set(enums, name, names)
         end
     end
 end

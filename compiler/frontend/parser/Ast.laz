@@ -69,11 +69,17 @@ static if_clause(condition, body) {
     return Node("IfClause", ["condition": condition, "body": body])
 }
 
-// A nullary enum `enum Name { A, B }`: `variants` is a list of variant-name
-// strings. Lowers to `Name.A = 'A'`, … ; a variant value is its own name string.
-// `type_params` holds any generic parameters (e.g. `enum Option<T>`).
+// An enum `enum Name { A, B(T) }`: `variants` is a list of `EnumVariant` nodes;
+// `type_params` holds any generic parameters (e.g. `enum Option<T>`). A nullary
+// variant lowers to `Name.A = 'A'`; a payload variant to a constructor function
+// returning a `{ kind = 'B', _1 = … }` table.
 static enum_decl(name, variants, line, col, type_params) {
     return Node("EnumDecl", ["name": name, "variants": variants, "line": line, "col": col, "type_params": type_params])
+}
+
+// One enum variant: a name plus a list of payload field types (empty = nullary).
+static enum_variant(name, fields, line, col) {
+    return Node("EnumVariant", ["name": name, "fields": fields, "line": line, "col": col])
 }
 
 // A named (optionally generic) type: `int`, `dynamic`, `Result<int>`. `args` is
@@ -97,10 +103,11 @@ static match_arm(pattern, body) {
     return Node("MatchArm", ["pattern": pattern, "is_wildcard": false, "is_variant": false, "body": body])
 }
 
-// A `Variant => { ... }` arm: matches when the scrutinee equals the variant's
-// name string. The checker resolves `variant` to its enum for exhaustiveness.
-static match_variant(variant, body) {
-    return Node("MatchArm", ["variant": variant, "is_wildcard": false, "is_variant": true, "body": body])
+// A `Variant => { ... }` (nullary) or `Variant(a, b) => { ... }` (payload) arm.
+// `bindings` names the payload fields to bind (empty for a nullary pattern). The
+// checker resolves `variant` to its enum for exhaustiveness and arity.
+static match_variant(variant, bindings, body) {
+    return Node("MatchArm", ["variant": variant, "bindings": bindings, "is_wildcard": false, "is_variant": true, "body": body])
 }
 
 // A `_ => { ... }` arm: the catch-all, lowered to the `else` branch.

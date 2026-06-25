@@ -35,14 +35,32 @@ public emit_member(node) {
     return .emit_stmt(node)
 }
 
-// A nullary enum lowers to one assignment per variant on the class table, each
-// variant's value being its own name as a (single-quoted) Lua string.
+// A nullary variant lowers to `E.V = 'V'` (its value is its own name string); a
+// payload variant to a constructor `function E.V(_1, …) return { kind='V', … }`.
 private emit_enum(node) {
     mut lines = []
     for variant in node.child("variants") {
-        lines.push(.ctx.name() ++ "." ++ variant ++ " = '" ++ variant ++ "'")
+        mut name = variant.child("name")
+        if variant.child("fields").len() == 0 {
+            lines.push(.ctx.name() ++ "." ++ name ++ " = '" ++ name ++ "'")
+        } else {
+            lines.push(.emit_variant_ctor(name, variant.child("fields")))
+        }
     }
     return Text.lines(lines)
+}
+
+private emit_variant_ctor(name, fields) {
+    mut params = []
+    mut assigns = ["kind = '" ++ name ++ "'"]
+    mut i = 1
+    for field in fields {
+        params.push("_" ++ i)
+        assigns.push("_" ++ i ++ " = _" ++ i)
+        i = i + 1
+    }
+    mut header = "function " ++ .ctx.name() ++ "." ++ name ++ "(" ++ Text.join(params, ", ") ++ ")"
+    return Text.lines([header, Text.indent("return { " ++ Text.join(assigns, ", ") ++ " }"), "end"])
 }
 
 public emit_stmt(node) {
@@ -109,8 +127,12 @@ private emit_match(node) {
                 keyword = "if "
             }
             first = false
-            parts.push(keyword ++ temp ++ " == " ++ .match_test(arm) ++ " then")
-            .push_block(parts, arm.child("body"))
+            parts.push(keyword ++ .match_condition(temp, arm) ++ " then")
+            if .has_bindings(arm) {
+                .push_payload_body(parts, temp, arm)
+            } else {
+                .push_block(parts, arm.child("body"))
+            }
         }
     }
     if first {
@@ -129,13 +151,43 @@ private emit_match(node) {
     return Text.lines(parts)
 }
 
-// The right-hand side of an arm's `temp == …` test: a variant arm compares
-// against the variant's name string; a value arm against its pattern expression.
-private match_test(arm) {
+// An arm's test: a payload variant matches on the tagged table's `kind`; a
+// nullary variant compares against its name string; a value arm against its
+// pattern expression.
+private match_condition(temp, arm) {
     if arm.attr("is_variant").unwrap_or(false) {
-        return "'" ++ arm.child("variant") ++ "'"
+        if .has_bindings(arm) {
+            return temp ++ ".kind == '" ++ arm.child("variant") ++ "'"
+        }
+        return temp ++ " == '" ++ arm.child("variant") ++ "'"
     }
-    return .exprs.emit(arm.child("pattern"))
+    return temp ++ " == " ++ .exprs.emit(arm.child("pattern"))
+}
+
+private has_bindings(arm) {
+    return arm.attr("is_variant").unwrap_or(false) and arm.child("bindings").len() > 0
+}
+
+// A payload arm's body, preceded by `local <name> = <temp>._<n>` extractions for
+// each bound field (`_` skips one). Scoped so bindings don't leak between arms.
+private push_payload_body(parts, temp, arm) {
+    .ctx.push_scope()
+    mut lines = []
+    mut i = 1
+    for name in arm.child("bindings") {
+        if name != "_" {
+            .ctx.declare_local(name)
+            lines.push("local " ++ name ++ " = " ++ temp ++ "._" ++ i)
+        }
+        i = i + 1
+    }
+    for stmt in arm.child("body") {
+        lines.push(.emit_stmt(stmt))
+    }
+    .ctx.pop_scope()
+    if lines.len() > 0 {
+        parts.push(Text.indent(Text.lines(lines)))
+    }
 }
 
 // A statement list as an indented block, or "" when empty.
