@@ -2088,6 +2088,396 @@ function Schematic.collect_property(stmt, properties, source)
     end
 end
 
+local Type = {}
+
+function Type.new(kind, name, params, result)
+    local self = {}
+    self.is_dynamic = Type.is_dynamic
+    self.is_numeric = Type.is_numeric
+    self.equals = Type.equals
+    self.describe = Type.describe
+    self.kind = kind
+    self.name = name
+    self.params = params
+    self.result = result
+    return self
+end
+function Type.base(kind)
+    return Type.new(kind, "", __lz_list(), 0)
+end
+function Type.dynamic()
+    return Type.base("dynamic")
+end
+function Type.unit()
+    return Type.base("unit")
+end
+function Type.int()
+    return Type.base("int")
+end
+function Type.float()
+    return Type.base("float")
+end
+function Type.bool()
+    return Type.base("bool")
+end
+function Type.str()
+    return Type.base("str")
+end
+function Type.class_of(name)
+    return Type.new("class", name, __lz_list(), 0)
+end
+function Type.enum_of(name)
+    return Type.new("enum", name, __lz_list(), 0)
+end
+function Type.fn(params, result)
+    return Type.new("fn", "", params, result)
+end
+function Type.is_dynamic(self)
+    return self.kind == "dynamic"
+end
+function Type.is_numeric(self)
+    return (self.kind == "int") or (self.kind == "float")
+end
+function Type.equals(self, other)
+    if self.kind ~= other.kind then
+        return false
+    end
+    if (self.kind == "class") or (self.kind == "enum") then
+        return self.name == other.name
+    end
+    return true
+end
+function Type.describe(self)
+    if (self.kind == "class") or (self.kind == "enum") then
+        return self.name
+    end
+    return self.kind
+end
+
+local Typecheck = {}
+
+function Typecheck.new(source, class_name, imports, enums)
+    local self = {}
+    self.check = Typecheck.check
+    self.type_block = Typecheck.type_block
+    self.type_stmt = Typecheck.type_stmt
+    self.type_variable = Typecheck.type_variable
+    self.type_callable = Typecheck.type_callable
+    self.bind_params = Typecheck.bind_params
+    self.return_type = Typecheck.return_type
+    self.type_return = Typecheck.type_return
+    self.type_if = Typecheck.type_if
+    self.type_condition = Typecheck.type_condition
+    self.type_for = Typecheck.type_for
+    self.type_for_in = Typecheck.type_for_in
+    self.type_match = Typecheck.type_match
+    self.type_expr = Typecheck.type_expr
+    self.literal_type = Typecheck.literal_type
+    self.type_binary = Typecheck.type_binary
+    self.is_arith = Typecheck.is_arith
+    self.arith_type = Typecheck.arith_type
+    self.resolve = Typecheck.resolve
+    self.expect = Typecheck.expect
+    self.compatible = Typecheck.compatible
+    self.fail = Typecheck.fail
+    self.source = source
+    self.known_classes = __lz_map({})
+    for _, name in __lz_each(imports) do
+        __lz_idx_set(self.known_classes, name, true)
+    end
+    __lz_idx_set(self.known_classes, class_name, true)
+    self.enums = enums
+    return self
+end
+function Typecheck.check(self, program)
+    Typecheck.type_block(self, program:child("body"), Scope.root(), Type.dynamic())
+end
+function Typecheck.type_block(self, stmts, scope, ret)
+    for _, stmt in __lz_each(stmts) do
+        Typecheck.type_stmt(self, stmt, scope, ret)
+    end
+end
+function Typecheck.type_stmt(self, stmt, scope, ret)
+    local k = stmt.kind
+    if k == "VariableDecl" then
+        Typecheck.type_variable(self, stmt, scope)
+    elseif k == "FunctionDecl" then
+        Typecheck.type_callable(self, stmt, scope, Typecheck.return_type(self, stmt))
+    elseif k == "ConstructorDecl" then
+        Typecheck.type_callable(self, stmt, scope, Type.unit())
+    elseif k == "ReturnStmt" then
+        Typecheck.type_return(self, stmt, scope, ret)
+    elseif k == "ExpressionStmt" then
+        Typecheck.type_expr(self, stmt:child("expression"), scope)
+    elseif k == "FieldAssign" then
+        Typecheck.type_expr(self, stmt:child("value"), scope)
+    elseif k == "IndexAssign" then
+        Typecheck.type_expr(self, stmt:child("value"), scope)
+    elseif k == "IfStmt" then
+        Typecheck.type_if(self, stmt, scope, ret)
+    elseif k == "WhileStmt" then
+        Typecheck.type_condition(self, stmt:child("condition"), scope)
+        Typecheck.type_block(self, stmt:child("body"), scope:child(), ret)
+    elseif k == "LoopStmt" then
+        Typecheck.type_block(self, stmt:child("body"), scope:child(), ret)
+    elseif k == "ForStmt" then
+        Typecheck.type_for(self, stmt, scope, ret)
+    elseif k == "ForInStmt" then
+        Typecheck.type_for_in(self, stmt, scope, ret)
+    elseif k == "MatchStmt" then
+        Typecheck.type_match(self, stmt, scope, ret)
+    end
+end
+function Typecheck.type_variable(self, stmt, scope)
+    local value = stmt:attr("value")
+    if __lz_unwrap_or(stmt:attr("reassign"), false) then
+        if __lz_is_some(value) then
+            Typecheck.type_expr(self, __lz_unwrap(value), scope)
+        end
+        return
+    end
+    local actual = Type.dynamic()
+    if __lz_is_some(value) then
+        actual = Typecheck.type_expr(self, __lz_unwrap(value), scope)
+    end
+    local t = actual
+    local ann = stmt:attr("type")
+    if __lz_is_some(ann) then
+        t = Typecheck.resolve(self, __lz_unwrap(ann))
+        if __lz_is_some(value) then
+            Typecheck.expect(self, t, actual, stmt, "binding")
+        end
+    end
+    scope:declare(stmt:child("name"), t)
+end
+function Typecheck.type_callable(self, stmt, scope, ret)
+    local inner = scope:child()
+    Typecheck.bind_params(self, stmt, inner)
+    Typecheck.type_block(self, stmt:child("body"), inner, ret)
+end
+function Typecheck.bind_params(self, stmt, scope)
+    local types = stmt:attr("param_types")
+    local i = 1
+    for _, p in __lz_each(stmt:child("params")) do
+        local t = Type.dynamic()
+        if __lz_is_some(types) then
+            t = Typecheck.resolve(self, __lz_unwrap(__lz_get(__lz_unwrap(types), i)))
+        end
+        scope:declare(p, t)
+        i = i + 1
+    end
+end
+function Typecheck.return_type(self, stmt)
+    local rt = stmt:attr("return_type")
+    if __lz_is_some(rt) then
+        return Typecheck.resolve(self, __lz_unwrap(rt))
+    end
+    return Type.dynamic()
+end
+function Typecheck.type_return(self, stmt, scope, ret)
+    local value = stmt:attr("value")
+    if __lz_is_some(value) then
+        Typecheck.expect(self, ret, Typecheck.type_expr(self, __lz_unwrap(value), scope), stmt, "return")
+    end
+end
+function Typecheck.type_if(self, stmt, scope, ret)
+    for _, clause in __lz_each(stmt:child("clauses")) do
+        Typecheck.type_condition(self, clause:child("condition"), scope)
+        Typecheck.type_block(self, clause:child("body"), scope:child(), ret)
+    end
+    local else_body = stmt:attr("else_body")
+    if __lz_is_some(else_body) then
+        Typecheck.type_block(self, __lz_unwrap(else_body), scope:child(), ret)
+    end
+end
+function Typecheck.type_condition(self, node, scope)
+    local t = Typecheck.type_expr(self, node, scope)
+    if (not t:is_dynamic()) and (t.kind ~= "bool") then
+        Typecheck.fail(self, node, "a condition must be a bool, found " .. t:describe())
+    end
+end
+function Typecheck.type_for(self, stmt, scope, ret)
+    local inner = scope:child()
+    local init = stmt:attr("init")
+    if __lz_is_some(init) then
+        Typecheck.type_stmt(self, __lz_unwrap(init), inner, ret)
+    end
+    local cond = stmt:attr("condition")
+    if __lz_is_some(cond) then
+        Typecheck.type_condition(self, __lz_unwrap(cond), inner)
+    end
+    local step = stmt:attr("step")
+    if __lz_is_some(step) then
+        Typecheck.type_stmt(self, __lz_unwrap(step), inner, ret)
+    end
+    Typecheck.type_block(self, stmt:child("body"), inner:child(), ret)
+end
+function Typecheck.type_for_in(self, stmt, scope, ret)
+    Typecheck.type_expr(self, stmt:child("iter"), scope)
+    local inner = scope:child()
+    for _, name in __lz_each(stmt:child("vars")) do
+        inner:declare(name, Type.dynamic())
+    end
+    Typecheck.type_block(self, stmt:child("body"), inner, ret)
+end
+function Typecheck.type_match(self, stmt, scope, ret)
+    Typecheck.type_expr(self, stmt:child("scrutinee"), scope)
+    for _, arm in __lz_each(stmt:child("arms")) do
+        local arm_scope = scope:child()
+        if __lz_unwrap_or(arm:attr("is_variant"), false) then
+            for _, b in __lz_each(arm:child("bindings")) do
+                if b ~= "_" then
+                    arm_scope:declare(b, Type.dynamic())
+                end
+            end
+        elseif not __lz_unwrap_or(arm:attr("is_wildcard"), false) then
+            Typecheck.type_expr(self, arm:child("pattern"), scope)
+        end
+        Typecheck.type_block(self, arm:child("body"), arm_scope, ret)
+    end
+end
+function Typecheck.type_expr(self, node, scope)
+    local k = node.kind
+    if k == "LiteralExpr" then
+        return Typecheck.literal_type(self, node)
+    end
+    if k == "IdentifierExpr" then
+        return __lz_unwrap_or(scope:lookup(node:child("name")), Type.dynamic())
+    end
+    if k == "BinaryExpr" then
+        return Typecheck.type_binary(self, node, scope)
+    end
+    if k == "UnaryExpr" then
+        Typecheck.type_expr(self, node:child("operand"), scope)
+        return Type.bool()
+    end
+    if k == "CallExpr" then
+        Typecheck.type_expr(self, node:child("callee"), scope)
+        for _, arg in __lz_each(node:child("args")) do
+            Typecheck.type_expr(self, arg, scope)
+        end
+        return Type.dynamic()
+    end
+    if k == "MemberExpr" then
+        Typecheck.type_expr(self, node:child("object"), scope)
+        return Type.dynamic()
+    end
+    if k == "IndexExpr" then
+        Typecheck.type_expr(self, node:child("object"), scope)
+        Typecheck.type_expr(self, node:child("index"), scope)
+        return Type.dynamic()
+    end
+    if k == "ListExpr" then
+        for _, e in __lz_each(node:child("elements")) do
+            Typecheck.type_expr(self, e, scope)
+        end
+        return Type.dynamic()
+    end
+    if k == "MapExpr" then
+        for _, entry in __lz_each(node:child("entries")) do
+            Typecheck.type_expr(self, entry:child("key"), scope)
+            Typecheck.type_expr(self, entry:child("value"), scope)
+        end
+        return Type.dynamic()
+    end
+    return Type.dynamic()
+end
+function Typecheck.literal_type(self, node)
+    local lk = node:child("lit_kind")
+    if lk == "number" then
+        return Type.int()
+    end
+    if lk == "float" then
+        return Type.float()
+    end
+    if lk == "string" then
+        return Type.str()
+    end
+    if lk == "boolean" then
+        return Type.bool()
+    end
+    return Type.dynamic()
+end
+function Typecheck.type_binary(self, node, scope)
+    local lt = Typecheck.type_expr(self, node:child("left"), scope)
+    local rt = Typecheck.type_expr(self, node:child("right"), scope)
+    local op = node:child("op")
+    if Typecheck.is_arith(self, op) then
+        return Typecheck.arith_type(self, node, op, lt, rt)
+    end
+    if op == "CONCAT" then
+        return Type.str()
+    end
+    return Type.bool()
+end
+function Typecheck.is_arith(self, op)
+    return (((((op == "PLUS") or (op == "MINUS")) or (op == "MULTIPLY")) or (op == "DIVIDE")) or (op == "MODULO")) or (op == "POWER")
+end
+function Typecheck.arith_type(self, node, op, lt, rt)
+    if lt:is_dynamic() or rt:is_dynamic() then
+        return Type.dynamic()
+    end
+    if (not lt:is_numeric()) or (not rt:is_numeric()) then
+        Typecheck.fail(self, node, (("arithmetic needs numbers, found " .. lt:describe()) .. " and ") .. rt:describe())
+    end
+    if not lt:equals(rt) then
+        Typecheck.fail(self, node, ((("cannot mix " .. lt:describe()) .. " and ") .. rt:describe()) .. " in arithmetic; convert explicitly")
+    end
+    if op == "DIVIDE" then
+        return Type.float()
+    end
+    return lt
+end
+function Typecheck.resolve(self, t)
+    if t.kind == "TypeFn" then
+        local ps = __lz_list()
+        for _, p in __lz_each(t:child("params")) do
+            __lz_push(ps, Typecheck.resolve(self, p))
+        end
+        return Type.fn(ps, Typecheck.resolve(self, t:child("result")))
+    end
+    local name = t:child("name")
+    if name == "int" then
+        return Type.int()
+    end
+    if name == "float" then
+        return Type.float()
+    end
+    if name == "bool" then
+        return Type.bool()
+    end
+    if name == "str" then
+        return Type.str()
+    end
+    if name == "unit" then
+        return Type.unit()
+    end
+    if name == "dynamic" then
+        return Type.dynamic()
+    end
+    if __lz_has(self.enums, name) then
+        return Type.enum_of(name)
+    end
+    if __lz_has(self.known_classes, name) then
+        return Type.class_of(name)
+    end
+    return Type.dynamic()
+end
+function Typecheck.expect(self, expected, actual, node, what)
+    if not Typecheck.compatible(self, expected, actual) then
+        Typecheck.fail(self, node, (((("type mismatch in " .. what) .. ": expected ") .. expected:describe()) .. ", found ") .. actual:describe())
+    end
+end
+function Typecheck.compatible(self, expected, actual)
+    if expected:is_dynamic() or actual:is_dynamic() then
+        return true
+    end
+    return expected:equals(actual)
+end
+function Typecheck.fail(self, node, message)
+    Error.new("TypeError", message, node:line(), node:col(), self.source, 1):raise()
+end
+
 local Constants = {}
 
 function Constants.new(entries)
@@ -3412,6 +3802,7 @@ function Main.build_file(path)
     end
     for _, m in __lz_each(modules) do
         Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity)
+        Typecheck.new(m.source, m.class_name, m.imports, enums):check(m.ast)
         Optimizer.new():optimize(m.ast)
     end
     local file = __lz_unwrap(__lz_wrap(io.open("Main.lua", "w")))

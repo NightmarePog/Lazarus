@@ -1,0 +1,350 @@
+// Typecheck — the type-checking pass. Runs after Schematic (which resolved names)
+// and before the optimizer, and only validates: types are erased, so it never
+// touches the AST.
+//
+// It is gradual. An unannotated binding or function is `dynamic`, and any
+// operation touching a `dynamic` value is allowed and produces `dynamic`. Where
+// types are concrete the rules bite: arithmetic needs two numbers of the SAME
+// kind (int and float never mix), `/` produces a float, a condition must be a
+// bool, and an annotated binding or `return` must match its declared type. A
+// call/field result is `dynamic` for now (cross-signature typing comes later).
+
+import Error
+import frontend.schematic.Scope
+import frontend.typecheck.Type
+
+private source
+private known_classes
+private enums
+
+constructor(source, class_name, imports, enums) {
+    .source = source
+    .known_classes = [:]
+    for name in imports {
+        .known_classes[name] = true
+    }
+    .known_classes[class_name] = true
+    .enums = enums
+}
+
+public check(program) {
+    .type_block(program.child("body"), Scope.root(), Type.dynamic())
+}
+
+// ---- statements ----
+
+private type_block(stmts, scope, ret) {
+    for stmt in stmts {
+        .type_stmt(stmt, scope, ret)
+    }
+}
+
+private type_stmt(stmt, scope, ret) {
+    mut k = stmt.kind
+    if k == "VariableDecl" {
+        .type_variable(stmt, scope)
+    } else if k == "FunctionDecl" {
+        .type_callable(stmt, scope, .return_type(stmt))
+    } else if k == "ConstructorDecl" {
+        .type_callable(stmt, scope, Type.unit())
+    } else if k == "ReturnStmt" {
+        .type_return(stmt, scope, ret)
+    } else if k == "ExpressionStmt" {
+        .type_expr(stmt.child("expression"), scope)
+    } else if k == "FieldAssign" {
+        .type_expr(stmt.child("value"), scope)
+    } else if k == "IndexAssign" {
+        .type_expr(stmt.child("value"), scope)
+    } else if k == "IfStmt" {
+        .type_if(stmt, scope, ret)
+    } else if k == "WhileStmt" {
+        .type_condition(stmt.child("condition"), scope)
+        .type_block(stmt.child("body"), scope.child(), ret)
+    } else if k == "LoopStmt" {
+        .type_block(stmt.child("body"), scope.child(), ret)
+    } else if k == "ForStmt" {
+        .type_for(stmt, scope, ret)
+    } else if k == "ForInStmt" {
+        .type_for_in(stmt, scope, ret)
+    } else if k == "MatchStmt" {
+        .type_match(stmt, scope, ret)
+    }
+}
+
+// A declaration records the binding's type (annotation, else inferred from the
+// initialiser, else dynamic); an annotated initialiser is checked. A
+// reassignment only re-types its value — inferred types are not re-checked, so
+// untyped code is never rejected here.
+private type_variable(stmt, scope) {
+    mut value = stmt.attr("value")
+    if stmt.attr("reassign").unwrap_or(false) {
+        if value.is_some() {
+            .type_expr(value.unwrap(), scope)
+        }
+        return
+    }
+    mut actual = Type.dynamic()
+    if value.is_some() {
+        actual = .type_expr(value.unwrap(), scope)
+    }
+    mut t = actual
+    mut ann = stmt.attr("type")
+    if ann.is_some() {
+        t = .resolve(ann.unwrap())
+        if value.is_some() {
+            .expect(t, actual, stmt, "binding")
+        }
+    }
+    scope.declare(stmt.child("name"), t)
+}
+
+private type_callable(stmt, scope, ret) {
+    mut inner = scope.child()
+    .bind_params(stmt, inner)
+    .type_block(stmt.child("body"), inner, ret)
+}
+
+private bind_params(stmt, scope) {
+    mut types = stmt.attr("param_types")
+    mut i = 1
+    for p in stmt.child("params") {
+        mut t = Type.dynamic()
+        if types.is_some() {
+            t = .resolve(types.unwrap().get(i).unwrap())
+        }
+        scope.declare(p, t)
+        i = i + 1
+    }
+}
+
+private return_type(stmt) {
+    mut rt = stmt.attr("return_type")
+    if rt.is_some() {
+        return .resolve(rt.unwrap())
+    }
+    return Type.dynamic()
+}
+
+private type_return(stmt, scope, ret) {
+    mut value = stmt.attr("value")
+    if value.is_some() {
+        .expect(ret, .type_expr(value.unwrap(), scope), stmt, "return")
+    }
+}
+
+private type_if(stmt, scope, ret) {
+    for clause in stmt.child("clauses") {
+        .type_condition(clause.child("condition"), scope)
+        .type_block(clause.child("body"), scope.child(), ret)
+    }
+    mut else_body = stmt.attr("else_body")
+    if else_body.is_some() {
+        .type_block(else_body.unwrap(), scope.child(), ret)
+    }
+}
+
+private type_condition(node, scope) {
+    mut t = .type_expr(node, scope)
+    if not t.is_dynamic() and t.kind != "bool" {
+        .fail(node, "a condition must be a bool, found " ++ t.describe())
+    }
+}
+
+private type_for(stmt, scope, ret) {
+    mut inner = scope.child()
+    mut init = stmt.attr("init")
+    if init.is_some() {
+        .type_stmt(init.unwrap(), inner, ret)
+    }
+    mut cond = stmt.attr("condition")
+    if cond.is_some() {
+        .type_condition(cond.unwrap(), inner)
+    }
+    mut step = stmt.attr("step")
+    if step.is_some() {
+        .type_stmt(step.unwrap(), inner, ret)
+    }
+    .type_block(stmt.child("body"), inner.child(), ret)
+}
+
+private type_for_in(stmt, scope, ret) {
+    .type_expr(stmt.child("iter"), scope)
+    mut inner = scope.child()
+    for name in stmt.child("vars") {
+        inner.declare(name, Type.dynamic())
+    }
+    .type_block(stmt.child("body"), inner, ret)
+}
+
+private type_match(stmt, scope, ret) {
+    .type_expr(stmt.child("scrutinee"), scope)
+    for arm in stmt.child("arms") {
+        mut arm_scope = scope.child()
+        if arm.attr("is_variant").unwrap_or(false) {
+            for b in arm.child("bindings") {
+                if b != "_" {
+                    arm_scope.declare(b, Type.dynamic())
+                }
+            }
+        } else if not arm.attr("is_wildcard").unwrap_or(false) {
+            .type_expr(arm.child("pattern"), scope)
+        }
+        .type_block(arm.child("body"), arm_scope, ret)
+    }
+}
+
+// ---- expressions ----
+
+private type_expr(node, scope) {
+    mut k = node.kind
+    if k == "LiteralExpr" {
+        return .literal_type(node)
+    }
+    if k == "IdentifierExpr" {
+        return scope.lookup(node.child("name")).unwrap_or(Type.dynamic())
+    }
+    if k == "BinaryExpr" {
+        return .type_binary(node, scope)
+    }
+    if k == "UnaryExpr" {
+        .type_expr(node.child("operand"), scope)
+        return Type.bool()
+    }
+    if k == "CallExpr" {
+        .type_expr(node.child("callee"), scope)
+        for arg in node.child("args") {
+            .type_expr(arg, scope)
+        }
+        return Type.dynamic()
+    }
+    if k == "MemberExpr" {
+        .type_expr(node.child("object"), scope)
+        return Type.dynamic()
+    }
+    if k == "IndexExpr" {
+        .type_expr(node.child("object"), scope)
+        .type_expr(node.child("index"), scope)
+        return Type.dynamic()
+    }
+    if k == "ListExpr" {
+        for e in node.child("elements") {
+            .type_expr(e, scope)
+        }
+        return Type.dynamic()
+    }
+    if k == "MapExpr" {
+        for entry in node.child("entries") {
+            .type_expr(entry.child("key"), scope)
+            .type_expr(entry.child("value"), scope)
+        }
+        return Type.dynamic()
+    }
+    return Type.dynamic()
+}
+
+private literal_type(node) {
+    mut lk = node.child("lit_kind")
+    if lk == "number" {
+        return Type.int()
+    }
+    if lk == "float" {
+        return Type.float()
+    }
+    if lk == "string" {
+        return Type.str()
+    }
+    if lk == "boolean" {
+        return Type.bool()
+    }
+    return Type.dynamic()
+}
+
+private type_binary(node, scope) {
+    mut lt = .type_expr(node.child("left"), scope)
+    mut rt = .type_expr(node.child("right"), scope)
+    mut op = node.child("op")
+    if .is_arith(op) {
+        return .arith_type(node, op, lt, rt)
+    }
+    if op == "CONCAT" {
+        return Type.str()
+    }
+    return Type.bool()
+}
+
+private is_arith(op) {
+    return op == "PLUS" or op == "MINUS" or op == "MULTIPLY" or op == "DIVIDE" or op == "MODULO" or op == "POWER"
+}
+
+private arith_type(node, op, lt, rt) {
+    if lt.is_dynamic() or rt.is_dynamic() {
+        return Type.dynamic()
+    }
+    if not lt.is_numeric() or not rt.is_numeric() {
+        .fail(node, "arithmetic needs numbers, found " ++ lt.describe() ++ " and " ++ rt.describe())
+    }
+    if not lt.equals(rt) {
+        .fail(node, "cannot mix " ++ lt.describe() ++ " and " ++ rt.describe() ++ " in arithmetic; convert explicitly")
+    }
+    if op == "DIVIDE" {
+        return Type.float()
+    }
+    return lt
+}
+
+// ---- helpers ----
+
+// Turn a parsed type annotation node into a resolved Type. An unknown name (a
+// generic parameter, or a not-yet-known type) resolves to `dynamic`.
+private resolve(t) {
+    if t.kind == "TypeFn" {
+        mut ps = []
+        for p in t.child("params") {
+            ps.push(.resolve(p))
+        }
+        return Type.fn(ps, .resolve(t.child("result")))
+    }
+    mut name = t.child("name")
+    if name == "int" {
+        return Type.int()
+    }
+    if name == "float" {
+        return Type.float()
+    }
+    if name == "bool" {
+        return Type.bool()
+    }
+    if name == "str" {
+        return Type.str()
+    }
+    if name == "unit" {
+        return Type.unit()
+    }
+    if name == "dynamic" {
+        return Type.dynamic()
+    }
+    if .enums.has(name) {
+        return Type.enum_of(name)
+    }
+    if .known_classes.has(name) {
+        return Type.class_of(name)
+    }
+    return Type.dynamic()
+}
+
+private expect(expected, actual, node, what) {
+    if not .compatible(expected, actual) {
+        .fail(node, "type mismatch in " ++ what ++ ": expected " ++ expected.describe() ++ ", found " ++ actual.describe())
+    }
+}
+
+private compatible(expected, actual) {
+    if expected.is_dynamic() or actual.is_dynamic() {
+        return true
+    }
+    return expected.equals(actual)
+}
+
+private fail(node, message) {
+    Error("TypeError", message, node.line(), node.col(), .source, 1).raise()
+}

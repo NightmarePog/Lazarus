@@ -10,6 +10,7 @@ import std.Sys
 import frontend.lexer.Lexer
 import frontend.parser.Parser
 import frontend.schematic.Schematic
+import frontend.typecheck.Typecheck
 import frontend.optimizer.Optimizer
 import backend.Codegen
 import backend.Bundler
@@ -40,6 +41,7 @@ static build_file(path) {
 
     for m in modules {
         Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity)
+        Typecheck(m.source, m.class_name, m.imports, enums).check(m.ast)
         Optimizer().optimize(m.ast)
     }
     file = Sys.open("Main.lua", "w").unwrap()

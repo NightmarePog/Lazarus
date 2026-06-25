@@ -1,0 +1,85 @@
+// A resolved type used by the checker, erased once checking is done. Kinds:
+// int, float, bool, str, unit, dynamic, class, enum, fn. A type variable or a
+// generic argument resolves to `dynamic` until generics land in a later phase.
+
+public kind
+public name
+public params
+public result
+
+constructor(kind, name, params, result) {
+    .kind = kind
+    .name = name
+    .params = params
+    .result = result
+}
+
+// `result` is a placeholder (0) for every kind except `fn`, which carries a real
+// result Type — so the base helpers never recurse.
+static base(kind) {
+    return Type(kind, "", [], 0)
+}
+
+static dynamic() {
+    return Type.base("dynamic")
+}
+
+static unit() {
+    return Type.base("unit")
+}
+
+static int() {
+    return Type.base("int")
+}
+
+static float() {
+    return Type.base("float")
+}
+
+static bool() {
+    return Type.base("bool")
+}
+
+static str() {
+    return Type.base("str")
+}
+
+static class_of(name) {
+    return Type("class", name, [], 0)
+}
+
+static enum_of(name) {
+    return Type("enum", name, [], 0)
+}
+
+static fn(params, result) {
+    return Type("fn", "", params, result)
+}
+
+public is_dynamic() {
+    return .kind == "dynamic"
+}
+
+public is_numeric() {
+    return .kind == "int" or .kind == "float"
+}
+
+// Nominal equality; generic arguments are not compared yet. `int` and `float`
+// are deliberately distinct.
+public equals(other) {
+    if .kind != other.kind {
+        return false
+    }
+    if .kind == "class" or .kind == "enum" {
+        return .name == other.name
+    }
+    return true
+}
+
+// A short label for diagnostics.
+public describe() {
+    if .kind == "class" or .kind == "enum" {
+        return .name
+    }
+    return .kind
+}
