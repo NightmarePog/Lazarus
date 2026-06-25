@@ -427,11 +427,19 @@ function Lexer.read_number(self)
     while Char.is_digit(self.current) do
         Lexer.advance(self)
     end
+    local kind = "NUMBER"
+    if (self.current == ".") and Char.is_digit(Lexer.peek(self)) then
+        kind = "FLOAT"
+        Lexer.advance(self)
+        while Char.is_digit(self.current) do
+            Lexer.advance(self)
+        end
+    end
     if Char.is_ident_start(self.current) then
         Error.new("InvalidNumber", "unexpected character after number literal", self.line, self.col, self.source, 1):raise()
     end
     local text = __lz_unwrap_or(__lz_wrap(string.sub(self.source, start, self.pos - 1)), "")
-    return Token.new("NUMBER", text, line, col)
+    return Token.new(kind, text, line, col)
 end
 function Lexer.read_string(self)
     local line = self.line
@@ -820,6 +828,10 @@ function ExprParser.parse_primary(self)
     if k == "NUMBER" then
         self.cursor:advance()
         return Ast.literal("number", tok.value, tok.line, tok.column)
+    end
+    if k == "FLOAT" then
+        self.cursor:advance()
+        return Ast.literal("float", tok.value, tok.line, tok.column)
     end
     if k == "STRING" then
         self.cursor:advance()
@@ -1496,7 +1508,7 @@ function Booleanity.non_bool_reason(node)
     local k = node.kind
     if k == "LiteralExpr" then
         local lit_kind = node:child("lit_kind")
-        if lit_kind == "number" then
+        if (lit_kind == "number") or (lit_kind == "float") then
             return "a number"
         end
         if lit_kind == "string" then
@@ -2062,6 +2074,7 @@ function ExprFolder.new()
     self.foldable = ExprFolder.foldable
     self.can_fold = ExprFolder.can_fold
     self.is_number = ExprFolder.is_number
+    self.result_kind = ExprFolder.result_kind
     self.apply = ExprFolder.apply
     self.fold_call = ExprFolder.fold_call
     self.fold_list = ExprFolder.fold_list
@@ -2119,9 +2132,11 @@ function ExprFolder.fold_binary(self, node, constants)
     if ExprFolder.foldable(self, op, left, right) then
         local lv = __lz_unwrap_or(__lz_wrap(tonumber(left:child("value"))), 0)
         local rv = __lz_unwrap_or(__lz_wrap(tonumber(right:child("value"))), 0)
-        local result = ExprFolder.apply(self, op, lv, rv)
-        self.folds = self.folds + 1
-        return Ast.literal("number", __lz_unwrap_or(__lz_wrap(tostring(result)), "0"), node:line(), node:col())
+        if (op ~= "DIVIDE") or (rv ~= 0) then
+            local result = ExprFolder.apply(self, op, lv, rv)
+            self.folds = self.folds + 1
+            return Ast.literal(ExprFolder.result_kind(self, op, left, right), __lz_unwrap_or(__lz_wrap(tostring(result)), "0"), node:line(), node:col())
+        end
     end
     node:set("left", left)
     node:set("right", right)
@@ -2131,13 +2146,23 @@ function ExprFolder.foldable(self, op, left, right)
     return (ExprFolder.can_fold(self, op) and ExprFolder.is_number(self, left)) and ExprFolder.is_number(self, right)
 end
 function ExprFolder.can_fold(self, op)
-    return ((op == "PLUS") or (op == "MINUS")) or (op == "MULTIPLY")
+    return (((op == "PLUS") or (op == "MINUS")) or (op == "MULTIPLY")) or (op == "DIVIDE")
 end
 function ExprFolder.is_number(self, node)
     if node.kind ~= "LiteralExpr" then
         return false
     end
-    return node:child("lit_kind") == "number"
+    local lk = node:child("lit_kind")
+    return (lk == "number") or (lk == "float")
+end
+function ExprFolder.result_kind(self, op, left, right)
+    if op == "DIVIDE" then
+        return "float"
+    end
+    if (left:child("lit_kind") == "float") or (right:child("lit_kind") == "float") then
+        return "float"
+    end
+    return "number"
 end
 function ExprFolder.apply(self, op, a, b)
     if op == "PLUS" then
@@ -2146,7 +2171,10 @@ function ExprFolder.apply(self, op, a, b)
     if op == "MINUS" then
         return a - b
     end
-    return a * b
+    if op == "MULTIPLY" then
+        return a * b
+    end
+    return a / b
 end
 function ExprFolder.fold_call(self, node, constants)
     node:set("callee", ExprFolder.fold(self, node:child("callee"), constants))

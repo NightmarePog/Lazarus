@@ -11,3 +11,7 @@ extern max(a, b) = "math.max"
 extern min(a, b) = "math.min"
 extern to_number(s) = "tonumber"
 extern to_text(n) = "tostring"
+// Explicit int<->float conversion. `to_int` floors toward -inf; `to_float` is the
+// identity on a Lua number (the int/float split is a compile-time, erased fact).
+extern to_int(x) = "math.floor"
+extern to_float(x) = "tonumber"

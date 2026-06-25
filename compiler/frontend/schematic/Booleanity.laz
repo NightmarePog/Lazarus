@@ -26,7 +26,7 @@ static non_bool_reason(node) {
     mut k = node.kind
     if k == "LiteralExpr" {
         mut lit_kind = node.child("lit_kind")
-        if lit_kind == "number" {
+        if lit_kind == "number" or lit_kind == "float" {
             return "a number"
         }
         if lit_kind == "string" {
