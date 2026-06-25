@@ -66,6 +66,32 @@ static if_clause(condition, body) {
     return Node("IfClause", ["condition": condition, "body": body])
 }
 
+// A nullary enum `enum Name { A, B }`: `variants` is a list of variant-name
+// strings. Lowers to `Name.A = 'A'`, … ; a variant value is its own name string.
+static enum_decl(name, variants, line, col) {
+    return Node("EnumDecl", ["name": name, "variants": variants, "line": line, "col": col])
+}
+
+static match_stmt(scrutinee, arms, line, col) {
+    return Node("MatchStmt", ["scrutinee": scrutinee, "arms": arms, "line": line, "col": col])
+}
+
+// A `<value> => { ... }` arm: matches when the scrutinee equals `pattern`.
+static match_arm(pattern, body) {
+    return Node("MatchArm", ["pattern": pattern, "is_wildcard": false, "is_variant": false, "body": body])
+}
+
+// A `Variant => { ... }` arm: matches when the scrutinee equals the variant's
+// name string. The checker resolves `variant` to its enum for exhaustiveness.
+static match_variant(variant, body) {
+    return Node("MatchArm", ["variant": variant, "is_wildcard": false, "is_variant": true, "body": body])
+}
+
+// A `_ => { ... }` arm: the catch-all, lowered to the `else` branch.
+static match_default(body) {
+    return Node("MatchArm", ["is_wildcard": true, "is_variant": false, "body": body])
+}
+
 static map_entry(key, value) {
     return Node("MapEntry", ["key": key, "value": value])
 }

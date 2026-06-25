@@ -1,0 +1,22 @@
+// Module — one loaded compilation unit produced by the Linker.
+//
+// A program is bundled from many `.laz` files; each becomes a Module carrying
+// its resolved file `path`, its `class_name` (the file stem), the raw `source`
+// (for error snippets during analysis), its parsed `ast` (a Program node with
+// the `import` declarations already stripped out), and the list of imported
+// class `imports` — the names the checker treats as visible and the bundler
+// uses to lower `Name(...)` construction.
+
+public path
+public class_name
+public source
+public ast
+public imports
+
+constructor(path, class_name, source, ast, imports) {
+    .path = path
+    .class_name = class_name
+    .source = source
+    .ast = ast
+    .imports = imports
+}

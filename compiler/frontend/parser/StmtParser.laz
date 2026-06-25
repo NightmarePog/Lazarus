@@ -13,6 +13,7 @@
 // name against the current class before considering the receiver.
 
 import frontend.parser.Ast
+import std.Str
 
 private static compounds = [
     "PLUS_ASSIGN": "PLUS",
@@ -52,6 +53,10 @@ private parse_statement() {
     if k == "EXTERN" {
         .cursor.advance()
         return .parse_extern(tok)
+    }
+    if k == "ENUM" {
+        .cursor.advance()
+        return .parse_enum(tok)
     }
     if k == "PRIVATE" {
         .cursor.advance()
@@ -99,6 +104,10 @@ private parse_statement() {
     }
 
     if k == "IDENTIFIER" {
+        if tok.value == "match" and .starts_match() {
+            .cursor.advance()
+            return .parse_match(tok)
+        }
         if .looks_like_decl() {
             return .parse_method("", false)
         }
@@ -141,6 +150,27 @@ private parse_import(tok) {
         last = seg.value
     }
     return Ast.import_decl(segments, last, tok.line, tok.column)
+}
+
+// `enum Name { A, B, C }` — variant names are PascalCase, separated by a newline
+// or an optional comma. Lowers (in the backend) to `Name.A = 'A'`, ….
+private parse_enum(tok) {
+    mut name = .cursor.consume("IDENTIFIER", "Expected an enum name after 'enum'")
+    mut open = .cursor.consume("BODY_START", "Expected '{' to open enum body")
+    mut variants = []
+    loop {
+        if .cursor.check("BODY_END") {
+            break
+        }
+        if .cursor.at_end() {
+            .cursor.fail_at("Expected '}' to close enum body", open.line, open.column, 1)
+        }
+        mut v = .cursor.consume("IDENTIFIER", "Expected a variant name in the enum body")
+        variants.push(v.value)
+        .cursor.match("COMMA")
+    }
+    .cursor.consume("BODY_END", "Expected '}' to close enum body")
+    return Ast.enum_decl(name.value, variants, tok.line, tok.column)
 }
 
 private parse_extern(tok) {
@@ -310,6 +340,63 @@ private parse_loop(tok) {
 
 private parse_break(tok) {
     return Ast.break_stmt(tok.line, tok.column)
+}
+
+// `match` is a soft keyword (it stays an IDENTIFIER so `cursor.match(...)` and a
+// method named `match` keep working). It opens a match statement only at the head
+// of a statement when what follows begins a scrutinee expression — not a call
+// `match(...)`, an assignment `match = ...`/`match += ...`, or a `.`/`[` access.
+private starts_match() {
+    mut nk = .cursor.peek_next().kind
+    if nk == "LEFT_BRACKET" or nk == "ASSIGN" or nk == "DOT" or nk == "LSQUARE" {
+        return false
+    }
+    return .compound(nk).is_none()
+}
+
+// `match <expr> { <pattern> => { ... } ... _ => { ... } }`. The opening `match`
+// is already consumed.
+private parse_match(tok) {
+    mut scrutinee = .exprs.expression()
+    mut open = .cursor.consume("BODY_START", "Expected '{' to open match body")
+    mut arms = []
+    loop {
+        if .cursor.check("BODY_END") {
+            break
+        }
+        if .cursor.at_end() {
+            .cursor.fail_at("Expected '}' to close match body", open.line, open.column, 1)
+        }
+        arms.push(.parse_match_arm())
+    }
+    .cursor.consume("BODY_END", "Expected '}' to close match body")
+    return Ast.match_stmt(scrutinee, arms, tok.line, tok.column)
+}
+
+// One arm: a `_` catch-all; a bare PascalCase enum variant `Variant`; or a value
+// pattern expression compared against the scrutinee — then `=> { ... }`.
+private parse_match_arm() {
+    mut tok = .cursor.current()
+    if tok.kind == "IDENTIFIER" and tok.value == "_" {
+        .cursor.advance()
+        .cursor.consume("FAT_ARROW", "Expected '=>' after match pattern")
+        return Ast.match_default(.parse_block("match arm body"))
+    }
+    if tok.kind == "IDENTIFIER" and .is_variant_name(tok.value) and .cursor.peek_next().kind == "FAT_ARROW" {
+        .cursor.advance()
+        .cursor.consume("FAT_ARROW", "Expected '=>' after match pattern")
+        return Ast.match_variant(tok.value, .parse_block("match arm body"))
+    }
+    mut pattern = .exprs.expression()
+    .cursor.consume("FAT_ARROW", "Expected '=>' after match pattern")
+    return Ast.match_arm(pattern, .parse_block("match arm body"))
+}
+
+// A PascalCase name (leading uppercase letter) marks an enum-variant pattern,
+// distinct from a snake_case value/identifier pattern.
+private is_variant_name(name) {
+    mut first = Str.sub(name, 1, 1).unwrap_or("")
+    return first >= "A" and first <= "Z"
 }
 
 // The two `for` forms, told apart by lookahead: `for x in …` / `for k, v in …`

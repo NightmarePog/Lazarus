@@ -1,0 +1,91 @@
+// Bundler — assembles a dependencies-first module list into one runnable Lua
+// chunk. There is no runtime module system; everything is composed at compile
+// time: one header, one runtime prelude (only if some module used a collection),
+// each module's class block, and a single entry footer that runs the entry
+// class's constructor.
+//
+// Two passes, mirroring the reference bundle. Pass one collects extern
+// namespaces: a file whose body is *only* `extern` declarations emits no class —
+// its bindings (`Sys.print -> "print"`, …) are gathered into the externs map and
+// threaded into every real module's codegen, so a call like `Sys.print(x)`
+// lowers to its raw Lua target. Pass two generates each non-extern class block
+// with that externs map and the module's imports as its known classes.
+
+import backend.Codegen
+import backend.Runtime
+import backend.Text
+import Error
+
+private modules
+private entry_class
+
+constructor(modules, entry_class) {
+    .modules = modules
+    .entry_class = entry_class
+}
+
+public bundle() {
+    mut externs = .collect_externs()
+
+    mut blocks = []
+    mut any_collections = false
+    mut entry_has_ctor = false
+    mut entry_source = ""
+    for m in .modules {
+        if not .is_extern_module(m) {
+            mut cg = Codegen(m.class_name, m.imports, externs)
+            blocks.push(cg.class_block(m.ast))
+            if cg.uses_collections() {
+                any_collections = true
+            }
+            if m.class_name == .entry_class {
+                entry_has_ctor = cg.has_constructor(m.ast.child("body"))
+                entry_source = m.source
+            }
+        }
+    }
+
+    if not entry_has_ctor {
+        Error("LinkError", "entry class '" ++ .entry_class ++ "' must define a constructor", 1, 1, entry_source, 1).raise()
+    }
+
+    mut sections = [Codegen.header()]
+    if any_collections {
+        sections.push(Runtime.prelude())
+    }
+    for block in blocks {
+        sections.push(block)
+    }
+    sections.push("return " ++ .entry_class ++ ".new(...)")
+    return Text.join(sections, Text.nl() ++ Text.nl())
+}
+
+// Gather the extern-only modules into `externs[class_name][member] = target`.
+private collect_externs() {
+    mut externs = [:]
+    for m in .modules {
+        if .is_extern_module(m) {
+            mut binds = [:]
+            for node in m.ast.child("body") {
+                binds[node.child("name")] = node.child("target")
+            }
+            externs[m.class_name] = binds
+        }
+    }
+    return externs
+}
+
+// A module is an extern namespace when its body holds extern declarations and
+// nothing else — such a file contributes bindings but no class table.
+private is_extern_module(m) {
+    mut has_extern = false
+    mut has_other = false
+    for node in m.ast.child("body") {
+        if node.kind == "ExternDecl" {
+            has_extern = true
+        } else {
+            has_other = true
+        }
+    }
+    return has_extern and not has_other
+}

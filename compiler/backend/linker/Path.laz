@@ -1,0 +1,66 @@
+// Path — pure path-string helpers for the linker. All static: directory and
+// stem extraction, and resolving an import declaration to a source file. Kept
+// separate from Linker so the loader is just the dependency walk and the string
+// fiddling lives in one place.
+
+import std.Str
+import backend.Text
+
+// The directory part of a path (everything before the last '/'), or "" when the
+// path has no directory component.
+static dirname(path) {
+    mut n = Str.len(path).unwrap_or(0)
+    mut cut = 0
+    mut i = 1
+    loop {
+        if i > n {
+            break
+        }
+        mut ch = Str.sub(path, i, i).unwrap_or("")
+        if ch == "/" {
+            cut = i
+        }
+        i = i + 1
+    }
+    if cut == 0 {
+        return ""
+    }
+    return Str.sub(path, 1, cut - 1).unwrap_or("")
+}
+
+// The file stem: basename without directory or extension. `a/b/Vec.laz` -> `Vec`.
+static stem(path) {
+    mut n = Str.len(path).unwrap_or(0)
+    mut start = 1
+    mut dot = n + 1
+    mut i = 1
+    loop {
+        if i > n {
+            break
+        }
+        mut ch = Str.sub(path, i, i).unwrap_or("")
+        if ch == "/" {
+            start = i + 1
+        }
+        if ch == "." {
+            dot = i
+        }
+        i = i + 1
+    }
+    return Str.sub(path, start, dot - 1).unwrap_or(path)
+}
+
+// Resolve one import node to a source path, always from the project root:
+//   `import a.b.Name` -> `<root>/a/b/Name.laz`
+static resolve(root, node) {
+    mut rel = Text.join(node.child("segments"), "/") ++ ".laz"
+    return Path.join(root, rel)
+}
+
+// Join a directory and a relative path. An empty directory yields `rel` as-is.
+static join(dir, rel) {
+    if dir == "" {
+        return rel
+    }
+    return dir ++ "/" ++ rel
+}

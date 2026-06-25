@@ -29,7 +29,20 @@ public emit_member(node) {
     if k == "ConstructorDecl" {
         return .emit_constructor(node)
     }
+    if k == "EnumDecl" {
+        return .emit_enum(node)
+    }
     return .emit_stmt(node)
+}
+
+// A nullary enum lowers to one assignment per variant on the class table, each
+// variant's value being its own name as a (single-quoted) Lua string.
+private emit_enum(node) {
+    mut lines = []
+    for variant in node.child("variants") {
+        lines.push(.ctx.name() ++ "." ++ variant ++ " = '" ++ variant ++ "'")
+    }
+    return Text.lines(lines)
 }
 
 public emit_stmt(node) {
@@ -70,7 +83,59 @@ public emit_stmt(node) {
     if k == "ForInStmt" {
         return .emit_for_in(node)
     }
+    if k == "MatchStmt" {
+        return .emit_match(node)
+    }
     return ""
+}
+
+// A `match` lowers to an `if/elseif/else` ladder over a once-evaluated temp, so
+// the scrutinee runs exactly once and side effects are not repeated. Each value
+// arm becomes an `== pattern` test; the `_` arm becomes the `else`. A match with
+// only a `_` arm runs that body unconditionally inside a `do ... end`.
+private emit_match(node) {
+    mut temp = .ctx.fresh_temp()
+    mut parts = ["local " ++ temp ++ " = " ++ .exprs.emit(node.child("scrutinee"))]
+    mut first = true
+    mut has_default = false
+    mut default_body = []
+    for arm in node.child("arms") {
+        if arm.attr("is_wildcard").unwrap_or(false) {
+            has_default = true
+            default_body = arm.child("body")
+        } else {
+            mut keyword = "elseif "
+            if first {
+                keyword = "if "
+            }
+            first = false
+            parts.push(keyword ++ temp ++ " == " ++ .match_test(arm) ++ " then")
+            .push_block(parts, arm.child("body"))
+        }
+    }
+    if first {
+        if has_default {
+            parts.push("do")
+            .push_block(parts, default_body)
+            parts.push("end")
+        }
+        return Text.lines(parts)
+    }
+    if has_default {
+        parts.push("else")
+        .push_block(parts, default_body)
+    }
+    parts.push("end")
+    return Text.lines(parts)
+}
+
+// The right-hand side of an arm's `temp == …` test: a variant arm compares
+// against the variant's name string; a value arm against its pattern expression.
+private match_test(arm) {
+    if arm.attr("is_variant").unwrap_or(false) {
+        return "'" ++ arm.child("variant") ++ "'"
+    }
+    return .exprs.emit(arm.child("pattern"))
 }
 
 // A statement list as an indented block, or "" when empty.
