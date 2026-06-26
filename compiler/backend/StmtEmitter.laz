@@ -8,6 +8,7 @@
 // statements inside a body, declaring locals in the context so member references
 // stay qualified while locals stay bare.
 
+import std.Num
 import backend.Text
 
 private ctx
@@ -55,8 +56,9 @@ private emit_variant_ctor(name, fields) {
     mut assigns = ["kind = '" ++ name ++ "'"]
     mut i = 1
     for field in fields {
-        params.push("_" ++ i)
-        assigns.push("_" ++ i ++ " = _" ++ i)
+        mut s = Num.to_text(i).unwrap_or("0")
+        params.push("_" ++ s)
+        assigns.push("_" ++ s ++ " = _" ++ s)
         i = i + 1
     }
     mut header = "function " ++ .ctx.name() ++ "." ++ name ++ "(" ++ Text.join(params, ", ") ++ ")"
@@ -177,7 +179,7 @@ private push_payload_body(parts, temp, arm) {
     for name in arm.child("bindings") {
         if name != "_" {
             .ctx.declare_local(name)
-            lines.push("local " ++ name ++ " = " ++ temp ++ "._" ++ i)
+            lines.push("local " ++ name ++ " = " ++ temp ++ "._" ++ Num.to_text(i).unwrap_or("0"))
         }
         i = i + 1
     }
