@@ -1,10 +1,7 @@
-// StmtChecker — semantic validation of statements and blocks.
-//
-// Walks a block in source order, dispatching each statement to its rule and
-// threading the control-flow `Frame` (in-function / in-loop / in-constructor) and
-// a lexical `Scope`. Expression validation is delegated to the held ExprChecker;
-// entering an instance method or constructor toggles its receiver flag so
-// `.field` accesses inside resolve.
+// StmtChecker — semantic validation of statements and blocks. Walks a block in
+// source order, threading the control-flow `Frame` and a lexical `Scope` and
+// delegating expression checks to the held ExprChecker; entering a method or
+// constructor toggles the receiver flag so `.field` accesses resolve.
 
 import std.Str
 import Error
@@ -29,14 +26,14 @@ constructor(source, exprs, variant_owner, enums, variant_arity) {
 
 // Walk a block, marking each statement with whether it is the block's last (the
 // placement rule for `return` / `break`).
-public check_block(stmts, scope, frame) {
+public check_block(stmts, scope, frame: Frame) {
     mut n = stmts.len()
     for i, stmt in stmts {
         .check_statement(stmt, scope, frame, i == n - 1)
     }
 }
 
-private check_statement(stmt, scope, frame, is_last) {
+private check_statement(stmt, scope, frame: Frame, is_last: bool) {
     mut k = stmt.kind
     if k == "VariableDecl" {
         .check_variable(stmt, scope, frame)
@@ -67,13 +64,13 @@ private check_statement(stmt, scope, frame, is_last) {
     } else if k == "BreakStmt" {
         .check_break(stmt, frame, is_last)
     }
-    // ImportDecl / ExternDecl are metadata for the linker — nothing to check.
+    // ImportDecl / ExternDecl are linker metadata — nothing to check.
 }
 
 // A binding is a declaration (first sight, or any visibility/`mut` form) or a
 // reassignment (a bare name already in scope). A top-level visibility binding is
 // an instance property: validated, but not bound as a bare name.
-private check_variable(stmt, scope, frame) {
+private check_variable(stmt, scope, frame: Frame) {
     mut name = stmt.child("name")
     mut visibility = stmt.attr("visibility").unwrap_or("")
     mut is_static = stmt.attr("is_static").unwrap_or(false)
@@ -94,7 +91,7 @@ private check_variable(stmt, scope, frame) {
     }
 }
 
-private declare_binding(stmt, scope, frame, name, visibility) {
+private declare_binding(stmt, scope, frame: Frame, name: str, visibility: str) {
     if not frame.in_function and visibility == "" {
         .fail(stmt, "Top-level binding '" ++ name ++ "' must declare visibility ('private' or 'public')", Str.len(name).unwrap_or(1))
     }
@@ -113,7 +110,7 @@ private declare_binding(stmt, scope, frame, name, visibility) {
     stmt.set("reassign", false)
 }
 
-private reassign_binding(stmt, scope, name, existing) {
+private reassign_binding(stmt, scope, name: str, existing) {
     if not existing.mutable {
         .fail(stmt, "Cannot assign to immutable binding '" ++ name ++ "'", Str.len(name).unwrap_or(1))
     }
@@ -133,7 +130,7 @@ private check_optional_value(stmt, scope) {
     }
 }
 
-private value_noncallable(stmt) {
+private value_noncallable(stmt): bool {
     mut value = stmt.attr("value")
     if value.is_none() {
         return false
@@ -141,10 +138,9 @@ private value_noncallable(stmt) {
     return Callability.is_noncallable(value.unwrap())
 }
 
-// The name is bound before the body is walked, so a function may recurse. The
-// body runs in a child scope holding the parameters; a top-level instance method
-// (not static, not nested) is analysed with a receiver in scope.
-private check_function(stmt, scope, frame) {
+// The name is bound before the body is walked, so a function may recurse. A
+// top-level instance method (not static, not nested) is analysed with a receiver.
+private check_function(stmt, scope, frame: Frame) {
     mut name = stmt.child("name")
     if scope.declared_here(name) {
         .fail(stmt, "Duplicate declaration '" ++ name ++ "'", Str.len(name).unwrap_or(1))
@@ -157,18 +153,17 @@ private check_function(stmt, scope, frame) {
     .check_callable_body(stmt, scope, Frame(true, false, false), is_instance)
 }
 
-// A constructor is class-level (not nested), has a receiver, and must not
-// `return` — analysed with `in_constructor` so `return` is rejected.
-private check_constructor(stmt, scope, frame) {
+// A constructor is class-level, has a receiver, and must not `return`.
+private check_constructor(stmt, scope, frame: Frame) {
     if frame.in_function {
         .fail(stmt, "'constructor' must be at the top level of a class", 11)
     }
     .check_callable_body(stmt, scope, Frame(true, false, true), true)
 }
 
-// Shared body analysis for a method / constructor: bind params in a child scope,
-// then walk the body with the receiver flag set for an instance context.
-private check_callable_body(stmt, scope, frame, is_instance) {
+// Bind params in a child scope, then walk the body with the receiver flag set for
+// an instance context.
+private check_callable_body(stmt, scope, frame: Frame, is_instance: bool) {
     mut inner = scope.child()
     .bind_params(stmt, inner)
     mut outer = .exprs.instance_flag()
@@ -187,7 +182,7 @@ private bind_params(stmt, scope) {
     }
 }
 
-private check_return(stmt, scope, frame, is_last) {
+private check_return(stmt, scope, frame: Frame, is_last: bool) {
     if frame.in_constructor {
         .fail(stmt, "'return' is not allowed in a constructor; the instance is returned implicitly", 6)
     }
@@ -203,7 +198,7 @@ private check_return(stmt, scope, frame, is_last) {
     }
 }
 
-private check_break(stmt, frame, is_last) {
+private check_break(stmt, frame: Frame, is_last: bool) {
     if not frame.in_loop {
         .fail(stmt, "'break' outside of a loop", 5)
     }
@@ -227,9 +222,9 @@ private check_assign(stmt, scope) {
 }
 
 // Each clause condition is validated; each branch is a child scope so a binding
-// in one neither leaks nor collides with another. The frame is inherited so
-// `return` / `break` inside a branch are judged by the enclosing context.
-private check_if(stmt, scope, frame) {
+// in one neither leaks nor collides. The frame is inherited so `return` / `break`
+// inside a branch are judged by the enclosing context.
+private check_if(stmt, scope, frame: Frame) {
     for clause in stmt.child("clauses") {
         .exprs.check_condition(clause.child("condition"), scope)
         .check_block(clause.child("body"), scope.child(), frame)
@@ -240,19 +235,19 @@ private check_if(stmt, scope, frame) {
     }
 }
 
-private check_while(stmt, scope, frame) {
+private check_while(stmt, scope, frame: Frame) {
     .exprs.check_condition(stmt.child("condition"), scope)
     .check_block(stmt.child("body"), scope.child(), frame.in_loop_body())
 }
 
-private check_loop(stmt, scope, frame) {
+private check_loop(stmt, scope, frame: Frame) {
     .check_block(stmt.child("body"), scope.child(), frame.in_loop_body())
 }
 
-// The loop variable bound by `init` is loop-local and implicitly mutable (so the
-// step may reassign it); condition, step and body all see it, and the body runs
-// in a further child scope so its own declarations do not leak.
-private check_for(stmt, scope, frame) {
+// The `init` loop variable is loop-local and implicitly mutable (the step may
+// reassign it); condition, step and body all see it, and the body runs in a
+// further child scope so its own declarations do not leak.
+private check_for(stmt, scope, frame: Frame) {
     mut inner = scope.child()
     mut loop_frame = frame.in_loop_body()
 
@@ -286,7 +281,7 @@ private check_for_init(init, scope) {
 
 // The iterated value is checked in the enclosing scope; the body sees the fresh,
 // immutable loop variable(s) — one (value) or two (key/index and value).
-private check_for_in(stmt, scope, frame) {
+private check_for_in(stmt, scope, frame: Frame) {
     .exprs.check(stmt.child("iter"), scope)
     mut inner = scope.child()
     for name in stmt.child("vars") {
@@ -299,12 +294,9 @@ private check_for_in(stmt, scope, frame) {
     .check_block(stmt.child("body"), inner, frame.in_loop_body())
 }
 
-// The scrutinee is validated in the enclosing scope; each arm body is its own
-// child scope (so a binding in one arm neither leaks nor collides), with the
-// frame inherited so `return` / `break` inside an arm are judged by the enclosing
-// context. Variant arms are resolved to a single enum and, absent a `_`, the
-// match must cover every variant of that enum (exhaustiveness).
-private check_match(stmt, scope, frame) {
+// The scrutinee is validated, then each arm body in its own child scope. Variant
+// arms resolve to a single enum and, absent a `_`, must cover every variant.
+private check_match(stmt, scope, frame: Frame) {
     .exprs.check(stmt.child("scrutinee"), scope)
     mut enum_name = ""
     mut covered = [:]
@@ -326,9 +318,8 @@ private check_match(stmt, scope, frame) {
     }
 }
 
-// Resolve one variant arm: the name must be a known variant, all variant arms in
-// a match must belong to the same enum, and a variant must not repeat.
-private check_variant_arm(stmt, arm, enum_name, covered) {
+// Resolve one variant arm: a known variant, all arms from the same enum, no repeat.
+private check_variant_arm(stmt, arm, enum_name: str, covered): str {
     mut v = arm.child("variant")
     mut owner = .variant_owner.get(v)
     if owner.is_none() {
@@ -358,7 +349,7 @@ private declare_bindings(arm, scope) {
     }
 }
 
-private check_exhaustive(stmt, enum_name, covered) {
+private check_exhaustive(stmt, enum_name: str, covered) {
     for variant in .enums.get(enum_name).unwrap() {
         if not covered.has(variant) {
             .fail(stmt, "Non-exhaustive match on enum '" ++ enum_name ++ "': missing variant '" ++ variant ++ "' (add it, or a '_' arm)", 1)
@@ -366,6 +357,6 @@ private check_exhaustive(stmt, enum_name, covered) {
     }
 }
 
-private fail(node, message, span) {
+private fail(node, message: str, span: int) {
     Error("SemanticError", message, node.line(), node.col(), .source, span).raise()
 }
