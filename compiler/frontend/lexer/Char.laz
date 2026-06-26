@@ -3,7 +3,6 @@
 // no byte, so `code_of` is None and `unwrap_or(0)` makes every predicate false.
 
 import std.Str
-import std.Option
 
 static code_of(c: str): Option<int> {
     return Str.byte(c, 1)

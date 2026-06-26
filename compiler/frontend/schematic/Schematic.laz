@@ -24,6 +24,11 @@ static analyze(program, source: str, class_name: str, imports, variant_owner, en
     for name in imports {
         root.declare(name, Symbol("class", false, false))
     }
+    // Built-in collection / optional namespaces, available without an import:
+    // `Option.some/none`, `Result.ok/err`, and the List/Map literal types.
+    for name in ["Option", "Result", "List", "Map"] {
+        root.declare(name, Symbol("class", false, false))
+    }
 
     mut exprs = ExprChecker(source, properties, methods, variant_owner)
     mut stmts = StmtChecker(source, exprs, variant_owner, enums, variant_arity)

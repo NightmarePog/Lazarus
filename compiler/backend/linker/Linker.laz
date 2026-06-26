@@ -26,20 +26,10 @@ constructor(entry: str) {
     .ordered = []
 }
 
-// The full module set, dependencies-first. Option<T>/Result<T> back every
-// collection/IO result, so they are linked into every program implicitly — but
-// only when present, so a program shipping no `std/` still links.
+// The full module set reachable from the entry file, dependencies-first.
 public link() {
     .load(.entry, "", 0, 0, 1)
-    .load_runtime(Path.join(.root, "std/Option.laz"))
-    .load_runtime(Path.join(.root, "std/Result.laz"))
     return .ordered
-}
-
-private load_runtime(path: str) {
-    if Sys.read_file(path).is_some() {
-        .load(path, "", 0, 0, 1)
-    }
 }
 
 public entry_class(): str {

@@ -10,7 +10,6 @@
 import frontend.parser.Ast
 import frontend.parser.Node
 import std.Str
-import std.Option
 
 private static compounds = [
     "PLUS_ASSIGN": "PLUS",
