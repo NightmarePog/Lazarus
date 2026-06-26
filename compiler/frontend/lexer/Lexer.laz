@@ -1,7 +1,6 @@
-// Single-pass scanner from source text to a flat token list.
-//
-// `current` is the character at `pos`, or "" at end of source. Every `Char`
-// predicate is false for "", so the scan loops stop at the end without a guard.
+// Single-pass scanner from source text to a flat token list. `current` is the
+// char at `pos`, or "" at end of source; every `Char` predicate is false for "",
+// so the scan loops stop at the end without a guard.
 
 import std.Str
 import Error
@@ -9,13 +8,13 @@ import frontend.lexer.Char
 import frontend.lexer.Keywords
 import frontend.lexer.Token
 
-private source
-private pos
-private line
-private col
-private current
+private source: str
+private pos: int
+private line: int
+private col: int
+private current: str
 
-constructor(source) {
+constructor(source: str) {
     .source = source
     .pos = 1
     .line = 1
@@ -36,15 +35,15 @@ public scan() {
 }
 
 // "" when `i` is past the end; out-of-range indices are safe in `string.sub`.
-private char_at(i) {
+private char_at(i: int): str {
     return Str.sub(.source, i, i).unwrap_or("")
 }
 
-private peek() {
+private peek(): str {
     return .char_at(.pos + 1)
 }
 
-private at_end() {
+private at_end(): bool {
     return .current == ""
 }
 
@@ -72,7 +71,7 @@ private skip_trivia() {
 }
 
 // True when a `// ...` or `/* ... */` comment was consumed; false for a lone `/`.
-private skip_comment() {
+private skip_comment(): bool {
     if .current != "/" {
         return false
     }
@@ -113,7 +112,7 @@ private skip_comment() {
     return false
 }
 
-private next_token() {
+private next_token(): Token {
     if Char.is_ident_start(.current) {
         return .read_identifier()
     }
@@ -126,7 +125,7 @@ private next_token() {
     return .read_symbol()
 }
 
-private read_identifier() {
+private read_identifier(): Token {
     mut start = .pos
     mut line = .line
     mut col = .col
@@ -137,11 +136,9 @@ private read_identifier() {
     return Token(Keywords.word_kind(text), text, line, col)
 }
 
-// A `NUMBER` (integer) or `FLOAT` literal. A `.` is part of the number only when
-// a digit follows it (`3.14`); otherwise it's left as its own token, so `x.field`
-// and `3.method` still work. A letter right after the digits (`123abc`) is an
-// error, not two tokens.
-private read_number() {
+// A `.` joins the number only when a digit follows (`3.14`), so `x.field` and
+// `3.method` still tokenize; a letter right after the digits is an error.
+private read_number(): Token {
     mut start = .pos
     mut line = .line
     mut col = .col
@@ -163,8 +160,7 @@ private read_number() {
     return Token(kind, text, line, col)
 }
 
-// `value` holds the content between the quotes.
-private read_string() {
+private read_string(): Token {
     mut line = .line
     mut col = .col
     .advance()
@@ -187,7 +183,7 @@ private read_string() {
 }
 
 // Maximal munch: a two-character operator wins when the source matches one.
-private read_symbol() {
+private read_symbol(): Token {
     mut line = .line
     mut col = .col
     mut ch = .current

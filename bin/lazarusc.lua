@@ -251,77 +251,31 @@ function Char.code_of(c)
     return __lz_wrap(string.byte(c, 1))
 end
 function Char.is_digit(c)
-    local b = Char.code_of(c)
-    if b:is_none() then
-        return false
-    end
-    local code = b:unwrap()
+    local code = Char.code_of(c):unwrap_or(0)
     return (code >= 48) and (code <= 57)
 end
 function Char.is_alpha(c)
-    local b = Char.code_of(c)
-    if b:is_none() then
-        return false
-    end
-    local code = b:unwrap()
-    local lower = (code >= 97) and (code <= 122)
-    local upper = (code >= 65) and (code <= 90)
-    return lower or upper
+    local code = Char.code_of(c):unwrap_or(0)
+    return ((code >= 97) and (code <= 122)) or ((code >= 65) and (code <= 90))
 end
 function Char.is_underscore(c)
-    local b = Char.code_of(c)
-    if b:is_none() then
-        return false
-    end
-    return b:unwrap() == 95
+    return Char.code_of(c):unwrap_or(0) == 95
 end
 function Char.is_ident_start(c)
-    local b = Char.code_of(c)
-    if b:is_none() then
-        return false
-    end
-    local code = b:unwrap()
-    local lower = (code >= 97) and (code <= 122)
-    local upper = (code >= 65) and (code <= 90)
-    local under = code == 95
-    return (lower or upper) or under
+    return Char.is_alpha(c) or Char.is_underscore(c)
 end
 function Char.is_ident_char(c)
-    local b = Char.code_of(c)
-    if b:is_none() then
-        return false
-    end
-    local code = b:unwrap()
-    local lower = (code >= 97) and (code <= 122)
-    local upper = (code >= 65) and (code <= 90)
-    local digit = (code >= 48) and (code <= 57)
-    local under = code == 95
-    return ((lower or upper) or digit) or under
+    return Char.is_ident_start(c) or Char.is_digit(c)
 end
 function Char.is_space(c)
-    local b = Char.code_of(c)
-    if b:is_none() then
-        return false
-    end
-    local code = b:unwrap()
-    if code == 32 then
-        return true
-    end
-    return (code >= 9) and (code <= 13)
+    local code = Char.code_of(c):unwrap_or(0)
+    return (code == 32) or ((code >= 9) and (code <= 13))
 end
 function Char.is_newline(c)
-    local b = Char.code_of(c)
-    if b:is_none() then
-        return false
-    end
-    return b:unwrap() == 10
+    return Char.code_of(c):unwrap_or(0) == 10
 end
 function Char.is_quote(c)
-    local b = Char.code_of(c)
-    if b:is_none() then
-        return false
-    end
-    return b:unwrap() == 34
+    return Char.code_of(c):unwrap_or(0) == 34
 end
 
 local Keywords = {}

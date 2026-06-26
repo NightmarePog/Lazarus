@@ -1,6 +1,8 @@
 // Source spellings to token-kind tags. `ops2` is checked before `ops1` so
 // two-character operators win over their leading character (maximal munch).
 
+import std.Option
+
 private static words = [
     "import": "IMPORT",
     "extern": "EXTERN",
@@ -62,14 +64,14 @@ private static ops1 = [
     "]": "RSQUARE"
 ]
 
-public static word_kind(word) {
+public static word_kind(word: str): str {
     return Keywords.words.get(word).unwrap_or("IDENTIFIER")
 }
 
-public static two(pair) {
+public static two(pair: str): Option<str> {
     return Keywords.ops2.get(pair)
 }
 
-public static one(ch) {
+public static one(ch: str): Option<str> {
     return Keywords.ops1.get(ch)
 }
