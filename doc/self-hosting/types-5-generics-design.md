@@ -17,7 +17,7 @@ types.
 |------|----------|
 | Scope | Generics on **enums and classes**, plus **generic methods**. |
 | Class type params | Declared on the constructor: `constructor<T, U>(...)`; scope the whole file-class. |
-| Generic methods | A method may carry its own `<U>` with its own inference scope. |
+| Generic methods | A method may carry its own `<U>` with its own inference scope. **Limited to non-function signatures this round** — methods that *take* a function (`map`/`fold`) await first-class function values, a separate next part. |
 | Enum variant construction | **Bare**: `Some(5)`, `None`, `Ok("hi")` — prelude-style, resolved via the program-wide variant registry. |
 | Leniency | **Fully lenient** about missing/unsolvable args: bare `Option` = `Option<dynamic>`; unsolved inference → `dynamic`. Only two **concrete** args clash (`Result<int>` ≠ `Result<str>`). |
 | Explicit-arg arity | When args ARE written (`Option<int, str>`), the count must match the decl — else error. Bare (no `<...>`) is always allowed. |
@@ -40,9 +40,20 @@ first(): A { return .left }
 mut p = Pair(1, "x")   // p : Pair<int, str>
 mut f = p.first()      // f : int
 
-// generic method — its own <U>
-map<U>(fn: (A) -> U): U { return fn(.left) }
+// generic method — its own <U> (parsing/scoping/inference land now)
+wrap<U>(u: U): Pair<A, U> { ... }    // p.wrap("z") : Pair<int, str>
+
+// DEFERRED to the function-values part: a method that TAKES a function needs
+// first-class function values, which don't exist yet.
+//   map<U>(fn: (A) -> U): U { return fn(.left) }
 ```
+
+## Out of scope (deferred)
+
+- **First-class function values** (lambdas / passing & calling functions): the
+  *next* part. Until it lands, generic methods may not take function-value
+  params, so `map`/`fold`-style methods are deferred. Everything else generic
+  (enum/class generics, bare variants, non-function generic methods) ships here.
 
 ## Architecture
 
