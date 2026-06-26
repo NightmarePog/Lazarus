@@ -1,12 +1,12 @@
-// Option<T> — a typed optional value, generic over its element type T. Construct
+// Option<T> — the one optional type, generic over its element type T. Construct
 // with the static factories `Option.some(v)` / `Option.none()`; the type argument
 // is inferred at the factory (`Option.some(5)` is an `Option<int>`).
 //
-// Distinct from the runtime/untyped Option produced at the extern boundary (which
-// uses the reserved `is_some`/`unwrap` builtins). The typed Option uses
-// `present`/`absent` and `take`/`take_or` to avoid those reserved names. The
-// `none` placeholder value is erased and never observed (`take` panics, `take_or`
-// returns its default).
+// This is the single Option in the language: collection and IO operations
+// (`list.get`, `list.pop`, `Sys.read_line`, …) return an `Option<T>`, and
+// `is_some`/`is_none`/`unwrap`/`unwrap_or` are real methods on it (no longer
+// reserved runtime builtins). The `none` placeholder value is erased and never
+// observed (`unwrap` panics, `unwrap_or` returns its default).
 
 import std.Sys
 
@@ -26,22 +26,22 @@ static none(): Option<T> {
     return Option(false, 0)
 }
 
-present(): bool {
+is_some(): bool {
     return .full
 }
 
-absent(): bool {
+is_none(): bool {
     return not .full
 }
 
-take(): T {
+unwrap(): T {
     if .full {
         return .value
     }
-    Sys.panic("take() on an absent Option")
+    Sys.panic("unwrap() on a None value")
 }
 
-take_or(d: T): T {
+unwrap_or(d: T): T {
     if .full {
         return .value
     }

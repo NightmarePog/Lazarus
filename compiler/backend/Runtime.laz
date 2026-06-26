@@ -1,11 +1,17 @@
-// Runtime — the collection / Option prelude emitted ahead of generated code.
+// Runtime — the collection prelude emitted ahead of generated code.
 //
-// Lists, maps and Option are untyped tagged tables (`{ kind = ... }`) and every
-// operation dispatches on the tag through these `__lz_*` helpers. The block is
-// emitted once, only when a program actually uses a collection or Option. Tag
-// strings are single-quoted in the emitted Lua (`'list'`), which keeps them as
-// plain characters inside these Lazarus double-quoted literals (the lexer does
-// not process escapes, and a double quote would close the string).
+// Lists and maps are untyped tagged tables (`{ kind = ... }`) and every operation
+// dispatches on the tag through these `__lz_*` helpers. The block is emitted once,
+// only when a program actually uses a collection or Option. Tag strings are
+// single-quoted in the emitted Lua (`'list'`), which keeps them as plain
+// characters inside these Lazarus double-quoted literals (the lexer does not
+// process escapes, and a double quote would close the string).
+//
+// Option is no longer a runtime tag: the operations that used to yield a runtime
+// Option (`get`, `pop`, and the extern-boundary `__lz_wrap`) now return the std
+// `Option<T>` class via `Option.some` / `Option.none`. The bundler emits the
+// Option/Result class blocks ahead of this prelude, so those names are in scope
+// here (captured as upvalues).
 
 import backend.Text
 
@@ -17,15 +23,9 @@ static prelude() {
         "local function __lz_map(items)",
         "    return { kind = 'map', items = items }",
         "end",
-        "local function __lz_some(v)",
-        "    return { kind = 'some', value = v }",
-        "end",
-        "local function __lz_none()",
-        "    return { kind = 'none' }",
-        "end",
         "local function __lz_wrap(v)",
-        "    if v == nil then return __lz_none() end",
-        "    return __lz_some(v)",
+        "    if v == nil then return Option.none() end",
+        "    return Option.some(v)",
         "end",
         "local function __lz_len(c)",
         "    if c.kind == 'list' then return #c.items end",
@@ -38,15 +38,15 @@ static prelude() {
         "end",
         "local function __lz_pop(c)",
         "    local n = #c.items",
-        "    if n == 0 then return __lz_none() end",
+        "    if n == 0 then return Option.none() end",
         "    local v = c.items[n]",
         "    c.items[n] = nil",
-        "    return __lz_some(v)",
+        "    return Option.some(v)",
         "end",
         "local function __lz_get(c, k)",
         "    local v = c.items[k]",
-        "    if v == nil then return __lz_none() end",
-        "    return __lz_some(v)",
+        "    if v == nil then return Option.none() end",
+        "    return Option.some(v)",
         "end",
         "local function __lz_has(c, k)",
         "    return c.items[k] ~= nil",
@@ -61,20 +61,6 @@ static prelude() {
         "    else",
         "        c.items[i] = v",
         "    end",
-        "end",
-        "local function __lz_is_some(o)",
-        "    return o.kind == 'some'",
-        "end",
-        "local function __lz_is_none(o)",
-        "    return o.kind == 'none'",
-        "end",
-        "local function __lz_unwrap(o)",
-        "    if o.kind ~= 'some' then error('unwrap of a None value') end",
-        "    return o.value",
-        "end",
-        "local function __lz_unwrap_or(o, d)",
-        "    if o.kind == 'some' then return o.value end",
-        "    return d",
         "end",
         "local function __lz_str_find(s, sub)",
         "    return (string.find(s, sub, 1, true))",

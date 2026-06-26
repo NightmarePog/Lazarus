@@ -29,6 +29,7 @@ constructor(modules, entry_class, variant_owner) {
 public bundle() {
     mut externs = .collect_externs()
 
+    mut runtime_blocks = []
     mut blocks = []
     mut any_collections = false
     mut entry_has_ctor = false
@@ -36,7 +37,12 @@ public bundle() {
     for m in .modules {
         if not .is_extern_module(m) {
             mut cg = Codegen(m.class_name, m.imports, externs, .variant_owner)
-            blocks.push(cg.class_block(m.ast))
+            mut block = cg.class_block(m.ast)
+            if .is_runtime_type(m.class_name) {
+                runtime_blocks.push(block)
+            } else {
+                blocks.push(block)
+            }
             if cg.uses_collections() {
                 any_collections = true
             }
@@ -52,6 +58,12 @@ public bundle() {
     }
 
     mut sections = [Codegen.header()]
+    // Option<T>/Result<T> back the collection prelude (`__lz_get`/`__lz_pop`/
+    // `__lz_wrap` call `Option.some`/`Option.none`), so their class tables are
+    // emitted ahead of it, captured as upvalues.
+    for block in runtime_blocks {
+        sections.push(block)
+    }
     if any_collections {
         sections.push(Runtime.prelude())
     }
@@ -75,6 +87,11 @@ private collect_externs() {
         }
     }
     return externs
+}
+
+// The runtime-implicit types (Option<T>/Result<T>) emitted before the prelude.
+private is_runtime_type(name) {
+    return name == "Option" or name == "Result"
 }
 
 // A module is an extern namespace when its body holds extern declarations and

@@ -28,16 +28,16 @@ private static op_map = [
     "OR": "or"
 ]
 
+// Collection operations that lower to a `__lz_*` helper with the receiver as the
+// first argument. Option's is_some/is_none/unwrap/unwrap_or are NOT here: Option
+// is the std `Option<T>` class now, so those are ordinary method calls dispatched
+// on the instance (`o:unwrap()`).
 private static builtins = [
     "len": "__lz_len",
     "push": "__lz_push",
     "pop": "__lz_pop",
     "get": "__lz_get",
-    "has": "__lz_has",
-    "is_some": "__lz_is_some",
-    "is_none": "__lz_is_none",
-    "unwrap": "__lz_unwrap",
-    "unwrap_or": "__lz_unwrap_or"
+    "has": "__lz_has"
 ]
 
 private ctx

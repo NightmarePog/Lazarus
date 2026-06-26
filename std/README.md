@@ -5,7 +5,7 @@ import these with a dotted, root-relative path:
 
 ```
 import std.Str
-import std.ResultString
+import std.Option
 ```
 
 (Stdlib files import each other the same way, e.g. `import std.Sys` — every
@@ -15,8 +15,8 @@ import resolves from the project root, never relative to the importing file.)
 
 Thin wrappers over Lua's stdlib via the `extern` mechanism. Every extern call
 forwards its args (no arity check) and wraps its result at the **Option boundary**
-— a Lua `nil` becomes the untyped runtime `None`, any other value `Some` — so the
-result is consumed with the builtin `.unwrap()` / `.is_some()` / `.unwrap_or(d)`.
+— a Lua `nil` becomes `Option.none()`, any other value `Option.some(v)` — so the
+result is consumed with `.is_some()` / `.unwrap()` / `.unwrap_or(d)`.
 
 | File | Wraps | Notes |
 |------|-------|-------|
@@ -24,22 +24,25 @@ result is consumed with the builtin `.unwrap()` / `.is_some()` / `.unwrap_or(d)`
 | `Num.laz` | `math.*` + `tonumber` | `to_number` returns `None` for a non-numeric string. |
 | `Sys.laz` | `io.*` / `os.*` / `print` | `panic(msg)` binds to Lua `error()` and never returns. |
 
-## Typed Option / Result
+## Option / Result
 
-Type safety by convention: each class only ever holds one kind of value (there is
-no type system to enforce it). These are plain Lazarus classes — **not** the
-untyped runtime Option produced at the extern boundary.
+There is **one** `Option<T>` and **one** `Result<T>`, generic over their element
+type — no per-type copies. They are ordinary Lazarus classes, type-checked like
+any other generic class, and the type argument is inferred at construction
+(`Option.some(5)` is an `Option<int>`).
 
-The runtime reserves the method names `unwrap`/`unwrap_or`/`is_some`/`is_none`, so
-the typed classes use distinct names:
+`Option<T>` and `Result<T>` are also the language's *runtime* optional types:
+collection and IO operations (`list.get`, `list.pop`, `Sys.read_line`, every
+extern result) return an `Option<T>`. They are linked into every program
+implicitly, so you can consume a collection result without importing them; import
+them explicitly when you name the type or call the static factories.
 
-- **`ResultBool` / `ResultString` / `ResultInt`** — `Ok(<type>) | Err(str)`.
-  Build with `ResultX.ok(v)` / `ResultX.err(m)`; query with `is_ok()` / `is_err()`;
-  extract with `take()` (aborts via `Sys.panic` on `Err`) / `take_or(d)`; read the
+- **`Option<T>`** — `Some(T) | None`. Build with `Option.some(v)` /
+  `Option.none()`; query with `is_some()` / `is_none()`; extract with `unwrap()`
+  (aborts via `Sys.panic` on `None`) / `unwrap_or(d)`.
+- **`Result<T>`** — `Ok(T) | Err(str)`. Build with `Result.ok(v)` /
+  `Result.err(m)`; query with `is_ok()` / `is_err()`; extract with `unwrap()`
+  (aborts via `Sys.panic` with the message on `Err`) / `unwrap_or(d)`; read the
   error message with `error()`.
-- **`OptionBool` / `OptionString` / `OptionInt`** — `Some(<type>) | None`.
-  Build with `OptionX.some(v)` / `OptionX.none()`; query with `present()` /
-  `absent()`; extract with `take()` / `take_or(d)`.
 
-Add a new Ok/Some type by copying the corresponding class and changing the Err/None
-placeholder value.
+The `None`/`Err` placeholder element value is erased and never observed.

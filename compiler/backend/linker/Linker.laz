@@ -30,9 +30,23 @@ constructor(entry) {
 }
 
 // The full module set reachable from the entry file, dependencies-first.
+// Option<T>/Result<T> back every collection and IO result (the prelude's `get`/
+// `pop`/extern-wrap build them), so they are linked into every program
+// implicitly — but only when actually present, so a program that ships no `std/`
+// (and therefore uses no collections) still links.
 public link() {
     .load(.entry, "", 0, 0, 1)
+    .load_runtime(Path.join(.root, "std/Option.laz"))
+    .load_runtime(Path.join(.root, "std/Result.laz"))
     return .ordered
+}
+
+// Link a runtime-implicit module if its source can be read; silently skip it
+// otherwise (no `import` line to point an error at).
+private load_runtime(path) {
+    if Sys.read_file(path).is_some() {
+        .load(path, "", 0, 0, 1)
+    }
 }
 
 // The entry class name — the file stem of the entry path.

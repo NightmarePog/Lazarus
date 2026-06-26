@@ -3,10 +3,9 @@
 // `Result.err(m)`; the type argument is inferred at `ok` (`Result.ok(5)` is a
 // `Result<int>`).
 //
-// `take()` returns the Ok value or panics with the message; `take_or(d)` returns
-// a default on Err. (`unwrap`/`unwrap_or` are reserved by the runtime Option, so
-// the typed Result uses `take`/`take_or`.) The Err placeholder Ok value is erased
-// and never observed.
+// `unwrap()` returns the Ok value or panics with the message; `unwrap_or(d)`
+// returns a default on Err; `error()` reads the Err message. The Err placeholder
+// Ok value is erased and never observed.
 
 import std.Sys
 
@@ -36,14 +35,14 @@ is_err(): bool {
     return not .ok_flag
 }
 
-take(): T {
+unwrap(): T {
     if .ok_flag {
         return .value
     }
     Sys.panic(.message)
 }
 
-take_or(d: T): T {
+unwrap_or(d: T): T {
     if .ok_flag {
         return .value
     }
