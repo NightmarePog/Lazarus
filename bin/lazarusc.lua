@@ -4339,7 +4339,7 @@ function Main.new()
     if path:is_some() then
         Main.build_file(path:unwrap())
     else
-        Error.new("NoFileAppended", "No file appended, use 'lazarus <FILE.laz>'", 0, 0, 0, 2):raise()
+        Error.new("NoFileAppended", "No file appended, use 'lazarus <FILE.laz>'", 0, 0, "", 2):raise()
     end
     return self
 end

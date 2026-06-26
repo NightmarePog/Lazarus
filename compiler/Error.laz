@@ -1,10 +1,6 @@
-// A located compiler error rendered as a coloured diagnostic box, mirroring the
-// reference `src/error.lua`: a type label, a `unknown:line:col` location, the
-// message, and a source snippet with a caret under the offending column.
-//
-// The subset has no exceptions, so `raise()` prints the box and exits — it never
-// returns. Construct with the source text and a caret `span` so the snippet can
-// be drawn.
+// A located compiler error rendered as a coloured diagnostic box: a type label, a
+// `unknown:line:col` location, the message, and a source snippet with a caret
+// under the offending column. No exceptions, so `raise()` prints and exits.
 
 import std.Str
 import std.Sys
@@ -16,7 +12,7 @@ public column
 public source
 public span
 
-constructor(kind, message, line, column, source, span) {
+constructor(kind: str, message: str, line: int, column: int, source: str, span: int) {
     .kind = kind
     .message = message
     .line = line
@@ -25,7 +21,7 @@ constructor(kind, message, line, column, source, span) {
     .span = span
 }
 
-public to_string() {
+public to_string(): str {
     return .format()
 }
 
@@ -34,7 +30,7 @@ public raise() {
     Sys.exit(1)
 }
 
-public format() {
+public format(): str {
     mut esc = Str.char(27).unwrap_or("")
     mut red = esc ++ "[31m"
     mut bold = esc ++ "[1m"
@@ -60,7 +56,7 @@ public format() {
 }
 
 // The 1-based `target` line of `source`, without its trailing newline.
-static source_line(source, target) {
+static source_line(source: str, target: int): str {
     mut nl = Str.char(10).unwrap_or("")
     mut len = Str.len(source).unwrap_or(0)
     mut cur = 1
@@ -88,8 +84,8 @@ static source_line(source, target) {
 }
 
 // Display width in codepoints: UTF-8 continuation bytes (0x80..0xBF) don't count,
-// so the multibyte `│` in the line prefix aligns the caret correctly.
-static display_width(s) {
+// so the multibyte `│` in the prefix aligns the caret correctly.
+static display_width(s: str): int {
     mut len = Str.len(s).unwrap_or(0)
     mut w = 0
     mut i = 1

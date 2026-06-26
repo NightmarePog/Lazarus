@@ -1,9 +1,7 @@
-// Sys — extern bindings to Lua's process / IO / runtime functions.
-//
-// Extern calls forward their args (no arity check) and wrap their result at the
-// Option boundary (a Lua nil becomes the runtime None). `panic` binds to Lua's
-// `error`, which never returns — it is how the typed Result/Option `take()`
-// methods abort.
+// Sys — extern bindings to Lua's process / IO / runtime functions. Extern calls
+// forward their args (no arity check) and wrap their result at the Option boundary
+// (a Lua nil becomes `Option.none()`). `panic` binds to Lua's `error`, which never
+// returns — it is how `Option`/`Result.unwrap()` abort.
 
 extern panic(message) = "error"
 extern print(s) = "print"
