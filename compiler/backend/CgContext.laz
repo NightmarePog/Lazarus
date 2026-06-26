@@ -1,13 +1,10 @@
-// CgContext — per-generation codegen state for the file = class model.
-//
-// A file lowers to a class table `C`; its top-level functions and bindings are
-// members emitted as `function C.name(...)` / `C.name = value`. Inside a body, a
-// reference to another member must be qualified (`C.other`) while locals and
-// parameters stay bare — `emit_name` makes that call using the member set and a
-// stack of local scopes (Lazarus has no metatables, so the scope chain is an
-// explicit list searched outward).
+// CgContext — per-generation codegen state for the file = class model. A file
+// lowers to a class table `C`; inside a body, a reference to another member is
+// qualified (`C.other`) while locals and parameters stay bare. `emit_name` makes
+// that call using the member set and a stack of local scopes (no metatables, so
+// the scope chain is an explicit list searched outward).
 
-private cls
+private cls: str
 private members
 private instance_methods
 private instance_order
@@ -33,14 +30,14 @@ constructor(cls, members, instance_methods, instance_order, properties, known_cl
     .temp_seq = 0
 }
 
-// A fresh, collision-free local name for a generated temporary (e.g. the
-// once-evaluated scrutinee of a `match`). Unique within this class block.
+// A fresh, collision-free local name for a generated temporary (e.g. a `match`
+// scrutinee). Unique within this class block.
 public fresh_temp() {
     .temp_seq = .temp_seq + 1
     return "__lz_m" ++ .temp_seq
 }
 
-public name() {
+public name(): str {
     return .cls
 }
 
@@ -54,26 +51,26 @@ public property_decls() {
     return .properties
 }
 
-public is_member(name) {
+public is_member(name: str): bool {
     return .members.has(name)
 }
 
-public is_instance_method(name) {
+public is_instance_method(name: str): bool {
     return .instance_methods.has(name)
 }
 
 // Whether `name` names a class (this one or an import) — so `name(...)` is
-// construction `name.new(...)` and `name.m(...)` is a static, not a colon, call.
-public is_construction(name) {
+// construction and `name.m(...)` is a static, not a colon, call.
+public is_construction(name: str): bool {
     if name == .cls {
         return true
     }
     return .known_classes.has(name)
 }
 
-// The raw Lua target an extern member lowers to, or a None when `ns`.`member` is
+// The raw Lua target an extern member lowers to, or None when `ns`.`member` is
 // not an extern binding in scope.
-public extern_target(ns, member) {
+public extern_target(ns: str, member: str) {
     mut table = .externs.get(ns)
     if table.is_none() {
         return table
@@ -85,7 +82,7 @@ public mark_collections() {
     .collections = true
 }
 
-public used_collections() {
+public used_collections(): bool {
     return .collections
 }
 
@@ -97,12 +94,12 @@ public pop_scope() {
     .scopes.pop()
 }
 
-public declare_local(name) {
+public declare_local(name: str) {
     mut top = .scopes.get(.scopes.len()).unwrap()
     top[name] = true
 }
 
-public is_local(name) {
+public is_local(name: str): bool {
     for scope in .scopes {
         if scope.has(name) {
             return true
@@ -113,18 +110,16 @@ public is_local(name) {
 
 // Whether `name` is a bare enum variant (so `Some(5)` / `None` lower to the
 // owner-qualified `Owner.Some(5)` / `Owner.None` the enum block emits).
-public is_variant(name) {
+public is_variant(name: str): bool {
     return .variant_owner.has(name)
 }
 
-// Qualify a bare variant as `Owner.Variant`, the name the enum block emits.
-public variant_qualified(name) {
+public variant_qualified(name: str): str {
     return .variant_owner.get(name).unwrap() ++ "." ++ name
 }
 
-// Qualify a member reference as `C.name`; leave locals, parameters and globals
-// (imports, builtins) bare.
-public emit_name(name) {
+// Qualify a member reference as `C.name`; leave locals, parameters and globals bare.
+public emit_name(name: str): str {
     if .is_local(name) {
         return name
     }

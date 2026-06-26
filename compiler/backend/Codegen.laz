@@ -1,10 +1,9 @@
 // Codegen — the backend façade: an analysed, optimised program in, Lua source
 // out. The file lowers to a class table `C` (no metatables); top-level functions
-// and static bindings become members, a non-static visibility binding becomes an
-// instance property whose default is seeded in `C.new`, and `import`/`extern`
-// declarations emit nothing. When the class defines a constructor, an entry
-// footer `return C.new(...)` runs it as the program's entry point. The `__lz_*`
-// runtime prelude is prepended only when a collection or Option was emitted.
+// and static bindings become members, a non-static visibility binding an instance
+// property seeded in `C.new`, and `import`/`extern` emit nothing. A constructor
+// adds an entry footer `return C.new(...)`. The `__lz_*` prelude is prepended only
+// when a collection/Option was emitted.
 
 import backend.CgContext
 import backend.ExprEmitter
@@ -13,13 +12,13 @@ import backend.Runtime
 import backend.Text
 import Meta
 
-private class_name
+private class_name: str
 private known_classes
 private externs
 private variant_owner
 private collections_used
 
-constructor(class_name, imports, externs, variant_owner) {
+constructor(class_name: str, imports, externs, variant_owner) {
     .class_name = class_name
     .known_classes = [:]
     for name in imports {
@@ -30,10 +29,9 @@ constructor(class_name, imports, externs, variant_owner) {
     .collections_used = false
 }
 
-// A whole single-file program as a self-contained Lua chunk: header, the runtime
-// prelude (only when a collection/Option was emitted), the class table, and —
-// when the class defines a constructor — an entry footer that runs it.
-public generate(program) {
+// A whole single-file program as a self-contained Lua chunk: header, prelude (only
+// when needed), the class table, and — with a constructor — an entry footer.
+public generate(program): str {
     mut block = .class_block(program)
 
     mut sections = [Codegen.header()]
@@ -47,11 +45,10 @@ public generate(program) {
     return Text.join(sections, Text.nl() ++ Text.nl())
 }
 
-// Just the class table `local C = {}` plus its member lines — no header, runtime
-// prelude or entry footer. The bundler emits those once for the whole program,
-// so it composes class blocks instead of calling `generate`. Records whether any
-// member used a collection/Option, exposed via `uses_collections`.
-public class_block(program) {
+// Just the class table `local C = {}` plus its member lines. The bundler emits the
+// header/prelude/footer once for the whole program, so it composes class blocks
+// instead of calling `generate`. Records whether a member used a collection.
+public class_block(program): str {
     mut body = program.child("body")
     mut ctx = .build_context(body)
     mut stmts = StmtEmitter(ctx, ExprEmitter(ctx))
@@ -71,17 +68,16 @@ public class_block(program) {
     return block
 }
 
-// Whether the most recently generated class block emitted a collection/Option
-// (so the runtime prelude is needed). Valid after `class_block`/`generate`.
-// Named `uses_collections` — distinct from CgContext's `used_collections` — so a
-// `ctx.used_collections()` call inside this class does not mis-dispatch to here.
-public uses_collections() {
+// Whether the last class block needed the prelude. Named `uses_collections`,
+// distinct from CgContext's `used_collections`, so `ctx.used_collections()` inside
+// this class does not mis-dispatch to here.
+public uses_collections(): bool {
     return .collections_used
 }
 
-// Classify the top-level declarations into the member set, the instance-method
-// set (and declaration order), and the instance-property declarations.
-private build_context(body) {
+// Classify the top-level declarations into the member set, the instance-method set
+// (and order), and the instance-property declarations.
+private build_context(body): CgContext {
     mut members = [:]
     mut instance_methods = [:]
     mut instance_order = []
@@ -105,15 +101,15 @@ private build_context(body) {
     return CgContext(.class_name, members, instance_methods, instance_order, properties, .known_classes, .externs, .variant_owner)
 }
 
-private is_property(stmt) {
+private is_property(stmt): bool {
     mut visibility = stmt.attr("visibility").unwrap_or("")
     mut is_static = stmt.attr("is_static").unwrap_or(false)
     return visibility != "" and not is_static
 }
 
-// A declaration that contributes a member line: not an import/extern (metadata)
-// and not an instance property (its default is seeded into `C.new` instead).
-private is_emittable(stmt) {
+// A declaration that contributes a member line: not an import/extern, and not an
+// instance property (its default is seeded into `C.new` instead).
+private is_emittable(stmt): bool {
     mut k = stmt.kind
     if k == "ImportDecl" {
         return false
@@ -127,7 +123,7 @@ private is_emittable(stmt) {
     return true
 }
 
-public has_constructor(body) {
+public has_constructor(body): bool {
     for stmt in body {
         if stmt.kind == "ConstructorDecl" {
             return true
@@ -136,7 +132,7 @@ public has_constructor(body) {
     return false
 }
 
-public static header() {
+public static header(): str {
     return Text.lines([
         "--------------------------------------------------------------------",
         "-- Generated by the " ++ Meta.name() ++ " compiler v" ++ Meta.version() ++ " (self-hosted)",
