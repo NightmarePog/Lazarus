@@ -23,13 +23,13 @@ constructor() {
     if path.is_some() {
         Main.build_file(path.unwrap())
     } else {
-        Error("NoFileAppended", "No file appended, use 'lazarus <FILE.laz>'", 0, 0, 0, 2).raise()
+        Error("NoFileAppended", "No file appended, use 'lazarus <FILE.laz>'", 0, 0, "", 2).raise()
     }
 }
 
 // A file entry point: follow its imports and bundle the whole program. Each
 // module is analysed and optimised on its own before the bundler composes them.
-static build_file(path) {
+static build_file(path: str) {
     mut linker = Linker(path)
     mut modules = linker.link()
 
@@ -54,11 +54,10 @@ static build_file(path) {
     file.close()
 }
 
-// Gather every module's enum declarations into a program-wide registry so a
-// `match` can be checked for exhaustiveness against an enum imported from any
-// file: `enums[name]` is the variant list, `variant_owner[variant]` its enum.
-// `variant_fields[variant]` is the variant's list of payload type nodes, so the
-// checker can type the names a `Variant(a, b)` pattern binds.
+// Gather every module's enum declarations into a program-wide registry, so a
+// `match` is checked for exhaustiveness against an enum imported from any file:
+// `enums[name]` is the variant list, `variant_owner[variant]` its enum, and
+// `variant_fields[variant]` its payload type nodes (to type pattern bindings).
 static collect_enums(ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params) {
     for stmt in ast.child("body") {
         if stmt.kind == "EnumDecl" {
@@ -79,13 +78,11 @@ static collect_enums(ast, variant_owner, enums, variant_arity, variant_fields, e
 
 // Gather one module's class signature into the program-wide `classes` registry,
 // so the checker can type construction, calls and member access across files.
-// `classes[Name]` carries `fields` (instance property name -> an Option of its
-// type node, `None` when unannotated), `methods` (name -> {params, result,
-// is_static, type_params}),
-// `ctor` (an Option of the constructor's param type nodes — `None` when the class
-// declares no constructor, distinct from `Some([])` for a zero-arg constructor)
-// and `type_params` (the class's generic parameter names from `constructor<...>`).
-static collect_signatures(ast, class_name, classes) {
+// Each entry carries `fields` (property name -> Option of its type node), `methods`
+// (name -> {params, result, is_static, type_params}), `ctor` (Option of the
+// constructor's param types — None when none, distinct from Some([])) and the
+// class's `type_params`.
+static collect_signatures(ast, class_name: str, classes) {
     mut fields = [:]
     mut methods = [:]
     mut ctor = Option.none()

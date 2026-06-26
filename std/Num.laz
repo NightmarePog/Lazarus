@@ -1,8 +1,6 @@
 // Num — extern bindings to Lua's `math` library plus `tonumber` / `tostring`.
-//
-// Extern calls forward their args (no arity check, so the variadic `max`/`min`
-// accept two or more) and wrap their result at the Option boundary (`to_number`
-// returns None when the string is not numeric).
+// Calls forward their args (so variadic `max`/`min` take two or more) and wrap the
+// result at the Option boundary (`to_number` is None for a non-numeric string).
 
 extern floor(x) = "math.floor"
 extern ceil(x) = "math.ceil"
