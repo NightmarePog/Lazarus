@@ -141,12 +141,14 @@ constructible only from within its own file).
 
 ```
 pub  mut  fn  return  self  static  init  extends  override  super  abstract
-import  from  extern  lua  as
+import  extern  lua  as
 if  else  while  loop  for  break  match
 enum  trait  impl
 and  or  not  true  false
 int  float  str  bool        // primitive type names (contextual)
 ```
 
-`Option`, `Result`, `Some`, `None`, `Ok`, `Err` are built-in identifiers
-provided by the prelude, not reserved keywords.
+`Option`, `Some`, `None` are built-in identifiers provided by the prelude, not
+reserved keywords. `Result` is **not** built-in: it is provided by the stdlib as
+typed classes (`ResultBool`/`ResultString`/`ResultInt`) — see
+[04-types-and-data.md](04-types-and-data.md).

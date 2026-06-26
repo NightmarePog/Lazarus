@@ -36,6 +36,7 @@ function Showcase.describe(self)
 end
 function Showcase.new()
     local self = {}
+    self.describe = Showcase.describe
     self.answer = Showcase.compute(4)
     self.label = Showcase.brand()
     self.summary = Showcase.describe(self)

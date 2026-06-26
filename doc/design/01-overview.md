@@ -41,8 +41,9 @@ Two kinds of user-defined type exist:
   consumed by `match`. Enums are **data-only**.
 
 There is deliberately **no `struct`**, and **no user generics** in v1. The
-generic-looking built-ins — `Option<T>`, `Result<T, E>`, `[T]`, `{K: V}` — are
-provided by the compiler.
+generic-looking built-ins — `Option<T>`, `[T]`, `{K: V}` — are provided by the
+compiler. `Result` is **not** a built-in: it ships in the stdlib as typed classes
+(`ResultBool`/`ResultString`/`ResultInt`).
 
 ## A complete example
 

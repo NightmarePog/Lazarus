@@ -48,30 +48,42 @@ under the hood — but the type system forces you to handle the `None` case, so 
 
 ## Result — recoverable errors
 
-`Result<T, E>` is the error-handling type (there is no exception mechanism, no
-`panic`, and no `?` operator in v1):
+`Result` is the error-handling type (there is no exception mechanism and no `?`
+operator in v1). It is **not** a built-in generic — v1 has no user generics — so
+it is provided by the **stdlib** as a small family of typed classes, each fixing
+the Ok type, with the Err side a `str` message:
 
 ```
-enum Result<T, E> { Ok(T), Err(E) }   // built-in
+ResultBool      // Ok(bool) | Err(str)
+ResultString    // Ok(str)  | Err(str)
+ResultInt       // Ok(int)  | Err(str)
 ```
 
+Construct with the static factories `ok(v)` / `err(m)` and consume with the
+query/extract methods. The runtime reserves `unwrap`/`unwrap_or` (for the untyped
+extern-boundary Option), so the typed Results use **`take`/`take_or`** instead:
+
 ```
-fn read(self, path: str): Result<str, str> {
+import std.ResultString
+
+fn read(self, path: str): ResultString {
     if not self.exists(path) {
-        return Result.Err("no such file: {path}")
+        return ResultString.err("no such file: {path}")
     }
-    return Result.Ok(self.load(path))
+    return ResultString.ok(self.load(path))
 }
 
-match self.read("cfg") {
-    Ok(text) => { self.parse(text) },
-    Err(msg) => { self.report(msg) },
+mut r = self.read("cfg")
+if r.is_ok() {
+    self.parse(r.take())        // the Ok value (panics if called on an Err)
+} else {
+    self.report(r.error())      // the Err message
 }
 ```
 
-To propagate, you `match` and `return Result.Err(e)` explicitly. Genuinely
-unrecoverable states (which should be rare) drop to Lua's `error()` through a
-`lua { }` block (see [07-interop.md](07-interop.md)).
+`take()` aborts on an Err via Lua's `error()` (bound as `Sys.panic`); `take_or(d)`
+returns a default instead. A new Ok type is supported by adding another
+`Result<Type>` class to the stdlib.
 
 ## Enums
 
