@@ -1,7 +1,6 @@
-// Symbol — a scope entry. The language is untyped, so the only facts tracked
-// about a binding are its kind ("constant"/"variable"/"function"/"class"),
-// whether it may be reassigned, and whether its value is provably **not** a
-// function (so a later call on it can be rejected up front).
+// What the checker remembers about one name in scope: its kind
+// (constant/variable/function/class), whether it can be reassigned, and whether
+// we already know it isn't a function — so calling it can be flagged early.
 
 public kind
 public mutable

@@ -1,19 +1,11 @@
-// Linker — the module loader at the front of bundling.
+// Gathers every module a program needs and orders them for bundling.
 //
-// Lazarus has no runtime module system: a program is bundled at compile time
-// into one Lua chunk. Starting from the entry file, the linker lexes + parses
-// each `.laz`, splits its `import` declarations out of the body, resolves them
-// to files (via Path), and recurses — producing every class the program needs,
-// ordered **dependencies-first** so a class's code appears before any class that
-// uses it. Imports are stripped here, so the later stages only ever see an
-// ordinary single-class Program.
-//
-// Adapted to the self-hosting subset: there are no first-class functions, so the
-// linker reads sources directly via `Sys.read_file` (no callback); `link` and
-// `entry_class` are separate methods because there is no multiple return; and
-// the DFS guard never deletes from `visiting` (maps cannot drop keys) — once a
-// path lands in `loaded`, that guard short-circuits any re-entry on a cycle. An
-// unreadable import raises a located `Error` pointing at the offending `import`.
+// Starting at the entry file, it lexes and parses each `.laz`, lifts the
+// `import` lines out of the body, resolves them to files (via Path), and walks
+// the imports depth-first — emitting each dependency before whatever uses it, so
+// later stages only ever see a plain single-class program. An already-loaded
+// file is skipped, which also breaks import cycles. An import that can't be read
+// raises an error pointing at the offending `import` line.
 
 import std.Str
 import std.Sys
