@@ -1,2 +1,7 @@
 doc/out/
 .claude/
+
+# Generated Lua output from compiling .laz sources
+compiler/Main.lua
+examples/multi/Main.lua
+examples/std_demo/Main.lua

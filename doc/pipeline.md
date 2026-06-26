@@ -325,7 +325,6 @@ Function bodies are folded recursively. Constants visible from the enclosing sco
 | `x - 0` | `x` |
 | `x * 0`, `0 * x` | `LiteralExpr(0)` |
 | `x * 1`, `1 * x` | `x` |
-| `x / 1` | `x` |
 
 ### Example
 
