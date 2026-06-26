@@ -1,19 +1,16 @@
-// StmtParser — the statement and block grammar, over a shared TokenCursor.
+// StmtParser — the statement and block grammar over a shared TokenCursor. Most
+// nodes come from the `Ast` factory; the four kinds with optional attributes
+// (VariableDecl, ReturnStmt, IfStmt, ForStmt) assemble their attrs here and use
+// `Ast.node` (an absent optional is a missing key).
 //
-// Holds the cursor and an ExprParser; statements embed expressions but never the
-// reverse, so the dependency is one-way. Nodes are built through the `Ast`
-// factory, except the four kinds with optional attributes (VariableDecl,
-// ReturnStmt, IfStmt, ForStmt), whose attrs map is assembled here and handed to
-// `Ast.node` — an absent optional is simply a missing key (the language has no
-// `nil`).
-//
-// Grammar methods are named `parse_*`: a method whose name matches one of the
-// `Ast` factory's node constructors (e.g. `import_decl`, `while_stmt`) would be
-// mis-compiled into a self-call, since method dispatch resolves a call's field
-// name against the current class before considering the receiver.
+// Grammar methods are named `parse_*`: a method named like an `Ast` factory (e.g.
+// `while_stmt`) would be mis-compiled into a self-call, since a call's field name
+// resolves against the current class before the receiver.
 
 import frontend.parser.Ast
+import frontend.parser.Node
 import std.Str
+import std.Option
 
 private static compounds = [
     "PLUS_ASSIGN": "PLUS",
@@ -30,8 +27,7 @@ constructor(cursor, exprs) {
     .exprs = exprs
 }
 
-// Parse the whole stream into a `Program` node whose `body` is the statement list.
-public parse_program() {
+public parse_program(): Node {
     mut body = []
     loop {
         if .cursor.at_end() {
@@ -42,7 +38,7 @@ public parse_program() {
     return Ast.program(body)
 }
 
-private parse_statement() {
+private parse_statement(): Node {
     mut tok = .cursor.current()
     mut k = tok.kind
 
@@ -124,7 +120,7 @@ private parse_statement() {
 }
 
 // A braced block `{ <statement>* }`; `context` names it for error messages.
-private parse_block(context) {
+private parse_block(context: str) {
     mut open = .cursor.consume("BODY_START", "Expected '{' to open " ++ context)
     mut body = []
     loop {
@@ -140,7 +136,7 @@ private parse_block(context) {
     return body
 }
 
-private parse_import(tok) {
+private parse_import(tok): Node {
     mut first = .cursor.consume("IDENTIFIER", "Expected a name after 'import'")
     mut segments = [first.value]
     mut last = first.value
@@ -156,8 +152,8 @@ private parse_import(tok) {
 }
 
 // `enum Name { A, B(T), C }` — PascalCase variant names, optionally carrying
-// payload types `B(T, U)`, separated by a newline or an optional comma.
-private parse_enum(tok) {
+// payload types, separated by a newline or an optional comma.
+private parse_enum(tok): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected an enum name after 'enum'")
     mut type_params = .parse_type_params()
     mut open = .cursor.consume("BODY_START", "Expected '{' to open enum body")
@@ -176,8 +172,7 @@ private parse_enum(tok) {
     return Ast.enum_decl(name.value, variants, tok.line, tok.column, type_params)
 }
 
-// One variant: a name, plus an optional `( Type, ... )` payload.
-private parse_enum_variant() {
+private parse_enum_variant(): Node {
     mut v = .cursor.consume("IDENTIFIER", "Expected a variant name in the enum body")
     mut fields = []
     if .cursor.match("LEFT_BRACKET") {
@@ -194,7 +189,7 @@ private parse_enum_variant() {
     return Ast.enum_variant(v.value, fields, v.line, v.column)
 }
 
-private parse_extern(tok) {
+private parse_extern(tok): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected a name after 'extern'")
     .cursor.consume("LEFT_BRACKET", "Expected '(' after extern name")
     mut params = .parse_params([])
@@ -205,7 +200,7 @@ private parse_extern(tok) {
 }
 
 // A `private`/`public` declaration: a property, a class member, or a method.
-private parse_member(visibility) {
+private parse_member(visibility: str): Node {
     if .cursor.match("STATIC") {
         if .cursor.check("IDENTIFIER") and .looks_like_decl() {
             return .parse_method(visibility, true)
@@ -220,8 +215,7 @@ private parse_member(visibility) {
     return .parse_binding(visibility, mutable, "Expected property name", false)
 }
 
-// A bare `static` declaration (no visibility): a static method or member.
-private parse_static() {
+private parse_static(): Node {
     if .cursor.check("IDENTIFIER") and .looks_like_decl() {
         return .parse_method("", true)
     }
@@ -229,10 +223,9 @@ private parse_static() {
     return .parse_binding("", static_mut, "Expected member name after 'static'", true)
 }
 
-// One binding once visibility/mutability are known. An immutable binding must be
-// initialised, except an instance property (a non-static visibility binding),
-// which may be set later in the constructor.
-private parse_binding(visibility, mutable, name_err, is_static) {
+// An immutable binding must be initialised, except an instance property (a
+// non-static visibility binding), which may be set later in the constructor.
+private parse_binding(visibility: str, mutable: bool, name_err: str, is_static: bool): Node {
     mut name = .cursor.consume("IDENTIFIER", name_err)
     mut is_property = visibility != "" and not is_static
     mut attrs = ["name": name.value, "visibility": visibility, "mutable": mutable, "is_static": is_static, "line": name.line, "col": name.column]
@@ -248,8 +241,8 @@ private parse_binding(visibility, mutable, name_err, is_static) {
 }
 
 // A bare assignment `<name> = <expr>` or compound `<name> += <expr>`; the latter
-// desugars to a plain reassignment with a `BinaryExpr` value.
-private parse_assignment(name_err) {
+// desugars to a reassignment with a `BinaryExpr` value.
+private parse_assignment(name_err: str): Node {
     mut name = .cursor.consume("IDENTIFIER", name_err)
     if .cursor.match("ASSIGN") {
         return .local_binding(name, .exprs.expression())
@@ -265,12 +258,11 @@ private parse_assignment(name_err) {
     return Ast.node("VariableDecl", ["name": name.value, "visibility": "", "mutable": false, "is_static": false])
 }
 
-// A function-local immutable binding `<name> = <value>` (no visibility).
-private local_binding(name, value) {
+private local_binding(name, value): Node {
     return Ast.node("VariableDecl", ["name": name.value, "value": value, "visibility": "", "mutable": false, "is_static": false, "line": name.line, "col": name.column])
 }
 
-private parse_method(visibility, is_static) {
+private parse_method(visibility: str, is_static: bool): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected method name")
     mut type_params = .parse_type_params()
     .cursor.consume("LEFT_BRACKET", "Expected '(' after method name")
@@ -282,7 +274,7 @@ private parse_method(visibility, is_static) {
     return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column, param_types, return_type, type_params)
 }
 
-private parse_constructor(tok) {
+private parse_constructor(tok): Node {
     mut type_params = .parse_type_params()
     .cursor.consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
     mut param_types = []
@@ -292,9 +284,9 @@ private parse_constructor(tok) {
     return Ast.constructor_decl(params, body, tok.line, tok.column, param_types, type_params)
 }
 
-// A comma-separated parameter list, the opening `(` already consumed. Names are
-// returned; each name's optional `: Type` (or `dynamic` when absent) is pushed
-// onto `out_types`, kept aligned with the names.
+// A comma-separated parameter list, the opening `(` consumed. Names are returned;
+// each name's optional `: Type` (or `dynamic` when absent) is pushed onto
+// `out_types`, kept aligned with the names.
 private parse_params(out_types) {
     mut params = []
     if not .cursor.check("RIGHT_BRACKET") {
@@ -310,24 +302,21 @@ private parse_params(out_types) {
     return params
 }
 
-private param_type(name_tok) {
+private param_type(name_tok): Node {
     if .cursor.match("COLON") {
         return .parse_type()
     }
     return Ast.type_name("dynamic", [], name_tok.line, name_tok.column)
 }
 
-// The optional `: Type` return annotation; an unannotated function is `dynamic`
-// for now (Phase 1 parses and ignores types; mandatory typing comes later).
-private parse_return_type() {
+private parse_return_type(): Node {
     if .cursor.match("COLON") {
         return .parse_type()
     }
     return Ast.type_name("dynamic", [], 0, 0)
 }
 
-// A typed immutable local `<name>: <Type> = <value>`.
-private parse_typed_local(tok) {
+private parse_typed_local(tok): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected variable name")
     .cursor.consume("COLON", "Expected ':' before the type")
     mut ty = .parse_type()
@@ -353,8 +342,8 @@ private parse_type_params() {
 }
 
 // A type expression: a named/generic type `Name<...>`, or a function type
-// `(T, ...) -> R`. Used by parameter, return, field and local annotations.
-private parse_type() {
+// `(T, ...) -> R`.
+private parse_type(): Node {
     if .cursor.check("LEFT_BRACKET") {
         return .parse_type_fn()
     }
@@ -372,7 +361,7 @@ private parse_type() {
     return Ast.type_name(name.value, args, name.line, name.column)
 }
 
-private parse_type_fn() {
+private parse_type_fn(): Node {
     mut open = .cursor.consume("LEFT_BRACKET", "Expected '(' to open a function type")
     mut params = []
     if not .cursor.check("RIGHT_BRACKET") {
@@ -390,13 +379,10 @@ private parse_type_fn() {
 }
 
 // Lookahead: does the current `IDENTIFIER` begin a declaration `name(params) {`?
-// True when a `(` follows, its matching `)` is found, and either a `{` or a `:`
-// (a return-type annotation) comes next — which separates a method declaration
-// from a call statement `name(args)`.
-private looks_like_decl() {
+// True when a `(` follows (after an optional `<...>` generic header), its
+// matching `)` is found, and a `{` or `:` (return type) comes next.
+private looks_like_decl(): bool {
     mut i = .cursor.position() + 1
-    // Skip an optional generic header `<T, ...>` between the name and `(` (its
-    // params are bare identifier names, so the first `>` closes it).
     if .cursor.token_at(i).kind == "LESS" {
         loop {
             mut k = .cursor.token_at(i).kind
@@ -430,7 +416,7 @@ private looks_like_decl() {
     }
 }
 
-private parse_return(tok) {
+private parse_return(tok): Node {
     mut attrs = ["line": tok.line, "col": tok.column]
     if not .cursor.check("BODY_END") and not .cursor.at_end() {
         attrs["value"] = .exprs.expression()
@@ -438,7 +424,7 @@ private parse_return(tok) {
     return Ast.node("ReturnStmt", attrs)
 }
 
-private parse_if(tok) {
+private parse_if(tok): Node {
     mut clauses = [Ast.if_clause(.exprs.expression(), .parse_block("if body"))]
     mut attrs = ["clauses": clauses, "line": tok.line, "col": tok.column]
     loop {
@@ -455,25 +441,24 @@ private parse_if(tok) {
     return Ast.node("IfStmt", attrs)
 }
 
-private parse_while(tok) {
+private parse_while(tok): Node {
     mut condition = .exprs.expression()
     mut body = .parse_block("while body")
     return Ast.while_stmt(condition, body, tok.line, tok.column)
 }
 
-private parse_loop(tok) {
+private parse_loop(tok): Node {
     return Ast.loop_stmt(.parse_block("loop body"), tok.line, tok.column)
 }
 
-private parse_break(tok) {
+private parse_break(tok): Node {
     return Ast.break_stmt(tok.line, tok.column)
 }
 
-// `match` is a soft keyword (it stays an IDENTIFIER so `cursor.match(...)` and a
-// method named `match` keep working). It opens a match statement only at the head
-// of a statement when what follows begins a scrutinee expression — not a call
-// `match(...)`, an assignment `match = ...`/`match += ...`, or a `.`/`[` access.
-private starts_match() {
+// `match` is a soft keyword (it stays an IDENTIFIER, so `cursor.match(...)` and a
+// method named `match` keep working). It opens a match only at a statement head
+// when what follows begins a scrutinee — not a call, assignment, or `.`/`[`.
+private starts_match(): bool {
     mut nk = .cursor.peek_next().kind
     if nk == "LEFT_BRACKET" or nk == "ASSIGN" or nk == "DOT" or nk == "LSQUARE" {
         return false
@@ -481,9 +466,7 @@ private starts_match() {
     return .compound(nk).is_none()
 }
 
-// `match <expr> { <pattern> => { ... } ... _ => { ... } }`. The opening `match`
-// is already consumed.
-private parse_match(tok) {
+private parse_match(tok): Node {
     mut scrutinee = .exprs.expression()
     mut open = .cursor.consume("BODY_START", "Expected '{' to open match body")
     mut arms = []
@@ -500,9 +483,9 @@ private parse_match(tok) {
     return Ast.match_stmt(scrutinee, arms, tok.line, tok.column)
 }
 
-// One arm: a `_` catch-all; a bare PascalCase enum variant `Variant`; or a value
-// pattern expression compared against the scrutinee — then `=> { ... }`.
-private parse_match_arm() {
+// One arm: a `_` catch-all; a bare PascalCase enum variant; or a value pattern
+// expression compared against the scrutinee — then `=> { ... }`.
+private parse_match_arm(): Node {
     mut tok = .cursor.current()
     if tok.kind == "IDENTIFIER" and tok.value == "_" {
         .cursor.advance()
@@ -520,15 +503,12 @@ private parse_match_arm() {
     return Ast.match_arm(pattern, .parse_block("match arm body"))
 }
 
-// A variant pattern is a PascalCase name followed by `=>` (nullary) or `(`
-// (payload bindings).
-private variant_pattern_ahead() {
+private variant_pattern_ahead(): bool {
     mut nk = .cursor.peek_next().kind
     return nk == "FAT_ARROW" or nk == "LEFT_BRACKET"
 }
 
-// The optional `( a, b )` binding names after a payload variant pattern; `_`
-// ignores a field.
+// The optional `( a, b )` binding names after a payload variant pattern.
 private parse_variant_bindings() {
     mut bindings = []
     if .cursor.match("LEFT_BRACKET") {
@@ -546,23 +526,23 @@ private parse_variant_bindings() {
     return bindings
 }
 
-// A PascalCase name (leading uppercase letter) marks an enum-variant pattern,
-// distinct from a snake_case value/identifier pattern.
-private is_variant_name(name) {
+// A PascalCase name (leading uppercase) marks an enum-variant pattern, distinct
+// from a snake_case value/identifier pattern.
+private is_variant_name(name: str): bool {
     mut first = Str.sub(name, 1, 1).unwrap_or("")
     return first >= "A" and first <= "Z"
 }
 
-// The two `for` forms, told apart by lookahead: `for x in …` / `for k, v in …`
-// (for-in) versus the C-style `for <init>; <cond>; <step> { … }`.
-private parse_for(tok) {
+// The two `for` forms: `for x in …` / `for k, v in …` versus the C-style
+// `for <init>; <cond>; <step> { … }`, told apart by lookahead.
+private parse_for(tok): Node {
     if .looks_like_for_in() {
         return .parse_for_in(tok)
     }
     return .parse_for_c(tok)
 }
 
-private parse_for_in(tok) {
+private parse_for_in(tok): Node {
     mut first = .cursor.consume("IDENTIFIER", "Expected a loop variable after 'for'")
     mut vars = [first.value]
     if .cursor.match("COMMA") {
@@ -575,7 +555,7 @@ private parse_for_in(tok) {
     return Ast.for_in(vars, iter, body, tok.line, tok.column)
 }
 
-private parse_for_c(tok) {
+private parse_for_c(tok): Node {
     mut attrs = ["line": tok.line, "col": tok.column]
     if not .cursor.check("SEMICOLON") {
         attrs["init"] = .parse_assignment("Expected loop variable in for-init")
@@ -592,7 +572,7 @@ private parse_for_c(tok) {
     return Ast.node("ForStmt", attrs)
 }
 
-private looks_like_for_in() {
+private looks_like_for_in(): bool {
     if not .cursor.check("IDENTIFIER") {
         return false
     }
@@ -600,9 +580,9 @@ private looks_like_for_in() {
     return k == "IN" or k == "COMMA"
 }
 
-// A bare expression used as a statement — or, when it is a field/index access
-// followed by `=` (or a compound `+=`), an assignment to that target.
-private parse_expr_statement(tok) {
+// A bare expression statement — or, when it is a field/index access followed by
+// `=` (or a compound `+=`), an assignment to that target.
+private parse_expr_statement(tok): Node {
     mut expr = .exprs.expression()
     mut assignable = expr.kind == "MemberExpr" or expr.kind == "IndexExpr"
     if not assignable {
@@ -620,13 +600,13 @@ private parse_expr_statement(tok) {
     return Ast.expression_stmt(expr, tok.line, tok.column)
 }
 
-private make_assign(target, value, tok) {
+private make_assign(target, value, tok): Node {
     if target.kind == "MemberExpr" {
         return Ast.field_assign(target, value, tok.line, tok.column)
     }
     return Ast.index_assign(target, value, tok.line, tok.column)
 }
 
-private compound(kind) {
+private compound(kind: str): Option<str> {
     return StmtParser.compounds.get(kind)
 }
