@@ -1,14 +1,11 @@
-// ExprFolder — constant folding and constant propagation for expressions.
-//
-// `fold` returns the possibly-replaced node (folding may collapse a subtree to a
-// single literal), so callers assign the result back. Two real rewrites: a name
-// known to be a compile-time constant is replaced with its literal, and a binary
-// op on two numeric literals is evaluated now. `+` `-` `*` `/` fold (division by
-// a literal zero is left for the runtime); `%` and `^` don't yet. Everything else
-// only recurses so constants propagate inward. A running `folds` count makes the
-// pass's effect observable.
+// ExprFolder — constant folding and propagation for expressions. `fold` returns
+// the possibly-replaced node (folding may collapse a subtree to a literal). Two
+// rewrites: a name known to be a compile-time constant becomes its literal, and a
+// `+`/`-`/`*`/`/` over two numeric literals is evaluated now (division by a literal
+// zero is left for the runtime). Everything else just recurses.
 
 import frontend.parser.Ast
+import frontend.parser.Node
 import std.Num
 
 private folds
@@ -17,11 +14,11 @@ constructor() {
     .folds = 0
 }
 
-public fold_count() {
+public fold_count(): int {
     return .folds
 }
 
-public fold(node, constants) {
+public fold(node, constants): Node {
     mut k = node.kind
     if k == "IdentifierExpr" {
         return .fold_identifier(node, constants)
@@ -54,8 +51,7 @@ public fold(node, constants) {
     return node
 }
 
-// Constant propagation: replace a reference with its recorded literal.
-private fold_identifier(node, constants) {
+private fold_identifier(node, constants): Node {
     mut hit = constants.lookup(node.child("name"))
     if hit.is_some() {
         .folds = .folds + 1
@@ -64,8 +60,7 @@ private fold_identifier(node, constants) {
     return node
 }
 
-// Constant folding: a `+`/`-`/`*`/`/` over two numeric literals is evaluated now.
-private fold_binary(node, constants) {
+private fold_binary(node, constants): Node {
     mut left = .fold(node.child("left"), constants)
     mut right = .fold(node.child("right"), constants)
     mut op = node.child("op")
@@ -83,15 +78,15 @@ private fold_binary(node, constants) {
     return node
 }
 
-private foldable(op, left, right) {
+private foldable(op: str, left, right): bool {
     return .can_fold(op) and .is_number(left) and .is_number(right)
 }
 
-private can_fold(op) {
+private can_fold(op: str): bool {
     return op == "PLUS" or op == "MINUS" or op == "MULTIPLY" or op == "DIVIDE"
 }
 
-private is_number(node) {
+private is_number(node): bool {
     if node.kind != "LiteralExpr" {
         return false
     }
@@ -99,9 +94,9 @@ private is_number(node) {
     return lk == "number" or lk == "float"
 }
 
-// Division always yields a `float`; for the rest the result is a `float` only if
+// Division always yields a `float`; otherwise the result is a `float` only if
 // either operand is one (int op int stays int).
-private result_kind(op, left, right) {
+private result_kind(op: str, left, right): str {
     if op == "DIVIDE" {
         return "float"
     }
@@ -111,7 +106,7 @@ private result_kind(op, left, right) {
     return "number"
 }
 
-private apply(op, a, b) {
+private apply(op: str, a, b) {
     if op == "PLUS" {
         return a + b
     }
@@ -124,7 +119,7 @@ private apply(op, a, b) {
     return a / b
 }
 
-private fold_call(node, constants) {
+private fold_call(node, constants): Node {
     node.set("callee", .fold(node.child("callee"), constants))
     mut folded = []
     for arg in node.child("args") {
@@ -134,7 +129,7 @@ private fold_call(node, constants) {
     return node
 }
 
-private fold_list(node, constants) {
+private fold_list(node, constants): Node {
     mut folded = []
     for element in node.child("elements") {
         folded.push(.fold(element, constants))
@@ -143,7 +138,7 @@ private fold_list(node, constants) {
     return node
 }
 
-private fold_map(node, constants) {
+private fold_map(node, constants): Node {
     for entry in node.child("entries") {
         entry.set("key", .fold(entry.child("key"), constants))
         entry.set("value", .fold(entry.child("value"), constants))
