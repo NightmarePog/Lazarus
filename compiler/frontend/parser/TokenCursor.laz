@@ -1,11 +1,9 @@
-// TokenCursor — navigation over the flat token list, shared by the parsers.
+// Walks the flat token list for the parsers.
 //
-// Past-the-end reads return an EOF *null-object* token (kind "EOF") rather than a
-// None, so callers never juggle Options: `current().kind`, `check`, `at_end` and
-// the lookahead helpers all work uniformly whether or not a token is there. The
-// lexer never emits an "EOF" kind, so the sentinel is unambiguous. The cursor
-// also owns error raising, since it alone holds the source text and the position
-// to point a caret at.
+// Reads past the end return a stand-in "EOF" token instead of an Option, so
+// callers never have to guard for the end — `current()`, `check`, `at_end` and
+// the lookahead helpers all just work. The cursor also raises syntax errors,
+// since it's the one holding the source text and position to point a caret at.
 
 import std.Str
 import Error

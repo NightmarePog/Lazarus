@@ -13,6 +13,7 @@
 // name against the current class before considering the receiver.
 
 import frontend.parser.Ast
+import std.Str
 
 private static compounds = [
     "PLUS_ASSIGN": "PLUS",
@@ -52,6 +53,10 @@ private parse_statement() {
     if k == "EXTERN" {
         .cursor.advance()
         return .parse_extern(tok)
+    }
+    if k == "ENUM" {
+        .cursor.advance()
+        return .parse_enum(tok)
     }
     if k == "PRIVATE" {
         .cursor.advance()
@@ -99,6 +104,13 @@ private parse_statement() {
     }
 
     if k == "IDENTIFIER" {
+        if tok.value == "match" and .starts_match() {
+            .cursor.advance()
+            return .parse_match(tok)
+        }
+        if .cursor.peek_next().kind == "COLON" {
+            return .parse_typed_local(tok)
+        }
         if .looks_like_decl() {
             return .parse_method("", false)
         }
@@ -143,10 +155,49 @@ private parse_import(tok) {
     return Ast.import_decl(segments, last, tok.line, tok.column)
 }
 
+// `enum Name { A, B(T), C }` — PascalCase variant names, optionally carrying
+// payload types `B(T, U)`, separated by a newline or an optional comma.
+private parse_enum(tok) {
+    mut name = .cursor.consume("IDENTIFIER", "Expected an enum name after 'enum'")
+    mut type_params = .parse_type_params()
+    mut open = .cursor.consume("BODY_START", "Expected '{' to open enum body")
+    mut variants = []
+    loop {
+        if .cursor.check("BODY_END") {
+            break
+        }
+        if .cursor.at_end() {
+            .cursor.fail_at("Expected '}' to close enum body", open.line, open.column, 1)
+        }
+        variants.push(.parse_enum_variant())
+        .cursor.match("COMMA")
+    }
+    .cursor.consume("BODY_END", "Expected '}' to close enum body")
+    return Ast.enum_decl(name.value, variants, tok.line, tok.column, type_params)
+}
+
+// One variant: a name, plus an optional `( Type, ... )` payload.
+private parse_enum_variant() {
+    mut v = .cursor.consume("IDENTIFIER", "Expected a variant name in the enum body")
+    mut fields = []
+    if .cursor.match("LEFT_BRACKET") {
+        if not .cursor.check("RIGHT_BRACKET") {
+            loop {
+                fields.push(.parse_type())
+                if not .cursor.match("COMMA") {
+                    break
+                }
+            }
+        }
+        .cursor.consume("RIGHT_BRACKET", "Expected ')' after the variant payload types")
+    }
+    return Ast.enum_variant(v.value, fields, v.line, v.column)
+}
+
 private parse_extern(tok) {
     mut name = .cursor.consume("IDENTIFIER", "Expected a name after 'extern'")
     .cursor.consume("LEFT_BRACKET", "Expected '(' after extern name")
-    mut params = .parse_params()
+    mut params = .parse_params([])
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after extern parameters")
     .cursor.consume("ASSIGN", "Expected '=' after extern parameters")
     mut target = .cursor.consume("STRING", "Expected a quoted Lua target after '='")
@@ -185,6 +236,9 @@ private parse_binding(visibility, mutable, name_err, is_static) {
     mut name = .cursor.consume("IDENTIFIER", name_err)
     mut is_property = visibility != "" and not is_static
     mut attrs = ["name": name.value, "visibility": visibility, "mutable": mutable, "is_static": is_static, "line": name.line, "col": name.column]
+    if .cursor.match("COLON") {
+        attrs["type"] = .parse_type()
+    }
     if .cursor.match("ASSIGN") {
         attrs["value"] = .exprs.expression()
     } else if not mutable and not is_property {
@@ -219,27 +273,33 @@ private local_binding(name, value) {
 private parse_method(visibility, is_static) {
     mut name = .cursor.consume("IDENTIFIER", "Expected method name")
     .cursor.consume("LEFT_BRACKET", "Expected '(' after method name")
-    mut params = .parse_params()
+    mut param_types = []
+    mut params = .parse_params(param_types)
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after parameters")
+    mut return_type = .parse_return_type()
     mut body = .parse_block("method body")
-    return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column)
+    return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column, param_types, return_type)
 }
 
 private parse_constructor(tok) {
     .cursor.consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
-    mut params = .parse_params()
+    mut param_types = []
+    mut params = .parse_params(param_types)
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after parameters")
     mut body = .parse_block("constructor body")
-    return Ast.constructor_decl(params, body, tok.line, tok.column)
+    return Ast.constructor_decl(params, body, tok.line, tok.column, param_types)
 }
 
-// A comma-separated parameter-name list, the opening `(` already consumed.
-private parse_params() {
+// A comma-separated parameter list, the opening `(` already consumed. Names are
+// returned; each name's optional `: Type` (or `dynamic` when absent) is pushed
+// onto `out_types`, kept aligned with the names.
+private parse_params(out_types) {
     mut params = []
     if not .cursor.check("RIGHT_BRACKET") {
         loop {
             mut p = .cursor.consume("IDENTIFIER", "Expected parameter name")
             params.push(p.value)
+            out_types.push(.param_type(p))
             if not .cursor.match("COMMA") {
                 break
             }
@@ -248,9 +308,89 @@ private parse_params() {
     return params
 }
 
+private param_type(name_tok) {
+    if .cursor.match("COLON") {
+        return .parse_type()
+    }
+    return Ast.type_name("dynamic", [], name_tok.line, name_tok.column)
+}
+
+// The optional `: Type` return annotation; an unannotated function is `dynamic`
+// for now (Phase 1 parses and ignores types; mandatory typing comes later).
+private parse_return_type() {
+    if .cursor.match("COLON") {
+        return .parse_type()
+    }
+    return Ast.type_name("dynamic", [], 0, 0)
+}
+
+// A typed immutable local `<name>: <Type> = <value>`.
+private parse_typed_local(tok) {
+    mut name = .cursor.consume("IDENTIFIER", "Expected variable name")
+    .cursor.consume("COLON", "Expected ':' before the type")
+    mut ty = .parse_type()
+    .cursor.consume("ASSIGN", "Expected '=' after the type annotation")
+    mut value = .exprs.expression()
+    return Ast.node("VariableDecl", ["name": name.value, "value": value, "type": ty, "visibility": "", "mutable": false, "is_static": false, "line": name.line, "col": name.column])
+}
+
+// Optional generic parameters `<T, U>` after an enum (or class) name.
+private parse_type_params() {
+    mut params = []
+    if .cursor.match("LESS") {
+        loop {
+            mut t = .cursor.consume("IDENTIFIER", "Expected a type parameter name")
+            params.push(t.value)
+            if not .cursor.match("COMMA") {
+                break
+            }
+        }
+        .cursor.consume("GREATER", "Expected '>' to close type parameters")
+    }
+    return params
+}
+
+// A type expression: a named/generic type `Name<...>`, or a function type
+// `(T, ...) -> R`. Used by parameter, return, field and local annotations.
+private parse_type() {
+    if .cursor.check("LEFT_BRACKET") {
+        return .parse_type_fn()
+    }
+    mut name = .cursor.consume("IDENTIFIER", "Expected a type name")
+    mut args = []
+    if .cursor.match("LESS") {
+        loop {
+            args.push(.parse_type())
+            if not .cursor.match("COMMA") {
+                break
+            }
+        }
+        .cursor.consume("GREATER", "Expected '>' to close type arguments")
+    }
+    return Ast.type_name(name.value, args, name.line, name.column)
+}
+
+private parse_type_fn() {
+    mut open = .cursor.consume("LEFT_BRACKET", "Expected '(' to open a function type")
+    mut params = []
+    if not .cursor.check("RIGHT_BRACKET") {
+        loop {
+            params.push(.parse_type())
+            if not .cursor.match("COMMA") {
+                break
+            }
+        }
+    }
+    .cursor.consume("RIGHT_BRACKET", "Expected ')' in the function type")
+    .cursor.consume("ARROW", "Expected '->' in the function type")
+    mut result = .parse_type()
+    return Ast.type_fn(params, result, open.line, open.column)
+}
+
 // Lookahead: does the current `IDENTIFIER` begin a declaration `name(params) {`?
-// True when a `(` follows, its matching `)` is found, and a `{` comes next —
-// which separates a method declaration from a call statement `name(args)`.
+// True when a `(` follows, its matching `)` is found, and either a `{` or a `:`
+// (a return-type annotation) comes next — which separates a method declaration
+// from a call statement `name(args)`.
 private looks_like_decl() {
     if .cursor.peek_next().kind != "LEFT_BRACKET" {
         return false
@@ -266,7 +406,8 @@ private looks_like_decl() {
         } else if kind == "RIGHT_BRACKET" {
             depth = depth - 1
             if depth == 0 {
-                return .cursor.token_at(i + 1).kind == "BODY_START"
+                mut after = .cursor.token_at(i + 1).kind
+                return after == "BODY_START" or after == "COLON"
             }
         }
         i = i + 1
@@ -310,6 +451,90 @@ private parse_loop(tok) {
 
 private parse_break(tok) {
     return Ast.break_stmt(tok.line, tok.column)
+}
+
+// `match` is a soft keyword (it stays an IDENTIFIER so `cursor.match(...)` and a
+// method named `match` keep working). It opens a match statement only at the head
+// of a statement when what follows begins a scrutinee expression — not a call
+// `match(...)`, an assignment `match = ...`/`match += ...`, or a `.`/`[` access.
+private starts_match() {
+    mut nk = .cursor.peek_next().kind
+    if nk == "LEFT_BRACKET" or nk == "ASSIGN" or nk == "DOT" or nk == "LSQUARE" {
+        return false
+    }
+    return .compound(nk).is_none()
+}
+
+// `match <expr> { <pattern> => { ... } ... _ => { ... } }`. The opening `match`
+// is already consumed.
+private parse_match(tok) {
+    mut scrutinee = .exprs.expression()
+    mut open = .cursor.consume("BODY_START", "Expected '{' to open match body")
+    mut arms = []
+    loop {
+        if .cursor.check("BODY_END") {
+            break
+        }
+        if .cursor.at_end() {
+            .cursor.fail_at("Expected '}' to close match body", open.line, open.column, 1)
+        }
+        arms.push(.parse_match_arm())
+    }
+    .cursor.consume("BODY_END", "Expected '}' to close match body")
+    return Ast.match_stmt(scrutinee, arms, tok.line, tok.column)
+}
+
+// One arm: a `_` catch-all; a bare PascalCase enum variant `Variant`; or a value
+// pattern expression compared against the scrutinee — then `=> { ... }`.
+private parse_match_arm() {
+    mut tok = .cursor.current()
+    if tok.kind == "IDENTIFIER" and tok.value == "_" {
+        .cursor.advance()
+        .cursor.consume("FAT_ARROW", "Expected '=>' after match pattern")
+        return Ast.match_default(.parse_block("match arm body"))
+    }
+    if tok.kind == "IDENTIFIER" and .is_variant_name(tok.value) and .variant_pattern_ahead() {
+        .cursor.advance()
+        mut bindings = .parse_variant_bindings()
+        .cursor.consume("FAT_ARROW", "Expected '=>' after match pattern")
+        return Ast.match_variant(tok.value, bindings, .parse_block("match arm body"))
+    }
+    mut pattern = .exprs.expression()
+    .cursor.consume("FAT_ARROW", "Expected '=>' after match pattern")
+    return Ast.match_arm(pattern, .parse_block("match arm body"))
+}
+
+// A variant pattern is a PascalCase name followed by `=>` (nullary) or `(`
+// (payload bindings).
+private variant_pattern_ahead() {
+    mut nk = .cursor.peek_next().kind
+    return nk == "FAT_ARROW" or nk == "LEFT_BRACKET"
+}
+
+// The optional `( a, b )` binding names after a payload variant pattern; `_`
+// ignores a field.
+private parse_variant_bindings() {
+    mut bindings = []
+    if .cursor.match("LEFT_BRACKET") {
+        if not .cursor.check("RIGHT_BRACKET") {
+            loop {
+                mut b = .cursor.consume("IDENTIFIER", "Expected a binding name in the variant pattern")
+                bindings.push(b.value)
+                if not .cursor.match("COMMA") {
+                    break
+                }
+            }
+        }
+        .cursor.consume("RIGHT_BRACKET", "Expected ')' after the variant pattern bindings")
+    }
+    return bindings
+}
+
+// A PascalCase name (leading uppercase letter) marks an enum-variant pattern,
+// distinct from a snake_case value/identifier pattern.
+private is_variant_name(name) {
+    mut first = Str.sub(name, 1, 1).unwrap_or("")
+    return first >= "A" and first <= "Z"
 }
 
 // The two `for` forms, told apart by lookahead: `for x in …` / `for k, v in …`

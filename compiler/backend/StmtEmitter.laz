@@ -8,6 +8,7 @@
 // statements inside a body, declaring locals in the context so member references
 // stay qualified while locals stay bare.
 
+import std.Num
 import backend.Text
 
 private ctx
@@ -29,7 +30,39 @@ public emit_member(node) {
     if k == "ConstructorDecl" {
         return .emit_constructor(node)
     }
+    if k == "EnumDecl" {
+        return .emit_enum(node)
+    }
     return .emit_stmt(node)
+}
+
+// A nullary variant lowers to `E.V = 'V'` (its value is its own name string); a
+// payload variant to a constructor `function E.V(_1, …) return { kind='V', … }`.
+private emit_enum(node) {
+    mut lines = []
+    for variant in node.child("variants") {
+        mut name = variant.child("name")
+        if variant.child("fields").len() == 0 {
+            lines.push(.ctx.name() ++ "." ++ name ++ " = '" ++ name ++ "'")
+        } else {
+            lines.push(.emit_variant_ctor(name, variant.child("fields")))
+        }
+    }
+    return Text.lines(lines)
+}
+
+private emit_variant_ctor(name, fields) {
+    mut params = []
+    mut assigns = ["kind = '" ++ name ++ "'"]
+    mut i = 1
+    for field in fields {
+        mut s = Num.to_text(i).unwrap_or("0")
+        params.push("_" ++ s)
+        assigns.push("_" ++ s ++ " = _" ++ s)
+        i = i + 1
+    }
+    mut header = "function " ++ .ctx.name() ++ "." ++ name ++ "(" ++ Text.join(params, ", ") ++ ")"
+    return Text.lines([header, Text.indent("return { " ++ Text.join(assigns, ", ") ++ " }"), "end"])
 }
 
 public emit_stmt(node) {
@@ -70,7 +103,93 @@ public emit_stmt(node) {
     if k == "ForInStmt" {
         return .emit_for_in(node)
     }
+    if k == "MatchStmt" {
+        return .emit_match(node)
+    }
     return ""
+}
+
+// A `match` lowers to an `if/elseif/else` ladder over a once-evaluated temp, so
+// the scrutinee runs exactly once and side effects are not repeated. Each value
+// arm becomes an `== pattern` test; the `_` arm becomes the `else`. A match with
+// only a `_` arm runs that body unconditionally inside a `do ... end`.
+private emit_match(node) {
+    mut temp = .ctx.fresh_temp()
+    mut parts = ["local " ++ temp ++ " = " ++ .exprs.emit(node.child("scrutinee"))]
+    mut first = true
+    mut has_default = false
+    mut default_body = []
+    for arm in node.child("arms") {
+        if arm.attr("is_wildcard").unwrap_or(false) {
+            has_default = true
+            default_body = arm.child("body")
+        } else {
+            mut keyword = "elseif "
+            if first {
+                keyword = "if "
+            }
+            first = false
+            parts.push(keyword ++ .match_condition(temp, arm) ++ " then")
+            if .has_bindings(arm) {
+                .push_payload_body(parts, temp, arm)
+            } else {
+                .push_block(parts, arm.child("body"))
+            }
+        }
+    }
+    if first {
+        if has_default {
+            parts.push("do")
+            .push_block(parts, default_body)
+            parts.push("end")
+        }
+        return Text.lines(parts)
+    }
+    if has_default {
+        parts.push("else")
+        .push_block(parts, default_body)
+    }
+    parts.push("end")
+    return Text.lines(parts)
+}
+
+// An arm's test: a payload variant matches on the tagged table's `kind`; a
+// nullary variant compares against its name string; a value arm against its
+// pattern expression.
+private match_condition(temp, arm) {
+    if arm.attr("is_variant").unwrap_or(false) {
+        if .has_bindings(arm) {
+            return temp ++ ".kind == '" ++ arm.child("variant") ++ "'"
+        }
+        return temp ++ " == '" ++ arm.child("variant") ++ "'"
+    }
+    return temp ++ " == " ++ .exprs.emit(arm.child("pattern"))
+}
+
+private has_bindings(arm) {
+    return arm.attr("is_variant").unwrap_or(false) and arm.child("bindings").len() > 0
+}
+
+// A payload arm's body, preceded by `local <name> = <temp>._<n>` extractions for
+// each bound field (`_` skips one). Scoped so bindings don't leak between arms.
+private push_payload_body(parts, temp, arm) {
+    .ctx.push_scope()
+    mut lines = []
+    mut i = 1
+    for name in arm.child("bindings") {
+        if name != "_" {
+            .ctx.declare_local(name)
+            lines.push("local " ++ name ++ " = " ++ temp ++ "._" ++ Num.to_text(i).unwrap_or("0"))
+        }
+        i = i + 1
+    }
+    for stmt in arm.child("body") {
+        lines.push(.emit_stmt(stmt))
+    }
+    .ctx.pop_scope()
+    if lines.len() > 0 {
+        parts.push(Text.indent(Text.lines(lines)))
+    }
 }
 
 // A statement list as an indented block, or "" when empty.

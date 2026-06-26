@@ -1,104 +1,104 @@
-// The Lazarus compiler: lex, parse, analyse, optimise and emit Lua 5.1 source,
-// printed to stdout. The source comes from a file-path argument, else stdin, else
-// a built-in sample.
+// The Lazarus compiler: resolve imports, lex, parse, analyse, optimise and emit
+// one runnable Lua 5.1 chunk to stdout.
 //
-//   lua Main.lua some.laz       # compile a named file
-//   lua Main.lua < some.laz     # compile stdin
-//   lua Main.lua                # compile the built-in sample
+//   lua Main.lua path/to/Entry.laz   # bundle a file together with its imports
+//   lua Main.lua < some.laz          # compile stdin as a single class "Main"
+//   lua Main.lua                     # compile the built-in sample
 
 import std.Str
 import std.Sys
 import frontend.lexer.Lexer
 import frontend.parser.Parser
 import frontend.schematic.Schematic
+import frontend.typecheck.Typecheck
 import frontend.optimizer.Optimizer
 import backend.Codegen
+import backend.Bundler
+import backend.linker.Linker
+import Error
 
 constructor() {
-    mut src = Main.load_source()
-    mut class_name = Main.class_name()
-
-    mut tokens = Lexer(src).scan()
-    mut program = Parser(tokens, src).parse()
-    mut imports = Main.collect_imports(program)
-    Schematic.analyze(program, src, class_name, imports)
-    Optimizer().optimize(program)
-
-    mut codegen = Codegen(class_name, imports, [:])
-    Sys.print(codegen.generate(program))
-}
-
-// The imported class names, gathered from the program's `import` declarations and
-// bound so references to them resolve during analysis.
-static collect_imports(program) {
-    mut names = []
-    for stmt in program.child("body") {
-        if stmt.kind == "ImportDecl" {
-            names.push(stmt.child("name"))
-        }
-    }
-    return names
-}
-
-// The enclosing class name — the file stem of the path argument (one class per
-// file), or "Main" for stdin / the built-in sample.
-static class_name() {
     mut path = Sys.argv(1)
     if path.is_some() {
-        return Main.class_from_path(path.unwrap())
+        Main.build_file(path.unwrap())
+    } else {
+        Error("NoFileAppended", "No file appended, use 'lazarus <FILE.laz>'", 0, 0, 0, 2).raise()
     }
-    return "Main"
 }
 
-// The class name in `dir/Name.laz`: the segment after the last '/', before the
-// last '.'.
-static class_from_path(path) {
-    mut n = Str.len(path).unwrap_or(0)
-    mut start = 1
-    mut dot = n + 1
-    mut i = 1
-    loop {
-        if i > n {
-            break
-        }
-        mut ch = Str.sub(path, i, i).unwrap_or("")
-        if ch == "/" {
-            start = i + 1
-        }
-        if ch == "." {
-            dot = i
-        }
-        i = i + 1
+// A file entry point: follow its imports and bundle the whole program. Each
+// module is analysed and optimised on its own before the bundler composes them.
+static build_file(path) {
+    mut linker = Linker(path)
+    mut modules = linker.link()
+
+    mut variant_owner = [:]
+    mut enums = [:]
+    mut variant_arity = [:]
+    mut variant_fields = [:]
+    mut classes = [:]
+    for m in modules {
+        Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields)
+        Main.collect_signatures(m.ast, m.class_name, classes)
     }
-    return Str.sub(path, start, dot - 1).unwrap_or("Main")
+
+    for m in modules {
+        Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity)
+        Typecheck(m.source, m.class_name, m.imports, enums, classes, variant_fields).check(m.ast)
+        Optimizer().optimize(m.ast)
+    }
+    file = Sys.open("Main.lua", "w").unwrap()
+    file.write(Bundler(modules, linker.entry_class()).bundle())
+    file.close()
 }
 
-static load_source() {
-    mut path = Sys.argv(1)
-    if path.is_some() {
-        mut name = path.unwrap()
-        mut content = Sys.read_file(name)
-        if content.is_some() {
-            return content.unwrap()
+// Gather every module's enum declarations into a program-wide registry so a
+// `match` can be checked for exhaustiveness against an enum imported from any
+// file: `enums[name]` is the variant list, `variant_owner[variant]` its enum.
+// `variant_fields[variant]` is the variant's list of payload type nodes, so the
+// checker can type the names a `Variant(a, b)` pattern binds.
+static collect_enums(ast, variant_owner, enums, variant_arity, variant_fields) {
+    for stmt in ast.child("body") {
+        if stmt.kind == "EnumDecl" {
+            mut name = stmt.child("name")
+            mut names = []
+            for v in stmt.child("variants") {
+                mut vn = v.child("name")
+                names.push(vn)
+                variant_owner[vn] = name
+                variant_arity[vn] = v.child("fields").len()
+                variant_fields[vn] = v.child("fields")
+            }
+            enums[name] = names
         }
-        Sys.print("error: cannot open file '" ++ name ++ "'")
-        Sys.exit(1)
     }
-
-    mut stdin = Sys.read_all("*a").unwrap_or("")
-    if Str.len(stdin).unwrap_or(0) == 0 {
-        return Main.sample()
-    }
-    return stdin
 }
 
-static sample() {
-    mut nl = Str.char(10).unwrap_or("")
-    mut q = Str.char(34).unwrap_or("")
-    mut s = "static greet(name) {" ++ nl
-    s = s ++ "    mut msg = " ++ q ++ "hi " ++ q ++ " ++ name" ++ nl
-    s = s ++ "    if name == 0 { return name }" ++ nl
-    s = s ++ "    return msg // done" ++ nl
-    s = s ++ "}"
-    return s
+// Gather one module's class signature into the program-wide `classes` registry,
+// so the checker can type construction, calls and member access across files.
+// `classes[Name]` carries `fields` (instance property name -> type node, or 0
+// when unannotated), `methods` (name -> {params, result, is_static}) and `ctor`
+// (the constructor's param type nodes, or 0 when the class declares none).
+static collect_signatures(ast, class_name, classes) {
+    mut fields = [:]
+    mut methods = [:]
+    mut ctor = 0
+    for stmt in ast.child("body") {
+        mut k = stmt.kind
+        if k == "VariableDecl" {
+            mut visibility = stmt.attr("visibility").unwrap_or("")
+            mut is_static = stmt.attr("is_static").unwrap_or(false)
+            if visibility != "" and not is_static {
+                fields[stmt.child("name")] = stmt.attr("type").unwrap_or(0)
+            }
+        } else if k == "FunctionDecl" {
+            mut params = stmt.attr("param_types").unwrap_or([])
+            mut result = stmt.attr("return_type").unwrap_or(0)
+            mut is_static = stmt.attr("is_static").unwrap_or(false)
+            methods[stmt.child("name")] = ["params": params, "result": result, "is_static": is_static]
+        } else if k == "ConstructorDecl" {
+            ctor = stmt.attr("param_types").unwrap_or([])
+        }
+    }
+    classes[class_name] = ["fields": fields, "methods": methods, "ctor": ctor]
 }

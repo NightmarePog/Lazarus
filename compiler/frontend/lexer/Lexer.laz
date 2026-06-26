@@ -137,8 +137,10 @@ private read_identifier() {
     return Token(Keywords.word_kind(text), text, line, col)
 }
 
-// Integer literals only; a `.` after the digits is left to become its own token.
-// A letter right after the digits (`123abc`) is an error, not two tokens.
+// A `NUMBER` (integer) or `FLOAT` literal. A `.` is part of the number only when
+// a digit follows it (`3.14`); otherwise it's left as its own token, so `x.field`
+// and `3.method` still work. A letter right after the digits (`123abc`) is an
+// error, not two tokens.
 private read_number() {
     mut start = .pos
     mut line = .line
@@ -146,11 +148,19 @@ private read_number() {
     while Char.is_digit(.current) {
         .advance()
     }
+    mut kind = "NUMBER"
+    if .current == "." and Char.is_digit(.peek()) {
+        kind = "FLOAT"
+        .advance()
+        while Char.is_digit(.current) {
+            .advance()
+        }
+    }
     if Char.is_ident_start(.current) {
         Error("InvalidNumber", "unexpected character after number literal", .line, .col, .source, 1).raise()
     }
     mut text = Str.sub(.source, start, .pos - 1).unwrap_or("")
-    return Token("NUMBER", text, line, col)
+    return Token(kind, text, line, col)
 }
 
 // `value` holds the content between the quotes.

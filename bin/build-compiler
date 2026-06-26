@@ -1,0 +1,36 @@
+#!/bin/sh
+# build-compiler — rebuild the self-hosted Lazarus compiler from compiler/,
+# seeded by the committed self-host binary (bin/lazarusc.lua). Does NOT use src/.
+#
+# It compiles the compiler with the current seed (stage 1), then compiles it
+# again with that result (stage 2). A correct self-hosting compiler is a
+# fixpoint: stage 1 and stage 2 must be byte-identical. Only then is the new
+# binary installed over the seed — so a broken build can never overwrite a good
+# one.
+set -e
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+SEED="$ROOT/bin/lazarusc.lua"
+ENTRY="$ROOT/compiler/Main.laz"
+
+if [ ! -f "$SEED" ]; then
+    echo "build-compiler: missing seed $SEED" >&2
+    echo "  bootstrap it once with: lua src/cli.lua build compiler/Main.laz -o bin/lazarusc.lua" >&2
+    exit 1
+fi
+
+# The compiler writes its output to ./Main.lua, so each stage runs in its own dir.
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+mkdir "$work/s1" "$work/s2"
+
+( cd "$work/s1" && lua "$SEED" "$ENTRY" )
+( cd "$work/s2" && lua "$work/s1/Main.lua" "$ENTRY" )
+
+if ! cmp -s "$work/s1/Main.lua" "$work/s2/Main.lua"; then
+    echo "build-compiler: NOT a self-host fixpoint (stage1 != stage2); refusing to install" >&2
+    exit 1
+fi
+
+cp "$work/s1/Main.lua" "$SEED"
+echo "build-compiler: installed bin/lazarusc.lua ($(wc -l < "$SEED") lines), fixpoint verified"

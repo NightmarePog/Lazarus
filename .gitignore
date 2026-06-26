@@ -1,4 +1,5 @@
 doc/out/
+.claude/
 
 # Generated Lua output from compiling .laz sources
 compiler/Main.lua

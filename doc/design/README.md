@@ -19,7 +19,7 @@ Codegen, see [`../pipeline.md`](../pipeline.md)).
 | [01-overview.md](01-overview.md) | Vision, the "file = class" model, a complete example, target runtime |
 | [02-lexical.md](02-lexical.md) | Comments, identifiers & casing, literals, operators, bindings, visibility |
 | [03-classes.md](03-classes.md) | Fields, `static`, `init`, methods/`self`, inheritance, `override`, abstract, traits |
-| [04-types-and-data.md](04-types-and-data.md) | `int`/`float`/`str`/`bool`, `Option`, `Result`, enums, lists/maps, traits, strictness/`as` |
+| [04-types-and-data.md](04-types-and-data.md) | `int`/`float`/`str`/`bool`, `Option`, `Result` (stdlib), enums, lists/maps, traits, strictness/`as` |
 | [05-control-flow.md](05-control-flow.md) | `if`, `while`, `loop`, `for`, `match`, `break` |
 | [06-modules-and-linking.md](06-modules-and-linking.md) | `import`/`pub`, libraries, bundling/linking, entry point |
 | [07-interop.md](07-interop.md) | `extern`, `lua { }`, `as`, calling CC/OC APIs |
@@ -36,7 +36,8 @@ single source of truth; the per-topic docs expand on each.
 - **Classes are the only user type kind** (besides enums). `struct` does **not**
   exist — a class with only fields *is* your data record.
 - **Type system:** static, **erased at codegen** (zero runtime type cost).
-  **No user generics in v1** — `Option`, `Result`, `[T]`, `{K:V}` are built-in.
+  **No user generics in v1** — `Option`, `[T]`, `{K:V}` are built-in; `Result`
+  ships in the stdlib as typed classes (`ResultBool`/`ResultString`/`ResultInt`).
 - **Linking:** compile-time bundle to **one** self-contained `.lua`. No runtime
   `require`. **No tree-shaking in v1** (imported files linked whole).
 - **Target:** **Lua 5.0** now; **Lua 5.4** planned (this is why `int`/`float` are
@@ -57,8 +58,9 @@ single source of truth; the per-topic docs expand on each.
 - **Numbers:** `int` and `float` are distinct; **no `num` umbrella**.
 - **Scalars:** `int`, `float`, `str`, `bool` (with `true`/`false`).
 - **No `nil`.** Absence is the built-in `Option<T>` (`Some`/`None`).
-- **Errors:** built-in `Result<T, E>` (`Ok`/`Err`), matched explicitly. **No `?`
-  operator, no `panic`** — unrecoverable failures drop to `error()` via `lua { }`.
+- **Errors:** stdlib typed `Result` classes (`ResultBool`/`ResultString`/`ResultInt`),
+  Err is a `str`; built with `.ok(v)`/`.err(m)`, consumed with `is_ok()`/`take()`/
+  `take_or()`. **No `?` operator** — `take()` aborts via `Sys.panic` (Lua `error()`).
 - **Collections:** `[T]` lists and `{K:V}` maps. **0-based** indexing (compiler
   offsets to Lua's 1-based). Length via `.len()`. Methods: `push`, `pop`,
   `get(k): Option`, index assignment.
@@ -85,8 +87,8 @@ single source of truth; the per-topic docs expand on each.
   (`Counter.bump()`), instances via their constructors/methods.
 
 ### Modules & interop
-- **Imports are explicit:** `import Vec`, `import Enemy from "actors/Enemy"`; used
-  qualified (`Vec.zero()`).
+- **Imports are explicit:** `import Vec`, `import actors.enemy.Enemy` (dotted path
+  from the project root, no `../`); used qualified by class name (`Vec.zero()`).
 - **No manifest in v1:** `lazarus build src/Main.laz`; imports resolved relative to
   the entry file. (A `lazarus.toml` design is sketched in 06 for later.)
 - **Entry point:** the built file's static `fn main()`; the bundler appends a call.

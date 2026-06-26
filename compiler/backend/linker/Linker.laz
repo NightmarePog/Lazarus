@@ -1,0 +1,82 @@
+// Gathers every module a program needs and orders them for bundling.
+//
+// Starting at the entry file, it lexes and parses each `.laz`, lifts the
+// `import` lines out of the body, resolves them to files (via Path), and walks
+// the imports depth-first — emitting each dependency before whatever uses it, so
+// later stages only ever see a plain single-class program. An already-loaded
+// file is skipped, which also breaks import cycles. An import that can't be read
+// raises an error pointing at the offending `import` line.
+
+import std.Str
+import std.Sys
+import frontend.lexer.Lexer
+import frontend.parser.Parser
+import backend.linker.Module
+import backend.linker.Path
+import Error
+
+private entry
+private root
+private loaded
+private visiting
+private ordered
+
+constructor(entry) {
+    .entry = entry
+    .root = Path.dirname(entry)
+    .loaded = [:]
+    .visiting = [:]
+    .ordered = []
+}
+
+// The full module set reachable from the entry file, dependencies-first.
+public link() {
+    .load(.entry, "", 0, 0, 1)
+    return .ordered
+}
+
+// The entry class name — the file stem of the entry path.
+public entry_class() {
+    return Path.stem(.entry)
+}
+
+// Load `path` and everything it imports, appending each dependency before the
+// module that needs it. The `origin_*` describe the `import` that referenced
+// this file (empty/zero for the entry) so a read failure points at the source.
+private load(path, origin_source, origin_line, origin_col, origin_span) {
+    if .loaded.has(path) {
+        return
+    }
+    // Already on the DFS stack: a cycle. Type-reference cycles are fine (each
+    // class is still emitted once), so just do not re-enter.
+    if .visiting.get(path).unwrap_or(false) {
+        return
+    }
+    .visiting[path] = true
+
+    mut source_opt = Sys.read_file(path)
+    if source_opt.is_none() {
+        Error("LinkError", "cannot resolve import '" ++ path ++ "'", origin_line, origin_col, origin_source, origin_span).raise()
+    }
+    mut source = source_opt.unwrap()
+
+    mut class_name = Path.stem(path)
+    mut tokens = Lexer(source).scan()
+    mut program = Parser(tokens, source).parse()
+
+    mut imports = []
+    mut body = []
+    for node in program.child("body") {
+        if node.kind == "ImportDecl" {
+            mut span = Str.len(node.child("name")).unwrap_or(1)
+            .load(Path.resolve(.root, node), source, node.line(), node.col(), span)
+            imports.push(node.child("name"))
+        } else {
+            body.push(node)
+        }
+    }
+    program.set("body", body)
+
+    .ordered.push(Module(path, class_name, source, program, imports))
+    .loaded[path] = true
+}

@@ -16,6 +16,7 @@ private known_classes
 private externs
 private scopes
 private collections
+private temp_seq
 
 constructor(cls, members, instance_methods, instance_order, properties, known_classes, externs) {
     .cls = cls
@@ -27,6 +28,14 @@ constructor(cls, members, instance_methods, instance_order, properties, known_cl
     .externs = externs
     .scopes = [[:]]
     .collections = false
+    .temp_seq = 0
+}
+
+// A fresh, collision-free local name for a generated temporary (e.g. the
+// once-evaluated scrutinee of a `match`). Unique within this class block.
+public fresh_temp() {
+    .temp_seq = .temp_seq + 1
+    return "__lz_m" ++ .temp_seq
 }
 
 public name() {

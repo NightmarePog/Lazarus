@@ -10,15 +10,18 @@ A file must `import` another class before using it. Imports sit at the top of th
 file and make the dependency explicit:
 
 ```
-import Vec2                         // a class in the same source root
-import Enemy from "actors/Enemy"    // a class in a subdirectory
+import Vec2                       // a class at the project root
+import actors.enemy.Enemy         // a class in actors/enemy/Enemy.laz
 ```
 
-- `import Name` resolves `Name.laz` relative to the source root / entry file.
-- `import Name from "path"` gives an explicit path (without the `.laz`); the class
-  name is still `Name` and must match the file.
-- Imported classes are used **qualified**: `Vec2(1, 2)`, `Vec2.zero()`,
-  `Enemy.spawn()`. There is no selective/unqualified import and no aliasing in v1.
+- `import seg.seg.Class` is a **dot-separated path resolved from the project root**
+  (the entry file's directory). The final segment is the class name and the file
+  stem; the leading segments are folders. `import std.Str` -> `<root>/std/Str.laz`.
+- Every import is project-root-relative regardless of which file it sits in —
+  there is **no `../` form and no quoted-path form**.
+- Imported classes are used **qualified by the class name** (the final segment):
+  `Vec2(1, 2)`, `Vec2.zero()`, `Enemy.spawn()`. There is no selective/unqualified
+  import and no aliasing in v1.
 
 ## Exporting
 
@@ -41,16 +44,15 @@ singletons / factory-only types).
 
 A **library** is simply a set of `.laz` files with `pub` items and **no
 `fn main()`**. It is consumed by another project that imports its classes by
-path. Because v1 has **no manifest**, a library is distributed as source and
-imported relative to the consumer:
+their dotted, root-relative path. Because v1 has **no manifest**, a library is
+distributed as source and **vendored under the consumer's project root** (the
+same way `std/` is just a folder at the root):
 
 ```
 mygame/
-  src/
-    Main.laz            // import Vec from "../../vec/src/Vec"
-../vec/
-  src/
-    Vec.laz             // pub items, no main()
+  Main.laz            // import vec.Vec
+  vec/
+    Vec.laz           // pub items, no main()
 ```
 
 The bundler pulls the referenced library files into the consumer's single output.

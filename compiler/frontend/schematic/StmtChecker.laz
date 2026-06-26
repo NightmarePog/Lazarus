@@ -15,10 +15,16 @@ import frontend.schematic.Callability
 
 private source
 private exprs
+private variant_owner
+private enums
+private variant_arity
 
-constructor(source, exprs) {
+constructor(source, exprs, variant_owner, enums, variant_arity) {
     .source = source
     .exprs = exprs
+    .variant_owner = variant_owner
+    .enums = enums
+    .variant_arity = variant_arity
 }
 
 // Walk a block, marking each statement with whether it is the block's last (the
@@ -56,6 +62,8 @@ private check_statement(stmt, scope, frame, is_last) {
         .check_for(stmt, scope, frame)
     } else if k == "ForInStmt" {
         .check_for_in(stmt, scope, frame)
+    } else if k == "MatchStmt" {
+        .check_match(stmt, scope, frame)
     } else if k == "BreakStmt" {
         .check_break(stmt, frame, is_last)
     }
@@ -289,6 +297,73 @@ private check_for_in(stmt, scope, frame) {
         inner.declare(name, Symbol("variable", false, false))
     }
     .check_block(stmt.child("body"), inner, frame.in_loop_body())
+}
+
+// The scrutinee is validated in the enclosing scope; each arm body is its own
+// child scope (so a binding in one arm neither leaks nor collides), with the
+// frame inherited so `return` / `break` inside an arm are judged by the enclosing
+// context. Variant arms are resolved to a single enum and, absent a `_`, the
+// match must cover every variant of that enum (exhaustiveness).
+private check_match(stmt, scope, frame) {
+    .exprs.check(stmt.child("scrutinee"), scope)
+    mut enum_name = ""
+    mut covered = [:]
+    mut has_wildcard = false
+    for arm in stmt.child("arms") {
+        mut arm_scope = scope.child()
+        if arm.attr("is_wildcard").unwrap_or(false) {
+            has_wildcard = true
+        } else if arm.attr("is_variant").unwrap_or(false) {
+            enum_name = .check_variant_arm(stmt, arm, enum_name, covered)
+            .declare_bindings(arm, arm_scope)
+        } else {
+            .exprs.check(arm.child("pattern"), scope)
+        }
+        .check_block(arm.child("body"), arm_scope, frame)
+    }
+    if enum_name != "" and not has_wildcard {
+        .check_exhaustive(stmt, enum_name, covered)
+    }
+}
+
+// Resolve one variant arm: the name must be a known variant, all variant arms in
+// a match must belong to the same enum, and a variant must not repeat.
+private check_variant_arm(stmt, arm, enum_name, covered) {
+    mut v = arm.child("variant")
+    mut owner = .variant_owner.get(v)
+    if owner.is_none() {
+        .fail(stmt, "Unknown enum variant '" ++ v ++ "' in match", Str.len(v).unwrap_or(1))
+    }
+    if enum_name != "" and enum_name != owner.unwrap() {
+        .fail(stmt, "match arms mix variants from different enums ('" ++ enum_name ++ "' and '" ++ owner.unwrap() ++ "')", Str.len(v).unwrap_or(1))
+    }
+    if covered.has(v) {
+        .fail(stmt, "Duplicate match arm for variant '" ++ v ++ "'", Str.len(v).unwrap_or(1))
+    }
+    mut arity = .variant_arity.get(v).unwrap_or(0)
+    mut bound = arm.child("bindings").len()
+    if bound != arity {
+        .fail(stmt, "Variant '" ++ v ++ "' carries " ++ arity ++ " value(s), but the pattern binds " ++ bound, Str.len(v).unwrap_or(1))
+    }
+    covered[v] = true
+    return owner.unwrap()
+}
+
+// Bind a payload pattern's field names in the arm scope (`_` ignores a field).
+private declare_bindings(arm, scope) {
+    for name in arm.child("bindings") {
+        if name != "_" {
+            scope.declare(name, Symbol("variable", false, false))
+        }
+    }
+}
+
+private check_exhaustive(stmt, enum_name, covered) {
+    for variant in .enums.get(enum_name).unwrap() {
+        if not covered.has(variant) {
+            .fail(stmt, "Non-exhaustive match on enum '" ++ enum_name ++ "': missing variant '" ++ variant ++ "' (add it, or a '_' arm)", 1)
+        }
+    }
 }
 
 private fail(node, message, span) {

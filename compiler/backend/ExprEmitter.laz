@@ -3,9 +3,10 @@
 // The interesting work is call dispatch, checked in order: an extern namespace
 // call lowers to its raw Lua target wrapped at the Option boundary; a built-in
 // collection/Option method to its `__lz_*` helper; a class name in call position
-// to construction `C.new(...)`; an instance method to receiver-passing
-// `C.m(obj, ...)`; any other field call to Lua's colon `obj:m(...)`; everything
-// else to a plain call.
+// to construction `C.new(...)`; a `self` method to receiver-passing
+// `C.m(self, ...)`; any other instance/field call to Lua's colon `obj:m(...)`
+// (which dispatches on the receiver's own methods, so a name shared with the
+// current class no longer mis-routes); everything else to a plain call.
 
 import std.Str
 import backend.Text
@@ -165,7 +166,7 @@ private emit_call(node) {
     if callee.kind == "MemberExpr" {
         mut object = callee.child("object")
         mut field = callee.child("field")
-        if .ctx.is_instance_method(field) {
+        if object.kind == "SelfExpr" and .ctx.is_instance_method(field) {
             return .ctx.name() ++ "." ++ field ++ "(" ++ Text.join(.with_receiver(object, args), ", ") ++ ")"
         }
         if not .receiver_is_class(object) {

@@ -3,10 +3,10 @@
 // `fold` returns the possibly-replaced node (folding may collapse a subtree to a
 // single literal), so callers assign the result back. Two real rewrites: a name
 // known to be a compile-time constant is replaced with its literal, and a binary
-// op on two numeric literals is evaluated now. Only `+` / `-` / `*` fold — `/`,
-// `%` and `^` would synthesise a non-integer literal, and floats/division are
-// deferred in this subset. Everything else only recurses so constants propagate
-// inward. A running `folds` count makes the pass's effect observable.
+// op on two numeric literals is evaluated now. `+` `-` `*` `/` fold (division by
+// a literal zero is left for the runtime); `%` and `^` don't yet. Everything else
+// only recurses so constants propagate inward. A running `folds` count makes the
+// pass's effect observable.
 
 import frontend.parser.Ast
 import std.Num
@@ -64,7 +64,7 @@ private fold_identifier(node, constants) {
     return node
 }
 
-// Constant folding: a `+`/`-`/`*` over two numeric literals is evaluated now.
+// Constant folding: a `+`/`-`/`*`/`/` over two numeric literals is evaluated now.
 private fold_binary(node, constants) {
     mut left = .fold(node.child("left"), constants)
     mut right = .fold(node.child("right"), constants)
@@ -72,9 +72,11 @@ private fold_binary(node, constants) {
     if .foldable(op, left, right) {
         mut lv = Num.to_number(left.child("value")).unwrap_or(0)
         mut rv = Num.to_number(right.child("value")).unwrap_or(0)
-        mut result = .apply(op, lv, rv)
-        .folds = .folds + 1
-        return Ast.literal("number", Num.to_text(result).unwrap_or("0"), node.line(), node.col())
+        if op != "DIVIDE" or rv != 0 {
+            mut result = .apply(op, lv, rv)
+            .folds = .folds + 1
+            return Ast.literal(.result_kind(op, left, right), Num.to_text(result).unwrap_or("0"), node.line(), node.col())
+        }
     }
     node.set("left", left)
     node.set("right", right)
@@ -86,14 +88,27 @@ private foldable(op, left, right) {
 }
 
 private can_fold(op) {
-    return op == "PLUS" or op == "MINUS" or op == "MULTIPLY"
+    return op == "PLUS" or op == "MINUS" or op == "MULTIPLY" or op == "DIVIDE"
 }
 
 private is_number(node) {
     if node.kind != "LiteralExpr" {
         return false
     }
-    return node.child("lit_kind") == "number"
+    mut lk = node.child("lit_kind")
+    return lk == "number" or lk == "float"
+}
+
+// Division always yields a `float`; for the rest the result is a `float` only if
+// either operand is one (int op int stays int).
+private result_kind(op, left, right) {
+    if op == "DIVIDE" {
+        return "float"
+    }
+    if left.child("lit_kind") == "float" or right.child("lit_kind") == "float" {
+        return "float"
+    }
+    return "number"
 }
 
 private apply(op, a, b) {
@@ -103,7 +118,10 @@ private apply(op, a, b) {
     if op == "MINUS" {
         return a - b
     }
-    return a * b
+    if op == "MULTIPLY" {
+        return a * b
+    }
+    return a / b
 }
 
 private fold_call(node, constants) {

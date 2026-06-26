@@ -46,6 +46,8 @@ private fold_statement(stmt, constants) {
         .fold_for(stmt, constants)
     } else if k == "ForInStmt" {
         .fold_for_in(stmt, constants)
+    } else if k == "MatchStmt" {
+        .fold_match(stmt, constants)
     }
     // ImportDecl / ExternDecl / BreakStmt carry nothing to fold.
 }
@@ -112,4 +114,23 @@ private fold_for(stmt, constants) {
 private fold_for_in(stmt, constants) {
     stmt.set("iter", .exprs.fold(stmt.child("iter"), constants))
     .fold_block(stmt.child("body"), constants.child(stmt.child("vars")))
+}
+
+// The scrutinee folds against the current scope; each arm's pattern folds the
+// same way, and each arm body runs in a child constant scope so its locals do
+// not leak between arms.
+private fold_match(stmt, constants) {
+    stmt.set("scrutinee", .exprs.fold(stmt.child("scrutinee"), constants))
+    for arm in stmt.child("arms") {
+        if .is_value_arm(arm) {
+            arm.set("pattern", .exprs.fold(arm.child("pattern"), constants))
+        }
+        .fold_block(arm.child("body"), constants.child([]))
+    }
+}
+
+// Only a value arm carries a foldable `pattern` expression; variant and `_` arms
+// do not.
+private is_value_arm(arm) {
+    return not arm.attr("is_wildcard").unwrap_or(false) and not arm.attr("is_variant").unwrap_or(false)
 }

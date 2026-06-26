@@ -1,17 +1,17 @@
-test:
-	busted
-
 format:
-	stylua src spec types
+	stylua types
 
 lint:
-	selene src spec types
+	selene types
 
-dev:
-	lua src/repl.lua
+# Rebuild the self-hosted compiler from compiler/ into bin/lazarusc.lua,
+# seeded by the existing bin/ binary. Verifies the fixpoint first.
+selfhost:
+	bin/build-compiler
 
-build:
-	lua src/cli.lua build $(FILE)
+# Compile a .laz file with the self-hosted compiler (writes ./Main.lua).
+selfbuild:
+	lua bin/lazarusc.lua $(FILE)
 
 doc:
 	doxygen doc/Doxyfile

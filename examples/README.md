@@ -14,6 +14,23 @@ functions and bindings are members; the chunk ends with `return <Class>`.
 | [`Functions.laz`](Functions.laz) | [`Functions.lua`](Functions.lua) | Function declarations, calls, nested calls, the `main()` entry point |
 | [`Mutability.laz`](Mutability.laz) | [`Mutability.lua`](Mutability.lua) | `mut` locals reassigned in place vs immutable bindings; a `public mut` member |
 | [`Showcase.laz`](Showcase.laz) | [`Showcase.lua`](Showcase.lua) | Everything at once — folding, `public`/`private`, `mut`, params, nested functions, strings, recursion-safe self-reference |
+| [`multi/Main.laz`](multi/Main.laz) + [`multi/Box.laz`](multi/Box.laz) | [`multi/Main.lua`](multi/Main.lua) | **Multiple files** — `import`, cross-class construction (`Box(7)`) and instance-method dispatch (`b.read()`) bundled into one chunk |
+
+## Multi-file programs
+
+A program can span several `.laz` files. A file `import`s another class to use it,
+and the compiler **links** the whole import graph into a single self-contained Lua
+chunk (dependencies emitted first, no `require`). You build the **entry** file; its
+imports are pulled in automatically:
+
+```sh
+bin/lazarus build examples/multi/Main.laz   # follows `import Box`, bundles both
+lua -e 'local M = dofile("examples/multi/Main.lua"); print(M.result)'   # -> 7
+```
+
+Construction (`Box(7)`) and static calls (`Box.unit()`) lower to `Box.new(...)` /
+`Box.unit(...)`; an instance call across files (`b.read()`) lowers to Lua's colon
+`b:read()`, which works because each instance carries its methods (no metatables).
 
 ## How the output is produced
 

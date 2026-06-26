@@ -3,9 +3,7 @@
         "version": "Lua 5.1",
         "path": [
             "?.lua",
-            "?/init.lua",
-            "src/?.lua",
-            "src/?/init.lua"
+            "?/init.lua"
         ]
     },
     "workspace": {

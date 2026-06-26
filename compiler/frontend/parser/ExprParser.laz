@@ -148,6 +148,10 @@ private parse_primary() {
         .cursor.advance()
         return Ast.literal("number", tok.value, tok.line, tok.column)
     }
+    if k == "FLOAT" {
+        .cursor.advance()
+        return Ast.literal("float", tok.value, tok.line, tok.column)
+    }
     if k == "STRING" {
         .cursor.advance()
         return Ast.literal("string", tok.value, tok.line, tok.column)
