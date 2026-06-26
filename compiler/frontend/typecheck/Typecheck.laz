@@ -452,12 +452,12 @@ private type_call(node, scope) {
 private type_construction(name, args, scope, node) {
     mut ctor = .classes.get(name).unwrap().get("ctor").unwrap()
     mut subst = [:]
-    if ctor == 0 {
+    if ctor.is_none() {
         for arg in args {
             .type_expr(arg, scope)
         }
     } else {
-        .infer_and_check(ctor, .class_var_set(name), args, scope, node, subst)
+        .infer_and_check(ctor.unwrap(), .class_var_set(name), args, scope, node, subst)
     }
     return .class_instance(name, subst)
 }

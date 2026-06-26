@@ -7,6 +7,7 @@
 
 import std.Str
 import std.Sys
+import std.Option
 import frontend.lexer.Lexer
 import frontend.parser.Parser
 import frontend.schematic.Schematic
@@ -80,12 +81,13 @@ static collect_enums(ast, variant_owner, enums, variant_arity, variant_fields, e
 // so the checker can type construction, calls and member access across files.
 // `classes[Name]` carries `fields` (instance property name -> type node, or 0
 // when unannotated), `methods` (name -> {params, result, is_static, type_params}),
-// `ctor` (the constructor's param type nodes, or 0 when the class declares none)
+// `ctor` (an Option of the constructor's param type nodes — `None` when the class
+// declares no constructor, distinct from `Some([])` for a zero-arg constructor)
 // and `type_params` (the class's generic parameter names from `constructor<...>`).
 static collect_signatures(ast, class_name, classes) {
     mut fields = [:]
     mut methods = [:]
-    mut ctor = 0
+    mut ctor = Option.none()
     mut type_params = []
     for stmt in ast.child("body") {
         mut k = stmt.kind
@@ -102,7 +104,7 @@ static collect_signatures(ast, class_name, classes) {
             mut mtype_params = stmt.attr("type_params").unwrap_or([])
             methods[stmt.child("name")] = ["params": params, "result": result, "is_static": is_static, "type_params": mtype_params]
         } else if k == "ConstructorDecl" {
-            ctor = stmt.attr("param_types").unwrap_or([])
+            ctor = Option.some(stmt.attr("param_types").unwrap_or([]))
             type_params = stmt.attr("type_params").unwrap_or([])
         }
     }

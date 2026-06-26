@@ -2676,12 +2676,12 @@ end
 function Typecheck.type_construction(self, name, args, scope, node)
     local ctor = __lz_get(__lz_get(self.classes, name):unwrap(), "ctor"):unwrap()
     local subst = __lz_map({})
-    if ctor == 0 then
+    if ctor:is_none() then
         for _, arg in __lz_each(args) do
             Typecheck.type_expr(self, arg, scope)
         end
     else
-        Typecheck.infer_and_check(self, ctor, Typecheck.class_var_set(self, name), args, scope, node, subst)
+        Typecheck.infer_and_check(self, ctor:unwrap(), Typecheck.class_var_set(self, name), args, scope, node, subst)
     end
     return Typecheck.class_instance(self, name, subst)
 end
@@ -4431,7 +4431,7 @@ end
 function Main.collect_signatures(ast, class_name, classes)
     local fields = __lz_map({})
     local methods = __lz_map({})
-    local ctor = 0
+    local ctor = Option.none()
     local type_params = __lz_list()
     for _, stmt in __lz_each(ast:child("body")) do
         local k = stmt.kind
@@ -4448,7 +4448,7 @@ function Main.collect_signatures(ast, class_name, classes)
             local mtype_params = stmt:attr("type_params"):unwrap_or(__lz_list())
             __lz_idx_set(methods, stmt:child("name"), __lz_map({["params"] = params, ["result"] = result, ["is_static"] = is_static, ["type_params"] = mtype_params}))
         elseif k == "ConstructorDecl" then
-            ctor = stmt:attr("param_types"):unwrap_or(__lz_list())
+            ctor = Option.some(stmt:attr("param_types"):unwrap_or(__lz_list()))
             type_params = stmt:attr("type_params"):unwrap_or(__lz_list())
         end
     end
