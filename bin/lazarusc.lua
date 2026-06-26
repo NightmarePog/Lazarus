@@ -1595,7 +1595,7 @@ end
 
 local ExprChecker = {}
 
-function ExprChecker.new(source, properties, methods)
+function ExprChecker.new(source, properties, methods, variant_owner)
     local self = {}
     self.set_instance = ExprChecker.set_instance
     self.instance_flag = ExprChecker.instance_flag
@@ -1611,6 +1611,7 @@ function ExprChecker.new(source, properties, methods)
     self.source = source
     self.properties = properties
     self.methods = methods
+    self.variant_owner = variant_owner
     self.in_instance = false
     return self
 end
@@ -1653,7 +1654,7 @@ function ExprChecker.check_condition(self, node, scope)
 end
 function ExprChecker.check_identifier(self, node, scope)
     local name = node:child("name")
-    if __lz_is_none(scope:lookup(name)) then
+    if __lz_is_none(scope:lookup(name)) and (not __lz_has(self.variant_owner, name)) then
         ExprChecker.fail(self, node, ("Undeclared identifier '" .. name) .. "'", __lz_unwrap_or(__lz_wrap(string.len(name)), 1))
     end
 end
@@ -2074,7 +2075,7 @@ function Schematic.analyze(program, source, class_name, imports, variant_owner, 
     for _, name in __lz_each(imports) do
         root:declare(name, Symbol.new("class", false, false))
     end
-    local exprs = ExprChecker.new(source, properties, methods)
+    local exprs = ExprChecker.new(source, properties, methods, variant_owner)
     local stmts = StmtChecker.new(source, exprs, variant_owner, enums, variant_arity)
     stmts:check_block(program:child("body"), root, Frame.new(false, false, false))
 end
@@ -3277,7 +3278,7 @@ end
 
 local CgContext = {}
 
-function CgContext.new(cls, members, instance_methods, instance_order, properties, known_classes, externs)
+function CgContext.new(cls, members, instance_methods, instance_order, properties, known_classes, externs, variant_owner)
     local self = {}
     self.fresh_temp = CgContext.fresh_temp
     self.name = CgContext.name
@@ -3293,6 +3294,8 @@ function CgContext.new(cls, members, instance_methods, instance_order, propertie
     self.pop_scope = CgContext.pop_scope
     self.declare_local = CgContext.declare_local
     self.is_local = CgContext.is_local
+    self.is_variant = CgContext.is_variant
+    self.variant_qualified = CgContext.variant_qualified
     self.emit_name = CgContext.emit_name
     self.cls = cls
     self.members = members
@@ -3301,6 +3304,7 @@ function CgContext.new(cls, members, instance_methods, instance_order, propertie
     self.properties = properties
     self.known_classes = known_classes
     self.externs = externs
+    self.variant_owner = variant_owner
     self.scopes = __lz_list(__lz_map({}))
     self.collections = false
     self.temp_seq = 0
@@ -3361,6 +3365,12 @@ function CgContext.is_local(self, name)
         end
     end
     return false
+end
+function CgContext.is_variant(self, name)
+    return __lz_has(self.variant_owner, name)
+end
+function CgContext.variant_qualified(self, name)
+    return (__lz_unwrap(__lz_get(self.variant_owner, name)) .. ".") .. name
 end
 function CgContext.emit_name(self, name)
     if CgContext.is_local(self, name) then
@@ -3450,7 +3460,11 @@ function ExprEmitter.emit(self, node)
         return ExprEmitter.emit_literal(self, node)
     end
     if k == "IdentifierExpr" then
-        return self.ctx:emit_name(node:child("name"))
+        local id = node:child("name")
+        if self.ctx:is_variant(id) then
+            return self.ctx:variant_qualified(id)
+        end
+        return self.ctx:emit_name(id)
     end
     if k == "SelfExpr" then
         return "self"
@@ -3977,7 +3991,7 @@ end
 
 local Codegen = {}
 
-function Codegen.new(class_name, imports, externs)
+function Codegen.new(class_name, imports, externs, variant_owner)
     local self = {}
     self.generate = Codegen.generate
     self.class_block = Codegen.class_block
@@ -3992,6 +4006,7 @@ function Codegen.new(class_name, imports, externs)
         __lz_idx_set(self.known_classes, name, true)
     end
     self.externs = externs
+    self.variant_owner = variant_owner
     self.collections_used = false
     return self
 end
@@ -4048,7 +4063,7 @@ function Codegen.build_context(self, body)
             end
         end
     end
-    return CgContext.new(self.class_name, members, instance_methods, instance_order, properties, self.known_classes, self.externs)
+    return CgContext.new(self.class_name, members, instance_methods, instance_order, properties, self.known_classes, self.externs, self.variant_owner)
 end
 function Codegen.is_property(self, stmt)
     local visibility = __lz_unwrap_or(stmt:attr("visibility"), "")
@@ -4082,13 +4097,14 @@ end
 
 local Bundler = {}
 
-function Bundler.new(modules, entry_class)
+function Bundler.new(modules, entry_class, variant_owner)
     local self = {}
     self.bundle = Bundler.bundle
     self.collect_externs = Bundler.collect_externs
     self.is_extern_module = Bundler.is_extern_module
     self.modules = modules
     self.entry_class = entry_class
+    self.variant_owner = variant_owner
     return self
 end
 function Bundler.bundle(self)
@@ -4099,7 +4115,7 @@ function Bundler.bundle(self)
     local entry_source = ""
     for _, m in __lz_each(self.modules) do
         if not Bundler.is_extern_module(self, m) then
-            local cg = Codegen.new(m.class_name, m.imports, externs)
+            local cg = Codegen.new(m.class_name, m.imports, externs, self.variant_owner)
             __lz_push(blocks, cg:class_block(m.ast))
             if cg:uses_collections() then
                 any_collections = true
@@ -4297,7 +4313,7 @@ function Main.build_file(path)
         Optimizer.new():optimize(m.ast)
     end
     local file = __lz_unwrap(__lz_wrap(io.open("Main.lua", "w")))
-    file:write(Bundler.new(modules, linker:entry_class()):bundle())
+    file:write(Bundler.new(modules, linker:entry_class(), variant_owner):bundle())
     file:close()
 end
 function Main.collect_enums(ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)

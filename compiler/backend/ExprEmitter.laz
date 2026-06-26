@@ -52,7 +52,11 @@ public emit(node) {
         return .emit_literal(node)
     }
     if k == "IdentifierExpr" {
-        return .ctx.emit_name(node.child("name"))
+        mut id = node.child("name")
+        if .ctx.is_variant(id) {
+            return .ctx.variant_qualified(id)
+        }
+        return .ctx.emit_name(id)
     }
     if k == "SelfExpr" {
         return "self"

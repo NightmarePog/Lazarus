@@ -29,7 +29,7 @@ static analyze(program, source, class_name, imports, variant_owner, enums, varia
         root.declare(name, Symbol("class", false, false))
     }
 
-    mut exprs = ExprChecker(source, properties, methods)
+    mut exprs = ExprChecker(source, properties, methods, variant_owner)
     mut stmts = StmtChecker(source, exprs, variant_owner, enums, variant_arity)
     stmts.check_block(program.child("body"), root, Frame(false, false, false))
 }

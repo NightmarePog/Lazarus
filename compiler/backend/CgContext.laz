@@ -14,11 +14,12 @@ private instance_order
 private properties
 private known_classes
 private externs
+private variant_owner
 private scopes
 private collections
 private temp_seq
 
-constructor(cls, members, instance_methods, instance_order, properties, known_classes, externs) {
+constructor(cls, members, instance_methods, instance_order, properties, known_classes, externs, variant_owner) {
     .cls = cls
     .members = members
     .instance_methods = instance_methods
@@ -26,6 +27,7 @@ constructor(cls, members, instance_methods, instance_order, properties, known_cl
     .properties = properties
     .known_classes = known_classes
     .externs = externs
+    .variant_owner = variant_owner
     .scopes = [[:]]
     .collections = false
     .temp_seq = 0
@@ -107,6 +109,17 @@ public is_local(name) {
         }
     }
     return false
+}
+
+// Whether `name` is a bare enum variant (so `Some(5)` / `None` lower to the
+// owner-qualified `Owner.Some(5)` / `Owner.None` the enum block emits).
+public is_variant(name) {
+    return .variant_owner.has(name)
+}
+
+// Qualify a bare variant as `Owner.Variant`, the name the enum block emits.
+public variant_qualified(name) {
+    return .variant_owner.get(name).unwrap() ++ "." ++ name
 }
 
 // Qualify a member reference as `C.name`; leave locals, parameters and globals

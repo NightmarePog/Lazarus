@@ -18,10 +18,12 @@ import Error
 
 private modules
 private entry_class
+private variant_owner
 
-constructor(modules, entry_class) {
+constructor(modules, entry_class, variant_owner) {
     .modules = modules
     .entry_class = entry_class
+    .variant_owner = variant_owner
 }
 
 public bundle() {
@@ -33,7 +35,7 @@ public bundle() {
     mut entry_source = ""
     for m in .modules {
         if not .is_extern_module(m) {
-            mut cg = Codegen(m.class_name, m.imports, externs)
+            mut cg = Codegen(m.class_name, m.imports, externs, .variant_owner)
             blocks.push(cg.class_block(m.ast))
             if cg.uses_collections() {
                 any_collections = true

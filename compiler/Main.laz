@@ -49,7 +49,7 @@ static build_file(path) {
         Optimizer().optimize(m.ast)
     }
     file = Sys.open("Main.lua", "w").unwrap()
-    file.write(Bundler(modules, linker.entry_class()).bundle())
+    file.write(Bundler(modules, linker.entry_class(), variant_owner).bundle())
     file.close()
 }
 
