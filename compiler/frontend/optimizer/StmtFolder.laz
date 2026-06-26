@@ -1,10 +1,7 @@
-// StmtFolder — folds statements and blocks, mutating the AST in place.
-//
-// Each statement's expressions are folded through the held ExprFolder; an
-// immutable binding (not `mut`, not a reassignment) whose initialiser folded to a
-// literal is recorded so later statements in the block substitute it inline. A
-// nested block runs in a child constant scope so its locals do not leak out, and
-// parameters / loop variables are shadowed out so their runtime values survive.
+// StmtFolder — folds statements and blocks, mutating the AST in place. An
+// immutable binding whose initialiser folded to a literal is recorded so later
+// statements substitute it inline. A nested block runs in a child constant scope
+// so its locals do not leak, and parameters / loop variables are shadowed out.
 // Runs after schematic, which sets the `reassign` annotation this relies on.
 
 private exprs
@@ -65,7 +62,7 @@ private fold_variable(stmt, constants) {
 }
 
 // Fold an optional expression attribute (a `return`/`init` value) in place.
-private fold_optional(stmt, key, constants) {
+private fold_optional(stmt, key: str, constants) {
     mut value = stmt.attr(key)
     if value.is_some() {
         stmt.set(key, .exprs.fold(value.unwrap(), constants))
@@ -88,9 +85,9 @@ private fold_if(stmt, constants) {
     }
 }
 
-// The loop variable is mutable across iterations, so it is never recorded as a
-// constant: its initialiser folds against the outer scope, and its name is
-// shadowed out of the child scope used for the condition, step and body.
+// The loop variable is mutable across iterations, so it is never recorded: its
+// initialiser folds against the outer scope, and its name is shadowed out of the
+// child scope used for the condition, step and body.
 private fold_for(stmt, constants) {
     mut shadowed = []
     mut init = stmt.attr("init")
@@ -116,9 +113,8 @@ private fold_for_in(stmt, constants) {
     .fold_block(stmt.child("body"), constants.child(stmt.child("vars")))
 }
 
-// The scrutinee folds against the current scope; each arm's pattern folds the
-// same way, and each arm body runs in a child constant scope so its locals do
-// not leak between arms.
+// The scrutinee and each value arm's pattern fold against the current scope; each
+// arm body runs in a child constant scope so its locals do not leak between arms.
 private fold_match(stmt, constants) {
     stmt.set("scrutinee", .exprs.fold(stmt.child("scrutinee"), constants))
     for arm in stmt.child("arms") {
@@ -129,8 +125,7 @@ private fold_match(stmt, constants) {
     }
 }
 
-// Only a value arm carries a foldable `pattern` expression; variant and `_` arms
-// do not.
-private is_value_arm(arm) {
+// Only a value arm carries a foldable `pattern`; variant and `_` arms do not.
+private is_value_arm(arm): bool {
     return not arm.attr("is_wildcard").unwrap_or(false) and not arm.attr("is_variant").unwrap_or(false)
 }

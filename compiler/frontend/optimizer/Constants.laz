@@ -1,11 +1,7 @@
 // Constants — the names currently known to hold a compile-time literal, mapping
-// each to its LiteralExpr node. Constant propagation substitutes a recorded
-// name's reference with its literal.
-//
-// A child scope inherits the current constants but drops any name shadowed by a
-// parameter or loop variable, whose runtime value must not be substituted away.
-// Lazarus maps cannot delete a key, so a child is built by copying every entry
-// except the shadowed names.
+// each to its LiteralExpr node, for constant propagation. A child scope inherits
+// the current constants but drops any name shadowed by a parameter or loop
+// variable (built by copying, since Lazarus maps cannot delete a key).
 
 private entries
 
@@ -13,22 +9,21 @@ constructor(entries) {
     .entries = entries
 }
 
-static empty() {
+static empty(): Constants {
     return Constants([:])
 }
 
-// Record `name` as holding the compile-time `literal`.
-public record(name, literal) {
+public record(name: str, literal) {
     .entries[name] = literal
 }
 
 // The literal bound to `name`, or a None when it is not a known constant.
-public lookup(name) {
+public lookup(name: str) {
     return .entries.get(name)
 }
 
 // A child carrying every current constant except the `shadowed` names.
-public child(shadowed) {
+public child(shadowed): Constants {
     mut blocked = [:]
     for name in shadowed {
         blocked[name] = true
