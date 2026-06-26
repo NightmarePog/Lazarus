@@ -25,15 +25,31 @@ private static op_map = [
     "OR": "or"
 ]
 
-// Collection operations lowering to a `__lz_*` helper with the receiver first.
-// Option's is_some/unwrap/etc. are NOT here — Option is the std `Option<T>` class
-// now, so those are ordinary instance method calls (`o:unwrap()`).
+// Built-in collection / Option / Result methods, lowering to a `__lz_*` helper
+// with the receiver as the first argument. `unwrap`/`unwrap_or` serve both Option
+// and Result (the helper dispatches on the runtime tag).
 private static builtins = [
     "len": "__lz_len",
     "push": "__lz_push",
     "pop": "__lz_pop",
     "get": "__lz_get",
-    "has": "__lz_has"
+    "has": "__lz_has",
+    "is_some": "__lz_is_some",
+    "is_none": "__lz_is_none",
+    "is_ok": "__lz_is_ok",
+    "is_err": "__lz_is_err",
+    "unwrap": "__lz_unwrap",
+    "unwrap_or": "__lz_unwrap_or",
+    "error": "__lz_error"
+]
+
+// Built-in constructors `Option.some/none` and `Result.ok/err`, keyed by
+// `Type.method`, lowering directly to their `__lz_*` primitive.
+private static constructors = [
+    "Option.some": "__lz_some",
+    "Option.none": "__lz_none",
+    "Result.ok": "__lz_ok",
+    "Result.err": "__lz_err"
 ]
 
 private ctx
@@ -146,6 +162,11 @@ private emit_call(node): str {
             if target.is_some() {
                 .ctx.mark_collections()
                 return "__lz_wrap(" ++ target.unwrap() ++ "(" ++ Text.join(args, ", ") ++ "))"
+            }
+            mut ctor = ExprEmitter.constructors.get(object.child("name") ++ "." ++ field)
+            if ctor.is_some() {
+                .ctx.mark_collections()
+                return ctor.unwrap() ++ "(" ++ Text.join(args, ", ") ++ ")"
             }
         }
 
