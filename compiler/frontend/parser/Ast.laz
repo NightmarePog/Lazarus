@@ -27,14 +27,17 @@ static extern_decl(name, params, target, line, col) {
 }
 
 // `param_types` is a list of Type nodes aligned with `params`; `return_type` is
-// a Type node (both default to `dynamic` when unannotated). Phase 1 stores them;
-// the checker consumes them later.
-static function_decl(name, params, body, is_static, visibility, line, col, param_types, return_type) {
-    return Node("FunctionDecl", ["name": name, "params": params, "body": body, "is_static": is_static, "visibility": visibility, "line": line, "col": col, "param_types": param_types, "return_type": return_type])
+// a Type node (both default to `dynamic` when unannotated). `type_params` lists
+// the method's own generic parameter names (empty when not generic). Phase 1
+// stores them; the checker consumes them later.
+static function_decl(name, params, body, is_static, visibility, line, col, param_types, return_type, type_params) {
+    return Node("FunctionDecl", ["name": name, "params": params, "body": body, "is_static": is_static, "visibility": visibility, "line": line, "col": col, "param_types": param_types, "return_type": return_type, "type_params": type_params])
 }
 
-static constructor_decl(params, body, line, col, param_types) {
-    return Node("ConstructorDecl", ["params": params, "body": body, "line": line, "col": col, "param_types": param_types])
+// `type_params` lists the class's generic parameter names (declared on the
+// constructor, e.g. `constructor<T, U>`), scoping the whole file-class.
+static constructor_decl(params, body, line, col, param_types, type_params) {
+    return Node("ConstructorDecl", ["params": params, "body": body, "line": line, "col": col, "param_types": param_types, "type_params": type_params])
 }
 
 static expression_stmt(expression, line, col) {

@@ -25,8 +25,11 @@ private known_classes
 private enums
 private classes
 private variant_fields
+private variant_owner
+private enum_type_params
+private type_vars
 
-constructor(source, class_name, imports, enums, classes, variant_fields) {
+constructor(source, class_name, imports, enums, classes, variant_fields, variant_owner, enum_type_params) {
     .source = source
     .class_name = class_name
     .known_classes = [:]
@@ -37,10 +40,39 @@ constructor(source, class_name, imports, enums, classes, variant_fields) {
     .enums = enums
     .classes = classes
     .variant_fields = variant_fields
+    .variant_owner = variant_owner
+    .enum_type_params = enum_type_params
+    .type_vars = [:]
 }
 
 public check(program) {
+    .type_vars = .own_var_set()
     .type_block(program.child("body"), Scope.root(), Type.dynamic())
+}
+
+// The generic type variables of the current module's class/enum, in scope for
+// every member: a generic class's `constructor<T>` params, plus a generic enum's
+// `<T>` header params (for an enum module that also carries methods).
+private own_var_set() {
+    mut out = [:]
+    for p in .own_type_params() {
+        out[p] = true
+    }
+    return out
+}
+
+private own_type_params() {
+    mut out = []
+    mut centry = .classes.get(.class_name)
+    if centry.is_some() {
+        for p in centry.unwrap().get("type_params").unwrap_or([]) {
+            out.push(p)
+        }
+    }
+    for p in .enum_type_params.get(.class_name).unwrap_or([]) {
+        out.push(p)
+    }
+    return out
 }
 
 // ---- statements ----
@@ -56,9 +88,9 @@ private type_stmt(stmt, scope, ret) {
     if k == "VariableDecl" {
         .type_variable(stmt, scope)
     } else if k == "FunctionDecl" {
-        .type_callable(stmt, scope, .return_type(stmt))
+        .type_callable(stmt, scope)
     } else if k == "ConstructorDecl" {
-        .type_callable(stmt, scope, Type.unit())
+        .type_callable(stmt, scope)
     } else if k == "ReturnStmt" {
         .type_return(stmt, scope, ret)
     } else if k == "ExpressionStmt" {
@@ -114,10 +146,28 @@ private type_variable(stmt, scope) {
     scope.declare(stmt.child("name"), t)
 }
 
-private type_callable(stmt, scope, ret) {
+// A method/constructor body is checked with the class's type vars plus the
+// callable's own generic params in scope (so the return type, params and body all
+// see them), then the scope is restored (methods do not nest).
+private type_callable(stmt, scope) {
+    mut saved = .type_vars
+    .type_vars = .callable_var_set(stmt)
+    mut ret = Type.unit()
+    if stmt.kind == "FunctionDecl" {
+        ret = .return_type(stmt)
+    }
     mut inner = scope.child()
     .bind_params(stmt, inner)
     .type_block(stmt.child("body"), inner, ret)
+    .type_vars = saved
+}
+
+private callable_var_set(stmt) {
+    mut out = .own_var_set()
+    for p in stmt.attr("type_params").unwrap_or([]) {
+        out[p] = true
+    }
+    return out
 }
 
 private bind_params(stmt, scope) {
@@ -223,7 +273,7 @@ private type_expr(node, scope) {
         return .identifier_type(node.child("name"), scope)
     }
     if k == "SelfExpr" {
-        return Type.class_of(.class_name)
+        return Type.class_of(.class_name, .self_args())
     }
     if k == "BinaryExpr" {
         return .type_binary(node, scope)
@@ -356,22 +406,25 @@ private arith_type(node, op, lt, rt) {
 
 // ---- calls & members ----
 
-// An identifier is its bound type, or — for a bare class name used as a static
-// receiver (`Other.method()`) — the class itself; otherwise dynamic.
+// An identifier is its bound type; a bare nullary variant (`None`) is its enum;
+// a bare class name used as a static receiver is the class; otherwise dynamic.
 private identifier_type(name, scope) {
     mut found = scope.lookup(name)
     if found.is_some() {
         return found.unwrap()
     }
+    if .variant_owner.has(name) {
+        return .enum_instance(.variant_owner.get(name).unwrap(), [:])
+    }
     if .classes.has(name) {
-        return Type.class_of(name)
+        return Type.class_of(name, [])
     }
     return Type.dynamic()
 }
 
-// A call is construction when its callee names a known class, a method call when
-// its callee is a member access, and otherwise untyped. Construction and method
-// calls check their arguments and yield the declared result type.
+// A call is a bare variant construction (`Some(5)`), object construction
+// (`Class(args)`), a method call (`obj.m()`), or otherwise untyped. Each infers
+// its type args by unification and yields the constructed/declared result type.
 private type_call(node, scope) {
     mut callee = node.child("callee")
     mut args = node.child("args")
@@ -380,9 +433,11 @@ private type_call(node, scope) {
     }
     if callee.kind == "IdentifierExpr" {
         mut name = callee.child("name")
+        if .variant_owner.has(name) {
+            return .type_variant(name, args, scope, node)
+        }
         if not scope.lookup(name).is_some() and .classes.has(name) {
-            .check_ctor_args(name, args, scope, node)
-            return Type.class_of(name)
+            return .type_construction(name, args, scope, node)
         }
     }
     .type_expr(callee, scope)
@@ -392,18 +447,42 @@ private type_call(node, scope) {
     return Type.dynamic()
 }
 
+// Object construction: unify the constructor's params (in the class's var scope)
+// against the args, then read the class's type args off the solution.
+private type_construction(name, args, scope, node) {
+    mut ctor = .classes.get(name).unwrap().get("ctor").unwrap()
+    mut subst = [:]
+    if ctor == 0 {
+        for arg in args {
+            .type_expr(arg, scope)
+        }
+    } else {
+        .infer_and_check(ctor, .class_var_set(name), args, scope, node, subst)
+    }
+    return .class_instance(name, subst)
+}
+
+// Bare variant construction `Some(args)`: unify the variant's payload types (in
+// the owner enum's var scope) against the args; the result is the owner enum.
+private type_variant(name, args, scope, node) {
+    mut owner = .variant_owner.get(name).unwrap()
+    mut subst = [:]
+    .infer_and_check(.variant_fields.get(name).unwrap_or([]), .enum_var_set(owner), args, scope, node, subst)
+    return .enum_instance(owner, subst)
+}
+
 private type_method_call(member, args, scope, call) {
     mut object = member.child("object")
     mut method = member.child("field")
-    mut cls = .receiver_class(object, scope)
+    mut recv = .receiver_type(object, scope)
+    mut cls = .class_name_of(recv)
     if cls == "" {
         for arg in args {
             .type_expr(arg, scope)
         }
         return Type.dynamic()
     }
-    mut methods = .classes.get(cls).unwrap().get("methods").unwrap()
-    mut sig = methods.get(method)
+    mut sig = .classes.get(cls).unwrap().get("methods").unwrap().get(method)
     if not sig.is_some() {
         if .static_receiver(object, scope) {
             for arg in args {
@@ -413,25 +492,43 @@ private type_method_call(member, args, scope, call) {
         }
         .fail(member, "no method '" ++ method ++ "' on " ++ cls)
     }
-    .check_call_args(sig.unwrap().get("params").unwrap(), args, scope, call)
-    return .field_type(sig.unwrap().get("result"))
+    return .type_method_sig(cls, recv, sig.unwrap(), args, scope, call)
 }
 
-// A member read is a field's declared type. An unknown member on an instance
-// receiver is an error; a method referenced as a value, or any member off a bare
-// class name (which may name a static member the registry does not track), is
-// left dynamic.
+// A method call: the receiver's type args pre-bind the class params (so `T`
+// resolves to the receiver's concrete arg), the method's own `<U>` are inferred
+// from the call args, and the result is substituted through the solution.
+private type_method_sig(cls, recv, sig, args, scope, call) {
+    mut vars = .method_var_set(cls, sig)
+    mut subst = .receiver_subst(cls, recv)
+    .infer_and_check(sig.get("params").unwrap(), vars, args, scope, call, subst)
+    mut result = sig.get("result").unwrap_or(0)
+    if result == 0 {
+        return Type.dynamic()
+    }
+    return .substitute(.resolve_with(result, vars), subst)
+}
+
+// A member read is a field's declared type, with the receiver's type args
+// substituted in (so `value: T` on a `Box<int>` reads as `int`). An unknown
+// member on an instance receiver is an error; a method-as-value, or any member
+// off a bare class name, is left dynamic.
 private type_member(node, scope) {
     mut object = node.child("object")
     mut field = node.child("field")
-    mut cls = .receiver_class(object, scope)
+    mut recv = .receiver_type(object, scope)
+    mut cls = .class_name_of(recv)
     if cls == "" {
         return Type.dynamic()
     }
     mut entry = .classes.get(cls).unwrap()
     mut ft = entry.get("fields").unwrap().get(field)
     if ft.is_some() {
-        return .field_type(ft)
+        mut fnode = ft.unwrap()
+        if fnode == 0 {
+            return Type.dynamic()
+        }
+        return .substitute(.resolve_with(fnode, .class_var_set(cls)), .receiver_subst(cls, recv))
     }
     if entry.get("methods").unwrap().has(field) {
         return Type.dynamic()
@@ -442,24 +539,24 @@ private type_member(node, scope) {
     .fail(node, "no field '" ++ field ++ "' on " ++ cls)
 }
 
-// The class a member access dispatches on: the current class for `self`/`.x`, a
-// named class for a bare class reference (a static access), the class a value is
-// typed as, or "" when the receiver is dynamic.
-private receiver_class(object, scope) {
+// The receiver's type: the current class (with its own params as vars) for
+// `self`/`.x`, a bare class name for a static access, the value's type, or
+// dynamic.
+private receiver_type(object, scope) {
     if object.kind == "SelfExpr" {
-        return .class_name
+        return Type.class_of(.class_name, .self_args())
     }
     if object.kind == "IdentifierExpr" {
         mut found = scope.lookup(object.child("name"))
-        if not found.is_some() {
-            if .classes.has(object.child("name")) {
-                return object.child("name")
-            }
-            return ""
+        if found.is_some() {
+            return found.unwrap()
         }
-        return .class_name_of(found.unwrap())
+        if .classes.has(object.child("name")) {
+            return Type.class_of(object.child("name"), [])
+        }
+        return Type.dynamic()
     }
-    return .class_name_of(.type_expr(object, scope))
+    return .type_expr(object, scope)
 }
 
 private class_name_of(t) {
@@ -479,34 +576,33 @@ private static_receiver(object, scope) {
     return not scope.lookup(object.child("name")).is_some() and .classes.has(object.child("name"))
 }
 
-// Check an argument list against a list of parameter type nodes: the counts must
-// match, and each concrete parameter type must accept its argument.
-private check_call_args(params, args, scope, node) {
-    if params.len() != args.len() {
-        .fail(node, "wrong number of arguments: expected " ++ .count(params.len()) ++ ", found " ++ .count(args.len()))
+// Check args against parameter type nodes (resolved in the callee's var scope):
+// the counts must match, each param is unified against its arg to solve type
+// vars, then each concrete (substituted) param must accept its arg.
+private infer_and_check(param_nodes, callee_vars, args, scope, node, subst) {
+    if param_nodes.len() != args.len() {
+        .fail(node, "wrong number of arguments: expected " ++ .count(param_nodes.len()) ++ ", found " ++ .count(args.len()))
     }
+    mut ptypes = []
+    mut atypes = []
     mut i = 1
     for arg in args {
-        .expect(.resolve(params.get(i).unwrap()), .type_expr(arg, scope), arg, "argument")
+        mut pt = .resolve_with(param_nodes.get(i).unwrap(), callee_vars)
+        mut at = .type_expr(arg, scope)
+        .unify(pt, at, subst)
+        ptypes.push(pt)
+        atypes.push(at)
         i = i + 1
+    }
+    mut j = 1
+    for arg in args {
+        .expect(.substitute(ptypes.get(j).unwrap(), subst), atypes.get(j).unwrap(), arg, "argument")
+        j = j + 1
     }
 }
 
 private count(n) {
     return Str.format("%d", n).unwrap_or("?")
-}
-
-// Construction checks its arguments against the class's constructor parameters;
-// a class that declares no constructor accepts any arguments.
-private check_ctor_args(name, args, scope, node) {
-    mut ctor = .classes.get(name).unwrap().get("ctor").unwrap()
-    if ctor == 0 {
-        for arg in args {
-            .type_expr(arg, scope)
-        }
-        return
-    }
-    .check_call_args(ctor, args, scope, node)
 }
 
 // Resolve an optional field/result type node — an absent or unannotated (0) slot
@@ -522,10 +618,148 @@ private field_type(opt) {
     return .resolve(node)
 }
 
+// ---- generics ----
+
+// The current class's own type params rendered as type-variable arguments, so
+// `self` is `Box<T>` (not bare `Box`) and members typed in `T` flow.
+private self_args() {
+    mut out = []
+    for p in .own_type_params() {
+        out.push(Type.var(p))
+    }
+    return out
+}
+
+private class_instance(name, subst) {
+    return Type.class_of(name, .solved_args(.class_params(name), subst))
+}
+
+private enum_instance(owner, subst) {
+    return Type.enum_of(owner, .solved_args(.enum_type_params.get(owner).unwrap_or([]), subst))
+}
+
+// Read a declaration's type args off an inference solution: each param name maps
+// to its solved type, or `dynamic` when inference left it unbound.
+private solved_args(params, subst) {
+    mut out = []
+    for p in params {
+        out.push(.subst_lookup(subst, p))
+    }
+    return out
+}
+
+private subst_lookup(subst, name) {
+    mut v = subst.get(name)
+    if v.is_some() {
+        return v.unwrap()
+    }
+    return Type.dynamic()
+}
+
+private class_params(name) {
+    mut centry = .classes.get(name)
+    if centry.is_some() {
+        return centry.unwrap().get("type_params").unwrap_or([])
+    }
+    return []
+}
+
+private class_var_set(name) {
+    mut out = [:]
+    for p in .class_params(name) {
+        out[p] = true
+    }
+    return out
+}
+
+private enum_var_set(name) {
+    mut out = [:]
+    for p in .enum_type_params.get(name).unwrap_or([]) {
+        out[p] = true
+    }
+    return out
+}
+
+private method_var_set(cls, sig) {
+    mut out = .class_var_set(cls)
+    for p in sig.get("type_params").unwrap_or([]) {
+        out[p] = true
+    }
+    return out
+}
+
+// Pre-bind a class's type params to the receiver's concrete type args, so a
+// method/field typed in `T` reads at the receiver's instantiation.
+private receiver_subst(cls, recv) {
+    mut subst = [:]
+    mut i = 1
+    for p in .class_params(cls) {
+        subst[p] = recv.params.get(i).unwrap_or(Type.dynamic())
+        i = i + 1
+    }
+    return subst
+}
+
+// Resolve a type node with a specific set of type vars in scope (the callee's,
+// not the caller's), restoring afterward.
+private resolve_with(node, vars) {
+    mut saved = .type_vars
+    .type_vars = vars
+    mut r = .resolve(node)
+    .type_vars = saved
+    return r
+}
+
+// Solve type vars by matching a declared param type against a synthesized arg
+// type. Never fails: it only records solutions (first binding wins); a `dynamic`
+// side or a head mismatch simply yields no constraint.
+private unify(param, arg, subst) {
+    if param.kind == "var" {
+        if not subst.has(param.name) {
+            subst[param.name] = arg
+        }
+        return
+    }
+    if param.is_dynamic() or arg.is_dynamic() {
+        return
+    }
+    if param.kind == arg.kind and (param.kind == "class" or param.kind == "enum") and param.name == arg.name {
+        mut i = 1
+        for p in param.params {
+            .unify(p, arg.params.get(i).unwrap_or(Type.dynamic()), subst)
+            i = i + 1
+        }
+    }
+}
+
+// Replace type vars with their solutions (unbound → dynamic), recursing into
+// function and generic-instance arguments.
+private substitute(t, subst) {
+    if t.kind == "var" {
+        return .subst_lookup(subst, t.name)
+    }
+    if t.kind == "fn" {
+        mut ps = []
+        for p in t.params {
+            ps.push(.substitute(p, subst))
+        }
+        return Type.fn(ps, .substitute(t.result, subst))
+    }
+    if (t.kind == "class" or t.kind == "enum") and t.params.len() > 0 {
+        mut out = []
+        for a in t.params {
+            out.push(.substitute(a, subst))
+        }
+        return Type(t.kind, t.name, out, 0)
+    }
+    return t
+}
+
 // ---- helpers ----
 
-// Turn a parsed type annotation node into a resolved Type. An unknown name (a
-// generic parameter, or a not-yet-known type) resolves to `dynamic`.
+// Turn a parsed type annotation node into a resolved Type. A name in scope as a
+// type variable resolves to that `var`; a known class/enum to a (possibly
+// generic) instance; anything else to `dynamic`.
 private resolve(t) {
     if t.kind == "TypeFn" {
         mut ps = []
@@ -553,16 +787,45 @@ private resolve(t) {
     if name == "dynamic" {
         return Type.dynamic()
     }
+    if .type_vars.has(name) {
+        return Type.var(name)
+    }
     if .enums.has(name) {
-        return Type.enum_of(name)
+        return Type.enum_of(name, .resolve_args(t, name))
     }
-    if .known_classes.has(name) {
-        return Type.class_of(name)
-    }
-    if .classes.has(name) {
-        return Type.class_of(name)
+    if .known_classes.has(name) or .classes.has(name) {
+        return Type.class_of(name, .resolve_args(t, name))
     }
     return Type.dynamic()
+}
+
+// Resolve a type node's explicit `<...>` arguments. A bare name (no args) yields
+// `[]` (lenient); when args ARE written, their count must match the declaration.
+private resolve_args(t, name) {
+    mut nodes = t.child("args")
+    if nodes.len() == 0 {
+        return []
+    }
+    mut declared = .declared_arity(name)
+    if declared >= 0 and nodes.len() != declared {
+        .fail(t, name ++ " expects " ++ .count(declared) ++ " type argument(s), found " ++ .count(nodes.len()))
+    }
+    mut out = []
+    for a in nodes {
+        out.push(.resolve(a))
+    }
+    return out
+}
+
+private declared_arity(name) {
+    if .enum_type_params.has(name) {
+        return .enum_type_params.get(name).unwrap().len()
+    }
+    mut centry = .classes.get(name)
+    if centry.is_some() {
+        return centry.unwrap().get("type_params").unwrap_or([]).len()
+    }
+    return 0 - 1
 }
 
 private expect(expected, actual, node, what) {
@@ -571,11 +834,42 @@ private expect(expected, actual, node, what) {
     }
 }
 
+// Assignability. `dynamic` and unsolved type variables defer (lenient). Two
+// concrete class/enum types must share a name and have compatible type args
+// position-wise — but a missing or `dynamic` arg on either side is compatible, so
+// `Result<int>` clashes with `Result<str>` while bare `Result` matches anything.
 private compatible(expected, actual) {
     if expected.is_dynamic() or actual.is_dynamic() {
         return true
     }
-    return expected.equals(actual)
+    if expected.kind == "var" or actual.kind == "var" {
+        return true
+    }
+    if not expected.equals(actual) {
+        return false
+    }
+    if expected.kind == "class" or expected.kind == "enum" {
+        return .args_compatible(expected.params, actual.params)
+    }
+    return true
+}
+
+private args_compatible(a, b) {
+    mut n = a.len()
+    if b.len() > n {
+        n = b.len()
+    }
+    mut i = 1
+    loop {
+        if i > n {
+            break
+        }
+        if not .compatible(a.get(i).unwrap_or(Type.dynamic()), b.get(i).unwrap_or(Type.dynamic())) {
+            return false
+        }
+        i = i + 1
+    }
+    return true
 }
 
 private fail(node, message) {
