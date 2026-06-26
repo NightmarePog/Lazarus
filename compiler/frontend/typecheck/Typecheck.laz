@@ -525,10 +525,10 @@ private type_member(node, scope) {
     mut ft = entry.get("fields").unwrap().get(field)
     if ft.is_some() {
         mut fnode = ft.unwrap()
-        if fnode == 0 {
+        if fnode.is_none() {
             return Type.dynamic()
         }
-        return .substitute(.resolve_with(fnode, .class_var_set(cls)), .receiver_subst(cls, recv))
+        return .substitute(.resolve_with(fnode.unwrap(), .class_var_set(cls)), .receiver_subst(cls, recv))
     }
     if entry.get("methods").unwrap().has(field) {
         return Type.dynamic()

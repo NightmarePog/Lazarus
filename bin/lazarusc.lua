@@ -2736,10 +2736,10 @@ function Typecheck.type_member(self, node, scope)
     local ft = __lz_get(__lz_get(entry, "fields"):unwrap(), field)
     if ft:is_some() then
         local fnode = ft:unwrap()
-        if fnode == 0 then
+        if fnode:is_none() then
             return Type.dynamic()
         end
-        return Typecheck.substitute(self, Typecheck.resolve_with(self, fnode, Typecheck.class_var_set(self, cls)), Typecheck.receiver_subst(self, cls, recv))
+        return Typecheck.substitute(self, Typecheck.resolve_with(self, fnode:unwrap(), Typecheck.class_var_set(self, cls)), Typecheck.receiver_subst(self, cls, recv))
     end
     if __lz_has(__lz_get(entry, "methods"):unwrap(), field) then
         return Type.dynamic()
@@ -4439,7 +4439,7 @@ function Main.collect_signatures(ast, class_name, classes)
             local visibility = stmt:attr("visibility"):unwrap_or("")
             local is_static = stmt:attr("is_static"):unwrap_or(false)
             if (visibility ~= "") and (not is_static) then
-                __lz_idx_set(fields, stmt:child("name"), stmt:attr("type"):unwrap_or(0))
+                __lz_idx_set(fields, stmt:child("name"), stmt:attr("type"))
             end
         elseif k == "FunctionDecl" then
             local params = stmt:attr("param_types"):unwrap_or(__lz_list())

@@ -79,8 +79,9 @@ static collect_enums(ast, variant_owner, enums, variant_arity, variant_fields, e
 
 // Gather one module's class signature into the program-wide `classes` registry,
 // so the checker can type construction, calls and member access across files.
-// `classes[Name]` carries `fields` (instance property name -> type node, or 0
-// when unannotated), `methods` (name -> {params, result, is_static, type_params}),
+// `classes[Name]` carries `fields` (instance property name -> an Option of its
+// type node, `None` when unannotated), `methods` (name -> {params, result,
+// is_static, type_params}),
 // `ctor` (an Option of the constructor's param type nodes — `None` when the class
 // declares no constructor, distinct from `Some([])` for a zero-arg constructor)
 // and `type_params` (the class's generic parameter names from `constructor<...>`).
@@ -95,7 +96,7 @@ static collect_signatures(ast, class_name, classes) {
             mut visibility = stmt.attr("visibility").unwrap_or("")
             mut is_static = stmt.attr("is_static").unwrap_or(false)
             if visibility != "" and not is_static {
-                fields[stmt.child("name")] = stmt.attr("type").unwrap_or(0)
+                fields[stmt.child("name")] = stmt.attr("type")
             }
         } else if k == "FunctionDecl" {
             mut params = stmt.attr("param_types").unwrap_or([])
