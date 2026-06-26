@@ -1,11 +1,8 @@
-// Gathers every module a program needs and orders them for bundling.
-//
-// Starting at the entry file, it lexes and parses each `.laz`, lifts the
-// `import` lines out of the body, resolves them to files (via Path), and walks
-// the imports depth-first — emitting each dependency before whatever uses it, so
-// later stages only ever see a plain single-class program. An already-loaded
-// file is skipped, which also breaks import cycles. An import that can't be read
-// raises an error pointing at the offending `import` line.
+// Linker — gathers every module a program needs and orders them for bundling.
+// From the entry file it lexes/parses each `.laz`, lifts the `import` lines, and
+// walks imports depth-first (each dependency emitted before its user), so later
+// stages see a plain single-class program. An already-loaded file is skipped,
+// breaking cycles; an unreadable import raises at its `import` line.
 
 import std.Str
 import std.Sys
@@ -15,13 +12,13 @@ import backend.linker.Module
 import backend.linker.Path
 import Error
 
-private entry
-private root
+private entry: str
+private root: str
 private loaded
 private visiting
 private ordered
 
-constructor(entry) {
+constructor(entry: str) {
     .entry = entry
     .root = Path.dirname(entry)
     .loaded = [:]
@@ -29,11 +26,9 @@ constructor(entry) {
     .ordered = []
 }
 
-// The full module set reachable from the entry file, dependencies-first.
-// Option<T>/Result<T> back every collection and IO result (the prelude's `get`/
-// `pop`/extern-wrap build them), so they are linked into every program
-// implicitly — but only when actually present, so a program that ships no `std/`
-// (and therefore uses no collections) still links.
+// The full module set, dependencies-first. Option<T>/Result<T> back every
+// collection/IO result, so they are linked into every program implicitly — but
+// only when present, so a program shipping no `std/` still links.
 public link() {
     .load(.entry, "", 0, 0, 1)
     .load_runtime(Path.join(.root, "std/Option.laz"))
@@ -41,28 +36,25 @@ public link() {
     return .ordered
 }
 
-// Link a runtime-implicit module if its source can be read; silently skip it
-// otherwise (no `import` line to point an error at).
-private load_runtime(path) {
+private load_runtime(path: str) {
     if Sys.read_file(path).is_some() {
         .load(path, "", 0, 0, 1)
     }
 }
 
-// The entry class name — the file stem of the entry path.
-public entry_class() {
+public entry_class(): str {
     return Path.stem(.entry)
 }
 
-// Load `path` and everything it imports, appending each dependency before the
-// module that needs it. The `origin_*` describe the `import` that referenced
-// this file (empty/zero for the entry) so a read failure points at the source.
-private load(path, origin_source, origin_line, origin_col, origin_span) {
+// Load `path` and everything it imports, appending each dependency before its
+// user. The `origin_*` describe the `import` that referenced this file so a read
+// failure points at the source.
+private load(path: str, origin_source: str, origin_line: int, origin_col: int, origin_span: int) {
     if .loaded.has(path) {
         return
     }
-    // Already on the DFS stack: a cycle. Type-reference cycles are fine (each
-    // class is still emitted once), so just do not re-enter.
+    // Already on the DFS stack: a cycle. Type-reference cycles are fine (each class
+    // is still emitted once), so just do not re-enter.
     if .visiting.get(path).unwrap_or(false) {
         return
     }

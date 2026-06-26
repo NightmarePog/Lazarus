@@ -15,7 +15,7 @@
 
 import backend.Text
 
-static prelude() {
+static prelude(): str {
     return Text.lines([
         "local function __lz_list(...)",
         "    return { kind = 'list', items = { ... } }",

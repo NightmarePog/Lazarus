@@ -1,15 +1,10 @@
 // Bundler — assembles a dependencies-first module list into one runnable Lua
-// chunk. There is no runtime module system; everything is composed at compile
-// time: one header, one runtime prelude (only if some module used a collection),
-// each module's class block, and a single entry footer that runs the entry
-// class's constructor.
+// chunk (there is no runtime module system; everything composes at compile time).
 //
-// Two passes, mirroring the reference bundle. Pass one collects extern
-// namespaces: a file whose body is *only* `extern` declarations emits no class —
-// its bindings (`Sys.print -> "print"`, …) are gathered into the externs map and
-// threaded into every real module's codegen, so a call like `Sys.print(x)`
-// lowers to its raw Lua target. Pass two generates each non-extern class block
-// with that externs map and the module's imports as its known classes.
+// Pass one collects extern namespaces: a file whose body is only `extern`
+// declarations emits no class — its bindings are gathered into the externs map and
+// threaded into every real module's codegen. Pass two generates each non-extern
+// class block with that map and the module's imports as its known classes.
 
 import backend.Codegen
 import backend.Runtime
@@ -17,16 +12,16 @@ import backend.Text
 import Error
 
 private modules
-private entry_class
+private entry_class: str
 private variant_owner
 
-constructor(modules, entry_class, variant_owner) {
+constructor(modules, entry_class: str, variant_owner) {
     .modules = modules
     .entry_class = entry_class
     .variant_owner = variant_owner
 }
 
-public bundle() {
+public bundle(): str {
     mut externs = .collect_externs()
 
     mut runtime_blocks = []
@@ -58,9 +53,8 @@ public bundle() {
     }
 
     mut sections = [Codegen.header()]
-    // Option<T>/Result<T> back the collection prelude (`__lz_get`/`__lz_pop`/
-    // `__lz_wrap` call `Option.some`/`Option.none`), so their class tables are
-    // emitted ahead of it, captured as upvalues.
+    // Option/Result back the collection prelude (`__lz_get`/`__lz_pop`/`__lz_wrap`
+    // call `Option.some`/`Option.none`), so their class tables come first.
     for block in runtime_blocks {
         sections.push(block)
     }
@@ -89,14 +83,14 @@ private collect_externs() {
     return externs
 }
 
-// The runtime-implicit types (Option<T>/Result<T>) emitted before the prelude.
-private is_runtime_type(name) {
+// The runtime-implicit types (Option/Result) emitted before the prelude.
+private is_runtime_type(name: str): bool {
     return name == "Option" or name == "Result"
 }
 
 // A module is an extern namespace when its body holds extern declarations and
-// nothing else — such a file contributes bindings but no class table.
-private is_extern_module(m) {
+// nothing else — it contributes bindings but no class table.
+private is_extern_module(m): bool {
     mut has_extern = false
     mut has_other = false
     for node in m.ast.child("body") {

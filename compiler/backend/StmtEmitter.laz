@@ -1,12 +1,11 @@
 // StmtEmitter — lowers statements and class members to Lua source text.
 //
-// `emit_member` lowers a top-level declaration: a method to `function C.name` (an
-// instance method gains an implicit `self` first parameter), a binding to a
-// static field `C.name = value`, a constructor to `function C.new` (which builds
-// a plain table, copies each instance method onto it for colon dispatch, seeds
-// property defaults, runs the body, and returns it). `emit_stmt` lowers ordinary
-// statements inside a body, declaring locals in the context so member references
-// stay qualified while locals stay bare.
+// `emit_member` lowers a top-level declaration (method -> `function C.name`, an
+// instance method gaining an implicit `self`; binding -> `C.name = value`;
+// constructor -> `function C.new`, which builds a table, copies instance methods
+// on for colon dispatch, seeds property defaults, runs the body and returns it).
+// `emit_stmt` lowers ordinary statements, declaring locals in the context so
+// member references stay qualified while locals stay bare.
 
 import std.Num
 import backend.Text
@@ -19,7 +18,7 @@ constructor(ctx, exprs) {
     .exprs = exprs
 }
 
-public emit_member(node) {
+public emit_member(node): str {
     mut k = node.kind
     if k == "FunctionDecl" {
         return .emit_method(node)
@@ -36,9 +35,9 @@ public emit_member(node) {
     return .emit_stmt(node)
 }
 
-// A nullary variant lowers to `E.V = 'V'` (its value is its own name string); a
-// payload variant to a constructor `function E.V(_1, …) return { kind='V', … }`.
-private emit_enum(node) {
+// A nullary variant lowers to `E.V = 'V'`; a payload variant to a constructor
+// `function E.V(_1, …) return { kind='V', … }`.
+private emit_enum(node): str {
     mut lines = []
     for variant in node.child("variants") {
         mut name = variant.child("name")
@@ -51,7 +50,7 @@ private emit_enum(node) {
     return Text.lines(lines)
 }
 
-private emit_variant_ctor(name, fields) {
+private emit_variant_ctor(name: str, fields): str {
     mut params = []
     mut assigns = ["kind = '" ++ name ++ "'"]
     mut i = 1
@@ -65,7 +64,7 @@ private emit_variant_ctor(name, fields) {
     return Text.lines([header, Text.indent("return { " ++ Text.join(assigns, ", ") ++ " }"), "end"])
 }
 
-public emit_stmt(node) {
+public emit_stmt(node): str {
     mut k = node.kind
     if k == "VariableDecl" {
         return .emit_variable(node)
@@ -110,10 +109,9 @@ public emit_stmt(node) {
 }
 
 // A `match` lowers to an `if/elseif/else` ladder over a once-evaluated temp, so
-// the scrutinee runs exactly once and side effects are not repeated. Each value
-// arm becomes an `== pattern` test; the `_` arm becomes the `else`. A match with
-// only a `_` arm runs that body unconditionally inside a `do ... end`.
-private emit_match(node) {
+// the scrutinee runs exactly once. Each value arm becomes an `== pattern` test;
+// the `_` arm becomes the `else` (or a bare `do ... end` when it is the only arm).
+private emit_match(node): str {
     mut temp = .ctx.fresh_temp()
     mut parts = ["local " ++ temp ++ " = " ++ .exprs.emit(node.child("scrutinee"))]
     mut first = true
@@ -153,10 +151,9 @@ private emit_match(node) {
     return Text.lines(parts)
 }
 
-// An arm's test: a payload variant matches on the tagged table's `kind`; a
-// nullary variant compares against its name string; a value arm against its
-// pattern expression.
-private match_condition(temp, arm) {
+// A payload variant matches on the tagged table's `kind`; a nullary variant
+// compares against its name string; a value arm against its pattern.
+private match_condition(temp: str, arm): str {
     if arm.attr("is_variant").unwrap_or(false) {
         if .has_bindings(arm) {
             return temp ++ ".kind == '" ++ arm.child("variant") ++ "'"
@@ -166,13 +163,13 @@ private match_condition(temp, arm) {
     return temp ++ " == " ++ .exprs.emit(arm.child("pattern"))
 }
 
-private has_bindings(arm) {
+private has_bindings(arm): bool {
     return arm.attr("is_variant").unwrap_or(false) and arm.child("bindings").len() > 0
 }
 
 // A payload arm's body, preceded by `local <name> = <temp>._<n>` extractions for
 // each bound field (`_` skips one). Scoped so bindings don't leak between arms.
-private push_payload_body(parts, temp, arm) {
+private push_payload_body(parts, temp: str, arm) {
     .ctx.push_scope()
     mut lines = []
     mut i = 1
@@ -193,7 +190,7 @@ private push_payload_body(parts, temp, arm) {
 }
 
 // A statement list as an indented block, or "" when empty.
-private emit_block(stmts) {
+private emit_block(stmts): str {
     if stmts.len() == 0 {
         return ""
     }
@@ -205,7 +202,7 @@ private emit_block(stmts) {
 }
 
 // A function body with its parameters declared as locals in a fresh scope.
-private emit_fn_body(params, body) {
+private emit_fn_body(params, body): str {
     .ctx.push_scope()
     for param in params {
         .ctx.declare_local(param)
@@ -215,7 +212,7 @@ private emit_fn_body(params, body) {
     return out
 }
 
-private emit_variable(node) {
+private emit_variable(node): str {
     mut name = node.child("name")
     mut value = node.attr("value")
     if node.attr("reassign").unwrap_or(false) {
@@ -232,19 +229,19 @@ private emit_variable(node) {
     return "local " ++ name
 }
 
-private emit_index_assign(node) {
+private emit_index_assign(node): str {
     .ctx.mark_collections()
     mut target = node.child("target")
     return "__lz_idx_set(" ++ .exprs.emit(target.child("object")) ++ ", " ++ .exprs.emit(target.child("index")) ++ ", " ++ .exprs.emit(node.child("value")) ++ ")"
 }
 
-private emit_local_function(node) {
+private emit_local_function(node): str {
     .ctx.declare_local(node.child("name"))
     mut header = "local function " ++ node.child("name") ++ "(" ++ Text.join(node.child("params"), ", ") ++ ")"
     return .wrap_body(header, .emit_fn_body(node.child("params"), node.child("body")))
 }
 
-private emit_return(node) {
+private emit_return(node): str {
     mut value = node.attr("value")
     if value.is_some() {
         return "return " ++ .exprs.emit(value.unwrap())
@@ -252,7 +249,7 @@ private emit_return(node) {
     return "return"
 }
 
-private emit_if(node) {
+private emit_if(node): str {
     mut parts = []
     for i, clause in node.child("clauses") {
         mut keyword = "elseif "
@@ -271,14 +268,14 @@ private emit_if(node) {
     return Text.lines(parts)
 }
 
-private emit_while(node) {
+private emit_while(node): str {
     mut parts = ["while " ++ .exprs.emit(node.child("condition")) ++ " do"]
     .push_block(parts, node.child("body"))
     parts.push("end")
     return Text.lines(parts)
 }
 
-private emit_loop(node) {
+private emit_loop(node): str {
     mut parts = ["while true do"]
     .push_block(parts, node.child("body"))
     parts.push("end")
@@ -287,7 +284,7 @@ private emit_loop(node) {
 
 // The C-style `for` lowers to a `while` wrapped in `do ... end` so the loop
 // variable stays scoped; the step runs at the end of each iteration.
-private emit_for(node) {
+private emit_for(node): str {
     mut loop_body = []
     for stmt in node.child("body") {
         loop_body.push(stmt)
@@ -317,9 +314,9 @@ private emit_for(node) {
 }
 
 // `for x in c` / `for k, v in c` lowers to a generic-for over `__lz_each(c)`,
-// which yields (0-based index, value) for a list and (key, value) for a map. A
+// which yields (0-based index, value) for a list and (key, value) for a map; a
 // single loop variable takes the value, so a throwaway `_` holds the index/key.
-private emit_for_in(node) {
+private emit_for_in(node): str {
     .ctx.mark_collections()
     mut iter = .exprs.emit(node.child("iter"))
     .ctx.push_scope()
@@ -340,7 +337,7 @@ private emit_for_in(node) {
     return Text.lines(parts)
 }
 
-private emit_method(node) {
+private emit_method(node): str {
     mut params = node.child("params")
     if not node.attr("is_static").unwrap_or(false) {
         params = .with_self(params)
@@ -349,7 +346,7 @@ private emit_method(node) {
     return .wrap_body(header, .emit_fn_body(params, node.child("body")))
 }
 
-private emit_static_field(node) {
+private emit_static_field(node): str {
     mut value = node.attr("value")
     mut rhs = "nil"
     if value.is_some() {
@@ -358,7 +355,7 @@ private emit_static_field(node) {
     return .ctx.name() ++ "." ++ node.child("name") ++ " = " ++ rhs
 }
 
-private emit_constructor(node) {
+private emit_constructor(node): str {
     .ctx.push_scope()
     for param in node.child("params") {
         .ctx.declare_local(param)
@@ -386,7 +383,7 @@ private emit_constructor(node) {
 }
 
 // A header plus a (possibly empty) indented body, closed with `end`.
-private wrap_body(header, body) {
+private wrap_body(header: str, body: str): str {
     if body == "" {
         return Text.lines([header, "end"])
     }

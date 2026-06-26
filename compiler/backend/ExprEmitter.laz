@@ -1,12 +1,9 @@
-// ExprEmitter — lowers an expression AST node to a Lua source string.
-//
-// The interesting work is call dispatch, checked in order: an extern namespace
-// call lowers to its raw Lua target wrapped at the Option boundary; a built-in
-// collection/Option method to its `__lz_*` helper; a class name in call position
-// to construction `C.new(...)`; a `self` method to receiver-passing
-// `C.m(self, ...)`; any other instance/field call to Lua's colon `obj:m(...)`
-// (which dispatches on the receiver's own methods, so a name shared with the
-// current class no longer mis-routes); everything else to a plain call.
+// ExprEmitter — lowers an expression AST node to a Lua source string. The
+// interesting work is call dispatch, checked in order: an extern call -> its raw
+// Lua target wrapped at the Option boundary; a built-in collection method -> its
+// `__lz_*` helper; a class name in call position -> `C.new(...)`; a `self` method
+// -> `C.m(self, ...)`; any other instance call -> Lua colon `obj:m(...)`;
+// everything else -> a plain call.
 
 import std.Str
 import backend.Text
@@ -28,10 +25,9 @@ private static op_map = [
     "OR": "or"
 ]
 
-// Collection operations that lower to a `__lz_*` helper with the receiver as the
-// first argument. Option's is_some/is_none/unwrap/unwrap_or are NOT here: Option
-// is the std `Option<T>` class now, so those are ordinary method calls dispatched
-// on the instance (`o:unwrap()`).
+// Collection operations lowering to a `__lz_*` helper with the receiver first.
+// Option's is_some/unwrap/etc. are NOT here — Option is the std `Option<T>` class
+// now, so those are ordinary instance method calls (`o:unwrap()`).
 private static builtins = [
     "len": "__lz_len",
     "push": "__lz_push",
@@ -46,7 +42,7 @@ constructor(ctx) {
     .ctx = ctx
 }
 
-public emit(node) {
+public emit(node): str {
     mut k = node.kind
     if k == "LiteralExpr" {
         return .emit_literal(node)
@@ -85,7 +81,7 @@ public emit(node) {
     return ""
 }
 
-private emit_literal(node) {
+private emit_literal(node): str {
     mut lit_kind = node.child("lit_kind")
     mut value = node.child("value")
     if lit_kind == "string" {
@@ -100,16 +96,16 @@ private emit_literal(node) {
     return value
 }
 
-private emit_field(node) {
+private emit_field(node): str {
     return .emit_operand(node.child("object")) ++ "." ++ node.child("field")
 }
 
-private emit_list(node) {
+private emit_list(node): str {
     .ctx.mark_collections()
     return "__lz_list(" ++ Text.join(.emit_args(node.child("elements")), ", ") ++ ")"
 }
 
-private emit_map(node) {
+private emit_map(node): str {
     .ctx.mark_collections()
     mut parts = []
     for entry in node.child("entries") {
@@ -118,16 +114,16 @@ private emit_map(node) {
     return "__lz_map({" ++ Text.join(parts, ", ") ++ "})"
 }
 
-private emit_index(node) {
+private emit_index(node): str {
     .ctx.mark_collections()
     return "__lz_idx_get(" ++ .emit(node.child("object")) ++ ", " ++ .emit(node.child("index")) ++ ")"
 }
 
-private emit_unary(node) {
+private emit_unary(node): str {
     return "not " ++ .emit_operand(node.child("operand"))
 }
 
-private emit_binary(node) {
+private emit_binary(node): str {
     mut left = .emit_operand(node.child("left"))
     mut right = .emit_operand(node.child("right"))
     mut op = node.child("op")
@@ -137,7 +133,7 @@ private emit_binary(node) {
     return left ++ " " ++ ExprEmitter.op_map.get(op).unwrap_or(op) ++ " " ++ right
 }
 
-private emit_call(node) {
+private emit_call(node): str {
     mut callee = node.child("callee")
     mut args = .emit_args(node.child("args"))
 
@@ -187,7 +183,7 @@ private emit_call(node) {
 
 // Emit an operand, parenthesising a binary/unary expression that would otherwise
 // bind wrongly as an indexed/called/operated value.
-private emit_operand(node) {
+private emit_operand(node): str {
     mut src = .emit(node)
     if .needs_parens(node) {
         return "(" ++ src ++ ")"
@@ -195,19 +191,19 @@ private emit_operand(node) {
     return src
 }
 
-private needs_parens(node) {
+private needs_parens(node): bool {
     return node.kind == "BinaryExpr" or node.kind == "UnaryExpr"
 }
 
-private receiver_is_class(object) {
+private receiver_is_class(object): bool {
     if object.kind != "IdentifierExpr" {
         return false
     }
     return .ctx.is_construction(object.child("name"))
 }
 
-// The argument list with the receiver expression prepended (built-in and
-// instance-method calls pass the receiver as the first argument).
+// The argument list with the receiver prepended (built-in and instance-method
+// calls pass the receiver as the first argument).
 private with_receiver(object, args) {
     mut out = [.emit_operand(object)]
     for arg in args {
