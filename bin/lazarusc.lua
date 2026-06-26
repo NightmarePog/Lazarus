@@ -2178,8 +2178,19 @@ function Typecheck.new(source, class_name, imports, enums, classes, variant_fiel
     self.type_condition = Typecheck.type_condition
     self.type_for = Typecheck.type_for
     self.type_for_in = Typecheck.type_for_in
+    self.bind_loop_vars = Typecheck.bind_loop_vars
     self.type_match = Typecheck.type_match
     self.type_expr = Typecheck.type_expr
+    self.is_builtin_name = Typecheck.is_builtin_name
+    self.is_builtin_type = Typecheck.is_builtin_type
+    self.type_arg = Typecheck.type_arg
+    self.opt_of = Typecheck.opt_of
+    self.unify_elem = Typecheck.unify_elem
+    self.type_list = Typecheck.type_list
+    self.type_map = Typecheck.type_map
+    self.type_index = Typecheck.type_index
+    self.type_builtin_ctor = Typecheck.type_builtin_ctor
+    self.builtin_method = Typecheck.builtin_method
     self.literal_type = Typecheck.literal_type
     self.type_binary = Typecheck.type_binary
     self.is_arith = Typecheck.is_arith
@@ -2400,12 +2411,33 @@ function Typecheck.type_for(self, stmt, scope, ret)
     Typecheck.type_block(self, stmt:child("body"), inner:child(), ret)
 end
 function Typecheck.type_for_in(self, stmt, scope, ret)
-    Typecheck.type_expr(self, stmt:child("iter"), scope)
+    local it = Typecheck.type_expr(self, stmt:child("iter"), scope)
     local inner = scope:child()
-    for _, name in __lz_each(stmt:child("vars")) do
-        inner:declare(name, Type.dynamic())
-    end
+    Typecheck.bind_loop_vars(self, stmt:child("vars"), it, inner)
     Typecheck.type_block(self, stmt:child("body"), inner, ret)
+end
+function Typecheck.bind_loop_vars(self, vars, it, scope)
+    if (it.kind == "class") and (it.name == "List") then
+        if __lz_len(vars) == 1 then
+            scope:declare(__lz_unwrap(__lz_get(vars, 1)), Typecheck.type_arg(self, it, 1))
+        else
+            scope:declare(__lz_unwrap(__lz_get(vars, 1)), Type.int())
+            scope:declare(__lz_unwrap(__lz_get(vars, 2)), Typecheck.type_arg(self, it, 1))
+        end
+        return
+    end
+    if (it.kind == "class") and (it.name == "Map") then
+        if __lz_len(vars) == 1 then
+            scope:declare(__lz_unwrap(__lz_get(vars, 1)), Typecheck.type_arg(self, it, 2))
+        else
+            scope:declare(__lz_unwrap(__lz_get(vars, 1)), Typecheck.type_arg(self, it, 1))
+            scope:declare(__lz_unwrap(__lz_get(vars, 2)), Typecheck.type_arg(self, it, 2))
+        end
+        return
+    end
+    for _, name in __lz_each(vars) do
+        scope:declare(name, Type.dynamic())
+    end
 end
 function Typecheck.type_match(self, stmt, scope, ret)
     Typecheck.type_expr(self, stmt:child("scrutinee"), scope)
@@ -2451,24 +2483,128 @@ function Typecheck.type_expr(self, node, scope)
         return Typecheck.type_member(self, node, scope)
     end
     if k == "IndexExpr" then
-        Typecheck.type_expr(self, node:child("object"), scope)
-        Typecheck.type_expr(self, node:child("index"), scope)
-        return Type.dynamic()
+        return Typecheck.type_index(self, node, scope)
     end
     if k == "ListExpr" then
-        for _, e in __lz_each(node:child("elements")) do
-            Typecheck.type_expr(self, e, scope)
-        end
-        return Type.dynamic()
+        return Typecheck.type_list(self, node, scope)
     end
     if k == "MapExpr" then
-        for _, entry in __lz_each(node:child("entries")) do
-            Typecheck.type_expr(self, entry:child("key"), scope)
-            Typecheck.type_expr(self, entry:child("value"), scope)
-        end
-        return Type.dynamic()
+        return Typecheck.type_map(self, node, scope)
     end
     return Type.dynamic()
+end
+function Typecheck.is_builtin_name(self, name)
+    return (((name == "Option") or (name == "Result")) or (name == "List")) or (name == "Map")
+end
+function Typecheck.is_builtin_type(self, t)
+    return (t.kind == "class") and Typecheck.is_builtin_name(self, t.name)
+end
+function Typecheck.type_arg(self, t, i)
+    return __lz_unwrap_or(__lz_get(t.params, i), Type.dynamic())
+end
+function Typecheck.opt_of(self, t)
+    return Type.class_of("Option", __lz_list(t))
+end
+function Typecheck.unify_elem(self, acc, next)
+    if next:is_dynamic() then
+        return acc
+    end
+    if acc:is_dynamic() then
+        return next
+    end
+    if not acc:equals(next) then
+        return Type.dynamic()
+    end
+    return acc
+end
+function Typecheck.type_list(self, node, scope)
+    local elem = Type.dynamic()
+    for _, e in __lz_each(node:child("elements")) do
+        elem = Typecheck.unify_elem(self, elem, Typecheck.type_expr(self, e, scope))
+    end
+    return Type.class_of("List", __lz_list(elem))
+end
+function Typecheck.type_map(self, node, scope)
+    local kt = Type.dynamic()
+    local vt = Type.dynamic()
+    for _, entry in __lz_each(node:child("entries")) do
+        kt = Typecheck.unify_elem(self, kt, Typecheck.type_expr(self, entry:child("key"), scope))
+        vt = Typecheck.unify_elem(self, vt, Typecheck.type_expr(self, entry:child("value"), scope))
+    end
+    return Type.class_of("Map", __lz_list(kt, vt))
+end
+function Typecheck.type_index(self, node, scope)
+    local obj = Typecheck.type_expr(self, node:child("object"), scope)
+    Typecheck.type_expr(self, node:child("index"), scope)
+    if (obj.kind == "class") and (obj.name == "List") then
+        return Typecheck.type_arg(self, obj, 1)
+    end
+    if (obj.kind == "class") and (obj.name == "Map") then
+        return Typecheck.type_arg(self, obj, 2)
+    end
+    return Type.dynamic()
+end
+function Typecheck.type_builtin_ctor(self, ns, field, args, scope)
+    local elem = Type.dynamic()
+    for _, arg in __lz_each(args) do
+        local at = Typecheck.type_expr(self, arg, scope)
+        if elem:is_dynamic() then
+            elem = at
+        end
+    end
+    if ns == "Option" then
+        if field == "some" then
+            return Typecheck.opt_of(self, elem)
+        end
+        return Typecheck.opt_of(self, Type.dynamic())
+    end
+    if field == "ok" then
+        return Type.class_of("Result", __lz_list(elem))
+    end
+    return Type.class_of("Result", __lz_list(Type.dynamic()))
+end
+function Typecheck.builtin_method(self, recv, method, args, scope)
+    for _, arg in __lz_each(args) do
+        Typecheck.type_expr(self, arg, scope)
+    end
+    local a = Typecheck.type_arg(self, recv, 1)
+    if recv.name == "List" then
+        if (method == "get") or (method == "pop") then
+            return Typecheck.opt_of(self, a)
+        end
+        if method == "len" then
+            return Type.int()
+        end
+        if method == "has" then
+            return Type.bool()
+        end
+        return Type.unit()
+    end
+    if recv.name == "Map" then
+        if method == "get" then
+            return Typecheck.opt_of(self, Typecheck.type_arg(self, recv, 2))
+        end
+        if method == "has" then
+            return Type.bool()
+        end
+        if method == "len" then
+            return Type.int()
+        end
+        return Type.unit()
+    end
+    if recv.name == "Option" then
+        if (method == "unwrap") or (method == "unwrap_or") then
+            return a
+        end
+        return Type.bool()
+    end
+    if (method == "unwrap") or (method == "unwrap_or") then
+        return a
+    end
+    if method == "error" then
+        return Type.str()
+    end
+    return Type.bool()
 end
 function Typecheck.literal_type(self, node)
     local lk = node:child("lit_kind")
@@ -2569,6 +2705,10 @@ function Typecheck.type_call(self, node, scope)
     local callee = node:child("callee")
     local args = node:child("args")
     if callee.kind == "MemberExpr" then
+        local obj = callee:child("object")
+        if (obj.kind == "IdentifierExpr") and ((obj:child("name") == "Option") or (obj:child("name") == "Result")) then
+            return Typecheck.type_builtin_ctor(self, obj:child("name"), callee:child("field"), args, scope)
+        end
         return Typecheck.type_method_call(self, callee, args, scope, node)
     end
     if callee.kind == "IdentifierExpr" then
@@ -2608,6 +2748,9 @@ function Typecheck.type_method_call(self, member, args, scope, call)
     local object = member:child("object")
     local method = member:child("field")
     local recv = Typecheck.receiver_type(self, object, scope)
+    if Typecheck.is_builtin_type(self, recv) then
+        return Typecheck.builtin_method(self, recv, method, args, scope)
+    end
     local cls = Typecheck.class_name_of(self, recv)
     if cls == "" then
         for _, arg in __lz_each(args) do
@@ -2866,6 +3009,9 @@ function Typecheck.resolve(self, t)
     if __lz_has(self.type_vars, name) then
         return Type.var(name)
     end
+    if Typecheck.is_builtin_name(self, name) then
+        return Type.class_of(name, Typecheck.resolve_args(self, t, name))
+    end
     if __lz_has(self.enums, name) then
         return Type.enum_of(name, Typecheck.resolve_args(self, t, name))
     end
@@ -2890,6 +3036,12 @@ function Typecheck.resolve_args(self, t, name)
     return out
 end
 function Typecheck.declared_arity(self, name)
+    if ((name == "Option") or (name == "Result")) or (name == "List") then
+        return 1
+    end
+    if name == "Map" then
+        return 2
+    end
     if __lz_has(self.enum_type_params, name) then
         return __lz_len(__lz_unwrap(__lz_get(self.enum_type_params, name)))
     end
