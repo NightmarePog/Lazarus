@@ -1,18 +1,18 @@
-// What the checker remembers about one name in scope: its kind
-// (constant/variable/function/class), whether it can be reassigned, and whether
-// we already know it isn't a function — so calling it can be flagged early.
+// What the checker remembers about one name: its kind (constant/variable/
+// function/class), whether it can be reassigned, and whether it is known not to
+// be a function (so calling it can be flagged early).
 
 public kind
 public mutable
 public noncallable
 
-constructor(kind, mutable, noncallable) {
+constructor(kind: str, mutable: bool, noncallable: bool) {
     .kind = kind
     .mutable = mutable
     .noncallable = noncallable
 }
 
 // Refresh the callability fact after a reassignment changes the bound value.
-public set_noncallable(flag) {
+public set_noncallable(flag: bool) {
     .noncallable = flag
 }

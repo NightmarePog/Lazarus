@@ -1,11 +1,8 @@
-// ExprChecker — semantic validation of expressions against the visible scope.
-//
-// Recurses through every sub-expression. The two non-structural rules: a bare
-// identifier must be declared, and a bare-name call must not target a value
-// provably not a function. The instance context (`in_instance` plus the class's
-// declared `properties` / `methods`) is held here so a `.field` / `self` access
-// can be checked for a receiver; the statement checker toggles `in_instance` as
-// it enters and leaves instance method / constructor bodies.
+// ExprChecker — semantic validation of expressions against the visible scope. The
+// non-structural rules: a bare identifier must be declared (or a known enum
+// variant), and a bare-name call must not target a value provably not a function.
+// The instance context (`in_instance` + the class's properties/methods) lets a
+// `.field` / `self` access be checked; the statement checker toggles it.
 
 import std.Str
 import Error
@@ -25,16 +22,14 @@ constructor(source, properties, methods, variant_owner) {
     .in_instance = false
 }
 
-public set_instance(flag) {
+public set_instance(flag: bool) {
     .in_instance = flag
 }
 
-public instance_flag() {
+public instance_flag(): bool {
     return .in_instance
 }
 
-// Validate an expression and, recursively, its sub-expressions. Kinds with
-// nothing to check (literals) fall through.
 public check(node, scope) {
     mut k = node.kind
     if k == "IdentifierExpr" {
@@ -60,8 +55,7 @@ public check(node, scope) {
     }
 }
 
-// Validate an expression used as a condition: it must not be provably non-boolean
-// (the language has no truthiness).
+// A condition must not be provably non-boolean (the language has no truthiness).
 public check_condition(node, scope) {
     .check(node, scope)
     mut reason = Booleanity.non_bool_reason(node)
@@ -92,9 +86,9 @@ private check_call(node, scope) {
     }
 }
 
-// A leading-dot access `.field` parses to a member over `self`. It is valid only
-// where a receiver exists and must name a declared instance property or method.
-// Any other object's field is a dynamic key, so only the object is validated.
+// A leading-dot `.field` parses to a member over `self`: valid only where a
+// receiver exists, and must name a declared instance property or method. Any other
+// object's field is a dynamic key, so only the object is validated.
 private check_member(node, scope) {
     mut object = node.child("object")
     if object.kind == "SelfExpr" {
@@ -130,6 +124,6 @@ private check_map(node, scope) {
     }
 }
 
-private fail(node, message, span) {
+private fail(node, message: str, span: int) {
     Error("SemanticError", message, node.line(), node.col(), .source, span).raise()
 }
