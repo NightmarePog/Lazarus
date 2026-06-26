@@ -2156,7 +2156,7 @@ end
 
 local Typecheck = {}
 
-function Typecheck.new(source, class_name, imports, enums)
+function Typecheck.new(source, class_name, imports, enums, classes, variant_fields)
     local self = {}
     self.check = Typecheck.check
     self.type_block = Typecheck.type_block
@@ -2175,18 +2175,37 @@ function Typecheck.new(source, class_name, imports, enums)
     self.literal_type = Typecheck.literal_type
     self.type_binary = Typecheck.type_binary
     self.is_arith = Typecheck.is_arith
+    self.is_ordering = Typecheck.is_ordering
+    self.concat_type = Typecheck.concat_type
+    self.str_or_dynamic = Typecheck.str_or_dynamic
+    self.equality_type = Typecheck.equality_type
+    self.ordering_type = Typecheck.ordering_type
     self.arith_type = Typecheck.arith_type
+    self.identifier_type = Typecheck.identifier_type
+    self.type_call = Typecheck.type_call
+    self.type_method_call = Typecheck.type_method_call
+    self.type_member = Typecheck.type_member
+    self.receiver_class = Typecheck.receiver_class
+    self.class_name_of = Typecheck.class_name_of
+    self.static_receiver = Typecheck.static_receiver
+    self.check_call_args = Typecheck.check_call_args
+    self.count = Typecheck.count
+    self.check_ctor_args = Typecheck.check_ctor_args
+    self.field_type = Typecheck.field_type
     self.resolve = Typecheck.resolve
     self.expect = Typecheck.expect
     self.compatible = Typecheck.compatible
     self.fail = Typecheck.fail
     self.source = source
+    self.class_name = class_name
     self.known_classes = __lz_map({})
     for _, name in __lz_each(imports) do
         __lz_idx_set(self.known_classes, name, true)
     end
     __lz_idx_set(self.known_classes, class_name, true)
     self.enums = enums
+    self.classes = classes
+    self.variant_fields = variant_fields
     return self
 end
 function Typecheck.check(self, program)
@@ -2232,7 +2251,11 @@ function Typecheck.type_variable(self, stmt, scope)
     local value = stmt:attr("value")
     if __lz_unwrap_or(stmt:attr("reassign"), false) then
         if __lz_is_some(value) then
-            Typecheck.type_expr(self, __lz_unwrap(value), scope)
+            local actual = Typecheck.type_expr(self, __lz_unwrap(value), scope)
+            local prior = scope:lookup(stmt:child("name"))
+            if __lz_is_some(prior) then
+                Typecheck.expect(self, __lz_unwrap(prior), actual, stmt, "reassignment")
+            end
         end
         return
     end
@@ -2325,10 +2348,13 @@ function Typecheck.type_match(self, stmt, scope, ret)
     for _, arm in __lz_each(stmt:child("arms")) do
         local arm_scope = scope:child()
         if __lz_unwrap_or(arm:attr("is_variant"), false) then
+            local fields = __lz_unwrap_or(__lz_get(self.variant_fields, arm:child("variant")), __lz_list())
+            local i = 1
             for _, b in __lz_each(arm:child("bindings")) do
                 if b ~= "_" then
-                    arm_scope:declare(b, Type.dynamic())
+                    arm_scope:declare(b, Typecheck.field_type(self, __lz_get(fields, i)))
                 end
+                i = i + 1
             end
         elseif not __lz_unwrap_or(arm:attr("is_wildcard"), false) then
             Typecheck.type_expr(self, arm:child("pattern"), scope)
@@ -2342,7 +2368,10 @@ function Typecheck.type_expr(self, node, scope)
         return Typecheck.literal_type(self, node)
     end
     if k == "IdentifierExpr" then
-        return __lz_unwrap_or(scope:lookup(node:child("name")), Type.dynamic())
+        return Typecheck.identifier_type(self, node:child("name"), scope)
+    end
+    if k == "SelfExpr" then
+        return Type.class_of(self.class_name)
     end
     if k == "BinaryExpr" then
         return Typecheck.type_binary(self, node, scope)
@@ -2352,15 +2381,10 @@ function Typecheck.type_expr(self, node, scope)
         return Type.bool()
     end
     if k == "CallExpr" then
-        Typecheck.type_expr(self, node:child("callee"), scope)
-        for _, arg in __lz_each(node:child("args")) do
-            Typecheck.type_expr(self, arg, scope)
-        end
-        return Type.dynamic()
+        return Typecheck.type_call(self, node, scope)
     end
     if k == "MemberExpr" then
-        Typecheck.type_expr(self, node:child("object"), scope)
-        return Type.dynamic()
+        return Typecheck.type_member(self, node, scope)
     end
     if k == "IndexExpr" then
         Typecheck.type_expr(self, node:child("object"), scope)
@@ -2406,12 +2430,48 @@ function Typecheck.type_binary(self, node, scope)
         return Typecheck.arith_type(self, node, op, lt, rt)
     end
     if op == "CONCAT" then
-        return Type.str()
+        return Typecheck.concat_type(self, node, lt, rt)
+    end
+    if (op == "EQ") or (op == "NEQ") then
+        return Typecheck.equality_type(self, node, lt, rt)
+    end
+    if Typecheck.is_ordering(self, op) then
+        return Typecheck.ordering_type(self, node, lt, rt)
     end
     return Type.bool()
 end
 function Typecheck.is_arith(self, op)
     return (((((op == "PLUS") or (op == "MINUS")) or (op == "MULTIPLY")) or (op == "DIVIDE")) or (op == "MODULO")) or (op == "POWER")
+end
+function Typecheck.is_ordering(self, op)
+    return (((op == "LESS") or (op == "LESS_EQUAL")) or (op == "GREATER")) or (op == "GREATER_EQUAL")
+end
+function Typecheck.concat_type(self, node, lt, rt)
+    if (not Typecheck.str_or_dynamic(self, lt)) or (not Typecheck.str_or_dynamic(self, rt)) then
+        Typecheck.fail(self, node, ((("++ joins strings, found " .. lt:describe()) .. " and ") .. rt:describe()) .. "; convert explicitly")
+    end
+    return Type.str()
+end
+function Typecheck.str_or_dynamic(self, t)
+    return t:is_dynamic() or (t.kind == "str")
+end
+function Typecheck.equality_type(self, node, lt, rt)
+    if ((not lt:is_dynamic()) and (not rt:is_dynamic())) and (not lt:equals(rt)) then
+        Typecheck.fail(self, node, ((("cannot compare " .. lt:describe()) .. " and ") .. rt:describe()) .. " for equality")
+    end
+    return Type.bool()
+end
+function Typecheck.ordering_type(self, node, lt, rt)
+    if lt:is_dynamic() or rt:is_dynamic() then
+        return Type.bool()
+    end
+    if (not lt:is_numeric()) or (not rt:is_numeric()) then
+        Typecheck.fail(self, node, (("ordering needs numbers, found " .. lt:describe()) .. " and ") .. rt:describe())
+    end
+    if not lt:equals(rt) then
+        Typecheck.fail(self, node, ((("cannot order " .. lt:describe()) .. " against ") .. rt:describe()) .. "; convert explicitly")
+    end
+    return Type.bool()
 end
 function Typecheck.arith_type(self, node, op, lt, rt)
     if lt:is_dynamic() or rt:is_dynamic() then
@@ -2427,6 +2487,140 @@ function Typecheck.arith_type(self, node, op, lt, rt)
         return Type.float()
     end
     return lt
+end
+function Typecheck.identifier_type(self, name, scope)
+    local found = scope:lookup(name)
+    if __lz_is_some(found) then
+        return __lz_unwrap(found)
+    end
+    if __lz_has(self.classes, name) then
+        return Type.class_of(name)
+    end
+    return Type.dynamic()
+end
+function Typecheck.type_call(self, node, scope)
+    local callee = node:child("callee")
+    local args = node:child("args")
+    if callee.kind == "MemberExpr" then
+        return Typecheck.type_method_call(self, callee, args, scope, node)
+    end
+    if callee.kind == "IdentifierExpr" then
+        local name = callee:child("name")
+        if (not __lz_is_some(scope:lookup(name))) and __lz_has(self.classes, name) then
+            Typecheck.check_ctor_args(self, name, args, scope, node)
+            return Type.class_of(name)
+        end
+    end
+    Typecheck.type_expr(self, callee, scope)
+    for _, arg in __lz_each(args) do
+        Typecheck.type_expr(self, arg, scope)
+    end
+    return Type.dynamic()
+end
+function Typecheck.type_method_call(self, member, args, scope, call)
+    local object = member:child("object")
+    local method = member:child("field")
+    local cls = Typecheck.receiver_class(self, object, scope)
+    if cls == "" then
+        for _, arg in __lz_each(args) do
+            Typecheck.type_expr(self, arg, scope)
+        end
+        return Type.dynamic()
+    end
+    local methods = __lz_unwrap(__lz_get(__lz_unwrap(__lz_get(self.classes, cls)), "methods"))
+    local sig = __lz_get(methods, method)
+    if not __lz_is_some(sig) then
+        if Typecheck.static_receiver(self, object, scope) then
+            for _, arg in __lz_each(args) do
+                Typecheck.type_expr(self, arg, scope)
+            end
+            return Type.dynamic()
+        end
+        Typecheck.fail(self, member, (("no method '" .. method) .. "' on ") .. cls)
+    end
+    Typecheck.check_call_args(self, __lz_unwrap(__lz_get(__lz_unwrap(sig), "params")), args, scope, call)
+    return Typecheck.field_type(self, __lz_get(__lz_unwrap(sig), "result"))
+end
+function Typecheck.type_member(self, node, scope)
+    local object = node:child("object")
+    local field = node:child("field")
+    local cls = Typecheck.receiver_class(self, object, scope)
+    if cls == "" then
+        return Type.dynamic()
+    end
+    local entry = __lz_unwrap(__lz_get(self.classes, cls))
+    local ft = __lz_get(__lz_unwrap(__lz_get(entry, "fields")), field)
+    if __lz_is_some(ft) then
+        return Typecheck.field_type(self, ft)
+    end
+    if __lz_has(__lz_unwrap(__lz_get(entry, "methods")), field) then
+        return Type.dynamic()
+    end
+    if Typecheck.static_receiver(self, object, scope) then
+        return Type.dynamic()
+    end
+    Typecheck.fail(self, node, (("no field '" .. field) .. "' on ") .. cls)
+end
+function Typecheck.receiver_class(self, object, scope)
+    if object.kind == "SelfExpr" then
+        return self.class_name
+    end
+    if object.kind == "IdentifierExpr" then
+        local found = scope:lookup(object:child("name"))
+        if not __lz_is_some(found) then
+            if __lz_has(self.classes, object:child("name")) then
+                return object:child("name")
+            end
+            return ""
+        end
+        return Typecheck.class_name_of(self, __lz_unwrap(found))
+    end
+    return Typecheck.class_name_of(self, Typecheck.type_expr(self, object, scope))
+end
+function Typecheck.class_name_of(self, t)
+    if t.kind == "class" then
+        return t.name
+    end
+    return ""
+end
+function Typecheck.static_receiver(self, object, scope)
+    if object.kind ~= "IdentifierExpr" then
+        return false
+    end
+    return (not __lz_is_some(scope:lookup(object:child("name")))) and __lz_has(self.classes, object:child("name"))
+end
+function Typecheck.check_call_args(self, params, args, scope, node)
+    if __lz_len(params) ~= __lz_len(args) then
+        Typecheck.fail(self, node, (("wrong number of arguments: expected " .. Typecheck.count(self, __lz_len(params))) .. ", found ") .. Typecheck.count(self, __lz_len(args)))
+    end
+    local i = 1
+    for _, arg in __lz_each(args) do
+        Typecheck.expect(self, Typecheck.resolve(self, __lz_unwrap(__lz_get(params, i))), Typecheck.type_expr(self, arg, scope), arg, "argument")
+        i = i + 1
+    end
+end
+function Typecheck.count(self, n)
+    return __lz_unwrap_or(__lz_wrap(string.format("%d", n)), "?")
+end
+function Typecheck.check_ctor_args(self, name, args, scope, node)
+    local ctor = __lz_unwrap(__lz_get(__lz_unwrap(__lz_get(self.classes, name)), "ctor"))
+    if ctor == 0 then
+        for _, arg in __lz_each(args) do
+            Typecheck.type_expr(self, arg, scope)
+        end
+        return
+    end
+    Typecheck.check_call_args(self, ctor, args, scope, node)
+end
+function Typecheck.field_type(self, opt)
+    if not __lz_is_some(opt) then
+        return Type.dynamic()
+    end
+    local node = __lz_unwrap(opt)
+    if node == 0 then
+        return Type.dynamic()
+    end
+    return Typecheck.resolve(self, node)
 end
 function Typecheck.resolve(self, t)
     if t.kind == "TypeFn" then
@@ -2459,6 +2653,9 @@ function Typecheck.resolve(self, t)
         return Type.enum_of(name)
     end
     if __lz_has(self.known_classes, name) then
+        return Type.class_of(name)
+    end
+    if __lz_has(self.classes, name) then
         return Type.class_of(name)
     end
     return Type.dynamic()
@@ -3175,8 +3372,9 @@ function StmtEmitter.emit_variant_ctor(self, name, fields)
     local assigns = __lz_list(("kind = '" .. name) .. "'")
     local i = 1
     for _, field in __lz_each(fields) do
-        __lz_push(params, "_" .. i)
-        __lz_push(assigns, (("_" .. i) .. " = _") .. i)
+        local s = __lz_unwrap_or(__lz_wrap(tostring(i)), "0")
+        __lz_push(params, "_" .. s)
+        __lz_push(assigns, (("_" .. s) .. " = _") .. s)
         i = i + 1
     end
     local header = ((((("function " .. self.ctx:name()) .. ".") .. name) .. "(") .. Text.join(params, ", ")) .. ")"
@@ -3283,7 +3481,7 @@ function StmtEmitter.push_payload_body(self, parts, temp, arm)
     for _, name in __lz_each(arm:child("bindings")) do
         if name ~= "_" then
             self.ctx:declare_local(name)
-            __lz_push(lines, (((("local " .. name) .. " = ") .. temp) .. "._") .. i)
+            __lz_push(lines, (((("local " .. name) .. " = ") .. temp) .. "._") .. __lz_unwrap_or(__lz_wrap(tostring(i)), "0"))
         end
         i = i + 1
     end
@@ -3797,19 +3995,22 @@ function Main.build_file(path)
     local variant_owner = __lz_map({})
     local enums = __lz_map({})
     local variant_arity = __lz_map({})
+    local variant_fields = __lz_map({})
+    local classes = __lz_map({})
     for _, m in __lz_each(modules) do
-        Main.collect_enums(m.ast, variant_owner, enums, variant_arity)
+        Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields)
+        Main.collect_signatures(m.ast, m.class_name, classes)
     end
     for _, m in __lz_each(modules) do
         Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity)
-        Typecheck.new(m.source, m.class_name, m.imports, enums):check(m.ast)
+        Typecheck.new(m.source, m.class_name, m.imports, enums, classes, variant_fields):check(m.ast)
         Optimizer.new():optimize(m.ast)
     end
     local file = __lz_unwrap(__lz_wrap(io.open("Main.lua", "w")))
     file:write(Bundler.new(modules, linker:entry_class()):bundle())
     file:close()
 end
-function Main.collect_enums(ast, variant_owner, enums, variant_arity)
+function Main.collect_enums(ast, variant_owner, enums, variant_arity, variant_fields)
     for _, stmt in __lz_each(ast:child("body")) do
         if stmt.kind == "EnumDecl" then
             local name = stmt:child("name")
@@ -3819,10 +4020,34 @@ function Main.collect_enums(ast, variant_owner, enums, variant_arity)
                 __lz_push(names, vn)
                 __lz_idx_set(variant_owner, vn, name)
                 __lz_idx_set(variant_arity, vn, __lz_len(v:child("fields")))
+                __lz_idx_set(variant_fields, vn, v:child("fields"))
             end
             __lz_idx_set(enums, name, names)
         end
     end
+end
+function Main.collect_signatures(ast, class_name, classes)
+    local fields = __lz_map({})
+    local methods = __lz_map({})
+    local ctor = 0
+    for _, stmt in __lz_each(ast:child("body")) do
+        local k = stmt.kind
+        if k == "VariableDecl" then
+            local visibility = __lz_unwrap_or(stmt:attr("visibility"), "")
+            local is_static = __lz_unwrap_or(stmt:attr("is_static"), false)
+            if (visibility ~= "") and (not is_static) then
+                __lz_idx_set(fields, stmt:child("name"), __lz_unwrap_or(stmt:attr("type"), 0))
+            end
+        elseif k == "FunctionDecl" then
+            local params = __lz_unwrap_or(stmt:attr("param_types"), __lz_list())
+            local result = __lz_unwrap_or(stmt:attr("return_type"), 0)
+            local is_static = __lz_unwrap_or(stmt:attr("is_static"), false)
+            __lz_idx_set(methods, stmt:child("name"), __lz_map({["params"] = params, ["result"] = result, ["is_static"] = is_static}))
+        elseif k == "ConstructorDecl" then
+            ctor = __lz_unwrap_or(stmt:attr("param_types"), __lz_list())
+        end
+    end
+    __lz_idx_set(classes, class_name, __lz_map({["fields"] = fields, ["methods"] = methods, ["ctor"] = ctor}))
 end
 
 return Main.new(...)

@@ -6,25 +6,37 @@
 // operation touching a `dynamic` value is allowed and produces `dynamic`. Where
 // types are concrete the rules bite: arithmetic needs two numbers of the SAME
 // kind (int and float never mix), `/` produces a float, a condition must be a
-// bool, and an annotated binding or `return` must match its declared type. A
-// call/field result is `dynamic` for now (cross-signature typing comes later).
+// bool, and an annotated binding or `return` must match its declared type.
+//
+// A call result is typed from the callee's signature, member access from the
+// receiver's class field types, and call arguments are checked for count and
+// type — all against the program-wide `classes` registry, so a concrete
+// receiver's members and a known class's constructor bite while a `dynamic`
+// receiver stays unchecked.
 
+import std.Str
 import Error
 import frontend.schematic.Scope
 import frontend.typecheck.Type
 
 private source
+private class_name
 private known_classes
 private enums
+private classes
+private variant_fields
 
-constructor(source, class_name, imports, enums) {
+constructor(source, class_name, imports, enums, classes, variant_fields) {
     .source = source
+    .class_name = class_name
     .known_classes = [:]
     for name in imports {
         .known_classes[name] = true
     }
     .known_classes[class_name] = true
     .enums = enums
+    .classes = classes
+    .variant_fields = variant_fields
 }
 
 public check(program) {
@@ -79,7 +91,11 @@ private type_variable(stmt, scope) {
     mut value = stmt.attr("value")
     if stmt.attr("reassign").unwrap_or(false) {
         if value.is_some() {
-            .type_expr(value.unwrap(), scope)
+            mut actual = .type_expr(value.unwrap(), scope)
+            mut prior = scope.lookup(stmt.child("name"))
+            if prior.is_some() {
+                .expect(prior.unwrap(), actual, stmt, "reassignment")
+            }
         }
         return
     }
@@ -181,10 +197,13 @@ private type_match(stmt, scope, ret) {
     for arm in stmt.child("arms") {
         mut arm_scope = scope.child()
         if arm.attr("is_variant").unwrap_or(false) {
+            mut fields = .variant_fields.get(arm.child("variant")).unwrap_or([])
+            mut i = 1
             for b in arm.child("bindings") {
                 if b != "_" {
-                    arm_scope.declare(b, Type.dynamic())
+                    arm_scope.declare(b, .field_type(fields.get(i)))
                 }
+                i = i + 1
             }
         } else if not arm.attr("is_wildcard").unwrap_or(false) {
             .type_expr(arm.child("pattern"), scope)
@@ -201,7 +220,10 @@ private type_expr(node, scope) {
         return .literal_type(node)
     }
     if k == "IdentifierExpr" {
-        return scope.lookup(node.child("name")).unwrap_or(Type.dynamic())
+        return .identifier_type(node.child("name"), scope)
+    }
+    if k == "SelfExpr" {
+        return Type.class_of(.class_name)
     }
     if k == "BinaryExpr" {
         return .type_binary(node, scope)
@@ -211,15 +233,10 @@ private type_expr(node, scope) {
         return Type.bool()
     }
     if k == "CallExpr" {
-        .type_expr(node.child("callee"), scope)
-        for arg in node.child("args") {
-            .type_expr(arg, scope)
-        }
-        return Type.dynamic()
+        return .type_call(node, scope)
     }
     if k == "MemberExpr" {
-        .type_expr(node.child("object"), scope)
-        return Type.dynamic()
+        return .type_member(node, scope)
     }
     if k == "IndexExpr" {
         .type_expr(node.child("object"), scope)
@@ -267,13 +284,58 @@ private type_binary(node, scope) {
         return .arith_type(node, op, lt, rt)
     }
     if op == "CONCAT" {
-        return Type.str()
+        return .concat_type(node, lt, rt)
+    }
+    if op == "EQ" or op == "NEQ" {
+        return .equality_type(node, lt, rt)
+    }
+    if .is_ordering(op) {
+        return .ordering_type(node, lt, rt)
     }
     return Type.bool()
 }
 
 private is_arith(op) {
     return op == "PLUS" or op == "MINUS" or op == "MULTIPLY" or op == "DIVIDE" or op == "MODULO" or op == "POWER"
+}
+
+private is_ordering(op) {
+    return op == "LESS" or op == "LESS_EQUAL" or op == "GREATER" or op == "GREATER_EQUAL"
+}
+
+// `++` joins two strings; either side may be `dynamic`, but a concrete non-string
+// must be converted first.
+private concat_type(node, lt, rt) {
+    if not .str_or_dynamic(lt) or not .str_or_dynamic(rt) {
+        .fail(node, "++ joins strings, found " ++ lt.describe() ++ " and " ++ rt.describe() ++ "; convert explicitly")
+    }
+    return Type.str()
+}
+
+private str_or_dynamic(t) {
+    return t.is_dynamic() or t.kind == "str"
+}
+
+// `==`/`!=` compare two values of the same type; a `dynamic` side defers.
+private equality_type(node, lt, rt) {
+    if not lt.is_dynamic() and not rt.is_dynamic() and not lt.equals(rt) {
+        .fail(node, "cannot compare " ++ lt.describe() ++ " and " ++ rt.describe() ++ " for equality")
+    }
+    return Type.bool()
+}
+
+// `< > <= >=` order two numbers of the same kind; a `dynamic` side defers.
+private ordering_type(node, lt, rt) {
+    if lt.is_dynamic() or rt.is_dynamic() {
+        return Type.bool()
+    }
+    if not lt.is_numeric() or not rt.is_numeric() {
+        .fail(node, "ordering needs numbers, found " ++ lt.describe() ++ " and " ++ rt.describe())
+    }
+    if not lt.equals(rt) {
+        .fail(node, "cannot order " ++ lt.describe() ++ " against " ++ rt.describe() ++ "; convert explicitly")
+    }
+    return Type.bool()
 }
 
 private arith_type(node, op, lt, rt) {
@@ -290,6 +352,174 @@ private arith_type(node, op, lt, rt) {
         return Type.float()
     }
     return lt
+}
+
+// ---- calls & members ----
+
+// An identifier is its bound type, or — for a bare class name used as a static
+// receiver (`Other.method()`) — the class itself; otherwise dynamic.
+private identifier_type(name, scope) {
+    mut found = scope.lookup(name)
+    if found.is_some() {
+        return found.unwrap()
+    }
+    if .classes.has(name) {
+        return Type.class_of(name)
+    }
+    return Type.dynamic()
+}
+
+// A call is construction when its callee names a known class, a method call when
+// its callee is a member access, and otherwise untyped. Construction and method
+// calls check their arguments and yield the declared result type.
+private type_call(node, scope) {
+    mut callee = node.child("callee")
+    mut args = node.child("args")
+    if callee.kind == "MemberExpr" {
+        return .type_method_call(callee, args, scope, node)
+    }
+    if callee.kind == "IdentifierExpr" {
+        mut name = callee.child("name")
+        if not scope.lookup(name).is_some() and .classes.has(name) {
+            .check_ctor_args(name, args, scope, node)
+            return Type.class_of(name)
+        }
+    }
+    .type_expr(callee, scope)
+    for arg in args {
+        .type_expr(arg, scope)
+    }
+    return Type.dynamic()
+}
+
+private type_method_call(member, args, scope, call) {
+    mut object = member.child("object")
+    mut method = member.child("field")
+    mut cls = .receiver_class(object, scope)
+    if cls == "" {
+        for arg in args {
+            .type_expr(arg, scope)
+        }
+        return Type.dynamic()
+    }
+    mut methods = .classes.get(cls).unwrap().get("methods").unwrap()
+    mut sig = methods.get(method)
+    if not sig.is_some() {
+        if .static_receiver(object, scope) {
+            for arg in args {
+                .type_expr(arg, scope)
+            }
+            return Type.dynamic()
+        }
+        .fail(member, "no method '" ++ method ++ "' on " ++ cls)
+    }
+    .check_call_args(sig.unwrap().get("params").unwrap(), args, scope, call)
+    return .field_type(sig.unwrap().get("result"))
+}
+
+// A member read is a field's declared type. An unknown member on an instance
+// receiver is an error; a method referenced as a value, or any member off a bare
+// class name (which may name a static member the registry does not track), is
+// left dynamic.
+private type_member(node, scope) {
+    mut object = node.child("object")
+    mut field = node.child("field")
+    mut cls = .receiver_class(object, scope)
+    if cls == "" {
+        return Type.dynamic()
+    }
+    mut entry = .classes.get(cls).unwrap()
+    mut ft = entry.get("fields").unwrap().get(field)
+    if ft.is_some() {
+        return .field_type(ft)
+    }
+    if entry.get("methods").unwrap().has(field) {
+        return Type.dynamic()
+    }
+    if .static_receiver(object, scope) {
+        return Type.dynamic()
+    }
+    .fail(node, "no field '" ++ field ++ "' on " ++ cls)
+}
+
+// The class a member access dispatches on: the current class for `self`/`.x`, a
+// named class for a bare class reference (a static access), the class a value is
+// typed as, or "" when the receiver is dynamic.
+private receiver_class(object, scope) {
+    if object.kind == "SelfExpr" {
+        return .class_name
+    }
+    if object.kind == "IdentifierExpr" {
+        mut found = scope.lookup(object.child("name"))
+        if not found.is_some() {
+            if .classes.has(object.child("name")) {
+                return object.child("name")
+            }
+            return ""
+        }
+        return .class_name_of(found.unwrap())
+    }
+    return .class_name_of(.type_expr(object, scope))
+}
+
+private class_name_of(t) {
+    if t.kind == "class" {
+        return t.name
+    }
+    return ""
+}
+
+// Whether a receiver is a bare class name (a static access like `Other.x`), as
+// opposed to `self` or a value typed as a class — used to stay lenient about
+// members the instance-side registry does not track (e.g. static members).
+private static_receiver(object, scope) {
+    if object.kind != "IdentifierExpr" {
+        return false
+    }
+    return not scope.lookup(object.child("name")).is_some() and .classes.has(object.child("name"))
+}
+
+// Check an argument list against a list of parameter type nodes: the counts must
+// match, and each concrete parameter type must accept its argument.
+private check_call_args(params, args, scope, node) {
+    if params.len() != args.len() {
+        .fail(node, "wrong number of arguments: expected " ++ .count(params.len()) ++ ", found " ++ .count(args.len()))
+    }
+    mut i = 1
+    for arg in args {
+        .expect(.resolve(params.get(i).unwrap()), .type_expr(arg, scope), arg, "argument")
+        i = i + 1
+    }
+}
+
+private count(n) {
+    return Str.format("%d", n).unwrap_or("?")
+}
+
+// Construction checks its arguments against the class's constructor parameters;
+// a class that declares no constructor accepts any arguments.
+private check_ctor_args(name, args, scope, node) {
+    mut ctor = .classes.get(name).unwrap().get("ctor").unwrap()
+    if ctor == 0 {
+        for arg in args {
+            .type_expr(arg, scope)
+        }
+        return
+    }
+    .check_call_args(ctor, args, scope, node)
+}
+
+// Resolve an optional field/result type node — an absent or unannotated (0) slot
+// is `dynamic`.
+private field_type(opt) {
+    if not opt.is_some() {
+        return Type.dynamic()
+    }
+    mut node = opt.unwrap()
+    if node == 0 {
+        return Type.dynamic()
+    }
+    return .resolve(node)
 }
 
 // ---- helpers ----
@@ -327,6 +557,9 @@ private resolve(t) {
         return Type.enum_of(name)
     }
     if .known_classes.has(name) {
+        return Type.class_of(name)
+    }
+    if .classes.has(name) {
         return Type.class_of(name)
     }
     return Type.dynamic()
