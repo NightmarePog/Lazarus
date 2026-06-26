@@ -1,0 +1,55 @@
+// Result<T> — a fallible value, generic over its Ok element type T; the Err side
+// is a string message. Construct with the static factories `Result.ok(v)` /
+// `Result.err(m)`; the type argument is inferred at `ok` (`Result.ok(5)` is a
+// `Result<int>`).
+//
+// `take()` returns the Ok value or panics with the message; `take_or(d)` returns
+// a default on Err. (`unwrap`/`unwrap_or` are reserved by the runtime Option, so
+// the typed Result uses `take`/`take_or`.) The Err placeholder Ok value is erased
+// and never observed.
+
+import std.Sys
+
+private ok_flag: bool
+private value: T
+private message: str
+
+constructor<T>(ok_flag: bool, value: T, message: str) {
+    .ok_flag = ok_flag
+    .value = value
+    .message = message
+}
+
+static ok(v: T): Result<T> {
+    return Result(true, v, "")
+}
+
+static err(m: str): Result<T> {
+    return Result(false, 0, m)
+}
+
+is_ok(): bool {
+    return .ok_flag
+}
+
+is_err(): bool {
+    return not .ok_flag
+}
+
+take(): T {
+    if .ok_flag {
+        return .value
+    }
+    Sys.panic(.message)
+}
+
+take_or(d: T): T {
+    if .ok_flag {
+        return .value
+    }
+    return d
+}
+
+error(): str {
+    return .message
+}

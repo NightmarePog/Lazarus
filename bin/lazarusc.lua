@@ -2811,7 +2811,10 @@ function Typecheck.receiver_subst(self, cls, recv)
     local subst = __lz_map({})
     local i = 1
     for _, p in __lz_each(Typecheck.class_params(self, cls)) do
-        __lz_idx_set(subst, p, __lz_unwrap_or(__lz_get(recv.params, i), Type.dynamic()))
+        local arg = __lz_get(recv.params, i)
+        if __lz_is_some(arg) then
+            __lz_idx_set(subst, p, __lz_unwrap(arg))
+        end
         i = i + 1
     end
     return subst

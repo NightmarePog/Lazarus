@@ -689,12 +689,19 @@ private method_var_set(cls, sig) {
 }
 
 // Pre-bind a class's type params to the receiver's concrete type args, so a
-// method/field typed in `T` reads at the receiver's instantiation.
+// method/field typed in `T` reads at the receiver's instantiation. A param the
+// receiver does not carry — a bare class name in a static call like
+// `Option.some(5)`, whose receiver has no type args — is left unbound, so the
+// call's arguments can still solve it (`T` = int) instead of collapsing to
+// `dynamic`.
 private receiver_subst(cls, recv) {
     mut subst = [:]
     mut i = 1
     for p in .class_params(cls) {
-        subst[p] = recv.params.get(i).unwrap_or(Type.dynamic())
+        mut arg = recv.params.get(i)
+        if arg.is_some() {
+            subst[p] = arg.unwrap()
+        }
         i = i + 1
     }
     return subst
