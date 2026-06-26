@@ -1,0 +1,16 @@
+// Meta — compiler-wide metadata in one place: the toolchain's name and version,
+// and the runtime it targets. The codegen header (and any future version
+// reporting) read these, so the compiler's identity lives in a single file
+// instead of being spelled out at each use site.
+
+static name() {
+    return "Lazarus"
+}
+
+static version() {
+    return "0.1.0"
+}
+
+static target() {
+    return "Lua 5.1"
+}

@@ -2,11 +2,15 @@
 # build-compiler — rebuild the self-hosted Lazarus compiler from compiler/,
 # seeded by the committed self-host binary (bin/lazarusc.lua). Does NOT use src/.
 #
-# It compiles the compiler with the current seed (stage 1), then compiles it
-# again with that result (stage 2). A correct self-hosting compiler is a
-# fixpoint: stage 1 and stage 2 must be byte-identical. Only then is the new
-# binary installed over the seed — so a broken build can never overwrite a good
-# one.
+# It compiles the compiler with the current seed (stage 1), then with that
+# result (stage 2), then once more (stage 3). A correct self-hosting compiler is
+# a fixpoint, but stage 1 is emitted by the *old* seed: when a change alters the
+# codegen of a construct the compiler itself uses (e.g. how `.unwrap()` lowers),
+# stage 1 still carries the old lowering while stage 2 already carries the new
+# one, so stage1 != stage2 legitimately. Stages 2 and 3 are both produced by
+# new-codegen compilers, so they converge — the real fixpoint is stage2 ==
+# stage3. Stage 2 (fully self-built) is installed. A broken build never
+# overwrites a good seed.
 set -e
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -22,15 +26,16 @@ fi
 # The compiler writes its output to ./Main.lua, so each stage runs in its own dir.
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-mkdir "$work/s1" "$work/s2"
+mkdir "$work/s1" "$work/s2" "$work/s3"
 
 ( cd "$work/s1" && lua "$SEED" "$ENTRY" )
 ( cd "$work/s2" && lua "$work/s1/Main.lua" "$ENTRY" )
+( cd "$work/s3" && lua "$work/s2/Main.lua" "$ENTRY" )
 
-if ! cmp -s "$work/s1/Main.lua" "$work/s2/Main.lua"; then
-    echo "build-compiler: NOT a self-host fixpoint (stage1 != stage2); refusing to install" >&2
+if ! cmp -s "$work/s2/Main.lua" "$work/s3/Main.lua"; then
+    echo "build-compiler: NOT a self-host fixpoint (stage2 != stage3); refusing to install" >&2
     exit 1
 fi
 
-cp "$work/s1/Main.lua" "$SEED"
+cp "$work/s2/Main.lua" "$SEED"
 echo "build-compiler: installed bin/lazarusc.lua ($(wc -l < "$SEED") lines), fixpoint verified"

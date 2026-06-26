@@ -1,6 +1,8 @@
 // A resolved type used by the checker, erased once checking is done. Kinds:
-// int, float, bool, str, unit, dynamic, class, enum, fn. A type variable or a
-// generic argument resolves to `dynamic` until generics land in a later phase.
+// int, float, bool, str, unit, dynamic, class, enum, fn, var. For `class`/`enum`
+// the `params` list carries the generic type arguments (`Option<int>` is an
+// `enum "Option"` with `params=[int]`; a non-generic type has `params=[]`). A
+// `var` is a type variable (its `name`), live only inside a generic decl's scope.
 
 public kind
 public name
@@ -44,16 +46,21 @@ static str() {
     return Type.base("str")
 }
 
-static class_of(name) {
-    return Type("class", name, [], 0)
+static class_of(name, args) {
+    return Type("class", name, args, 0)
 }
 
-static enum_of(name) {
-    return Type("enum", name, [], 0)
+static enum_of(name, args) {
+    return Type("enum", name, args, 0)
 }
 
 static fn(params, result) {
     return Type("fn", "", params, result)
+}
+
+// A type variable, named after the generic parameter it stands for.
+static var(name) {
+    return Type("var", name, [], 0)
 }
 
 public is_dynamic() {
@@ -64,22 +71,38 @@ public is_numeric() {
     return .kind == "int" or .kind == "float"
 }
 
-// Nominal equality; generic arguments are not compared yet. `int` and `float`
-// are deliberately distinct.
+// Nominal equality of the head only (kind, and name for class/enum/var). Generic
+// arguments are compared leniently by the checker (`Typecheck.compatible`), not
+// here. `int` and `float` are deliberately distinct.
 public equals(other) {
     if .kind != other.kind {
         return false
     }
-    if .kind == "class" or .kind == "enum" {
+    if .kind == "class" or .kind == "enum" or .kind == "var" {
         return .name == other.name
     }
     return true
 }
 
-// A short label for diagnostics.
+// A short label for diagnostics, rendering generic arguments (`Result<int>`).
 public describe() {
-    if .kind == "class" or .kind == "enum" {
+    if .kind == "var" {
         return .name
+    }
+    if .kind == "class" or .kind == "enum" {
+        if .params.len() == 0 {
+            return .name
+        }
+        mut inner = ""
+        mut i = 1
+        for a in .params {
+            if i > 1 {
+                inner = inner ++ ", "
+            }
+            inner = inner ++ a.describe()
+            i = i + 1
+        }
+        return .name ++ "<" ++ inner ++ ">"
     }
     return .kind
 }

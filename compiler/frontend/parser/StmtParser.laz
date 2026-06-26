@@ -272,22 +272,24 @@ private local_binding(name, value) {
 
 private parse_method(visibility, is_static) {
     mut name = .cursor.consume("IDENTIFIER", "Expected method name")
+    mut type_params = .parse_type_params()
     .cursor.consume("LEFT_BRACKET", "Expected '(' after method name")
     mut param_types = []
     mut params = .parse_params(param_types)
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after parameters")
     mut return_type = .parse_return_type()
     mut body = .parse_block("method body")
-    return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column, param_types, return_type)
+    return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column, param_types, return_type, type_params)
 }
 
 private parse_constructor(tok) {
+    mut type_params = .parse_type_params()
     .cursor.consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
     mut param_types = []
     mut params = .parse_params(param_types)
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after parameters")
     mut body = .parse_block("constructor body")
-    return Ast.constructor_decl(params, body, tok.line, tok.column, param_types)
+    return Ast.constructor_decl(params, body, tok.line, tok.column, param_types, type_params)
 }
 
 // A comma-separated parameter list, the opening `(` already consumed. Names are
@@ -392,11 +394,25 @@ private parse_type_fn() {
 // (a return-type annotation) comes next — which separates a method declaration
 // from a call statement `name(args)`.
 private looks_like_decl() {
-    if .cursor.peek_next().kind != "LEFT_BRACKET" {
+    mut i = .cursor.position() + 1
+    // Skip an optional generic header `<T, ...>` between the name and `(` (its
+    // params are bare identifier names, so the first `>` closes it).
+    if .cursor.token_at(i).kind == "LESS" {
+        loop {
+            mut k = .cursor.token_at(i).kind
+            if k == "EOF" {
+                return false
+            }
+            i = i + 1
+            if k == "GREATER" {
+                break
+            }
+        }
+    }
+    if .cursor.token_at(i).kind != "LEFT_BRACKET" {
         return false
     }
     mut depth = 0
-    mut i = .cursor.position() + 1
     loop {
         mut kind = .cursor.token_at(i).kind
         if kind == "EOF" {

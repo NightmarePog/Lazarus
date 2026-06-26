@@ -1,0 +1,49 @@
+// Option<T> — the one optional type, generic over its element type T. Construct
+// with the static factories `Option.some(v)` / `Option.none()`; the type argument
+// is inferred at the factory (`Option.some(5)` is an `Option<int>`).
+//
+// This is the single Option in the language: collection and IO operations
+// (`list.get`, `list.pop`, `Sys.read_line`, …) return an `Option<T>`, and
+// `is_some`/`is_none`/`unwrap`/`unwrap_or` are real methods on it (no longer
+// reserved runtime builtins). The `none` placeholder value is erased and never
+// observed (`unwrap` panics, `unwrap_or` returns its default).
+
+import std.Sys
+
+private full: bool
+private value: T
+
+constructor<T>(full: bool, value: T) {
+    .full = full
+    .value = value
+}
+
+static some(v: T): Option<T> {
+    return Option(true, v)
+}
+
+static none(): Option<T> {
+    return Option(false, 0)
+}
+
+is_some(): bool {
+    return .full
+}
+
+is_none(): bool {
+    return not .full
+}
+
+unwrap(): T {
+    if .full {
+        return .value
+    }
+    Sys.panic("unwrap() on a None value")
+}
+
+unwrap_or(d: T): T {
+    if .full {
+        return .value
+    }
+    return d
+}

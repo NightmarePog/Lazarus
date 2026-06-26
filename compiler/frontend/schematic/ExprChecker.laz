@@ -14,12 +14,14 @@ import frontend.schematic.Booleanity
 private source
 private properties
 private methods
+private variant_owner
 private in_instance
 
-constructor(source, properties, methods) {
+constructor(source, properties, methods, variant_owner) {
     .source = source
     .properties = properties
     .methods = methods
+    .variant_owner = variant_owner
     .in_instance = false
 }
 
@@ -70,7 +72,7 @@ public check_condition(node, scope) {
 
 private check_identifier(node, scope) {
     mut name = node.child("name")
-    if scope.lookup(name).is_none() {
+    if scope.lookup(name).is_none() and not .variant_owner.has(name) {
         .fail(node, "Undeclared identifier '" ++ name ++ "'", Str.len(name).unwrap_or(1))
     }
 }
