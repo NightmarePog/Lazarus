@@ -1,80 +1,75 @@
-// A resolved type used by the checker, erased once checking is done. Kinds:
-// int, float, bool, str, unit, dynamic, class, enum, fn, var. For `class`/`enum`
-// the `params` list carries the generic type arguments (`Option<int>` is an
-// `enum "Option"` with `params=[int]`; a non-generic type has `params=[]`). A
-// `var` is a type variable (its `name`), live only inside a generic decl's scope.
+// A resolved type used by the checker, erased once checking is done.
 
 public kind
 public name
 public params
 public result
 
-constructor(kind, name, params, result) {
+constructor(kind: str, name: str, params, result) {
     .kind = kind
     .name = name
     .params = params
     .result = result
 }
 
-// `result` is a placeholder (0) for every kind except `fn`, which carries a real
-// result Type — so the base helpers never recurse.
-static base(kind) {
+// `result` is a real Type only for `fn`; every other kind passes 0 so the base
+// helpers never recurse.
+static base(kind: str): Type {
     return Type(kind, "", [], 0)
 }
 
-static dynamic() {
+static dynamic(): Type {
     return Type.base("dynamic")
 }
 
-static unit() {
+static unit(): Type {
     return Type.base("unit")
 }
 
-static int() {
+static int(): Type {
     return Type.base("int")
 }
 
-static float() {
+static float(): Type {
     return Type.base("float")
 }
 
-static bool() {
+static bool(): Type {
     return Type.base("bool")
 }
 
-static str() {
+static str(): Type {
     return Type.base("str")
 }
 
-static class_of(name, args) {
+static class_of(name: str, args): Type {
     return Type("class", name, args, 0)
 }
 
-static enum_of(name, args) {
+static enum_of(name: str, args): Type {
     return Type("enum", name, args, 0)
 }
 
-static fn(params, result) {
+static fn(params, result): Type {
     return Type("fn", "", params, result)
 }
 
-// A type variable, named after the generic parameter it stands for.
-static var(name) {
+static var(name: str): Type {
     return Type("var", name, [], 0)
 }
 
-public is_dynamic() {
+public is_dynamic(): bool {
     return .kind == "dynamic"
 }
 
-public is_numeric() {
+public is_numeric(): bool {
     return .kind == "int" or .kind == "float"
 }
 
-// Nominal equality of the head only (kind, and name for class/enum/var). Generic
-// arguments are compared leniently by the checker (`Typecheck.compatible`), not
-// here. `int` and `float` are deliberately distinct.
-public equals(other) {
+// Head-only nominal equality (kind, plus name for class/enum/var); generic
+// arguments are compared leniently in Typecheck.compatible, not here. `int` and
+// `float` are deliberately distinct.
+public equals(other: Type): bool {
     if .kind != other.kind {
         return false
     }
@@ -84,8 +79,8 @@ public equals(other) {
     return true
 }
 
-// A short label for diagnostics, rendering generic arguments (`Result<int>`).
-public describe() {
+// A short label for diagnostics, rendering generic arguments as `Result<int>`.
+public describe(): str {
     if .kind == "var" {
         return .name
     }
