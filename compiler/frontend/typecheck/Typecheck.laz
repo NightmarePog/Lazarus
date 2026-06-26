@@ -226,12 +226,36 @@ private type_for(stmt, scope, ret) {
 }
 
 private type_for_in(stmt, scope, ret) {
-    .type_expr(stmt.child("iter"), scope)
+    mut it = .type_expr(stmt.child("iter"), scope)
     mut inner = scope.child()
-    for name in stmt.child("vars") {
-        inner.declare(name, Type.dynamic())
-    }
+    .bind_loop_vars(stmt.child("vars"), it, inner)
     .type_block(stmt.child("body"), inner, ret)
+}
+
+// A loop variable over a `List<T>` binds `T` (a second var, the 0-based index, is
+// `int`); over a `Map<K,V>` a single var binds `V`, two bind `K` then `V`.
+private bind_loop_vars(vars, it, scope) {
+    if it.kind == "class" and it.name == "List" {
+        if vars.len() == 1 {
+            scope.declare(vars.get(1).unwrap(), .type_arg(it, 1))
+        } else {
+            scope.declare(vars.get(1).unwrap(), Type.int())
+            scope.declare(vars.get(2).unwrap(), .type_arg(it, 1))
+        }
+        return
+    }
+    if it.kind == "class" and it.name == "Map" {
+        if vars.len() == 1 {
+            scope.declare(vars.get(1).unwrap(), .type_arg(it, 2))
+        } else {
+            scope.declare(vars.get(1).unwrap(), .type_arg(it, 1))
+            scope.declare(vars.get(2).unwrap(), .type_arg(it, 2))
+        }
+        return
+    }
+    for name in vars {
+        scope.declare(name, Type.dynamic())
+    }
 }
 
 private type_match(stmt, scope, ret) {
@@ -281,24 +305,148 @@ private type_expr(node, scope): Type {
         return .type_member(node, scope)
     }
     if k == "IndexExpr" {
-        .type_expr(node.child("object"), scope)
-        .type_expr(node.child("index"), scope)
-        return Type.dynamic()
+        return .type_index(node, scope)
     }
     if k == "ListExpr" {
-        for e in node.child("elements") {
-            .type_expr(e, scope)
-        }
-        return Type.dynamic()
+        return .type_list(node, scope)
     }
     if k == "MapExpr" {
-        for entry in node.child("entries") {
-            .type_expr(entry.child("key"), scope)
-            .type_expr(entry.child("value"), scope)
-        }
-        return Type.dynamic()
+        return .type_map(node, scope)
     }
     return Type.dynamic()
+}
+
+// ---- built-in collections / Option / Result ----
+
+private is_builtin_name(name): bool {
+    return name == "Option" or name == "Result" or name == "List" or name == "Map"
+}
+
+// A built-in generic instance (List<int>, Option<str>, …).
+private is_builtin_type(t): bool {
+    return t.kind == "class" and .is_builtin_name(t.name)
+}
+
+// The i-th (1-based) type argument of a generic instance, or dynamic.
+private type_arg(t, i): Type {
+    return t.params.get(i).unwrap_or(Type.dynamic())
+}
+
+private opt_of(t): Type {
+    return Type.class_of("Option", [t])
+}
+
+// Lenient element unification: agreeing concrete types keep that type; a `dynamic`
+// side defers; a genuine mismatch falls back to `dynamic` (no error), so a mixed
+// literal is simply `List<dynamic>` / a record map `Map<…, dynamic>`.
+private unify_elem(acc, next): Type {
+    if next.is_dynamic() {
+        return acc
+    }
+    if acc.is_dynamic() {
+        return next
+    }
+    if not acc.equals(next) {
+        return Type.dynamic()
+    }
+    return acc
+}
+
+private type_list(node, scope): Type {
+    mut elem = Type.dynamic()
+    for e in node.child("elements") {
+        elem = .unify_elem(elem, .type_expr(e, scope))
+    }
+    return Type.class_of("List", [elem])
+}
+
+private type_map(node, scope): Type {
+    mut kt = Type.dynamic()
+    mut vt = Type.dynamic()
+    for entry in node.child("entries") {
+        kt = .unify_elem(kt, .type_expr(entry.child("key"), scope))
+        vt = .unify_elem(vt, .type_expr(entry.child("value"), scope))
+    }
+    return Type.class_of("Map", [kt, vt])
+}
+
+private type_index(node, scope): Type {
+    mut obj = .type_expr(node.child("object"), scope)
+    .type_expr(node.child("index"), scope)
+    if obj.kind == "class" and obj.name == "List" {
+        return .type_arg(obj, 1)
+    }
+    if obj.kind == "class" and obj.name == "Map" {
+        return .type_arg(obj, 2)
+    }
+    return Type.dynamic()
+}
+
+// `Option.some(v)` / `Result.ok(v)` carry their element type; `none`/`err` leave
+// it unbound (dynamic).
+private type_builtin_ctor(ns, field, args, scope): Type {
+    mut elem = Type.dynamic()
+    for arg in args {
+        mut at = .type_expr(arg, scope)
+        if elem.is_dynamic() {
+            elem = at
+        }
+    }
+    if ns == "Option" {
+        if field == "some" {
+            return .opt_of(elem)
+        }
+        return .opt_of(Type.dynamic())
+    }
+    if field == "ok" {
+        return Type.class_of("Result", [elem])
+    }
+    return Type.class_of("Result", [Type.dynamic()])
+}
+
+// Result types for the built-in methods of List/Map/Option/Result.
+private builtin_method(recv, method, args, scope): Type {
+    for arg in args {
+        .type_expr(arg, scope)
+    }
+    mut a = .type_arg(recv, 1)
+    if recv.name == "List" {
+        if method == "get" or method == "pop" {
+            return .opt_of(a)
+        }
+        if method == "len" {
+            return Type.int()
+        }
+        if method == "has" {
+            return Type.bool()
+        }
+        return Type.unit()
+    }
+    if recv.name == "Map" {
+        if method == "get" {
+            return .opt_of(.type_arg(recv, 2))
+        }
+        if method == "has" {
+            return Type.bool()
+        }
+        if method == "len" {
+            return Type.int()
+        }
+        return Type.unit()
+    }
+    if recv.name == "Option" {
+        if method == "unwrap" or method == "unwrap_or" {
+            return a
+        }
+        return Type.bool()
+    }
+    if method == "unwrap" or method == "unwrap_or" {
+        return a
+    }
+    if method == "error" {
+        return Type.str()
+    }
+    return Type.bool()
 }
 
 private literal_type(node): Type {
@@ -420,6 +568,10 @@ private type_call(node, scope): Type {
     mut callee = node.child("callee")
     mut args = node.child("args")
     if callee.kind == "MemberExpr" {
+        mut obj = callee.child("object")
+        if obj.kind == "IdentifierExpr" and (obj.child("name") == "Option" or obj.child("name") == "Result") {
+            return .type_builtin_ctor(obj.child("name"), callee.child("field"), args, scope)
+        }
         return .type_method_call(callee, args, scope, node)
     }
     if callee.kind == "IdentifierExpr" {
@@ -466,6 +618,9 @@ private type_method_call(member, args, scope, call): Type {
     mut object = member.child("object")
     mut method = member.child("field")
     mut recv = .receiver_type(object, scope)
+    if .is_builtin_type(recv) {
+        return .builtin_method(recv, method, args, scope)
+    }
     mut cls = .class_name_of(recv)
     if cls == "" {
         for arg in args {
@@ -785,6 +940,9 @@ private resolve(t): Type {
     if .type_vars.has(name) {
         return Type.var(name)
     }
+    if .is_builtin_name(name) {
+        return Type.class_of(name, .resolve_args(t, name))
+    }
     if .enums.has(name) {
         return Type.enum_of(name, .resolve_args(t, name))
     }
@@ -813,6 +971,12 @@ private resolve_args(t, name) {
 }
 
 private declared_arity(name): int {
+    if name == "Option" or name == "Result" or name == "List" {
+        return 1
+    }
+    if name == "Map" {
+        return 2
+    }
     if .enum_type_params.has(name) {
         return .enum_type_params.get(name).unwrap().len()
     }
