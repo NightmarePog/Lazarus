@@ -71,21 +71,39 @@ describe("Optimizer", function ()
     describe("control flow", function ()
         it("propagates a constant into an if condition", function ()
             local ast = optimize("private k = 5\nif k { x = 1 }")
-            local cond = ast.body[2].clauses[1].condition
+            local if_stmt = ast.body[2]
+            assert(if_stmt)
+            ---@cast if_stmt IfStmt
+            local clause = if_stmt.clauses[1]
+            assert(clause)
+            local cond = clause.condition
+            ---@cast cond LiteralExpr
             assert.equal("LiteralExpr", cond.type)
             assert.equal(5, cond.value)
         end)
 
         it("folds an arithmetic while condition", function ()
             local ast = optimize("private a = 1\nwhile 2 + 3 { x = a }")
-            local cond = ast.body[2].condition
+            local while_stmt = ast.body[2]
+            assert(while_stmt)
+            ---@cast while_stmt WhileStmt
+            local cond = while_stmt.condition
+            ---@cast cond LiteralExpr
             assert.equal("LiteralExpr", cond.type)
             assert.equal(5, cond.value)
         end)
 
         it("folds inside a loop body", function ()
             local ast = optimize("private k = 4\nloop { y = k + 1\nbreak }")
-            local y = ast.body[2].body[1].value
+            local loop_stmt = ast.body[2]
+            assert(loop_stmt)
+            ---@cast loop_stmt LoopStmt
+            local decl = loop_stmt.body[1]
+            assert(decl)
+            ---@cast decl VariableDecl
+            local y = decl.value
+            assert(y)
+            ---@cast y LiteralExpr
             assert.equal("LiteralExpr", y.type)
             assert.equal(5, y.value)
         end)
@@ -93,22 +111,44 @@ describe("Optimizer", function ()
         it("does not treat the for loop variable as a constant", function ()
             local ast = optimize("private n = 10\nfor i = 0; i < n; i += 1 { z = 2 * 4 }")
             local for_stmt = ast.body[2]
+            assert(for_stmt)
+            ---@cast for_stmt ForStmt
             -- `i` is mutable across iterations, so it must stay an identifier;
             -- `n` is an immutable literal and folds in.
-            assert.equal("BinaryExpr", for_stmt.condition.type)
-            assert.equal("IdentifierExpr", for_stmt.condition.left.type)
-            assert.equal("LiteralExpr", for_stmt.condition.right.type)
-            assert.equal(10, for_stmt.condition.right.value)
+            local cond = for_stmt.condition
+            assert(cond)
+            ---@cast cond BinaryExpr
+            assert.equal("BinaryExpr", cond.type)
+            local left = cond.left
+            ---@cast left IdentifierExpr
+            assert.equal("IdentifierExpr", left.type)
+            local right = cond.right
+            ---@cast right LiteralExpr
+            assert.equal("LiteralExpr", right.type)
+            assert.equal(10, right.value)
             -- the body still folds its own constant expressions
-            assert.equal(8, for_stmt.body[1].value.value)
+            local body_decl = for_stmt.body[1]
+            assert(body_decl)
+            ---@cast body_decl VariableDecl
+            local body_val = body_decl.value
+            assert(body_val)
+            ---@cast body_val LiteralExpr
+            assert.equal(8, body_val.value)
         end)
 
         it("propagates a constant into a unary operand", function ()
             local ast = optimize("private p = true\nprivate q = not p")
-            local q = ast.body[2].value
+            local decl = ast.body[2]
+            assert(decl)
+            ---@cast decl VariableDecl
+            local q = decl.value
+            assert(q)
+            ---@cast q UnaryExpr
             assert.equal("UnaryExpr", q.type)
-            assert.equal("LiteralExpr", q.operand.type)
-            assert.equal(true, q.operand.value)
+            local operand = q.operand
+            ---@cast operand LiteralExpr
+            assert.equal("LiteralExpr", operand.type)
+            assert.equal(true, operand.value)
         end)
     end)
 

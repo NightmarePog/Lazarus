@@ -17,9 +17,12 @@ local LUA = os.getenv("LAZARUS_LUA") or "lua"
 --- tests assert on the exit code instead of matching error text. The exit code
 --- is smuggled out on a trailing `LAZ_EXIT:<n>` line appended by the shell.
 ---@param args string
----@return string stdout, integer code
+---@return string stdout, number code
 local function run(args)
     local cmd = LUA .. " src/cli.lua " .. args .. ' 2>/dev/null; echo "LAZ_EXIT:$?"'
+    -- io.popen can return nil on failure, so this assert is intentional; the
+    -- stdlib stub types it as non-nil, hence the false-positive suppression.
+    ---@diagnostic disable-next-line: unnecessary-assert
     local proc = assert(io.popen(cmd, "r"))
     local out = proc:read("*a")
     proc:close()
@@ -117,6 +120,42 @@ describe("CLI", function()
         it("exits non-zero with no input file", function()
             local _, code = run("build")
             assert.is_true(code ~= 0)
+        end)
+
+        it("links and runs a multi-file program (imports + cross-class dispatch)", function()
+            -- Two classes in one temp dir: Main imports Box, constructs it, and
+            -- calls an *instance* method across the file boundary.
+            local stem = os.tmpname()
+            os.remove(stem)
+            local dir = stem:match("^(.*)[/\\][^/\\]*$") or "."
+
+            local function write(name, src)
+                local path = dir .. "/" .. name
+                local fh = assert(io.open(path, "w"))
+                fh:write(src)
+                fh:close()
+                return path
+            end
+
+            local box = write(
+                "Box.laz",
+                "private value\nread() { return .value }\nconstructor(v) { .value = v }\n"
+            )
+            local main = write(
+                "Main.laz",
+                "import Box\nprivate result\nconstructor() {\nmut b = Box(7)\n.result = b.read()\n}\n"
+            )
+
+            local out, code = run("build " .. main .. " -o -")
+            os.remove(box)
+            os.remove(main)
+
+            assert.equal(0, code)
+            -- Box is emitted before Main (dependencies first) and the call uses colon.
+            assert.is_true(has(out, "local Box = {}"))
+            assert.is_true(has(out, "b:read()"))
+            local inst = assert(load_chunk(out), "generated Lua failed to load")()
+            assert.equal(7, inst.result)
         end)
     end)
 

@@ -291,8 +291,8 @@ describe("Codegen", function()
         )
 
         it(
-            "leaves a field call on a non-method name as a plain obj.m() call",
-            function() assert.matches("p%.go%(%)", members("static f(p) { p.go() }")) end
+            "dispatches a method call on a non-class receiver via colon (passes self)",
+            function() assert.matches("p:go%(%)", members("static f(p) { p.go() }")) end
         )
     end)
 
@@ -313,8 +313,8 @@ describe("Codegen", function()
         )
 
         it(
-            "emits a method call",
-            function() assert.matches("p%.go%(%)", members("static f(p) { p.go() }")) end
+            "emits a method call on a receiver via colon",
+            function() assert.matches("p:go%(%)", members("static f(p) { p.go() }")) end
         )
 
         it(

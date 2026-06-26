@@ -4,9 +4,7 @@ local Schematic = require("frontend.schematic")
 local Error = require("error")
 
 local function analyze(source)
-    local ast = Parser.new(Lexer.new(source):scan(), source):parse()
-    Schematic.analyze(ast, source)
-    return ast
+    Schematic.analyze(Parser.new(Lexer.new(source):scan(), source):parse(), source)
 end
 
 describe("Schematic", function()
@@ -32,26 +30,26 @@ describe("Schematic", function()
 
     describe("mutability", function()
         it("rejects reassignment of an immutable binding", function()
-            local ok, err = pcall(analyze, "static f() { a = 1\na = 2\nreturn a }")
+            local ok, raw_err = pcall(analyze, "static f() { a = 1\na = 2\nreturn a }")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
             assert.matches("Cannot assign to immutable binding 'a'", err.message)
         end)
 
         it("rejects reassignment of a function parameter", function()
-            local ok, err = pcall(analyze, "static f(a) { a = 2\nreturn a }")
+            local ok, raw_err = pcall(analyze, "static f(a) { a = 2\nreturn a }")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.matches("Cannot assign to immutable binding 'a'", err.message)
         end)
     end)
 
     describe("visibility", function()
         it("rejects a top-level binding with no visibility modifier", function()
-            local ok, err = pcall(analyze, "x = 1")
+            local ok, raw_err = pcall(analyze, "x = 1")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
             assert.matches("must declare visibility", err.message)
         end)
@@ -63,9 +61,9 @@ describe("Schematic", function()
 
     describe("duplicate declarations", function()
         it("rejects a redeclared static member with SEMANTIC_ERROR and a position", function()
-            local ok, err = pcall(analyze, "private static x = 1\nprivate static x = 2")
+            local ok, raw_err = pcall(analyze, "private static x = 1\nprivate static x = 2")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
             assert.matches("Duplicate declaration 'x'", err.message)
             assert.equal(2, err.line)
@@ -81,9 +79,9 @@ describe("Schematic", function()
 
     describe("undeclared identifiers", function()
         it("rejects a reference to an unknown name with a source position", function()
-            local ok, err = pcall(analyze, "private static y = nope")
+            local ok, raw_err = pcall(analyze, "private static y = nope")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
             assert.matches("Undeclared identifier 'nope'", err.message)
             assert.equal(1, err.line)
@@ -91,9 +89,9 @@ describe("Schematic", function()
         end)
 
         it("rejects self-reference in an initialiser", function()
-            local ok, err = pcall(analyze, "private static x = x")
+            local ok, raw_err = pcall(analyze, "private static x = x")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
         end)
     end)
@@ -126,39 +124,39 @@ describe("Schematic", function()
         end)
 
         it("rejects an undeclared identifier in a condition", function()
-            local ok, err = pcall(analyze, "static f() { while nope { x = 1 } }")
+            local ok, raw_err = pcall(analyze, "static f() { while nope { x = 1 } }")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
             assert.matches("Undeclared identifier 'nope'", err.message)
         end)
 
         it("does not leak a binding declared inside an if body", function()
-            local ok, err = pcall(analyze, "static f(a) { if a { y = 1 }\n return y }")
+            local ok, raw_err = pcall(analyze, "static f(a) { if a { y = 1 }\n return y }")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.matches("Undeclared identifier 'y'", err.message)
         end)
 
         it("rejects break outside any loop", function()
-            local ok, err = pcall(analyze, "static f() { break }")
+            local ok, raw_err = pcall(analyze, "static f() { break }")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
             assert.matches("'break' outside", err.message)
         end)
 
         it("rejects break that is not the last statement in its block", function()
-            local ok, err = pcall(analyze, "static f() { loop { break\n x = 1 } }")
+            local ok, raw_err = pcall(analyze, "static f() { loop { break\n x = 1 } }")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.matches("'break' must be the last statement", err.message)
         end)
 
         it("checks operands of a unary expression", function()
-            local ok, err = pcall(analyze, "private static x = not nope")
+            local ok, raw_err = pcall(analyze, "private static x = not nope")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.matches("Undeclared identifier 'nope'", err.message)
         end)
 
@@ -171,9 +169,9 @@ describe("Schematic", function()
 
     describe("bare expression statements", function()
         it("rejects a bare expression as a statement", function()
-            local ok, err = pcall(analyze, "private static x = 1\nx + x")
+            local ok, raw_err = pcall(analyze, "private static x = 1\nx + x")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
             assert.matches("Bare expressions are not valid statements", err.message)
         end)
@@ -238,17 +236,17 @@ describe("Schematic", function()
         end)
 
         it("rejects an undeclared instance field", function()
-            local ok, err = pcall(analyze, "deposit() { .bogus = 1 }")
+            local ok, raw_err = pcall(analyze, "deposit() { .bogus = 1 }")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
             assert.matches("Unknown instance member '.bogus'", err.message)
         end)
 
         it("rejects .field in a static method (no receiver)", function()
-            local ok, err = pcall(analyze, "private x\nstatic helper() { return .x }")
+            local ok, raw_err = pcall(analyze, "private x\nstatic helper() { return .x }")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
             assert.matches("no receiver", err.message)
         end)
@@ -288,9 +286,9 @@ describe("Schematic", function()
         end)
 
         it("rejects a bare 'self' outside an instance context (no receiver)", function()
-            local ok, err = pcall(analyze, "static helper() { return self }")
+            local ok, raw_err = pcall(analyze, "static helper() { return self }")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
             assert.matches("no receiver", err.message)
         end)
@@ -329,9 +327,9 @@ describe("Schematic", function()
         end)
 
         it("rejects a non-snake_case property name", function()
-            local ok, err = pcall(analyze, "private myVar")
+            local ok, raw_err = pcall(analyze, "private myVar")
             assert.is_false(ok)
-            local err = err --[[@as Error]]
+            local err = raw_err --[[@as Error]]
             assert.equal(Error.Type.SEMANTIC_ERROR, err.type)
             assert.matches("must be snake_case", err.message)
         end)

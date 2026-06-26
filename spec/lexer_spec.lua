@@ -39,6 +39,19 @@ describe("Lexer", function()
             assert.equal("private", tok(tokens, 1).value)
         end)
 
+        it("tokenises 'import' as IMPORT", function()
+            local tokens = scan("import")
+            assert.equal(1, #tokens)
+            assert.equal("IMPORT", tok(tokens, 1).type)
+            assert.equal("import", tok(tokens, 1).value)
+        end)
+
+        it("leaves 'from' as an ordinary IDENTIFIER (contextual, not reserved)", function()
+            local tokens = scan("from")
+            assert.equal(1, #tokens)
+            assert.equal("IDENTIFIER", tok(tokens, 1).type)
+        end)
+
         it("keyword tokens have nil literal", function()
             local tokens = scan("private")
             assert.is_nil(tok(tokens, 1).literal)
@@ -82,8 +95,8 @@ describe("Lexer", function()
         it("throws INVALID_NUMBER when a letter immediately follows a number literal", function()
             local ok, err = pcall(function() scan("1foo") end)
             assert.is_false(ok)
-            local err = err --[[@as Error]]
-            assert.equal(Error.Type.INVALID_NUMBER, err.type)
+            local e = err --[[@as Error]]
+            assert.equal(Error.Type.INVALID_NUMBER, e.type)
         end)
     end)
 
@@ -110,9 +123,9 @@ describe("Lexer", function()
         it("throws INVALID_NUMBER when a letter immediately follows a number", function()
             local ok, err = pcall(function() scan("123abc") end)
             assert.is_false(ok)
-            local err = err --[[@as Error]]
-            assert.equal(Error.Type.INVALID_NUMBER, err.type)
-            assert.matches("after number literal", err.message)
+            local e = err --[[@as Error]]
+            assert.equal(Error.Type.INVALID_NUMBER, e.type)
+            assert.matches("after number literal", e.message)
         end)
 
         it("tokenises a float literal", function()
@@ -166,22 +179,22 @@ describe("Lexer", function()
         it("throws UNTERMINATED_STRING for an unclosed string", function()
             local ok, err = pcall(function() scan('"hello') end)
             assert.is_false(ok)
-            local err = err --[[@as Error]]
-            assert.equal(Error.Type.UNTERMINATED_STRING, err.type)
+            local e = err --[[@as Error]]
+            assert.equal(Error.Type.UNTERMINATED_STRING, e.type)
         end)
 
         it("throws UNTERMINATED_STRING when a newline appears inside the string", function()
             local ok, err = pcall(function() scan('"hello\nworld"') end)
             assert.is_false(ok)
-            local err = err --[[@as Error]]
-            assert.equal(Error.Type.UNTERMINATED_STRING, err.type)
+            local e = err --[[@as Error]]
+            assert.equal(Error.Type.UNTERMINATED_STRING, e.type)
         end)
 
         it("reports the opening-quote column in UNTERMINATED_STRING", function()
             local ok, err = pcall(function() scan('   "oops') end)
             assert.is_false(ok)
-            local err = err --[[@as Error]]
-            assert.equal(4, err.col)
+            local e = err --[[@as Error]]
+            assert.equal(4, e.col)
         end)
     end)
 
@@ -205,30 +218,30 @@ describe("Lexer", function()
         it("throws UNEXPECTED_CHAR with the correct error type for an unknown symbol", function()
             local ok, err = pcall(function() scan("@") end)
             assert.is_false(ok)
-            local err = err --[[@as Error]]
-            assert.equal(Error.Type.UNEXPECTED_CHAR, err.type)
+            local e = err --[[@as Error]]
+            assert.equal(Error.Type.UNEXPECTED_CHAR, e.type)
         end)
 
         it("reports column 1 for an unknown symbol at the start of input", function()
             local ok, err = pcall(function() scan("@") end)
             assert.is_false(ok)
-            local err = err --[[@as Error]]
-            assert.equal(1, err.col)
+            local e = err --[[@as Error]]
+            assert.equal(1, e.col)
         end)
 
         it("includes the bad character in the error message", function()
             local ok, err = pcall(function() scan("@") end)
             assert.is_false(ok)
-            local err = err --[[@as Error]]
-            assert.matches("@", err.message)
+            local e = err --[[@as Error]]
+            assert.matches("@", e.message)
         end)
 
         it("reports the correct column when the bad character is not at position 1", function()
             local ok, err = pcall(function() scan("abc @") end)
             assert.is_false(ok)
-            local err = err --[[@as Error]]
-            assert.equal(Error.Type.UNEXPECTED_CHAR, err.type)
-            assert.equal(5, err.col)
+            local e = err --[[@as Error]]
+            assert.equal(Error.Type.UNEXPECTED_CHAR, e.type)
+            assert.equal(5, e.col)
         end)
     end)
 
@@ -380,8 +393,8 @@ describe("Lexer", function()
         it("throws UNTERMINATED_COMMENT for an unclosed block comment", function()
             local ok, err = pcall(function() scan("a /* never closed") end)
             assert.is_false(ok)
-            local err = err --[[@as Error]]
-            assert.equal(Error.Type.UNTERMINATED_COMMENT, err.type)
+            local e = err --[[@as Error]]
+            assert.equal(Error.Type.UNTERMINATED_COMMENT, e.type)
         end)
     end)
 

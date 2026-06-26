@@ -45,7 +45,9 @@ describe("Functions", function()
             assert.equal("f", decl.name)
             assert.same({}, decl.params)
             assert.equal(1, #decl.body)
-            assert.equal("ReturnStmt", decl.body[1].type)
+            local stmt = decl.body[1]
+            assert(stmt)
+            assert.equal("ReturnStmt", stmt.type)
         end)
 
         it("parses a parameter list", function()
@@ -70,13 +72,13 @@ describe("Functions", function()
             -- binding, which (being immutable and uninitialised) needs an `=`.
             local ok, err = pcall(parse, "static f { return 0 }")
             assert.is_false(ok)
-            assert.matches("must be initialised", err.message)
+            assert.matches("must be initialised", (err --[[@as Error]]).message)
         end)
 
         it("errors on an unterminated body", function()
             local ok, err = pcall(parse, "static f() { return 0")
             assert.is_false(ok)
-            assert.matches("Expected '}'", err.message)
+            assert.matches("Expected '}'", (err --[[@as Error]]).message)
         end)
     end)
 
@@ -98,31 +100,31 @@ describe("Functions", function()
         it("rejects 'return' outside a function", function()
             local ok, err = pcall(analyze, "return 0")
             assert.is_false(ok)
-            assert.matches("'return' outside of a function", err.message)
+            assert.matches("'return' outside of a function", (err --[[@as Error]]).message)
         end)
 
         it("rejects 'return' that is not the last statement in a block", function()
             local ok, err = pcall(analyze, "static f() { return 0\nprivate x = 1 }")
             assert.is_false(ok)
-            assert.matches("'return' must be the last statement", err.message)
+            assert.matches("'return' must be the last statement", (err --[[@as Error]]).message)
         end)
 
         it("rejects a duplicate parameter", function()
             local ok, err = pcall(analyze, "static f(a, a) { return a }")
             assert.is_false(ok)
-            assert.matches("Duplicate parameter 'a'", err.message)
+            assert.matches("Duplicate parameter 'a'", (err --[[@as Error]]).message)
         end)
 
         it("rejects an undeclared identifier in the body", function()
             local ok, err = pcall(analyze, "static f() { return nope }")
             assert.is_false(ok)
-            assert.matches("Undeclared identifier 'nope'", err.message)
+            assert.matches("Undeclared identifier 'nope'", (err --[[@as Error]]).message)
         end)
 
         it("does not leak a parameter into the outer scope", function()
             local ok, err = pcall(analyze, "static f(a) { return a }\nprivate x = a")
             assert.is_false(ok)
-            assert.matches("Undeclared identifier 'a'", err.message)
+            assert.matches("Undeclared identifier 'a'", (err --[[@as Error]]).message)
         end)
     end)
 
@@ -130,22 +132,26 @@ describe("Functions", function()
         it("folds a constant return expression", function()
             local decl = optimize("static f() { return 2 + 3 }").body[1] --[[@as FunctionDecl]]
             local ret = decl.body[1] --[[@as ReturnStmt]]
-            assert.equal("LiteralExpr", ret.value.type)
-            assert.equal(5, ret.value.value)
+            local value = ret.value --[[@as LiteralExpr]]
+            assert.equal("LiteralExpr", value.type)
+            assert.equal(5, value.value)
         end)
 
         it("propagates an outer constant into the body", function()
             local decl = optimize("private static k = 2\nstatic f() { return k + 1 }").body[2] --[[@as FunctionDecl]]
             local ret = decl.body[1] --[[@as ReturnStmt]]
-            assert.equal("LiteralExpr", ret.value.type)
-            assert.equal(3, ret.value.value)
+            local value = ret.value --[[@as LiteralExpr]]
+            assert.equal("LiteralExpr", value.type)
+            assert.equal(3, value.value)
         end)
 
         it("does not fold a parameter that shadows an outer constant", function()
             local decl = optimize("private static x = 9\nstatic f(x) { return x + 1 }").body[2] --[[@as FunctionDecl]]
             local ret = decl.body[1] --[[@as ReturnStmt]]
             -- `x` is the parameter, not the constant, so the sum must not fold.
-            assert.equal("BinaryExpr", ret.value.type)
+            local value = ret.value
+            assert(value)
+            assert.equal("BinaryExpr", value.type)
         end)
     end)
 
@@ -218,33 +224,42 @@ describe("Function calls", function()
             assert.equal("ExpressionStmt", stmt.type)
             local call = stmt.expression --[[@as CallExpr]]
             assert.equal("CallExpr", call.type)
-            assert.equal("IdentifierExpr", call.callee.type)
-            assert.equal("f", call.callee.name)
+            local callee = call.callee --[[@as IdentifierExpr]]
+            assert.equal("IdentifierExpr", callee.type)
+            assert.equal("f", callee.name)
             assert.equal(0, #call.args)
         end)
 
         it("parses a call with an argument list", function()
-            local call = parse("add(a, b)").body[1].expression --[[@as CallExpr]]
+            local stmt = parse("add(a, b)").body[1] --[[@as ExpressionStmt]]
+            local call = stmt.expression --[[@as CallExpr]]
             assert.equal(2, #call.args)
-            assert.equal("a", call.args[1].name)
-            assert.equal("b", call.args[2].name)
+            local arg1 = call.args[1] --[[@as IdentifierExpr]]
+            local arg2 = call.args[2] --[[@as IdentifierExpr]]
+            assert.equal("a", arg1.name)
+            assert.equal("b", arg2.name)
         end)
 
         it("parses a call used as an argument", function()
-            local call = parse("f(g(x))").body[1].expression --[[@as CallExpr]]
+            local stmt = parse("f(g(x))").body[1] --[[@as ExpressionStmt]]
+            local call = stmt.expression --[[@as CallExpr]]
             assert.equal(1, #call.args)
-            assert.equal("CallExpr", call.args[1].type)
+            local arg1 = call.args[1]
+            assert(arg1)
+            assert.equal("CallExpr", arg1.type)
         end)
 
         it("parses chained calls", function()
-            local call = parse("g()()").body[1].expression --[[@as CallExpr]]
+            local stmt = parse("g()()").body[1] --[[@as ExpressionStmt]]
+            local call = stmt.expression --[[@as CallExpr]]
             assert.equal("CallExpr", call.type)
             assert.equal("CallExpr", call.callee.type)
         end)
 
         it("binds a call tighter than multiplication", function()
             -- a * b(c)  ->  a * (b(c))
-            local mul = parse("a * b(c)").body[1].expression --[[@as BinaryExpr]]
+            local stmt = parse("a * b(c)").body[1] --[[@as ExpressionStmt]]
+            local mul = stmt.expression --[[@as BinaryExpr]]
             assert.equal("BinaryExpr", mul.type)
             assert.equal("CallExpr", mul.right.type)
         end)
@@ -252,7 +267,7 @@ describe("Function calls", function()
         it("errors on a missing ')' in an argument list", function()
             local ok, err = pcall(parse, "f(a, b")
             assert.is_false(ok)
-            assert.matches("Expected '%)'", err.message)
+            assert.matches("Expected '%)'", (err --[[@as Error]]).message)
         end)
     end)
 
@@ -270,28 +285,30 @@ describe("Function calls", function()
         it("rejects a call to an undeclared function", function()
             local ok, err = pcall(analyze, "nope()")
             assert.is_false(ok)
-            assert.matches("Undeclared identifier 'nope'", err.message)
+            assert.matches("Undeclared identifier 'nope'", (err --[[@as Error]]).message)
         end)
 
         it("rejects an undeclared argument", function()
             local ok, err = pcall(analyze, "static f(a) { return a }\nf(missing)")
             assert.is_false(ok)
-            assert.matches("Undeclared identifier 'missing'", err.message)
+            assert.matches("Undeclared identifier 'missing'", (err --[[@as Error]]).message)
         end)
 
         it("still rejects a bare non-call expression statement", function()
             local ok, err = pcall(analyze, "private static x = 1\nx")
             assert.is_false(ok)
-            assert.matches("Bare expressions are not valid statements", err.message)
+            assert.matches("Bare expressions are not valid statements", (err --[[@as Error]]).message)
         end)
     end)
 
     describe("optimizer", function()
         it("propagates a constant into a call argument", function()
-            local call =
-                optimize("private static k = 2\nstatic f(a) { return a }\nf(k + 1)").body[3].expression --[[@as CallExpr]]
-            assert.equal("LiteralExpr", call.args[1].type)
-            assert.equal(3, call.args[1].value)
+            local stmt =
+                optimize("private static k = 2\nstatic f(a) { return a }\nf(k + 1)").body[3] --[[@as ExpressionStmt]]
+            local call = stmt.expression --[[@as CallExpr]]
+            local arg1 = call.args[1] --[[@as LiteralExpr]]
+            assert.equal("LiteralExpr", arg1.type)
+            assert.equal(3, arg1.value)
         end)
     end)
 
