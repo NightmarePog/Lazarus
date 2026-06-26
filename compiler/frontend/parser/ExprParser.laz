@@ -1,16 +1,14 @@
-// ExprParser — the expression grammar, over a shared TokenCursor.
+// ExprParser — the expression grammar over a shared TokenCursor: precedence
+// climbing for infix operators, prefix `not`, postfix call/member/index, then the
+// primary atoms. The `precedences` table is the one place precedence is defined.
 //
-// Precedence (low -> high): infix operators (precedence climbing), prefix `not`,
-// postfix call / member / index, then the primary atoms. Operands of an infix
-// operator are parsed by the next-tighter level, so the table below is the one
-// place precedence is defined. Nodes are built through the `Ast` factory.
-//
-// Grammar methods are named `parse_*`: a method whose name matches one of the
-// `Ast` factory's node constructors (e.g. `binary`) would be mis-compiled into a
-// self-call, since method dispatch resolves a call's field name against the
-// current class before considering the receiver.
+// Grammar methods are named `parse_*`: a method named like an `Ast` factory (e.g.
+// `binary`) would be mis-compiled into a self-call, since a call's field name
+// resolves against the current class before the receiver.
 
 import frontend.parser.Ast
+import frontend.parser.Node
+import std.Option
 
 private static precedences = [
     "OR": 1,
@@ -36,15 +34,13 @@ constructor(cursor) {
     .cursor = cursor
 }
 
-// Entry point: a full expression (lowest precedence).
-public expression() {
+public expression(): Node {
     return .parse_binary(1)
 }
 
 // Left-associative precedence climbing: operators of precedence >= `min_prec`,
 // recursing with `prec + 1` on the right so equal precedences group leftward.
-// A non-operator (including end of input) has no precedence, which ends the loop.
-private parse_binary(min_prec) {
+private parse_binary(min_prec: int): Node {
     mut left = .parse_unary()
     loop {
         mut p = .precedence(.cursor.current_kind())
@@ -62,8 +58,7 @@ private parse_binary(min_prec) {
     return left
 }
 
-// Prefix `not`: binds tighter than infix operators, looser than calls.
-private parse_unary() {
+private parse_unary(): Node {
     if .cursor.check("NOT") {
         mut op = .cursor.advance()
         mut operand = .parse_unary()
@@ -72,10 +67,10 @@ private parse_unary() {
     return .parse_call()
 }
 
-// Postfix chain: a primary followed by calls `(...)`, member `.x` and index
-// `[i]`. A `.x` or `[i]` that opens a new source line is a fresh statement, not
-// a continuation, so it must share the previous token's line to chain.
-private parse_call() {
+// Postfix chain: a primary followed by calls, member `.x` and index `[i]`. A `.x`
+// or `[i]` opening a new line is a fresh statement, so it must share the previous
+// token's line to chain.
+private parse_call(): Node {
     mut expr = .parse_primary()
     loop {
         mut k = .cursor.current_kind()
@@ -92,28 +87,26 @@ private parse_call() {
     return expr
 }
 
-private finish_call(callee) {
+private finish_call(callee): Node {
     mut paren = .cursor.advance()
     mut args = .parse_arguments()
     return Ast.call(callee, args, paren.line, paren.column)
 }
 
-private finish_member(object) {
+private finish_member(object): Node {
     mut dot = .cursor.advance()
     mut field = .cursor.consume("IDENTIFIER", "Expected a field name after '.'")
     return Ast.member(object, field.value, dot.line, dot.column)
 }
 
-private finish_index(object) {
+private finish_index(object): Node {
     mut bracket = .cursor.advance()
     mut index = .expression()
     .cursor.consume("RSQUARE", "Expected ']' after an index expression")
     return Ast.index(object, index, bracket.line, bracket.column)
 }
 
-// Whether the current token sits on the same source line as the previous one —
-// the rule that tells a continuing `.x` / `[i]` from one starting a statement.
-private continues_line() {
+private continues_line(): bool {
     return .cursor.previous().line == .cursor.current().line
 }
 
@@ -134,7 +127,7 @@ private parse_arguments() {
 
 // The grammar atoms: literals, identifiers, `self`, leading-dot fields,
 // collection literals, and parenthesised sub-expressions.
-private parse_primary() {
+private parse_primary(): Node {
     mut tok = .cursor.current()
     mut k = tok.kind
 
@@ -189,10 +182,9 @@ private parse_primary() {
     return Ast.literal("string", "", 0, 0)
 }
 
-// A list `[a, b]` or map `["k": v]` literal, the opening `[` current. Empty
-// forms are `[]` (list) and `[:]` (map); otherwise a `:` after the first
-// element marks a map, and anything else is a list.
-private parse_collection() {
+// A list `[a, b]` or map `["k": v]` literal, the opening `[` current. Empty forms
+// are `[]` and `[:]`; otherwise a `:` after the first element marks a map.
+private parse_collection(): Node {
     mut open = .cursor.advance()
     if .cursor.check("RSQUARE") {
         .cursor.advance()
@@ -211,7 +203,7 @@ private parse_collection() {
     return .parse_list_rest(first, open)
 }
 
-private parse_map_rest(first, open) {
+private parse_map_rest(first, open): Node {
     mut entries = [Ast.map_entry(first, .expression())]
     loop {
         if not .cursor.match("COMMA") {
@@ -225,7 +217,7 @@ private parse_map_rest(first, open) {
     return Ast.map(entries, open.line, open.column)
 }
 
-private parse_list_rest(first, open) {
+private parse_list_rest(first, open): Node {
     mut elements = [first]
     loop {
         if not .cursor.match("COMMA") {
@@ -237,6 +229,6 @@ private parse_list_rest(first, open) {
     return Ast.list(elements, open.line, open.column)
 }
 
-private precedence(kind) {
+private precedence(kind: str): Option<int> {
     return ExprParser.precedences.get(kind)
 }
