@@ -4,11 +4,8 @@
 // so its locals do not leak, and parameters / loop variables are shadowed out.
 // Runs after schematic, which sets the `reassign` annotation this relies on.
 
+@auto
 private exprs
-
-constructor(exprs) {
-    .exprs = exprs
-}
 
 public fold_block(stmts, constants) {
     for stmt in stmts {

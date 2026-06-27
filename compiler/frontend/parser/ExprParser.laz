@@ -6,6 +6,7 @@
 // `binary`) would be mis-compiled into a self-call, since a call's field name
 // resolves against the current class before the receiver.
 
+@auto
 import frontend.parser.Ast
 import frontend.parser.Node
 
@@ -28,10 +29,6 @@ private static precedences = [
 ]
 
 private cursor
-
-constructor(cursor) {
-    .cursor = cursor
-}
 
 public expression(): Node {
     return .parse_binary(1)

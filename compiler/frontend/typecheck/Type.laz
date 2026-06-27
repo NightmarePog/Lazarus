@@ -1,16 +1,10 @@
 // A resolved type used by the checker, erased once checking is done.
 
-public kind
-public name
+@auto
+public kind: str
+public name: str
 public params
 public result
-
-constructor(kind: str, name: str, params, result) {
-    .kind = kind
-    .name = name
-    .params = params
-    .result = result
-}
 
 // `result` is a real Type only for `fn`; every other kind passes 0 so the base
 // helpers never recurse.

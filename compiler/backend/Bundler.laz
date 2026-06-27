@@ -6,6 +6,7 @@
 // threaded into every real module's codegen. Pass two generates each non-extern
 // class block with that map and the module's imports as its known classes.
 
+@auto
 import backend.Codegen
 import backend.Runtime
 import backend.Text
@@ -14,12 +15,6 @@ import Error
 private modules
 private entry_class: str
 private variant_owner
-
-constructor(modules, entry_class: str, variant_owner) {
-    .modules = modules
-    .entry_class = entry_class
-    .variant_owner = variant_owner
-}
 
 public bundle(): str {
     mut externs = .collect_externs()

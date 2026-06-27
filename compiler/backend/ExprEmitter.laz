@@ -5,6 +5,7 @@
 // -> `C.m(self, ...)`; any other instance call -> Lua colon `obj:m(...)`;
 // everything else -> a plain call.
 
+@auto
 import std.Str
 import backend.Text
 
@@ -53,10 +54,6 @@ private static constructors = [
 ]
 
 private ctx
-
-constructor(ctx) {
-    .ctx = ctx
-}
 
 public emit(node): str {
     match node.kind {

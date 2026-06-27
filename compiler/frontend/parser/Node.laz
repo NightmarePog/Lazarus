@@ -2,13 +2,9 @@
 // parsed construct is one Node; an attribute is a scalar, another Node, or a list
 // of Nodes, and an optional one is simply absent from the map.
 
+@auto
 public kind: str
 private attrs
-
-constructor(kind: str, attrs) {
-    .kind = kind
-    .attrs = attrs
-}
 
 // Named `attr`, not `get`, since `get` is a reserved built-in collection method.
 public attr(name: str) {
