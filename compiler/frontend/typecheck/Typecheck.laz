@@ -10,6 +10,7 @@
 
 import std.Str
 import Error
+import frontend.parser.Node
 import frontend.schematic.Scope
 import frontend.typecheck.Type
 
@@ -291,9 +292,36 @@ private type_expr(node, scope): Type {
         "IndexExpr" => { return .type_index(node, scope) }
         "ListExpr" => { return .type_list(node, scope) }
         "MapExpr" => { return .type_map(node, scope) }
+        "ListComp" => { return .type_list_comp(node, scope) }
+        "MapComp" => { return .type_map_comp(node, scope) }
         _ => {}
     }
     return Type.dynamic()
+}
+
+// A comprehension binds its loop variables from the iterable's element type, then
+// the produced expression gives the result's element type(s).
+private type_list_comp(node: Node, scope: Scope): Type {
+    mut inner = .comp_scope(node, scope)
+    return Type.class_of("List", [.type_expr(node.child("element"), inner)])
+}
+
+private type_map_comp(node: Node, scope: Scope): Type {
+    mut inner = .comp_scope(node, scope)
+    mut k = .type_expr(node.child("key"), inner)
+    mut v = .type_expr(node.child("value"), inner)
+    return Type.class_of("Map", [k, v])
+}
+
+private comp_scope(node: Node, scope: Scope): Scope {
+    mut it = .type_expr(node.child("iter"), scope)
+    mut inner = scope.child()
+    .bind_loop_vars(node.child("vars"), it, inner)
+    mut cond = node.attr("cond")
+    if cond.is_some() {
+        .type_expr(cond.unwrap(), inner)
+    }
+    return inner
 }
 
 // ---- built-in collections / Option / Result ----

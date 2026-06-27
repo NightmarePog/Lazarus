@@ -833,12 +833,43 @@ function ExprParser.parse_collection(self)
     end
     local first = ExprParser.expression(self)
     if self.cursor:match("COLON") then
-        return ExprParser.parse_map_rest(self, first, open)
+        local value = ExprParser.expression(self)
+        if self.cursor:check("FOR") then
+            return ExprParser.parse_map_comp(self, first, value, open)
+        end
+        return ExprParser.parse_map_rest(self, first, value, open)
+    end
+    if self.cursor:check("FOR") then
+        return ExprParser.parse_list_comp(self, first, open)
     end
     return ExprParser.parse_list_rest(self, first, open)
 end
-function ExprParser.parse_map_rest(self, first, open)
-    local entries = __lz_list(Ast.map_entry(first, ExprParser.expression(self)))
+function ExprParser.parse_list_comp(self, element, open)
+    local attrs = __lz_map({["element"] = element, ["line"] = open.line, ["col"] = open.column})
+    ExprParser.parse_comp_clause(self, attrs)
+    return Ast.node("ListComp", attrs)
+end
+function ExprParser.parse_map_comp(self, key, value, open)
+    local attrs = __lz_map({["key"] = key, ["value"] = value, ["line"] = open.line, ["col"] = open.column})
+    ExprParser.parse_comp_clause(self, attrs)
+    return Ast.node("MapComp", attrs)
+end
+function ExprParser.parse_comp_clause(self, attrs)
+    self.cursor:consume("FOR", "Expected 'for' in a comprehension")
+    local vars = __lz_list(self.cursor:consume("IDENTIFIER", "Expected a loop variable after 'for'").value)
+    if self.cursor:match("COMMA") then
+        __lz_push(vars, self.cursor:consume("IDENTIFIER", "Expected a second loop variable after ','").value)
+    end
+    self.cursor:consume("IN", "Expected 'in' after the comprehension loop variable(s)")
+    __lz_idx_set(attrs, "vars", vars)
+    __lz_idx_set(attrs, "iter", ExprParser.expression(self))
+    if self.cursor:match("IF") then
+        __lz_idx_set(attrs, "cond", ExprParser.expression(self))
+    end
+    self.cursor:consume("RSQUARE", "Expected ']' to close the comprehension")
+end
+function ExprParser.parse_map_rest(self, first, value, open)
+    local entries = __lz_list(Ast.map_entry(first, value))
     while true do
         if not self.cursor:match("COMMA") then
             break
@@ -877,6 +908,9 @@ function ExprParser.new(cursor)
     self.parse_arguments = ExprParser.parse_arguments
     self.parse_primary = ExprParser.parse_primary
     self.parse_collection = ExprParser.parse_collection
+    self.parse_list_comp = ExprParser.parse_list_comp
+    self.parse_map_comp = ExprParser.parse_map_comp
+    self.parse_comp_clause = ExprParser.parse_comp_clause
     self.parse_map_rest = ExprParser.parse_map_rest
     self.parse_list_rest = ExprParser.parse_list_rest
     self.precedence = ExprParser.precedence
@@ -1811,7 +1845,25 @@ function ExprChecker.check(self, node, scope)
     elseif __lz_m1 == "IndexExpr" then
         ExprChecker.check(self, node:child("object"), scope)
         ExprChecker.check(self, node:child("index"), scope)
+    elseif __lz_m1 == "ListComp" then
+        ExprChecker.check_comprehension(self, node, scope, __lz_list("element"))
+    elseif __lz_m1 == "MapComp" then
+        ExprChecker.check_comprehension(self, node, scope, __lz_list("key", "value"))
     else
+    end
+end
+function ExprChecker.check_comprehension(self, node, scope, value_keys)
+    ExprChecker.check(self, node:child("iter"), scope)
+    local inner = scope:child()
+    for _, name in __lz_each(node:child("vars")) do
+        inner:declare(name, Symbol.new("variable", false, false))
+    end
+    for _, key in __lz_each(value_keys) do
+        ExprChecker.check(self, node:child(key), inner)
+    end
+    local cond = node:attr("cond")
+    if __lz_is_some(cond) then
+        ExprChecker.check_condition(self, __lz_unwrap(cond), inner)
     end
 end
 function ExprChecker.check_condition(self, node, scope)
@@ -1880,6 +1932,7 @@ function ExprChecker.new(source, properties, methods, variant_owner)
     self.set_instance = ExprChecker.set_instance
     self.instance_flag = ExprChecker.instance_flag
     self.check = ExprChecker.check
+    self.check_comprehension = ExprChecker.check_comprehension
     self.check_condition = ExprChecker.check_condition
     self.check_identifier = ExprChecker.check_identifier
     self.check_call = ExprChecker.check_call
@@ -2405,6 +2458,9 @@ function Typecheck.new(source, class_name, imports, enums, classes, variant_fiel
     self.bind_loop_vars = Typecheck.bind_loop_vars
     self.type_match = Typecheck.type_match
     self.type_expr = Typecheck.type_expr
+    self.type_list_comp = Typecheck.type_list_comp
+    self.type_map_comp = Typecheck.type_map_comp
+    self.comp_scope = Typecheck.comp_scope
     self.is_builtin_name = Typecheck.is_builtin_name
     self.is_builtin_type = Typecheck.is_builtin_type
     self.type_arg = Typecheck.type_arg
@@ -2718,9 +2774,33 @@ function Typecheck.type_expr(self, node, scope)
         return Typecheck.type_list(self, node, scope)
     elseif __lz_m2 == "MapExpr" then
         return Typecheck.type_map(self, node, scope)
+    elseif __lz_m2 == "ListComp" then
+        return Typecheck.type_list_comp(self, node, scope)
+    elseif __lz_m2 == "MapComp" then
+        return Typecheck.type_map_comp(self, node, scope)
     else
     end
     return Type.dynamic()
+end
+function Typecheck.type_list_comp(self, node, scope)
+    local inner = Typecheck.comp_scope(self, node, scope)
+    return Type.class_of("List", __lz_list(Typecheck.type_expr(self, node:child("element"), inner)))
+end
+function Typecheck.type_map_comp(self, node, scope)
+    local inner = Typecheck.comp_scope(self, node, scope)
+    local k = Typecheck.type_expr(self, node:child("key"), inner)
+    local v = Typecheck.type_expr(self, node:child("value"), inner)
+    return Type.class_of("Map", __lz_list(k, v))
+end
+function Typecheck.comp_scope(self, node, scope)
+    local it = Typecheck.type_expr(self, node:child("iter"), scope)
+    local inner = scope:child()
+    Typecheck.bind_loop_vars(self, node:child("vars"), it, inner)
+    local cond = node:attr("cond")
+    if __lz_is_some(cond) then
+        Typecheck.type_expr(self, __lz_unwrap(cond), inner)
+    end
+    return inner
 end
 function Typecheck.is_builtin_name(self, name)
     return (((name == "Option") or (name == "Result")) or (name == "List")) or (name == "Map")
@@ -3533,9 +3613,28 @@ function ExprFolder.fold(self, node, constants)
         node:set("object", ExprFolder.fold(self, node:child("object"), constants))
         node:set("index", ExprFolder.fold(self, node:child("index"), constants))
         return node
+    elseif __lz_m1 == "ListComp" then
+        node:set("iter", ExprFolder.fold(self, node:child("iter"), constants))
+        local inner = constants:child(node:child("vars"))
+        node:set("element", ExprFolder.fold(self, node:child("element"), inner))
+        ExprFolder.fold_comp_cond(self, node, inner)
+        return node
+    elseif __lz_m1 == "MapComp" then
+        node:set("iter", ExprFolder.fold(self, node:child("iter"), constants))
+        local inner = constants:child(node:child("vars"))
+        node:set("key", ExprFolder.fold(self, node:child("key"), inner))
+        node:set("value", ExprFolder.fold(self, node:child("value"), inner))
+        ExprFolder.fold_comp_cond(self, node, inner)
+        return node
     else
     end
     return node
+end
+function ExprFolder.fold_comp_cond(self, node, constants)
+    local cond = node:attr("cond")
+    if __lz_is_some(cond) then
+        node:set("cond", ExprFolder.fold(self, __lz_unwrap(cond), constants))
+    end
 end
 function ExprFolder.fold_identifier(self, node, constants)
     local hit = constants:lookup(node:child("name"))
@@ -3624,6 +3723,7 @@ function ExprFolder.new()
     local self = {}
     self.fold_count = ExprFolder.fold_count
     self.fold = ExprFolder.fold
+    self.fold_comp_cond = ExprFolder.fold_comp_cond
     self.fold_identifier = ExprFolder.fold_identifier
     self.fold_binary = ExprFolder.fold_binary
     self.foldable = ExprFolder.foldable
@@ -3961,9 +4061,53 @@ function ExprEmitter.emit(self, node)
         return ExprEmitter.emit_unary(self, node)
     elseif __lz_m1 == "BinaryExpr" then
         return ExprEmitter.emit_binary(self, node)
+    elseif __lz_m1 == "ListComp" then
+        return ExprEmitter.emit_list_comp(self, node)
+    elseif __lz_m1 == "MapComp" then
+        return ExprEmitter.emit_map_comp(self, node)
     else
     end
     return ""
+end
+function ExprEmitter.emit_list_comp(self, node)
+    self.ctx:mark_collections()
+    local iter = ExprEmitter.emit(self, node:child("iter"))
+    local temp = self.ctx:fresh_temp()
+    self.ctx:push_scope()
+    ExprEmitter.declare_loop_vars(self, node:child("vars"))
+    local header = ExprEmitter.each_header(self, node:child("vars"), iter)
+    local body = ExprEmitter.comp_body(self, node, ((("__lz_push(" .. temp) .. ", ") .. ExprEmitter.emit(self, node:child("element"))) .. ")")
+    self.ctx:pop_scope()
+    return ((((((("(function() local " .. temp) .. " = __lz_list() ") .. header) .. " ") .. body) .. " end return ") .. temp) .. " end)()"
+end
+function ExprEmitter.emit_map_comp(self, node)
+    self.ctx:mark_collections()
+    local iter = ExprEmitter.emit(self, node:child("iter"))
+    local temp = self.ctx:fresh_temp()
+    self.ctx:push_scope()
+    ExprEmitter.declare_loop_vars(self, node:child("vars"))
+    local header = ExprEmitter.each_header(self, node:child("vars"), iter)
+    local body = ExprEmitter.comp_body(self, node, ((((("__lz_idx_set(" .. temp) .. ", ") .. ExprEmitter.emit(self, node:child("key"))) .. ", ") .. ExprEmitter.emit(self, node:child("value"))) .. ")")
+    self.ctx:pop_scope()
+    return ((((((("(function() local " .. temp) .. " = __lz_map({}) ") .. header) .. " ") .. body) .. " end return ") .. temp) .. " end)()"
+end
+function ExprEmitter.declare_loop_vars(self, vars)
+    for _, name in __lz_each(vars) do
+        self.ctx:declare_local(name)
+    end
+end
+function ExprEmitter.comp_body(self, node, add)
+    local cond = node:attr("cond")
+    if __lz_is_some(cond) then
+        return ((("if " .. ExprEmitter.emit(self, __lz_unwrap(cond))) .. " then ") .. add) .. " end"
+    end
+    return add
+end
+function ExprEmitter.each_header(self, vars, iter)
+    if __lz_len(vars) == 1 then
+        return ((("for _, " .. __lz_unwrap(__lz_get(vars, 1))) .. " in __lz_each(") .. iter) .. ") do"
+    end
+    return ((("for " .. Text.join(vars, ", ")) .. " in __lz_each(") .. iter) .. ") do"
 end
 function ExprEmitter.emit_identifier(self, node)
     local id = node:child("name")
@@ -4096,6 +4240,11 @@ end
 function ExprEmitter.new(ctx)
     local self = {}
     self.emit = ExprEmitter.emit
+    self.emit_list_comp = ExprEmitter.emit_list_comp
+    self.emit_map_comp = ExprEmitter.emit_map_comp
+    self.declare_loop_vars = ExprEmitter.declare_loop_vars
+    self.comp_body = ExprEmitter.comp_body
+    self.each_header = ExprEmitter.each_header
     self.emit_identifier = ExprEmitter.emit_identifier
     self.emit_literal = ExprEmitter.emit_literal
     self.emit_field = ExprEmitter.emit_field

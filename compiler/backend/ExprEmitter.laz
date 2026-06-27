@@ -8,6 +8,7 @@
 @auto
 import std.Str
 import backend.Text
+import frontend.parser.Node
 
 private static op_map = [
     "PLUS": "+",
@@ -67,9 +68,64 @@ public emit(node): str {
         "CallExpr" => { return .emit_call(node) }
         "UnaryExpr" => { return .emit_unary(node) }
         "BinaryExpr" => { return .emit_binary(node) }
+        "ListComp" => { return .emit_list_comp(node) }
+        "MapComp" => { return .emit_map_comp(node) }
         _ => {}
     }
     return ""
+}
+
+// A list comprehension lowers to an immediately-invoked function that builds a
+// fresh list: iterate the source with the same `__lz_each` form as a for-in,
+// optionally guard with the filter, and push each element. The closure captures
+// `self`, so `[.f(x) for x in xs]` works.
+private emit_list_comp(node: Node): str {
+    .ctx.mark_collections()
+    mut iter = .emit(node.child("iter"))
+    mut temp = .ctx.fresh_temp()
+    .ctx.push_scope()
+    .declare_loop_vars(node.child("vars"))
+    mut header = .each_header(node.child("vars"), iter)
+    mut body = .comp_body(node, "__lz_push(" ++ temp ++ ", " ++ .emit(node.child("element")) ++ ")")
+    .ctx.pop_scope()
+    return "(function() local " ++ temp ++ " = __lz_list() " ++ header ++ " " ++ body ++ " end return " ++ temp ++ " end)()"
+}
+
+private emit_map_comp(node: Node): str {
+    .ctx.mark_collections()
+    mut iter = .emit(node.child("iter"))
+    mut temp = .ctx.fresh_temp()
+    .ctx.push_scope()
+    .declare_loop_vars(node.child("vars"))
+    mut header = .each_header(node.child("vars"), iter)
+    mut body = .comp_body(node, "__lz_idx_set(" ++ temp ++ ", " ++ .emit(node.child("key")) ++ ", " ++ .emit(node.child("value")) ++ ")")
+    .ctx.pop_scope()
+    return "(function() local " ++ temp ++ " = __lz_map({}) " ++ header ++ " " ++ body ++ " end return " ++ temp ++ " end)()"
+}
+
+private declare_loop_vars(vars: List<str>) {
+    for name in vars {
+        .ctx.declare_local(name)
+    }
+}
+
+// The loop body: the add expression, wrapped in `if <cond> then … end` for a
+// filtered comprehension.
+private comp_body(node: Node, add: str): str {
+    mut cond = node.attr("cond")
+    if cond.is_some() {
+        return "if " ++ .emit(cond.unwrap()) ++ " then " ++ add ++ " end"
+    }
+    return add
+}
+
+// The `for … in __lz_each(iter) do` header, matching the for-in lowering: a single
+// variable takes the value (index discarded); two take key and value.
+private each_header(vars: List<str>, iter: str): str {
+    if vars.len() == 1 {
+        return "for _, " ++ vars.get(1).unwrap() ++ " in __lz_each(" ++ iter ++ ") do"
+    }
+    return "for " ++ Text.join(vars, ", ") ++ " in __lz_each(" ++ iter ++ ") do"
 }
 
 // A bare name: a nullary enum variant lowers to its owner-qualified form, anything

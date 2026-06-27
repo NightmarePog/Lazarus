@@ -7,6 +7,9 @@
 @auto
 import std.Str
 import Error
+import frontend.parser.Node
+import frontend.schematic.Symbol
+import frontend.schematic.Scope
 import frontend.schematic.Booleanity
 
 private source
@@ -40,7 +43,27 @@ public check(node, scope) {
             .check(node.child("object"), scope)
             .check(node.child("index"), scope)
         }
+        "ListComp" => { .check_comprehension(node, scope, ["element"]) }
+        "MapComp" => { .check_comprehension(node, scope, ["key", "value"]) }
         _ => {}
+    }
+}
+
+// A comprehension validates its iterable in the outer scope, then its produced
+// expression(s) and optional condition in a child scope where the loop variables
+// are declared (so they resolve rather than reading as undeclared).
+private check_comprehension(node: Node, scope: Scope, value_keys: List<str>) {
+    .check(node.child("iter"), scope)
+    mut inner = scope.child()
+    for name in node.child("vars") {
+        inner.declare(name, Symbol("variable", false, false))
+    }
+    for key in value_keys {
+        .check(node.child(key), inner)
+    }
+    mut cond = node.attr("cond")
+    if cond.is_some() {
+        .check_condition(cond.unwrap(), inner)
     }
 }
 
