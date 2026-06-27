@@ -799,50 +799,40 @@ function ExprParser.parse_arguments(self)
 end
 function ExprParser.parse_primary(self)
     local tok = self.cursor:current()
-    local k = tok.kind
-    if k == "LEFT_BRACKET" then
+    local __lz_m1 = tok.kind
+    if __lz_m1 == "LEFT_BRACKET" then
         self.cursor:advance()
         local inner = ExprParser.expression(self)
         self.cursor:consume("RIGHT_BRACKET", "Expected ')' after expression")
         return inner
-    end
-    if k == "NUMBER" then
+    elseif __lz_m1 == "NUMBER" then
         self.cursor:advance()
         return Ast.literal("number", tok.value, tok.line, tok.column)
-    end
-    if k == "FLOAT" then
+    elseif __lz_m1 == "FLOAT" then
         self.cursor:advance()
         return Ast.literal("float", tok.value, tok.line, tok.column)
-    end
-    if k == "STRING" then
+    elseif __lz_m1 == "STRING" then
         self.cursor:advance()
         return Ast.literal("string", tok.value, tok.line, tok.column)
-    end
-    if k == "TRUE" then
+    elseif __lz_m1 == "TRUE" then
         self.cursor:advance()
         return Ast.literal("boolean", true, tok.line, tok.column)
-    end
-    if k == "FALSE" then
+    elseif __lz_m1 == "FALSE" then
         self.cursor:advance()
         return Ast.literal("boolean", false, tok.line, tok.column)
-    end
-    if k == "IDENTIFIER" then
+    elseif __lz_m1 == "IDENTIFIER" then
         self.cursor:advance()
         return Ast.identifier(tok.value, tok.line, tok.column)
-    end
-    if k == "SELF" then
+    elseif __lz_m1 == "SELF" then
         self.cursor:advance()
         return Ast.self_expr(tok.line, tok.column)
-    end
-    if k == "LSQUARE" then
+    elseif __lz_m1 == "LSQUARE" then
         return ExprParser.parse_collection(self)
-    end
-    if k == "DOT" then
+    elseif __lz_m1 == "DOT" then
         self.cursor:advance()
         local field = self.cursor:consume("IDENTIFIER", "Expected a field name after '.'")
         return Ast.member(Ast.self_expr(tok.line, tok.column), field.value, tok.line, tok.column)
-    end
-    if k == "EOF" then
+    elseif __lz_m1 == "EOF" then
         self.cursor:fail("Unexpected end of input")
     else
         self.cursor:fail(("Unexpected token '" .. tok.value) .. "'")
@@ -1642,34 +1632,39 @@ local Booleanity = {}
 Booleanity.arithmetic = __lz_map({["PLUS"] = true, ["MINUS"] = true, ["MULTIPLY"] = true, ["DIVIDE"] = true, ["MODULO"] = true, ["POWER"] = true})
 Booleanity.non_bool_builtin = __lz_map({["len"] = "a number (the result of '.len()')", ["get"] = "an Option (the result of '.get()')", ["pop"] = "an Option (the result of '.pop()')"})
 function Booleanity.non_bool_reason(node)
-    local k = node.kind
-    if k == "LiteralExpr" then
-        local lit_kind = node:child("lit_kind")
-        if (lit_kind == "number") or (lit_kind == "float") then
-            return "a number"
-        end
-        if lit_kind == "string" then
-            return "a string"
-        end
-        return ""
-    elseif k == "ListExpr" then
+    local __lz_m1 = node.kind
+    if __lz_m1 == "LiteralExpr" then
+        return Booleanity.literal_reason(node:child("lit_kind"))
+    elseif __lz_m1 == "ListExpr" then
         return "a list"
-    elseif k == "MapExpr" then
+    elseif __lz_m1 == "MapExpr" then
         return "a map"
-    elseif k == "BinaryExpr" then
-        local op = node:child("op")
-        if __lz_has(Booleanity.arithmetic, op) then
-            return "an arithmetic value"
-        end
-        if op == "CONCAT" then
-            return "a string"
-        end
-        return ""
-    elseif k == "CallExpr" then
+    elseif __lz_m1 == "BinaryExpr" then
+        return Booleanity.binary_reason(node:child("op"))
+    elseif __lz_m1 == "CallExpr" then
         local callee = node:child("callee")
         if callee.kind == "MemberExpr" then
             return __lz_unwrap_or(__lz_get(Booleanity.non_bool_builtin, callee:child("field")), "")
         end
+    else
+    end
+    return ""
+end
+function Booleanity.literal_reason(lit_kind)
+    if (lit_kind == "number") or (lit_kind == "float") then
+        return "a number"
+    end
+    if lit_kind == "string" then
+        return "a string"
+    end
+    return ""
+end
+function Booleanity.binary_reason(op)
+    if __lz_has(Booleanity.arithmetic, op) then
+        return "an arithmetic value"
+    end
+    if op == "CONCAT" then
+        return "a string"
     end
     return ""
 end

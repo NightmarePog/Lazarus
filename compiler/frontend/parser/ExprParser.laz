@@ -128,55 +128,28 @@ private parse_arguments() {
 // collection literals, and parenthesised sub-expressions.
 private parse_primary(): Node {
     mut tok = .cursor.current()
-    mut k = tok.kind
-
-    if k == "LEFT_BRACKET" {
-        .cursor.advance()
-        mut inner = .expression()
-        .cursor.consume("RIGHT_BRACKET", "Expected ')' after expression")
-        return inner
-    }
-    if k == "NUMBER" {
-        .cursor.advance()
-        return Ast.literal("number", tok.value, tok.line, tok.column)
-    }
-    if k == "FLOAT" {
-        .cursor.advance()
-        return Ast.literal("float", tok.value, tok.line, tok.column)
-    }
-    if k == "STRING" {
-        .cursor.advance()
-        return Ast.literal("string", tok.value, tok.line, tok.column)
-    }
-    if k == "TRUE" {
-        .cursor.advance()
-        return Ast.literal("boolean", true, tok.line, tok.column)
-    }
-    if k == "FALSE" {
-        .cursor.advance()
-        return Ast.literal("boolean", false, tok.line, tok.column)
-    }
-    if k == "IDENTIFIER" {
-        .cursor.advance()
-        return Ast.identifier(tok.value, tok.line, tok.column)
-    }
-    if k == "SELF" {
-        .cursor.advance()
-        return Ast.self_expr(tok.line, tok.column)
-    }
-    if k == "LSQUARE" {
-        return .parse_collection()
-    }
-    if k == "DOT" {
-        .cursor.advance()
-        mut field = .cursor.consume("IDENTIFIER", "Expected a field name after '.'")
-        return Ast.member(Ast.self_expr(tok.line, tok.column), field.value, tok.line, tok.column)
-    }
-
-    if k == "EOF" {
-        .cursor.fail("Unexpected end of input")
-    } else {
-        .cursor.fail("Unexpected token '" ++ tok.value ++ "'")
+    match tok.kind {
+        "LEFT_BRACKET" => {
+            .cursor.advance()
+            mut inner = .expression()
+            .cursor.consume("RIGHT_BRACKET", "Expected ')' after expression")
+            return inner
+        }
+        "NUMBER" => { .cursor.advance() return Ast.literal("number", tok.value, tok.line, tok.column) }
+        "FLOAT" => { .cursor.advance() return Ast.literal("float", tok.value, tok.line, tok.column) }
+        "STRING" => { .cursor.advance() return Ast.literal("string", tok.value, tok.line, tok.column) }
+        "TRUE" => { .cursor.advance() return Ast.literal("boolean", true, tok.line, tok.column) }
+        "FALSE" => { .cursor.advance() return Ast.literal("boolean", false, tok.line, tok.column) }
+        "IDENTIFIER" => { .cursor.advance() return Ast.identifier(tok.value, tok.line, tok.column) }
+        "SELF" => { .cursor.advance() return Ast.self_expr(tok.line, tok.column) }
+        "LSQUARE" => { return .parse_collection() }
+        "DOT" => {
+            .cursor.advance()
+            mut field = .cursor.consume("IDENTIFIER", "Expected a field name after '.'")
+            return Ast.member(Ast.self_expr(tok.line, tok.column), field.value, tok.line, tok.column)
+        }
+        "EOF" => { .cursor.fail("Unexpected end of input") }
+        _ => { .cursor.fail("Unexpected token '" ++ tok.value ++ "'") }
     }
     return Ast.literal("string", "", 0, 0)
 }
