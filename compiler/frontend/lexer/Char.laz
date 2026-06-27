@@ -2,43 +2,44 @@
 // patterns). Each predicate takes a one-char string; the empty string (EOF) has
 // no byte, so `code_of` is None and `unwrap_or(0)` makes every predicate false.
 
+@object
 import std.Str
 
-static code_of(c: str): Option<int> {
+code_of(c: str): Option<int> {
     return Str.byte(c, 1)
 }
 
-static is_digit(c: str): bool {
+is_digit(c: str): bool {
     mut code = Char.code_of(c).unwrap_or(0)
     return code >= 48 and code <= 57
 }
 
-static is_alpha(c: str): bool {
+is_alpha(c: str): bool {
     mut code = Char.code_of(c).unwrap_or(0)
     return (code >= 97 and code <= 122) or (code >= 65 and code <= 90)
 }
 
-static is_underscore(c: str): bool {
+is_underscore(c: str): bool {
     return Char.code_of(c).unwrap_or(0) == 95
 }
 
-static is_ident_start(c: str): bool {
+is_ident_start(c: str): bool {
     return Char.is_alpha(c) or Char.is_underscore(c)
 }
 
-static is_ident_char(c: str): bool {
+is_ident_char(c: str): bool {
     return Char.is_ident_start(c) or Char.is_digit(c)
 }
 
-static is_space(c: str): bool {
+is_space(c: str): bool {
     mut code = Char.code_of(c).unwrap_or(0)
     return code == 32 or (code >= 9 and code <= 13)
 }
 
-static is_newline(c: str): bool {
+is_newline(c: str): bool {
     return Char.code_of(c).unwrap_or(0) == 10
 }
 
-static is_quote(c: str): bool {
+is_quote(c: str): bool {
     return Char.code_of(c).unwrap_or(0) == 34
 }

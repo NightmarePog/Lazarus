@@ -2,7 +2,8 @@
 // two-character operators win over their leading character (maximal munch).
 
 
-private static words = [
+@object
+private words = [
     "import": "IMPORT",
     "extern": "EXTERN",
     "enum": "ENUM",
@@ -28,7 +29,7 @@ private static words = [
     "not": "NOT"
 ]
 
-private static ops2 = [
+private ops2 = [
     "++": "CONCAT",
     "=>": "FAT_ARROW",
     "->": "ARROW",
@@ -42,7 +43,7 @@ private static ops2 = [
     "/=": "SLASH_ASSIGN"
 ]
 
-private static ops1 = [
+private ops1 = [
     "=": "ASSIGN",
     "+": "PLUS",
     "-": "MINUS",
@@ -65,14 +66,14 @@ private static ops1 = [
     "@": "AT"
 ]
 
-public static word_kind(word: str): str {
+public word_kind(word: str): str {
     return Keywords.words.get(word).unwrap_or("IDENTIFIER")
 }
 
-public static two(pair: str): Option<str> {
+public two(pair: str): Option<str> {
     return Keywords.ops2.get(pair)
 }
 
-public static one(ch: str): Option<str> {
+public one(ch: str): Option<str> {
     return Keywords.ops1.get(ch)
 }

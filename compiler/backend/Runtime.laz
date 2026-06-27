@@ -8,9 +8,10 @@
 // helper serves both. Tag strings are single-quoted in the emitted Lua, keeping
 // them plain inside these double-quoted Lazarus literals.
 
+@object
 import backend.Text
 
-static prelude(): str {
+prelude(): str {
     return Text.lines([
         "local function __lz_list(...)",
         "    return { kind = 'list', items = { ... } }",

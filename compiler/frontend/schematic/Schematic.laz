@@ -3,6 +3,7 @@
 // order), binds the class name and imports into a root scope (so construction and
 // `Other.static()` resolve), then walks the top-level block. First violation raises.
 
+@object
 import std.Str
 import Error
 import frontend.schematic.Symbol
@@ -14,7 +15,7 @@ import frontend.schematic.StmtChecker
 // `enums` maps an enum name to its variant names and `variant_owner` each variant
 // back to its enum — gathered across all modules, so an imported enum is still
 // known here. They drive `match` exhaustiveness checking.
-static analyze(program, source: str, class_name: str, imports, variant_owner, enums, variant_arity) {
+analyze(program, source: str, class_name: str, imports, variant_owner, enums, variant_arity) {
     mut properties = [:]
     mut methods = [:]
     Schematic.collect_members(program, properties, methods, source)
@@ -37,7 +38,7 @@ static analyze(program, source: str, class_name: str, imports, variant_owner, en
 
 // Gather instance properties (top-level visible non-static bindings) and instance
 // methods (non-static functions), rejecting duplicate properties.
-private static collect_members(program, properties, methods, source: str) {
+private collect_members(program, properties, methods, source: str) {
     for stmt in program.child("body") {
         mut k = stmt.kind
         if k == "VariableDecl" {
@@ -50,7 +51,7 @@ private static collect_members(program, properties, methods, source: str) {
     }
 }
 
-private static collect_property(stmt, properties, source: str) {
+private collect_property(stmt, properties, source: str) {
     mut visibility = stmt.attr("visibility").unwrap_or("")
     mut is_static = stmt.attr("is_static").unwrap_or(false)
     if visibility != "" and not is_static {
