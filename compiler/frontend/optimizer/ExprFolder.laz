@@ -7,6 +7,7 @@
 @auto
 import frontend.parser.Ast
 import frontend.parser.Node
+import frontend.optimizer.Constants
 import std.Num
 
 private folds = 0
@@ -35,9 +36,32 @@ public fold(node, constants): Node {
             node.set("index", .fold(node.child("index"), constants))
             return node
         }
+        "ListComp" => {
+            node.set("iter", .fold(node.child("iter"), constants))
+            mut inner = constants.child(node.child("vars"))
+            node.set("element", .fold(node.child("element"), inner))
+            .fold_comp_cond(node, inner)
+            return node
+        }
+        "MapComp" => {
+            node.set("iter", .fold(node.child("iter"), constants))
+            mut inner = constants.child(node.child("vars"))
+            node.set("key", .fold(node.child("key"), inner))
+            node.set("value", .fold(node.child("value"), inner))
+            .fold_comp_cond(node, inner)
+            return node
+        }
         _ => {}
     }
     return node
+}
+
+// Fold a comprehension's optional filter in the loop-variable-shadowed scope.
+private fold_comp_cond(node: Node, constants: Constants) {
+    mut cond = node.attr("cond")
+    if cond.is_some() {
+        node.set("cond", .fold(cond.unwrap(), constants))
+    }
 }
 
 private fold_identifier(node, constants): Node {

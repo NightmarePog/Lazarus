@@ -9,6 +9,7 @@
 @auto
 import frontend.parser.Ast
 import frontend.parser.Node
+import frontend.lexer.Token
 
 private static precedences = [
     "OR": 1,
@@ -167,13 +168,50 @@ private parse_collection(): Node {
 
     mut first = .expression()
     if .cursor.match("COLON") {
-        return .parse_map_rest(first, open)
+        mut value = .expression()
+        if .cursor.check("FOR") {
+            return .parse_map_comp(first, value, open)
+        }
+        return .parse_map_rest(first, value, open)
+    }
+    if .cursor.check("FOR") {
+        return .parse_list_comp(first, open)
     }
     return .parse_list_rest(first, open)
 }
 
-private parse_map_rest(first, open): Node {
-    mut entries = [Ast.map_entry(first, .expression())]
+// `[elem for v in it (if c)]` and `[k: val for v in it (if c)]`. The clause is
+// shared: it consumes `for <vars> in <iter> (if <cond>)` and the closing `]`,
+// filling `attrs`.
+private parse_list_comp(element: Node, open: Token): Node {
+    mut attrs = ["element": element, "line": open.line, "col": open.column]
+    .parse_comp_clause(attrs)
+    return Ast.node("ListComp", attrs)
+}
+
+private parse_map_comp(key: Node, value: Node, open: Token): Node {
+    mut attrs = ["key": key, "value": value, "line": open.line, "col": open.column]
+    .parse_comp_clause(attrs)
+    return Ast.node("MapComp", attrs)
+}
+
+private parse_comp_clause(attrs: Map<str, dynamic>) {
+    .cursor.consume("FOR", "Expected 'for' in a comprehension")
+    mut vars = [.cursor.consume("IDENTIFIER", "Expected a loop variable after 'for'").value]
+    if .cursor.match("COMMA") {
+        vars.push(.cursor.consume("IDENTIFIER", "Expected a second loop variable after ','").value)
+    }
+    .cursor.consume("IN", "Expected 'in' after the comprehension loop variable(s)")
+    attrs["vars"] = vars
+    attrs["iter"] = .expression()
+    if .cursor.match("IF") {
+        attrs["cond"] = .expression()
+    }
+    .cursor.consume("RSQUARE", "Expected ']' to close the comprehension")
+}
+
+private parse_map_rest(first: Node, value: Node, open: Token): Node {
+    mut entries = [Ast.map_entry(first, value)]
     loop {
         if not .cursor.match("COMMA") {
             break
