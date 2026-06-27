@@ -900,7 +900,10 @@ StmtParser.compounds = __lz_map({["PLUS_ASSIGN"] = "PLUS", ["MINUS_ASSIGN"] = "M
 function StmtParser.new(cursor, exprs)
     local self = {}
     self.parse_program = StmtParser.parse_program
-    self.parse_interface_file = StmtParser.parse_interface_file
+    self.parse_file_directive = StmtParser.parse_file_directive
+    self.parse_interface_body = StmtParser.parse_interface_body
+    self.parse_object_body = StmtParser.parse_object_body
+    self.parse_object_member = StmtParser.parse_object_member
     self.parse_statement = StmtParser.parse_statement
     self.parse_block = StmtParser.parse_block
     self.parse_import = StmtParser.parse_import
@@ -948,7 +951,7 @@ function StmtParser.new(cursor, exprs)
 end
 function StmtParser.parse_program(self)
     if self.cursor:check("AT") then
-        return StmtParser.parse_interface_file(self)
+        return StmtParser.parse_file_directive(self)
     end
     local body = __lz_list()
     while true do
@@ -959,11 +962,19 @@ function StmtParser.parse_program(self)
     end
     return Ast.program(body)
 end
-function StmtParser.parse_interface_file(self)
+function StmtParser.parse_file_directive(self)
     local at = self.cursor:consume("AT", "Expected a file directive")
-    if not self.cursor:match("INTERFACE") then
-        self.cursor:fail(("unknown file directive '@" .. self.cursor:current().value) .. "'")
+    if self.cursor:match("INTERFACE") then
+        return StmtParser.parse_interface_body(self, at)
     end
+    if self.cursor:check("IDENTIFIER") and (self.cursor:current().value == "object") then
+        self.cursor:advance()
+        return StmtParser.parse_object_body(self)
+    end
+    self.cursor:fail(("unknown file directive '@" .. self.cursor:current().value) .. "'")
+    return Ast.program(__lz_list())
+end
+function StmtParser.parse_interface_body(self, at)
     local body = __lz_list()
     local methods = __lz_list()
     local properties = __lz_list()
@@ -981,6 +992,41 @@ function StmtParser.parse_interface_file(self)
     end
     __lz_push(body, Ast.interface_decl("", methods, properties, __lz_list(), at.line, at.column))
     return Ast.program(body)
+end
+function StmtParser.parse_object_body(self)
+    local body = __lz_list()
+    while true do
+        if self.cursor:at_end() then
+            break
+        end
+        if self.cursor:check("IMPORT") then
+            local itok = self.cursor:current()
+            self.cursor:advance()
+            __lz_push(body, StmtParser.parse_import(self, itok))
+        else
+            __lz_push(body, StmtParser.parse_object_member(self))
+        end
+    end
+    return Ast.program(body)
+end
+function StmtParser.parse_object_member(self)
+    local visibility = ""
+    if self.cursor:match("PRIVATE") then
+        visibility = "private"
+    elseif self.cursor:match("PUBLIC") then
+        visibility = "public"
+    end
+    if self.cursor:check("STATIC") then
+        self.cursor:fail("'static' is implied in an @object file; remove it")
+    end
+    if self.cursor:check("CONSTRUCTOR") then
+        self.cursor:fail("an @object file has no instances; remove the constructor")
+    end
+    if self.cursor:check("IDENTIFIER") and StmtParser.looks_like_decl(self) then
+        return StmtParser.parse_method(self, visibility, true)
+    end
+    local mutable = self.cursor:match("MUTABLE")
+    return StmtParser.parse_binding(self, visibility, mutable, "Expected a member name in the @object file", true)
 end
 function StmtParser.parse_statement(self)
     local tok = self.cursor:current()
