@@ -4,8 +4,16 @@
 // that call using the member set and a stack of local scopes (no metatables, so
 // the scope chain is an explicit list searched outward).
 
+private cls: str
+private members
+private instance_methods
+private instance_order
+private properties
+private known_classes
+private externs
+private variant_owner
 @auto
-constructor(cls: str, members, instance_methods, instance_order, properties, known_classes, externs, variant_owner)
+constructor(cls, members, instance_methods, instance_order, properties, known_classes, externs, variant_owner)
 private scopes = [[:]]
 private collections = false
 private temp_seq = 0

@@ -19,6 +19,8 @@ private static compounds = [
     "SLASH_ASSIGN": "DIVIDE"
 ]
 
+private cursor
+private exprs
 @auto
 constructor(cursor, exprs)
 
@@ -58,11 +60,15 @@ private is_file_directive(): bool {
 // pipeline sees an ordinary class. The `.f = f` assignments are added in
 // `parse_constructor`.
 private expand_field_params(body) {
+    mut prop_types = .declared_property_types(body)
     mut props = []
     for stmt in body {
         if stmt.kind == "ConstructorDecl" {
             for fp in stmt.attr("field_params").unwrap_or([]) {
                 props.push(.field_property(fp))
+            }
+            if stmt.attr("auto").unwrap_or(false) {
+                .resolve_auto_params(stmt, prop_types)
             }
         }
     }
@@ -416,19 +422,24 @@ private parse_annotation(): Node {
     return Ast.constructor_decl([], [], 0, 0, [], [])
 }
 
-private parse_constructor(tok: Token, all_fields: bool): Node {
+private parse_constructor(tok: Token, auto: bool): Node {
     mut type_params = .parse_type_params()
     .cursor.consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
     mut param_types = []
     mut field_params = []
     mut params = .parse_ctor_params(param_types, field_params)
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after parameters")
-    if all_fields {
-        field_params = .all_field_params(params, param_types, tok)
-    }
     mut body = []
-    for fp in field_params {
-        body.push(.field_param_assign(fp))
+    if auto {
+        // `@auto`: assign every param to its same-named property (declared
+        // elsewhere; its type is inherited in `expand_field_params`).
+        for name in params {
+            body.push(.field_param_assign(["name": name, "line": tok.line, "col": tok.column]))
+        }
+    } else {
+        for fp in field_params {
+            body.push(.field_param_assign(fp))
+        }
     }
     if .cursor.check("BODY_START") {
         for stmt in .parse_block("constructor body") {
@@ -437,6 +448,7 @@ private parse_constructor(tok: Token, all_fields: bool): Node {
     }
     mut node = Ast.constructor_decl(params, body, tok.line, tok.column, param_types, type_params)
     node.set("field_params", field_params)
+    node.set("auto", auto)
     return node
 }
 
@@ -470,14 +482,34 @@ private field_param_assign(fp): Node {
 }
 
 // Every constructor parameter as a field param (for `@auto constructor(...)`).
-private all_field_params(params: List<str>, param_types: List<Node>, tok: Token) {
-    mut out = []
-    mut i = 1
-    for name in params {
-        out.push(["name": name, "type": param_types.get(i).unwrap(), "line": tok.line, "col": tok.column])
-        i = i + 1
+// The declared instance properties' type nodes, keyed by name — the source of an
+// `@auto` constructor's parameter types.
+private declared_property_types(body): Map<str, Node> {
+    mut out = [:]
+    for stmt in body {
+        if stmt.kind == "VariableDecl" and stmt.attr("visibility").unwrap_or("") != "" and not stmt.attr("is_static").unwrap_or(false) {
+            out[stmt.child("name")] = stmt.attr("type").unwrap_or(Ast.type_name("dynamic", [], stmt.line(), stmt.col()))
+        }
     }
     return out
+}
+
+// Fill an `@auto` constructor's parameter types from the matching declared
+// properties. A param with no declared property keeps its own (untyped) annotation
+// — its synthesized `.p = p` assignment then fails the unknown-instance-member
+// check, so an `@auto` param must have a declared property.
+private resolve_auto_params(ctor: Node, prop_types: Map<str, Node>) {
+    mut new_types = []
+    mut i = 1
+    for name in ctor.child("params") {
+        if prop_types.has(name) {
+            new_types.push(prop_types.get(name).unwrap())
+        } else {
+            new_types.push(ctor.child("param_types").get(i).unwrap())
+        }
+        i = i + 1
+    }
+    ctor.set("param_types", new_types)
 }
 
 // A comma-separated parameter list, the opening `(` consumed. Names are returned;

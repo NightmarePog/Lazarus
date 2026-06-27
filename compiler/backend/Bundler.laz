@@ -11,8 +11,11 @@ import backend.Runtime
 import backend.Text
 import Error
 
+private modules
+private entry_class: str
+private variant_owner
 @auto
-constructor(modules, entry_class: str, variant_owner)
+constructor(modules, entry_class, variant_owner)
 
 public bundle(): str {
     mut externs = .collect_externs()

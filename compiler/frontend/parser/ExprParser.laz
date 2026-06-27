@@ -28,6 +28,7 @@ private static precedences = [
     "POWER": 6
 ]
 
+private cursor
 @auto
 constructor(cursor)
 

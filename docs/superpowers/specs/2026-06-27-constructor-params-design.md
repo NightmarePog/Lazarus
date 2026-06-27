@@ -12,13 +12,16 @@ linker, and registries need **no changes** (same approach as `@object`).
 
 ## Form A — `@auto constructor(...)` (parameter properties for every param)
 
-> **Revised 2026-06-27:** `@auto` was originally a *file-head* directive that
-> synthesized the constructor from separately-declared fields. Per user feedback it
-> is now an annotation **directly above the constructor**, where every parameter
-> becomes a parameter-property (declared + assigned). This reads better (the params
-> are visible) and is just "`.` on every param". The 21 classes migrated to the old
-> form were re-migrated; the file-head form was removed. The migration used the
-> 3-step self-host dance (add-both → re-migrate → remove-old).
+> **Revised twice (2026-06-27).** (1) `@auto` moved from a *file-head* directive to
+> an annotation above the constructor. (2) Per the "no `dynamic`, properties must be
+> visible" directive, `@auto` is now **assign-only**: the properties are declared
+> explicitly (visible + typed), and `@auto constructor(a, b)` lists **bare** param
+> names whose types are **inherited from the matching property**. A param with no
+> declared property errors (its `.p = p` assignment fails the unknown-member check).
+> So nothing is hidden and nothing is `dynamic`. The 21 classes were re-migrated
+> again (smart-bridge self-host dance: inject-if-undeclared → re-migrate → drop the
+> inject fallback). Example (`Type.laz`): properties `kind: str`, `params: List<Type>`,
+> `result: Option<Type>` declared, then `@auto constructor(kind, name, params, result)`.
 
 ```laz
 @auto

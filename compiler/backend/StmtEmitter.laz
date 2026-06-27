@@ -10,6 +10,8 @@
 import std.Num
 import backend.Text
 
+private ctx
+private exprs
 @auto
 constructor(ctx, exprs)
 

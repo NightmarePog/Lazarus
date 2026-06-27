@@ -5,8 +5,14 @@
 import std.Str
 import std.Sys
 
+public kind: str
+public message: str
+public line: int
+public column: int
+public source: str
+public span: int
 @auto
-constructor(kind: str, message: str, line: int, column: int, source: str, span: int)
+constructor(kind, message, line, column, source, span)
 
 public to_string(): str {
     return .format()

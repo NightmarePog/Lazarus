@@ -53,6 +53,7 @@ private static constructors = [
     "Result.err": "__lz_err"
 ]
 
+private ctx
 @auto
 constructor(ctx)
 

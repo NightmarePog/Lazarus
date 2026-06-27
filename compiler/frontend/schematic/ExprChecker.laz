@@ -11,6 +11,10 @@ import frontend.schematic.Symbol
 import frontend.schematic.Scope
 import frontend.schematic.Booleanity
 
+private source
+private properties
+private methods
+private variant_owner
 @auto
 constructor(source, properties, methods, variant_owner)
 private in_instance = false
