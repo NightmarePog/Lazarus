@@ -4,6 +4,7 @@
 // that call using the member set and a stack of local scopes (no metatables, so
 // the scope chain is an explicit list searched outward).
 
+@auto
 private cls: str
 private members
 private instance_methods
@@ -12,23 +13,9 @@ private properties
 private known_classes
 private externs
 private variant_owner
-private scopes
-private collections
-private temp_seq
-
-constructor(cls, members, instance_methods, instance_order, properties, known_classes, externs, variant_owner) {
-    .cls = cls
-    .members = members
-    .instance_methods = instance_methods
-    .instance_order = instance_order
-    .properties = properties
-    .known_classes = known_classes
-    .externs = externs
-    .variant_owner = variant_owner
-    .scopes = [[:]]
-    .collections = false
-    .temp_seq = 0
-}
+private scopes = [[:]]
+private collections = false
+private temp_seq = 0
 
 // A fresh, collision-free local name for a generated temporary (e.g. a `match`
 // scrutinee). Unique within this class block.
