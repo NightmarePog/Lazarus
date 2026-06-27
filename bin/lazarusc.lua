@@ -3172,11 +3172,7 @@ function Typecheck.field_type(self, opt)
     return Typecheck.resolve(self, node)
 end
 function Typecheck.self_args(self)
-    local out = __lz_list()
-    for _, p in __lz_each(Typecheck.own_type_params(self)) do
-        __lz_push(out, Type.var(p))
-    end
-    return out
+    return (function() local __lz_m3 = __lz_list() for _, p in __lz_each(Typecheck.own_type_params(self)) do __lz_push(__lz_m3, Type.var(p)) end return __lz_m3 end)()
 end
 function Typecheck.class_instance(self, name, subst)
     return Type.class_of(name, Typecheck.solved_args(self, Typecheck.class_params(self, name), subst))
@@ -3185,11 +3181,7 @@ function Typecheck.enum_instance(self, owner, subst)
     return Type.enum_of(owner, Typecheck.solved_args(self, __lz_unwrap_or(__lz_get(self.enum_type_params, owner), __lz_list()), subst))
 end
 function Typecheck.solved_args(self, params, subst)
-    local out = __lz_list()
-    for _, p in __lz_each(params) do
-        __lz_push(out, Typecheck.subst_lookup(self, subst, p))
-    end
-    return out
+    return (function() local __lz_m4 = __lz_list() for _, p in __lz_each(params) do __lz_push(__lz_m4, Typecheck.subst_lookup(self, subst, p)) end return __lz_m4 end)()
 end
 function Typecheck.subst_lookup(self, subst, name)
     local v = __lz_get(subst, name)
@@ -3268,42 +3260,30 @@ function Typecheck.substitute(self, t, subst)
         return Typecheck.subst_lookup(self, subst, t.name)
     end
     if t.kind == "fn" then
-        local ps = __lz_list()
-        for _, p in __lz_each(t.params) do
-            __lz_push(ps, Typecheck.substitute(self, p, subst))
-        end
-        return Type.fn(ps, Typecheck.substitute(self, t.result, subst))
+        return Type.fn((function() local __lz_m5 = __lz_list() for _, p in __lz_each(t.params) do __lz_push(__lz_m5, Typecheck.substitute(self, p, subst)) end return __lz_m5 end)(), Typecheck.substitute(self, t.result, subst))
     end
     if ((t.kind == "class") or (t.kind == "enum")) and (__lz_len(t.params) > 0) then
-        local out = __lz_list()
-        for _, a in __lz_each(t.params) do
-            __lz_push(out, Typecheck.substitute(self, a, subst))
-        end
-        return Type.new(t.kind, t.name, out, 0)
+        return Type.new(t.kind, t.name, (function() local __lz_m6 = __lz_list() for _, a in __lz_each(t.params) do __lz_push(__lz_m6, Typecheck.substitute(self, a, subst)) end return __lz_m6 end)(), 0)
     end
     return t
 end
 function Typecheck.resolve(self, t)
     if t.kind == "TypeFn" then
-        local ps = __lz_list()
-        for _, p in __lz_each(t:child("params")) do
-            __lz_push(ps, Typecheck.resolve(self, p))
-        end
-        return Type.fn(ps, Typecheck.resolve(self, t:child("result")))
+        return Type.fn((function() local __lz_m7 = __lz_list() for _, p in __lz_each(t:child("params")) do __lz_push(__lz_m7, Typecheck.resolve(self, p)) end return __lz_m7 end)(), Typecheck.resolve(self, t:child("result")))
     end
     local name = t:child("name")
-    local __lz_m3 = name
-    if __lz_m3 == "int" then
+    local __lz_m8 = name
+    if __lz_m8 == "int" then
         return Type.int()
-    elseif __lz_m3 == "float" then
+    elseif __lz_m8 == "float" then
         return Type.float()
-    elseif __lz_m3 == "bool" then
+    elseif __lz_m8 == "bool" then
         return Type.bool()
-    elseif __lz_m3 == "str" then
+    elseif __lz_m8 == "str" then
         return Type.str()
-    elseif __lz_m3 == "unit" then
+    elseif __lz_m8 == "unit" then
         return Type.unit()
-    elseif __lz_m3 == "dynamic" then
+    elseif __lz_m8 == "dynamic" then
         return Type.dynamic()
     else
     end
@@ -3333,11 +3313,7 @@ function Typecheck.resolve_args(self, t, name)
     if (declared >= 0) and (__lz_len(nodes) ~= declared) then
         Typecheck.fail(self, t, (((name .. " expects ") .. Typecheck.count(self, declared)) .. " type argument(s), found ") .. Typecheck.count(self, __lz_len(nodes)))
     end
-    local out = __lz_list()
-    for _, a in __lz_each(nodes) do
-        __lz_push(out, Typecheck.resolve(self, a))
-    end
-    return out
+    return (function() local __lz_m9 = __lz_list() for _, a in __lz_each(nodes) do __lz_push(__lz_m9, Typecheck.resolve(self, a)) end return __lz_m9 end)()
 end
 function Typecheck.declared_arity(self, name)
     if ((name == "Option") or (name == "Result")) or (name == "List") then
@@ -3704,19 +3680,11 @@ function ExprFolder.apply(self, op, a, b)
 end
 function ExprFolder.fold_call(self, node, constants)
     node:set("callee", ExprFolder.fold(self, node:child("callee"), constants))
-    local folded = __lz_list()
-    for _, arg in __lz_each(node:child("args")) do
-        __lz_push(folded, ExprFolder.fold(self, arg, constants))
-    end
-    node:set("args", folded)
+    node:set("args", (function() local __lz_m3 = __lz_list() for _, arg in __lz_each(node:child("args")) do __lz_push(__lz_m3, ExprFolder.fold(self, arg, constants)) end return __lz_m3 end)())
     return node
 end
 function ExprFolder.fold_list(self, node, constants)
-    local folded = __lz_list()
-    for _, element in __lz_each(node:child("elements")) do
-        __lz_push(folded, ExprFolder.fold(self, element, constants))
-    end
-    node:set("elements", folded)
+    node:set("elements", (function() local __lz_m4 = __lz_list() for _, element in __lz_each(node:child("elements")) do __lz_push(__lz_m4, ExprFolder.fold(self, element, constants)) end return __lz_m4 end)())
     return node
 end
 function ExprFolder.fold_map(self, node, constants)
@@ -4153,10 +4121,7 @@ function ExprEmitter.emit_list(self, node)
 end
 function ExprEmitter.emit_map(self, node)
     self.ctx:mark_collections()
-    local parts = __lz_list()
-    for _, entry in __lz_each(node:child("entries")) do
-        __lz_push(parts, (("[" .. ExprEmitter.emit(self, entry:child("key"))) .. "] = ") .. ExprEmitter.emit(self, entry:child("value")))
-    end
+    local parts = (function() local __lz_m2 = __lz_list() for _, entry in __lz_each(node:child("entries")) do __lz_push(__lz_m2, (("[" .. ExprEmitter.emit(self, entry:child("key"))) .. "] = ") .. ExprEmitter.emit(self, entry:child("value"))) end return __lz_m2 end)()
     return ("__lz_map({" .. Text.join(parts, ", ")) .. "})"
 end
 function ExprEmitter.emit_index(self, node)
@@ -4245,11 +4210,7 @@ function ExprEmitter.with_receiver(self, object, args)
     return out
 end
 function ExprEmitter.emit_args(self, nodes)
-    local out = __lz_list()
-    for _, node in __lz_each(nodes) do
-        __lz_push(out, ExprEmitter.emit(self, node))
-    end
-    return out
+    return (function() local __lz_m3 = __lz_list() for _, node in __lz_each(nodes) do __lz_push(__lz_m3, ExprEmitter.emit(self, node)) end return __lz_m3 end)()
 end
 
 local StmtEmitter = {}
@@ -4430,11 +4391,7 @@ function StmtEmitter.emit_block(self, stmts)
     if __lz_len(stmts) == 0 then
         return ""
     end
-    local lines = __lz_list()
-    for _, stmt in __lz_each(stmts) do
-        __lz_push(lines, StmtEmitter.emit_stmt(self, stmt))
-    end
-    return Text.indent(Text.lines(lines))
+    return Text.indent(Text.lines((function() local __lz_m3 = __lz_list() for _, stmt in __lz_each(stmts) do __lz_push(__lz_m3, StmtEmitter.emit_stmt(self, stmt)) end return __lz_m3 end)()))
 end
 function StmtEmitter.emit_fn_body(self, params, body)
     self.ctx:push_scope()
@@ -4668,12 +4625,7 @@ function Codegen.class_block(self, program)
     local body = program:child("body")
     local ctx = Codegen.build_context(self, body)
     local stmts = StmtEmitter.new(ctx, ExprEmitter.new(ctx))
-    local member_lines = __lz_list()
-    for _, stmt in __lz_each(body) do
-        if Codegen.is_emittable(self, stmt) then
-            __lz_push(member_lines, stmts:emit_member(stmt))
-        end
-    end
+    local member_lines = (function() local __lz_m1 = __lz_list() for _, stmt in __lz_each(body) do if Codegen.is_emittable(self, stmt) then __lz_push(__lz_m1, stmts:emit_member(stmt)) end end return __lz_m1 end)()
     self.collections_used = ctx:used_collections()
     local block = ("local " .. self.class_name) .. " = {}"
     if __lz_len(member_lines) > 0 then

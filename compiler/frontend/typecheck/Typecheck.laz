@@ -781,11 +781,7 @@ private field_type(opt): Type {
 // The current class's own type params as type-variable arguments, so `self` is
 // `Box<T>` (not bare `Box`) and members typed in `T` flow.
 private self_args() {
-    mut out = []
-    for p in .own_type_params() {
-        out.push(Type.var(p))
-    }
-    return out
+    return [Type.var(p) for p in .own_type_params()]
 }
 
 private class_instance(name, subst): Type {
@@ -799,11 +795,7 @@ private enum_instance(owner, subst): Type {
 // Read a declaration's type args off an inference solution: each param maps to its
 // solved type, or `dynamic` when inference left it unbound.
 private solved_args(params, subst) {
-    mut out = []
-    for p in params {
-        out.push(.subst_lookup(subst, p))
-    }
-    return out
+    return [.subst_lookup(subst, p) for p in params]
 }
 
 private subst_lookup(subst, name): Type {
@@ -903,18 +895,10 @@ private substitute(t, subst): Type {
         return .subst_lookup(subst, t.name)
     }
     if t.kind == "fn" {
-        mut ps = []
-        for p in t.params {
-            ps.push(.substitute(p, subst))
-        }
-        return Type.fn(ps, .substitute(t.result, subst))
+        return Type.fn([.substitute(p, subst) for p in t.params], .substitute(t.result, subst))
     }
     if (t.kind == "class" or t.kind == "enum") and t.params.len() > 0 {
-        mut out = []
-        for a in t.params {
-            out.push(.substitute(a, subst))
-        }
-        return Type(t.kind, t.name, out, 0)
+        return Type(t.kind, t.name, [.substitute(a, subst) for a in t.params], 0)
     }
     return t
 }
@@ -926,11 +910,7 @@ private substitute(t, subst): Type {
 // instance; anything else to `dynamic`.
 private resolve(t): Type {
     if t.kind == "TypeFn" {
-        mut ps = []
-        for p in t.child("params") {
-            ps.push(.resolve(p))
-        }
-        return Type.fn(ps, .resolve(t.child("result")))
+        return Type.fn([.resolve(p) for p in t.child("params")], .resolve(t.child("result")))
     }
     mut name = t.child("name")
     match name {
@@ -971,11 +951,7 @@ private resolve_args(t, name) {
     if declared >= 0 and nodes.len() != declared {
         .fail(t, name ++ " expects " ++ .count(declared) ++ " type argument(s), found " ++ .count(nodes.len()))
     }
-    mut out = []
-    for a in nodes {
-        out.push(.resolve(a))
-    }
-    return out
+    return [.resolve(a) for a in nodes]
 }
 
 private declared_arity(name): int {

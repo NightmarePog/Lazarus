@@ -164,10 +164,7 @@ private emit_list(node): str {
 
 private emit_map(node): str {
     .ctx.mark_collections()
-    mut parts = []
-    for entry in node.child("entries") {
-        parts.push("[" ++ .emit(entry.child("key")) ++ "] = " ++ .emit(entry.child("value")))
-    }
+    mut parts = ["[" ++ .emit(entry.child("key")) ++ "] = " ++ .emit(entry.child("value")) for entry in node.child("entries")]
     return "__lz_map({" ++ Text.join(parts, ", ") ++ "})"
 }
 
@@ -275,9 +272,5 @@ private with_receiver(object, args) {
 }
 
 private emit_args(nodes) {
-    mut out = []
-    for node in nodes {
-        out.push(.emit(node))
-    }
-    return out
+    return [.emit(node) for node in nodes]
 }
