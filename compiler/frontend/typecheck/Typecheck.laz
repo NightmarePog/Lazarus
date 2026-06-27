@@ -277,37 +277,21 @@ private type_match(stmt, scope, ret) {
 // ---- expressions ----
 
 private type_expr(node, scope): Type {
-    mut k = node.kind
-    if k == "LiteralExpr" {
-        return .literal_type(node)
-    }
-    if k == "IdentifierExpr" {
-        return .identifier_type(node.child("name"), scope)
-    }
-    if k == "SelfExpr" {
-        return Type.class_of(.class_name, .self_args())
-    }
-    if k == "BinaryExpr" {
-        return .type_binary(node, scope)
-    }
-    if k == "UnaryExpr" {
-        .type_expr(node.child("operand"), scope)
-        return Type.bool()
-    }
-    if k == "CallExpr" {
-        return .type_call(node, scope)
-    }
-    if k == "MemberExpr" {
-        return .type_member(node, scope)
-    }
-    if k == "IndexExpr" {
-        return .type_index(node, scope)
-    }
-    if k == "ListExpr" {
-        return .type_list(node, scope)
-    }
-    if k == "MapExpr" {
-        return .type_map(node, scope)
+    match node.kind {
+        "LiteralExpr" => { return .literal_type(node) }
+        "IdentifierExpr" => { return .identifier_type(node.child("name"), scope) }
+        "SelfExpr" => { return Type.class_of(.class_name, .self_args()) }
+        "BinaryExpr" => { return .type_binary(node, scope) }
+        "UnaryExpr" => {
+            .type_expr(node.child("operand"), scope)
+            return Type.bool()
+        }
+        "CallExpr" => { return .type_call(node, scope) }
+        "MemberExpr" => { return .type_member(node, scope) }
+        "IndexExpr" => { return .type_index(node, scope) }
+        "ListExpr" => { return .type_list(node, scope) }
+        "MapExpr" => { return .type_map(node, scope) }
+        _ => {}
     }
     return Type.dynamic()
 }
@@ -921,23 +905,14 @@ private resolve(t): Type {
         return Type.fn(ps, .resolve(t.child("result")))
     }
     mut name = t.child("name")
-    if name == "int" {
-        return Type.int()
-    }
-    if name == "float" {
-        return Type.float()
-    }
-    if name == "bool" {
-        return Type.bool()
-    }
-    if name == "str" {
-        return Type.str()
-    }
-    if name == "unit" {
-        return Type.unit()
-    }
-    if name == "dynamic" {
-        return Type.dynamic()
+    match name {
+        "int" => { return Type.int() }
+        "float" => { return Type.float() }
+        "bool" => { return Type.bool() }
+        "str" => { return Type.str() }
+        "unit" => { return Type.unit() }
+        "dynamic" => { return Type.dynamic() }
+        _ => {}
     }
     if .type_vars.has(name) {
         return Type.var(name)

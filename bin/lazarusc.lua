@@ -2589,37 +2589,29 @@ function Typecheck.type_match(self, stmt, scope, ret)
     end
 end
 function Typecheck.type_expr(self, node, scope)
-    local k = node.kind
-    if k == "LiteralExpr" then
+    local __lz_m2 = node.kind
+    if __lz_m2 == "LiteralExpr" then
         return Typecheck.literal_type(self, node)
-    end
-    if k == "IdentifierExpr" then
+    elseif __lz_m2 == "IdentifierExpr" then
         return Typecheck.identifier_type(self, node:child("name"), scope)
-    end
-    if k == "SelfExpr" then
+    elseif __lz_m2 == "SelfExpr" then
         return Type.class_of(self.class_name, Typecheck.self_args(self))
-    end
-    if k == "BinaryExpr" then
+    elseif __lz_m2 == "BinaryExpr" then
         return Typecheck.type_binary(self, node, scope)
-    end
-    if k == "UnaryExpr" then
+    elseif __lz_m2 == "UnaryExpr" then
         Typecheck.type_expr(self, node:child("operand"), scope)
         return Type.bool()
-    end
-    if k == "CallExpr" then
+    elseif __lz_m2 == "CallExpr" then
         return Typecheck.type_call(self, node, scope)
-    end
-    if k == "MemberExpr" then
+    elseif __lz_m2 == "MemberExpr" then
         return Typecheck.type_member(self, node, scope)
-    end
-    if k == "IndexExpr" then
+    elseif __lz_m2 == "IndexExpr" then
         return Typecheck.type_index(self, node, scope)
-    end
-    if k == "ListExpr" then
+    elseif __lz_m2 == "ListExpr" then
         return Typecheck.type_list(self, node, scope)
-    end
-    if k == "MapExpr" then
+    elseif __lz_m2 == "MapExpr" then
         return Typecheck.type_map(self, node, scope)
+    else
     end
     return Type.dynamic()
 end
@@ -3124,23 +3116,20 @@ function Typecheck.resolve(self, t)
         return Type.fn(ps, Typecheck.resolve(self, t:child("result")))
     end
     local name = t:child("name")
-    if name == "int" then
+    local __lz_m3 = name
+    if __lz_m3 == "int" then
         return Type.int()
-    end
-    if name == "float" then
+    elseif __lz_m3 == "float" then
         return Type.float()
-    end
-    if name == "bool" then
+    elseif __lz_m3 == "bool" then
         return Type.bool()
-    end
-    if name == "str" then
+    elseif __lz_m3 == "str" then
         return Type.str()
-    end
-    if name == "unit" then
+    elseif __lz_m3 == "unit" then
         return Type.unit()
-    end
-    if name == "dynamic" then
+    elseif __lz_m3 == "dynamic" then
         return Type.dynamic()
+    else
     end
     if __lz_has(self.type_vars, name) then
         return Type.var(name)
