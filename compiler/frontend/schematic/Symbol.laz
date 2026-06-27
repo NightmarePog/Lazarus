@@ -2,15 +2,10 @@
 // function/class), whether it can be reassigned, and whether it is known not to
 // be a function (so calling it can be flagged early).
 
-public kind
-public mutable
-public noncallable
-
-constructor(kind: str, mutable: bool, noncallable: bool) {
-    .kind = kind
-    .mutable = mutable
-    .noncallable = noncallable
-}
+@auto
+public kind: str
+public mutable: bool
+public noncallable: bool
 
 // Refresh the callability fact after a reassignment changes the bound value.
 public set_noncallable(flag: bool) {
