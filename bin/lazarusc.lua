@@ -1691,17 +1691,6 @@ end
 
 local Scope = {}
 
-function Scope.new(parent, is_root)
-    local self = {}
-    self.child = Scope.child
-    self.declare = Scope.declare
-    self.declared_here = Scope.declared_here
-    self.lookup = Scope.lookup
-    self.names = __lz_map({})
-    self.parent = parent
-    self.is_root = is_root
-    return self
-end
 function Scope.root()
     return Scope.new(0, true)
 end
@@ -1723,6 +1712,17 @@ function Scope.lookup(self, name)
         return here
     end
     return self.parent:lookup(name)
+end
+function Scope.new(parent, is_root)
+    local self = {}
+    self.child = Scope.child
+    self.declare = Scope.declare
+    self.declared_here = Scope.declared_here
+    self.lookup = Scope.lookup
+    self.names = __lz_map({})
+    self.parent = parent
+    self.is_root = is_root
+    return self
 end
 
 local Frame = {}
@@ -1783,26 +1783,6 @@ end
 
 local ExprChecker = {}
 
-function ExprChecker.new(source, properties, methods, variant_owner)
-    local self = {}
-    self.set_instance = ExprChecker.set_instance
-    self.instance_flag = ExprChecker.instance_flag
-    self.check = ExprChecker.check
-    self.check_condition = ExprChecker.check_condition
-    self.check_identifier = ExprChecker.check_identifier
-    self.check_call = ExprChecker.check_call
-    self.check_member = ExprChecker.check_member
-    self.check_self = ExprChecker.check_self
-    self.check_list = ExprChecker.check_list
-    self.check_map = ExprChecker.check_map
-    self.fail = ExprChecker.fail
-    self.source = source
-    self.properties = properties
-    self.methods = methods
-    self.variant_owner = variant_owner
-    self.in_instance = false
-    return self
-end
 function ExprChecker.set_instance(self, flag)
     self.in_instance = flag
 end
@@ -1894,6 +1874,26 @@ function ExprChecker.check_map(self, node, scope)
 end
 function ExprChecker.fail(self, node, message, span)
     Error.new("SemanticError", message, node:line(), node:col(), self.source, span):raise()
+end
+function ExprChecker.new(source, properties, methods, variant_owner)
+    local self = {}
+    self.set_instance = ExprChecker.set_instance
+    self.instance_flag = ExprChecker.instance_flag
+    self.check = ExprChecker.check
+    self.check_condition = ExprChecker.check_condition
+    self.check_identifier = ExprChecker.check_identifier
+    self.check_call = ExprChecker.check_call
+    self.check_member = ExprChecker.check_member
+    self.check_self = ExprChecker.check_self
+    self.check_list = ExprChecker.check_list
+    self.check_map = ExprChecker.check_map
+    self.fail = ExprChecker.fail
+    self.in_instance = false
+    self.source = source
+    self.properties = properties
+    self.methods = methods
+    self.variant_owner = variant_owner
+    return self
 end
 
 local Naming = {}
@@ -3761,13 +3761,6 @@ end
 
 local Optimizer = {}
 
-function Optimizer.new()
-    local self = {}
-    self.optimize = Optimizer.optimize
-    self.fold_count = Optimizer.fold_count
-    self.folds = 0
-    return self
-end
 function Optimizer.optimize(self, program)
     local exprs = ExprFolder.new()
     local stmts = StmtFolder.new(exprs)
@@ -3778,41 +3771,16 @@ end
 function Optimizer.fold_count(self)
     return self.folds
 end
+function Optimizer.new()
+    local self = {}
+    self.optimize = Optimizer.optimize
+    self.fold_count = Optimizer.fold_count
+    self.folds = 0
+    return self
+end
 
 local CgContext = {}
 
-function CgContext.new(cls, members, instance_methods, instance_order, properties, known_classes, externs, variant_owner)
-    local self = {}
-    self.fresh_temp = CgContext.fresh_temp
-    self.name = CgContext.name
-    self.instance_method_names = CgContext.instance_method_names
-    self.property_decls = CgContext.property_decls
-    self.is_member = CgContext.is_member
-    self.is_instance_method = CgContext.is_instance_method
-    self.is_construction = CgContext.is_construction
-    self.extern_target = CgContext.extern_target
-    self.mark_collections = CgContext.mark_collections
-    self.used_collections = CgContext.used_collections
-    self.push_scope = CgContext.push_scope
-    self.pop_scope = CgContext.pop_scope
-    self.declare_local = CgContext.declare_local
-    self.is_local = CgContext.is_local
-    self.is_variant = CgContext.is_variant
-    self.variant_qualified = CgContext.variant_qualified
-    self.emit_name = CgContext.emit_name
-    self.cls = cls
-    self.members = members
-    self.instance_methods = instance_methods
-    self.instance_order = instance_order
-    self.properties = properties
-    self.known_classes = known_classes
-    self.externs = externs
-    self.variant_owner = variant_owner
-    self.scopes = __lz_list(__lz_map({}))
-    self.collections = false
-    self.temp_seq = 0
-    return self
-end
 function CgContext.fresh_temp(self)
     self.temp_seq = self.temp_seq + 1
     return "__lz_m" .. self.temp_seq
@@ -3883,6 +3851,38 @@ function CgContext.emit_name(self, name)
         return (self.cls .. ".") .. name
     end
     return name
+end
+function CgContext.new(cls, members, instance_methods, instance_order, properties, known_classes, externs, variant_owner)
+    local self = {}
+    self.fresh_temp = CgContext.fresh_temp
+    self.name = CgContext.name
+    self.instance_method_names = CgContext.instance_method_names
+    self.property_decls = CgContext.property_decls
+    self.is_member = CgContext.is_member
+    self.is_instance_method = CgContext.is_instance_method
+    self.is_construction = CgContext.is_construction
+    self.extern_target = CgContext.extern_target
+    self.mark_collections = CgContext.mark_collections
+    self.used_collections = CgContext.used_collections
+    self.push_scope = CgContext.push_scope
+    self.pop_scope = CgContext.pop_scope
+    self.declare_local = CgContext.declare_local
+    self.is_local = CgContext.is_local
+    self.is_variant = CgContext.is_variant
+    self.variant_qualified = CgContext.variant_qualified
+    self.emit_name = CgContext.emit_name
+    self.scopes = __lz_list(__lz_map({}))
+    self.collections = false
+    self.temp_seq = 0
+    self.cls = cls
+    self.members = members
+    self.instance_methods = instance_methods
+    self.instance_order = instance_order
+    self.properties = properties
+    self.known_classes = known_classes
+    self.externs = externs
+    self.variant_owner = variant_owner
+    return self
 end
 
 local Text = {}

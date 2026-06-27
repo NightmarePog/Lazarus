@@ -2,15 +2,12 @@
 // statement folder over a fresh constant scope, mutating the AST in place; the
 // number of rewrites is exposed via `fold_count`.
 
+@auto
 import frontend.optimizer.Constants
 import frontend.optimizer.ExprFolder
 import frontend.optimizer.StmtFolder
 
-private folds
-
-constructor() {
-    .folds = 0
-}
+private folds = 0
 
 public optimize(program) {
     mut exprs = ExprFolder()
