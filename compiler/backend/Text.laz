@@ -2,13 +2,14 @@
 // block indentation. The lexer does not process escapes, so a literal newline
 // comes from `Str.char(10)`, not a `\n`.
 
+@object
 import std.Str
 
-static nl(): str {
+nl(): str {
     return Str.char(10).unwrap_or("")
 }
 
-static join(parts, sep: str): str {
+join(parts, sep: str): str {
     mut out = ""
     mut first = true
     for part in parts {
@@ -22,13 +23,13 @@ static join(parts, sep: str): str {
     return out
 }
 
-static lines(parts): str {
+lines(parts): str {
     return Text.join(parts, Text.nl())
 }
 
 // Indent every non-empty line of `text` by four spaces; blank lines stay empty so
 // the output carries no trailing whitespace.
-static indent(text: str): str {
+indent(text: str): str {
     mut newline = Text.nl()
     mut n = Str.len(text).unwrap_or(0)
     mut out = ""
@@ -50,7 +51,7 @@ static indent(text: str): str {
     return out ++ Text.prefix(line)
 }
 
-private static prefix(line: str): str {
+private prefix(line: str): str {
     if line == "" {
         return ""
     }

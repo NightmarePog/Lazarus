@@ -1,19 +1,20 @@
 // Naming — identifier casing. Values (functions, variables, parameters, loop
 // variables, properties) must be snake_case; there are no type names to check.
 
+@object
 import std.Str
 import Error
 
 // Enforce snake_case on a value name, raising at (line, col) otherwise. `what`
 // names the kind of binding for the message (e.g. "Function", "Binding").
-static check_value(name: str, line: int, col: int, source: str, what: str) {
+check_value(name: str, line: int, col: int, source: str, what: str) {
     if not Naming.is_snake(name) {
         Error("SemanticError", what ++ " name '" ++ name ++ "' must be snake_case", line, col, source, Str.len(name).unwrap_or(1)).raise()
     }
 }
 
 // Starts with a lowercase letter or underscore, then lowercase/digits/underscore.
-private static is_snake(name: str): bool {
+private is_snake(name: str): bool {
     mut n = Str.len(name).unwrap_or(0)
     if n == 0 {
         return false

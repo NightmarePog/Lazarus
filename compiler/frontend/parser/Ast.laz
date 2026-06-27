@@ -1,77 +1,78 @@
 // Ast — the factory for AST nodes: one named constructor per node kind, so every
 // Node is built here and the parser stays free of stringly-typed map literals.
 
+@object
 import frontend.parser.Node
 
 // The generic escape hatch: a node from a kind and a ready-made attrs map, for
 // the few kinds whose optional attributes are set conditionally.
-static node(kind: str, attrs): Node {
+node(kind: str, attrs): Node {
     return Node(kind, attrs)
 }
 
-static program(body): Node {
+program(body): Node {
     return Node("Program", ["body": body])
 }
 
-static import_decl(segments, name: str, line: int, col: int): Node {
+import_decl(segments, name: str, line: int, col: int): Node {
     return Node("ImportDecl", ["segments": segments, "name": name, "line": line, "col": col])
 }
 
-static extern_decl(name: str, params, target, line: int, col: int): Node {
+extern_decl(name: str, params, target, line: int, col: int): Node {
     return Node("ExternDecl", ["name": name, "params": params, "target": target, "line": line, "col": col])
 }
 
 // `param_types`/`return_type` are Type nodes (default `dynamic`); `type_params`
 // lists the method's own generic parameter names (empty when not generic).
-static function_decl(name: str, params, body, is_static: bool, visibility: str, line: int, col: int, param_types, return_type, type_params): Node {
+function_decl(name: str, params, body, is_static: bool, visibility: str, line: int, col: int, param_types, return_type, type_params): Node {
     return Node("FunctionDecl", ["name": name, "params": params, "body": body, "is_static": is_static, "visibility": visibility, "line": line, "col": col, "param_types": param_types, "return_type": return_type, "type_params": type_params])
 }
 
 // `type_params` lists the class's generic parameter names (declared on the
 // constructor, e.g. `constructor<T, U>`), scoping the whole file-class.
-static constructor_decl(params, body, line: int, col: int, param_types, type_params): Node {
+constructor_decl(params, body, line: int, col: int, param_types, type_params): Node {
     return Node("ConstructorDecl", ["params": params, "body": body, "line": line, "col": col, "param_types": param_types, "type_params": type_params])
 }
 
-static expression_stmt(expression, line: int, col: int): Node {
+expression_stmt(expression, line: int, col: int): Node {
     return Node("ExpressionStmt", ["expression": expression, "line": line, "col": col])
 }
 
-static field_assign(target, value, line: int, col: int): Node {
+field_assign(target, value, line: int, col: int): Node {
     return Node("FieldAssign", ["target": target, "value": value, "line": line, "col": col])
 }
 
-static index_assign(target, value, line: int, col: int): Node {
+index_assign(target, value, line: int, col: int): Node {
     return Node("IndexAssign", ["target": target, "value": value, "line": line, "col": col])
 }
 
-static while_stmt(condition, body, line: int, col: int): Node {
+while_stmt(condition, body, line: int, col: int): Node {
     return Node("WhileStmt", ["condition": condition, "body": body, "line": line, "col": col])
 }
 
-static loop_stmt(body, line: int, col: int): Node {
+loop_stmt(body, line: int, col: int): Node {
     return Node("LoopStmt", ["body": body, "line": line, "col": col])
 }
 
-static break_stmt(line: int, col: int): Node {
+break_stmt(line: int, col: int): Node {
     return Node("BreakStmt", ["line": line, "col": col])
 }
 
-static for_in(vars, iter, body, line: int, col: int): Node {
+for_in(vars, iter, body, line: int, col: int): Node {
     return Node("ForInStmt", ["vars": vars, "iter": iter, "body": body, "line": line, "col": col])
 }
 
-static if_clause(condition, body): Node {
+if_clause(condition, body): Node {
     return Node("IfClause", ["condition": condition, "body": body])
 }
 
 // An enum `enum Name { A, B(T) }`: a nullary variant lowers to `Name.A = 'A'`, a
 // payload variant to a constructor returning `{ kind = 'B', _1 = … }`.
-static enum_decl(name: str, variants, line: int, col: int, type_params): Node {
+enum_decl(name: str, variants, line: int, col: int, type_params): Node {
     return Node("EnumDecl", ["name": name, "variants": variants, "line": line, "col": col, "type_params": type_params])
 }
 
-static enum_variant(name: str, fields, line: int, col: int): Node {
+enum_variant(name: str, fields, line: int, col: int): Node {
     return Node("EnumVariant", ["name": name, "fields": fields, "line": line, "col": col])
 }
 
@@ -79,87 +80,87 @@ static enum_variant(name: str, fields, line: int, col: int): Node {
 // `@interface` file desugars to one of these with an empty `name`, filled in from
 // the filename. `methods` are signatures (no body), `properties` requirements.
 // Fully erased at codegen.
-static interface_decl(name: str, methods, properties, type_params, line: int, col: int): Node {
+interface_decl(name: str, methods, properties, type_params, line: int, col: int): Node {
     return Node("InterfaceDecl", ["name": name, "methods": methods, "properties": properties, "type_params": type_params, "line": line, "col": col])
 }
 
-static interface_method(name: str, param_types, return_type, type_params): Node {
+interface_method(name: str, param_types, return_type, type_params): Node {
     return Node("InterfaceMethod", ["name": name, "param_types": param_types, "return_type": return_type, "type_params": type_params])
 }
 
-static interface_property(name: str, type): Node {
+interface_property(name: str, type): Node {
     return Node("InterfaceProperty", ["name": name, "type": type])
 }
 
 // A named (optionally generic) type: `int`, `dynamic`, `Result<int>`; `args` is
 // the list of type arguments (empty when not generic).
-static type_name(name: str, args, line: int, col: int): Node {
+type_name(name: str, args, line: int, col: int): Node {
     return Node("TypeName", ["name": name, "args": args, "line": line, "col": col])
 }
 
 // A function type `(P1, P2) -> R`.
-static type_fn(params, result, line: int, col: int): Node {
+type_fn(params, result, line: int, col: int): Node {
     return Node("TypeFn", ["params": params, "result": result, "line": line, "col": col])
 }
 
-static match_stmt(scrutinee, arms, line: int, col: int): Node {
+match_stmt(scrutinee, arms, line: int, col: int): Node {
     return Node("MatchStmt", ["scrutinee": scrutinee, "arms": arms, "line": line, "col": col])
 }
 
-static match_arm(pattern, body): Node {
+match_arm(pattern, body): Node {
     return Node("MatchArm", ["pattern": pattern, "is_wildcard": false, "is_variant": false, "body": body])
 }
 
 // A `Variant => …` (nullary) or `Variant(a, b) => …` (payload) arm; `bindings`
 // names the payload fields to bind. The checker resolves `variant` to its enum.
-static match_variant(variant, bindings, body): Node {
+match_variant(variant, bindings, body): Node {
     return Node("MatchArm", ["variant": variant, "bindings": bindings, "is_wildcard": false, "is_variant": true, "body": body])
 }
 
-static match_default(body): Node {
+match_default(body): Node {
     return Node("MatchArm", ["is_wildcard": true, "is_variant": false, "body": body])
 }
 
-static map_entry(key, value): Node {
+map_entry(key, value): Node {
     return Node("MapEntry", ["key": key, "value": value])
 }
 
-static binary(op: str, left, right, line: int, col: int): Node {
+binary(op: str, left, right, line: int, col: int): Node {
     return Node("BinaryExpr", ["op": op, "left": left, "right": right, "line": line, "col": col])
 }
 
-static unary(op: str, operand, line: int, col: int): Node {
+unary(op: str, operand, line: int, col: int): Node {
     return Node("UnaryExpr", ["op": op, "operand": operand, "line": line, "col": col])
 }
 
-static call(callee, args, line: int, col: int): Node {
+call(callee, args, line: int, col: int): Node {
     return Node("CallExpr", ["callee": callee, "args": args, "line": line, "col": col])
 }
 
-static member(object, field: str, line: int, col: int): Node {
+member(object, field: str, line: int, col: int): Node {
     return Node("MemberExpr", ["object": object, "field": field, "line": line, "col": col])
 }
 
-static index(object, index, line: int, col: int): Node {
+index(object, index, line: int, col: int): Node {
     return Node("IndexExpr", ["object": object, "index": index, "line": line, "col": col])
 }
 
-static self_expr(line: int, col: int): Node {
+self_expr(line: int, col: int): Node {
     return Node("SelfExpr", ["line": line, "col": col])
 }
 
-static identifier(name: str, line: int, col: int): Node {
+identifier(name: str, line: int, col: int): Node {
     return Node("IdentifierExpr", ["name": name, "line": line, "col": col])
 }
 
-static literal(lit_kind: str, value, line: int, col: int): Node {
+literal(lit_kind: str, value, line: int, col: int): Node {
     return Node("LiteralExpr", ["lit_kind": lit_kind, "value": value, "line": line, "col": col])
 }
 
-static list(elements, line: int, col: int): Node {
+list(elements, line: int, col: int): Node {
     return Node("ListExpr", ["elements": elements, "line": line, "col": col])
 }
 
-static map(entries, line: int, col: int): Node {
+map(entries, line: int, col: int): Node {
     return Node("MapExpr", ["entries": entries, "line": line, "col": col])
 }

@@ -3,14 +3,15 @@
 // reporting) read these, so the compiler's identity lives in a single file
 // instead of being spelled out at each use site.
 
-static name() {
+@object
+name() {
     return "Lazarus"
 }
 
-static version() {
+version() {
     return "0.1.0"
 }
 
-static target() {
+target() {
     return "Lua 5.1"
 }
