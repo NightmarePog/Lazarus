@@ -59,42 +59,30 @@ constructor(ctx) {
 }
 
 public emit(node): str {
-    mut k = node.kind
-    if k == "LiteralExpr" {
-        return .emit_literal(node)
-    }
-    if k == "IdentifierExpr" {
-        mut id = node.child("name")
-        if .ctx.is_variant(id) {
-            return .ctx.variant_qualified(id)
-        }
-        return .ctx.emit_name(id)
-    }
-    if k == "SelfExpr" {
-        return "self"
-    }
-    if k == "MemberExpr" {
-        return .emit_field(node)
-    }
-    if k == "ListExpr" {
-        return .emit_list(node)
-    }
-    if k == "MapExpr" {
-        return .emit_map(node)
-    }
-    if k == "IndexExpr" {
-        return .emit_index(node)
-    }
-    if k == "CallExpr" {
-        return .emit_call(node)
-    }
-    if k == "UnaryExpr" {
-        return .emit_unary(node)
-    }
-    if k == "BinaryExpr" {
-        return .emit_binary(node)
+    match node.kind {
+        "LiteralExpr" => { return .emit_literal(node) }
+        "IdentifierExpr" => { return .emit_identifier(node) }
+        "SelfExpr" => { return "self" }
+        "MemberExpr" => { return .emit_field(node) }
+        "ListExpr" => { return .emit_list(node) }
+        "MapExpr" => { return .emit_map(node) }
+        "IndexExpr" => { return .emit_index(node) }
+        "CallExpr" => { return .emit_call(node) }
+        "UnaryExpr" => { return .emit_unary(node) }
+        "BinaryExpr" => { return .emit_binary(node) }
+        _ => {}
     }
     return ""
+}
+
+// A bare name: a nullary enum variant lowers to its owner-qualified form, anything
+// else to the context's resolved name (local, member, or extern).
+private emit_identifier(node): str {
+    mut id = node.child("name")
+    if .ctx.is_variant(id) {
+        return .ctx.variant_qualified(id)
+    }
+    return .ctx.emit_name(id)
 }
 
 private emit_literal(node): str {
