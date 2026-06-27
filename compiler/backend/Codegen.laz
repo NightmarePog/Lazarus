@@ -117,6 +117,9 @@ private is_emittable(stmt): bool {
     if k == "ExternDecl" {
         return false
     }
+    if k == "InterfaceDecl" {
+        return false
+    }
     if k == "VariableDecl" and .is_property(stmt) {
         return false
     }

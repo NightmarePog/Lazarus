@@ -73,6 +73,21 @@ private load(path: str, origin_source: str, origin_line: int, origin_col: int, o
     }
     program.set("body", body)
 
-    .ordered.push(Module(path, class_name, source, program, imports))
+    .ordered.push(Module(path, class_name, source, program, imports, .body_is_interface(body)))
     .loaded[path] = true
+}
+
+// A module is an interface when its body holds only interface declarations (a
+// `@interface` file, or a file whose sole content is `interface` blocks): it
+// contributes a contract to the checker but no class table.
+private body_is_interface(body): bool {
+    if body.len() == 0 {
+        return false
+    }
+    for node in body {
+        if node.kind != "InterfaceDecl" {
+            return false
+        }
+    }
+    return true
 }

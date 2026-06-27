@@ -75,6 +75,22 @@ static enum_variant(name: str, fields, line: int, col: int): Node {
     return Node("EnumVariant", ["name": name, "fields": fields, "line": line, "col": col])
 }
 
+// An interface `interface Name<T> { sig…; prop… }` — a structural contract. A
+// `@interface` file desugars to one of these with an empty `name`, filled in from
+// the filename. `methods` are signatures (no body), `properties` requirements.
+// Fully erased at codegen.
+static interface_decl(name: str, methods, properties, type_params, line: int, col: int): Node {
+    return Node("InterfaceDecl", ["name": name, "methods": methods, "properties": properties, "type_params": type_params, "line": line, "col": col])
+}
+
+static interface_method(name: str, param_types, return_type, type_params): Node {
+    return Node("InterfaceMethod", ["name": name, "param_types": param_types, "return_type": return_type, "type_params": type_params])
+}
+
+static interface_property(name: str, type): Node {
+    return Node("InterfaceProperty", ["name": name, "type": type])
+}
+
 // A named (optionally generic) type: `int`, `dynamic`, `Result<int>`; `args` is
 // the list of type arguments (empty when not generic).
 static type_name(name: str, args, line: int, col: int): Node {

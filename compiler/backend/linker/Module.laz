@@ -1,17 +1,20 @@
 // Module — one loaded compilation unit from the Linker: its resolved file `path`,
 // `class_name` (the file stem), raw `source` (for error snippets), parsed `ast`
-// (a Program node with imports stripped), and `imports` (the visible class names).
+// (a Program node with imports stripped), `imports` (the visible class names), and
+// `is_interface` (the body is only interface declarations — no class is emitted).
 
 public path
 public class_name
 public source
 public ast
 public imports
+public is_interface
 
-constructor(path: str, class_name: str, source: str, ast, imports) {
+constructor(path: str, class_name: str, source: str, ast, imports, is_interface: bool) {
     .path = path
     .class_name = class_name
     .source = source
     .ast = ast
     .imports = imports
+    .is_interface = is_interface
 }

@@ -50,6 +50,12 @@ static enum_of(name: str, args): Type {
     return Type("enum", name, args, 0)
 }
 
+// A structural-interface type; `args` are its `<…>` arguments. A class satisfies
+// it via the conformance check in Typecheck, not by nominal equality.
+static iface_of(name: str, args): Type {
+    return Type("iface", name, args, 0)
+}
+
 static fn(params, result): Type {
     return Type("fn", "", params, result)
 }
@@ -73,7 +79,7 @@ public equals(other: Type): bool {
     if .kind != other.kind {
         return false
     }
-    if .kind == "class" or .kind == "enum" or .kind == "var" {
+    if .kind == "class" or .kind == "enum" or .kind == "var" or .kind == "iface" {
         return .name == other.name
     }
     return true
@@ -84,7 +90,7 @@ public describe(): str {
     if .kind == "var" {
         return .name
     }
-    if .kind == "class" or .kind == "enum" {
+    if .kind == "class" or .kind == "enum" or .kind == "iface" {
         if .params.len() == 0 {
             return .name
         }

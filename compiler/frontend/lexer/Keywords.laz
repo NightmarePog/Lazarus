@@ -6,6 +6,7 @@ private static words = [
     "import": "IMPORT",
     "extern": "EXTERN",
     "enum": "ENUM",
+    "interface": "INTERFACE",
     "private": "PRIVATE",
     "public": "PUBLIC",
     "mut": "MUTABLE",
@@ -60,7 +61,8 @@ private static ops1 = [
     ".": "DOT",
     ";": "SEMICOLON",
     "[": "LSQUARE",
-    "]": "RSQUARE"
+    "]": "RSQUARE",
+    "@": "AT"
 ]
 
 public static word_kind(word: str): str {
