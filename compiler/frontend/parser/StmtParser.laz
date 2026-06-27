@@ -39,7 +39,37 @@ public parse_program(): Node {
         }
         body.push(.parse_statement())
     }
-    return Ast.program(body)
+    return Ast.program(.expand_field_params(body))
+}
+
+// A `.`-prefixed constructor param (`constructor(.cursor, .exprs)`) declares the
+// field too: inject a private instance-property for each, so the rest of the
+// pipeline sees an ordinary class. The `.f = f` assignments are added in
+// `parse_constructor`.
+private expand_field_params(body) {
+    mut props = []
+    for stmt in body {
+        if stmt.kind == "ConstructorDecl" {
+            for fp in stmt.attr("field_params").unwrap_or([]) {
+                props.push(.field_property(fp))
+            }
+        }
+    }
+    if props.len() == 0 {
+        return body
+    }
+    mut out = []
+    for p in props {
+        out.push(p)
+    }
+    for stmt in body {
+        out.push(stmt)
+    }
+    return out
+}
+
+private field_property(fp): Node {
+    return Ast.node("VariableDecl", ["name": fp.get("name").unwrap(), "visibility": "private", "mutable": false, "is_static": false, "type": fp.get("type").unwrap(), "line": fp.get("line").unwrap(), "col": fp.get("col").unwrap()])
 }
 
 // `@interface` uses the `interface` keyword; `@object` is `@` + the identifier
@@ -54,8 +84,61 @@ private parse_file_directive(): Node {
         .cursor.advance()
         return .parse_object_body()
     }
+    if .cursor.check("IDENTIFIER") and .cursor.current().value == "auto" {
+        .cursor.advance()
+        return .parse_auto_body()
+    }
     .cursor.fail("unknown file directive '@" ++ .cursor.current().value ++ "'")
     return Ast.program([])
+}
+
+// `@auto` body: a normal class whose constructor is synthesized from its instance
+// fields — one param per field without a default, each assigned. An explicit
+// constructor is rejected (the directive owns it).
+private parse_auto_body(): Node {
+    mut body = []
+    loop {
+        if .cursor.at_end() {
+            break
+        }
+        mut stmt = .parse_statement()
+        if stmt.kind == "ConstructorDecl" {
+            .cursor.fail("an @auto file synthesizes its constructor; remove the explicit 'constructor'")
+        }
+        body.push(stmt)
+    }
+    body.push(.synthesize_constructor(body))
+    return Ast.program(body)
+}
+
+private synthesize_constructor(body): Node {
+    mut params = []
+    mut param_types = []
+    mut assigns = []
+    for stmt in body {
+        if stmt.kind == "VariableDecl" and .is_injected_field(stmt) {
+            params.push(stmt.child("name"))
+            param_types.push(.field_type_node(stmt))
+            assigns.push(.field_param_assign(["name": stmt.child("name"), "line": stmt.line(), "col": stmt.col()]))
+        }
+    }
+    return Ast.constructor_decl(params, assigns, 0, 0, param_types, [])
+}
+
+// An injected field: a visibility-bearing, non-static instance property with no
+// default value (a default-bearing field is seeded by codegen, not a ctor param).
+private is_injected_field(stmt): bool {
+    mut visibility = stmt.attr("visibility").unwrap_or("")
+    mut is_static = stmt.attr("is_static").unwrap_or(false)
+    return visibility != "" and not is_static and stmt.attr("value").is_none()
+}
+
+private field_type_node(stmt): Node {
+    mut t = stmt.attr("type")
+    if t.is_some() {
+        return t.unwrap()
+    }
+    return Ast.type_name("dynamic", [], stmt.line(), stmt.col())
 }
 
 // `@interface` body: signatures + property requirements (and imports), folded into
@@ -359,14 +442,56 @@ private parse_method(visibility: str, is_static: bool): Node {
     return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column, param_types, return_type, type_params)
 }
 
+// A `.`-prefixed param declares + assigns its field (parameter properties); the
+// body braces are optional, so `constructor(.a, .b)` is a complete constructor.
 private parse_constructor(tok): Node {
     mut type_params = .parse_type_params()
     .cursor.consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
     mut param_types = []
-    mut params = .parse_params(param_types)
+    mut field_params = []
+    mut params = .parse_ctor_params(param_types, field_params)
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after parameters")
-    mut body = .parse_block("constructor body")
-    return Ast.constructor_decl(params, body, tok.line, tok.column, param_types, type_params)
+    mut body = []
+    for fp in field_params {
+        body.push(.field_param_assign(fp))
+    }
+    if .cursor.check("BODY_START") {
+        for stmt in .parse_block("constructor body") {
+            body.push(stmt)
+        }
+    }
+    mut node = Ast.constructor_decl(params, body, tok.line, tok.column, param_types, type_params)
+    node.set("field_params", field_params)
+    return node
+}
+
+// Like `parse_params`, but a leading `.` marks a parameter property: the param is
+// also recorded as a field to declare and assign.
+private parse_ctor_params(out_types, field_params) {
+    mut params = []
+    if not .cursor.check("RIGHT_BRACKET") {
+        loop {
+            mut is_field = .cursor.match("DOT")
+            mut p = .cursor.consume("IDENTIFIER", "Expected parameter name")
+            params.push(p.value)
+            mut ty = .param_type(p)
+            out_types.push(ty)
+            if is_field {
+                field_params.push(["name": p.value, "type": ty, "line": p.line, "col": p.column])
+            }
+            if not .cursor.match("COMMA") {
+                break
+            }
+        }
+    }
+    return params
+}
+
+private field_param_assign(fp): Node {
+    mut name = fp.get("name").unwrap()
+    mut l = fp.get("line").unwrap()
+    mut c = fp.get("col").unwrap()
+    return Ast.field_assign(Ast.member(Ast.self_expr(l, c), name, l, c), Ast.identifier(name, l, c), l, c)
 }
 
 // A comma-separated parameter list, the opening `(` consumed. Names are returned;
