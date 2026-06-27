@@ -7,12 +7,11 @@
 // `emit_stmt` lowers ordinary statements, declaring locals in the context so
 // member references stay qualified while locals stay bare.
 
-@auto
 import std.Num
 import backend.Text
 
-private ctx
-private exprs
+@auto
+constructor(ctx, exprs)
 
 public emit_member(node): str {
     match node.kind {

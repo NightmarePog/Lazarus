@@ -4,7 +4,7 @@
 // variable (built by copying, since Lazarus maps cannot delete a key).
 
 @auto
-private entries
+constructor(entries)
 
 static empty(): Constants {
     return Constants([:])

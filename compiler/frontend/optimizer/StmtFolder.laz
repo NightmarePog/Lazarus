@@ -5,7 +5,7 @@
 // Runs after schematic, which sets the `reassign` annotation this relies on.
 
 @auto
-private exprs
+constructor(exprs)
 
 public fold_block(stmts, constants) {
     for stmt in stmts {

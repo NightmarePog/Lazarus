@@ -112,6 +112,19 @@ end
 
 local Error = {}
 
+function Error.new(kind, message, line, column, source, span)
+    local self = {}
+    self.to_string = Error.to_string
+    self.raise = Error.raise
+    self.format = Error.format
+    self.kind = kind
+    self.message = message
+    self.line = line
+    self.column = column
+    self.source = source
+    self.span = span
+    return self
+end
 function Error.to_string(self)
     return Error.format(self)
 end
@@ -187,19 +200,6 @@ function Error.display_width(s)
     end
     return w
 end
-function Error.new(kind, message, line, column, source, span)
-    local self = {}
-    self.to_string = Error.to_string
-    self.raise = Error.raise
-    self.format = Error.format
-    self.kind = kind
-    self.message = message
-    self.line = line
-    self.column = column
-    self.source = source
-    self.span = span
-    return self
-end
 
 local Char = {}
 
@@ -251,9 +251,6 @@ end
 
 local Token = {}
 
-function Token.to_string(self)
-    return __lz_unwrap_or(__lz_wrap(string.format("%s('%s', %d:%d)", self.kind, self.value, self.line, self.column)), "<token>")
-end
 function Token.new(kind, value, line, column)
     local self = {}
     self.to_string = Token.to_string
@@ -262,6 +259,9 @@ function Token.new(kind, value, line, column)
     self.line = line
     self.column = column
     return self
+end
+function Token.to_string(self)
+    return __lz_unwrap_or(__lz_wrap(string.format("%s('%s', %d:%d)", self.kind, self.value, self.line, self.column)), "<token>")
 end
 
 local Lexer = {}
@@ -453,6 +453,28 @@ end
 
 local TokenCursor = {}
 
+function TokenCursor.new(tokens, source)
+    local self = {}
+    self.position = TokenCursor.position
+    self.token_at = TokenCursor.token_at
+    self.current = TokenCursor.current
+    self.current_kind = TokenCursor.current_kind
+    self.peek_next = TokenCursor.peek_next
+    self.previous = TokenCursor.previous
+    self.at_end = TokenCursor.at_end
+    self.check = TokenCursor.check
+    self.advance = TokenCursor.advance
+    self.match = TokenCursor.match
+    self.consume = TokenCursor.consume
+    self.fail = TokenCursor.fail
+    self.fail_at = TokenCursor.fail_at
+    self.error_pos = TokenCursor.error_pos
+    self.eof = TokenCursor.eof
+    self.pos = 1
+    self.tokens = tokens
+    self.source = source
+    return self
+end
 function TokenCursor.position(self)
     return self.pos
 end
@@ -528,31 +550,21 @@ end
 function TokenCursor.eof(self)
     return Token.new("EOF", "", 0, 0)
 end
-function TokenCursor.new(tokens, source)
-    local self = {}
-    self.position = TokenCursor.position
-    self.token_at = TokenCursor.token_at
-    self.current = TokenCursor.current
-    self.current_kind = TokenCursor.current_kind
-    self.peek_next = TokenCursor.peek_next
-    self.previous = TokenCursor.previous
-    self.at_end = TokenCursor.at_end
-    self.check = TokenCursor.check
-    self.advance = TokenCursor.advance
-    self.match = TokenCursor.match
-    self.consume = TokenCursor.consume
-    self.fail = TokenCursor.fail
-    self.fail_at = TokenCursor.fail_at
-    self.error_pos = TokenCursor.error_pos
-    self.eof = TokenCursor.eof
-    self.pos = 1
-    self.tokens = tokens
-    self.source = source
-    return self
-end
 
 local Node = {}
 
+function Node.new(kind, attrs)
+    local self = {}
+    self.attr = Node.attr
+    self.child = Node.child
+    self.line = Node.line
+    self.col = Node.col
+    self.set = Node.set
+    self.summary = Node.summary
+    self.kind = kind
+    self.attrs = attrs
+    return self
+end
 function Node.attr(self, name)
     return __lz_get(self.attrs, name)
 end
@@ -574,18 +586,6 @@ function Node.summary(self)
         return (self.kind .. " ") .. __lz_unwrap(named)
     end
     return self.kind
-end
-function Node.new(kind, attrs)
-    local self = {}
-    self.attr = Node.attr
-    self.child = Node.child
-    self.line = Node.line
-    self.col = Node.col
-    self.set = Node.set
-    self.summary = Node.summary
-    self.kind = kind
-    self.attrs = attrs
-    return self
 end
 
 local Ast = {}
@@ -702,6 +702,28 @@ end
 local ExprParser = {}
 
 ExprParser.precedences = __lz_map({["OR"] = 1, ["AND"] = 2, ["EQ"] = 3, ["NEQ"] = 3, ["LESS"] = 3, ["LESS_EQUAL"] = 3, ["GREATER"] = 3, ["GREATER_EQUAL"] = 3, ["CONCAT"] = 4, ["PLUS"] = 4, ["MINUS"] = 4, ["MULTIPLY"] = 5, ["DIVIDE"] = 5, ["MODULO"] = 5, ["POWER"] = 6})
+function ExprParser.new(cursor)
+    local self = {}
+    self.expression = ExprParser.expression
+    self.parse_binary = ExprParser.parse_binary
+    self.parse_unary = ExprParser.parse_unary
+    self.parse_call = ExprParser.parse_call
+    self.finish_call = ExprParser.finish_call
+    self.finish_member = ExprParser.finish_member
+    self.finish_index = ExprParser.finish_index
+    self.continues_line = ExprParser.continues_line
+    self.parse_arguments = ExprParser.parse_arguments
+    self.parse_primary = ExprParser.parse_primary
+    self.parse_collection = ExprParser.parse_collection
+    self.parse_list_comp = ExprParser.parse_list_comp
+    self.parse_map_comp = ExprParser.parse_map_comp
+    self.parse_comp_clause = ExprParser.parse_comp_clause
+    self.parse_map_rest = ExprParser.parse_map_rest
+    self.parse_list_rest = ExprParser.parse_list_rest
+    self.precedence = ExprParser.precedence
+    self.cursor = cursor
+    return self
+end
 function ExprParser.expression(self)
     return ExprParser.parse_binary(self, 1)
 end
@@ -895,34 +917,72 @@ end
 function ExprParser.precedence(self, kind)
     return __lz_get(ExprParser.precedences, kind)
 end
-function ExprParser.new(cursor)
-    local self = {}
-    self.expression = ExprParser.expression
-    self.parse_binary = ExprParser.parse_binary
-    self.parse_unary = ExprParser.parse_unary
-    self.parse_call = ExprParser.parse_call
-    self.finish_call = ExprParser.finish_call
-    self.finish_member = ExprParser.finish_member
-    self.finish_index = ExprParser.finish_index
-    self.continues_line = ExprParser.continues_line
-    self.parse_arguments = ExprParser.parse_arguments
-    self.parse_primary = ExprParser.parse_primary
-    self.parse_collection = ExprParser.parse_collection
-    self.parse_list_comp = ExprParser.parse_list_comp
-    self.parse_map_comp = ExprParser.parse_map_comp
-    self.parse_comp_clause = ExprParser.parse_comp_clause
-    self.parse_map_rest = ExprParser.parse_map_rest
-    self.parse_list_rest = ExprParser.parse_list_rest
-    self.precedence = ExprParser.precedence
-    self.cursor = cursor
-    return self
-end
 
 local StmtParser = {}
 
 StmtParser.compounds = __lz_map({["PLUS_ASSIGN"] = "PLUS", ["MINUS_ASSIGN"] = "MINUS", ["STAR_ASSIGN"] = "MULTIPLY", ["SLASH_ASSIGN"] = "DIVIDE"})
+function StmtParser.new(cursor, exprs)
+    local self = {}
+    self.parse_program = StmtParser.parse_program
+    self.is_file_directive = StmtParser.is_file_directive
+    self.expand_field_params = StmtParser.expand_field_params
+    self.field_property = StmtParser.field_property
+    self.parse_file_directive = StmtParser.parse_file_directive
+    self.parse_interface_body = StmtParser.parse_interface_body
+    self.parse_object_body = StmtParser.parse_object_body
+    self.parse_object_member = StmtParser.parse_object_member
+    self.parse_statement = StmtParser.parse_statement
+    self.parse_identifier_statement = StmtParser.parse_identifier_statement
+    self.parse_block = StmtParser.parse_block
+    self.parse_import = StmtParser.parse_import
+    self.parse_enum = StmtParser.parse_enum
+    self.parse_enum_variant = StmtParser.parse_enum_variant
+    self.parse_interface = StmtParser.parse_interface
+    self.parse_interface_member = StmtParser.parse_interface_member
+    self.parse_extern = StmtParser.parse_extern
+    self.parse_member = StmtParser.parse_member
+    self.parse_static = StmtParser.parse_static
+    self.parse_binding = StmtParser.parse_binding
+    self.parse_assignment = StmtParser.parse_assignment
+    self.local_binding = StmtParser.local_binding
+    self.parse_method = StmtParser.parse_method
+    self.parse_annotation = StmtParser.parse_annotation
+    self.parse_constructor = StmtParser.parse_constructor
+    self.parse_ctor_params = StmtParser.parse_ctor_params
+    self.field_param_assign = StmtParser.field_param_assign
+    self.all_field_params = StmtParser.all_field_params
+    self.parse_params = StmtParser.parse_params
+    self.param_type = StmtParser.param_type
+    self.parse_return_type = StmtParser.parse_return_type
+    self.parse_typed_local = StmtParser.parse_typed_local
+    self.parse_type_params = StmtParser.parse_type_params
+    self.parse_type = StmtParser.parse_type
+    self.parse_type_fn = StmtParser.parse_type_fn
+    self.looks_like_decl = StmtParser.looks_like_decl
+    self.parse_return = StmtParser.parse_return
+    self.parse_if = StmtParser.parse_if
+    self.parse_while = StmtParser.parse_while
+    self.parse_loop = StmtParser.parse_loop
+    self.parse_break = StmtParser.parse_break
+    self.starts_match = StmtParser.starts_match
+    self.parse_match = StmtParser.parse_match
+    self.parse_match_arm = StmtParser.parse_match_arm
+    self.variant_pattern_ahead = StmtParser.variant_pattern_ahead
+    self.parse_variant_bindings = StmtParser.parse_variant_bindings
+    self.is_variant_name = StmtParser.is_variant_name
+    self.parse_for = StmtParser.parse_for
+    self.parse_for_in = StmtParser.parse_for_in
+    self.parse_for_c = StmtParser.parse_for_c
+    self.looks_like_for_in = StmtParser.looks_like_for_in
+    self.parse_expr_statement = StmtParser.parse_expr_statement
+    self.make_assign = StmtParser.make_assign
+    self.compound = StmtParser.compound
+    self.cursor = cursor
+    self.exprs = exprs
+    return self
+end
 function StmtParser.parse_program(self)
-    if self.cursor:check("AT") then
+    if self.cursor:check("AT") and StmtParser.is_file_directive(self) then
         return StmtParser.parse_file_directive(self)
     end
     local body = __lz_list()
@@ -933,6 +993,16 @@ function StmtParser.parse_program(self)
         __lz_push(body, StmtParser.parse_statement(self))
     end
     return Ast.program(StmtParser.expand_field_params(self, body))
+end
+function StmtParser.is_file_directive(self)
+    local after = self.cursor:peek_next()
+    if after.kind == "INTERFACE" then
+        return true
+    end
+    if (after.kind == "IDENTIFIER") and (after.value == "object") then
+        return true
+    end
+    return false
 end
 function StmtParser.expand_field_params(self, body)
     local props = __lz_list()
@@ -967,52 +1037,8 @@ function StmtParser.parse_file_directive(self)
         self.cursor:advance()
         return StmtParser.parse_object_body(self)
     end
-    if self.cursor:check("IDENTIFIER") and (self.cursor:current().value == "auto") then
-        self.cursor:advance()
-        return StmtParser.parse_auto_body(self)
-    end
     self.cursor:fail(("unknown file directive '@" .. self.cursor:current().value) .. "'")
     return Ast.program(__lz_list())
-end
-function StmtParser.parse_auto_body(self)
-    local body = __lz_list()
-    while true do
-        if self.cursor:at_end() then
-            break
-        end
-        local stmt = StmtParser.parse_statement(self)
-        if stmt.kind == "ConstructorDecl" then
-            self.cursor:fail("an @auto file synthesizes its constructor; remove the explicit 'constructor'")
-        end
-        __lz_push(body, stmt)
-    end
-    __lz_push(body, StmtParser.synthesize_constructor(self, body))
-    return Ast.program(body)
-end
-function StmtParser.synthesize_constructor(self, body)
-    local params = __lz_list()
-    local param_types = __lz_list()
-    local assigns = __lz_list()
-    for _, stmt in __lz_each(body) do
-        if (stmt.kind == "VariableDecl") and StmtParser.is_injected_field(self, stmt) then
-            __lz_push(params, stmt:child("name"))
-            __lz_push(param_types, StmtParser.field_type_node(self, stmt))
-            __lz_push(assigns, StmtParser.field_param_assign(self, __lz_map({["name"] = stmt:child("name"), ["line"] = stmt:line(), ["col"] = stmt:col()})))
-        end
-    end
-    return Ast.constructor_decl(params, assigns, 0, 0, param_types, __lz_list())
-end
-function StmtParser.is_injected_field(self, stmt)
-    local visibility = __lz_unwrap_or(stmt:attr("visibility"), "")
-    local is_static = __lz_unwrap_or(stmt:attr("is_static"), false)
-    return ((visibility ~= "") and (not is_static)) and __lz_is_none(stmt:attr("value"))
-end
-function StmtParser.field_type_node(self, stmt)
-    local t = stmt:attr("type")
-    if __lz_is_some(t) then
-        return __lz_unwrap(t)
-    end
-    return Ast.type_name("dynamic", __lz_list(), stmt:line(), stmt:col())
 end
 function StmtParser.parse_interface_body(self, at)
     local body = __lz_list()
@@ -1095,9 +1121,11 @@ function StmtParser.parse_statement(self)
     elseif __lz_m1 == "STATIC" then
         self.cursor:advance()
         return StmtParser.parse_static(self)
+    elseif __lz_m1 == "AT" then
+        return StmtParser.parse_annotation(self)
     elseif __lz_m1 == "CONSTRUCTOR" then
         self.cursor:advance()
-        return StmtParser.parse_constructor(self, tok)
+        return StmtParser.parse_constructor(self, tok, false)
     elseif __lz_m1 == "RETURN" then
         self.cursor:advance()
         return StmtParser.parse_return(self, tok)
@@ -1308,13 +1336,26 @@ function StmtParser.parse_method(self, visibility, is_static)
     local body = StmtParser.parse_block(self, "method body")
     return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column, param_types, return_type, type_params)
 end
-function StmtParser.parse_constructor(self, tok)
+function StmtParser.parse_annotation(self)
+    self.cursor:consume("AT", "Expected '@'")
+    local name = self.cursor:consume("IDENTIFIER", "Expected an annotation name after '@'")
+    if name.value == "auto" then
+        local tok = self.cursor:consume("CONSTRUCTOR", "@auto must annotate a constructor")
+        return StmtParser.parse_constructor(self, tok, true)
+    end
+    self.cursor:fail(("unknown annotation '@" .. name.value) .. "'")
+    return Ast.constructor_decl(__lz_list(), __lz_list(), 0, 0, __lz_list(), __lz_list())
+end
+function StmtParser.parse_constructor(self, tok, all_fields)
     local type_params = StmtParser.parse_type_params(self)
     self.cursor:consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
     local param_types = __lz_list()
     local field_params = __lz_list()
     local params = StmtParser.parse_ctor_params(self, param_types, field_params)
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after parameters")
+    if all_fields then
+        field_params = StmtParser.all_field_params(self, params, param_types, tok)
+    end
     local body = __lz_list()
     for _, fp in __lz_each(field_params) do
         __lz_push(body, StmtParser.field_param_assign(self, fp))
@@ -1352,6 +1393,15 @@ function StmtParser.field_param_assign(self, fp)
     local l = __lz_unwrap(__lz_get(fp, "line"))
     local c = __lz_unwrap(__lz_get(fp, "col"))
     return Ast.field_assign(Ast.member(Ast.self_expr(l, c), name, l, c), Ast.identifier(name, l, c), l, c)
+end
+function StmtParser.all_field_params(self, params, param_types, tok)
+    local out = __lz_list()
+    local i = 1
+    for _, name in __lz_each(params) do
+        __lz_push(out, __lz_map({["name"] = name, ["type"] = __lz_unwrap(__lz_get(param_types, i)), ["line"] = tok.line, ["col"] = tok.column}))
+        i = i + 1
+    end
+    return out
 end
 function StmtParser.parse_params(self, out_types)
     local params = __lz_list()
@@ -1633,67 +1683,6 @@ end
 function StmtParser.compound(self, kind)
     return __lz_get(StmtParser.compounds, kind)
 end
-function StmtParser.new(cursor, exprs)
-    local self = {}
-    self.parse_program = StmtParser.parse_program
-    self.expand_field_params = StmtParser.expand_field_params
-    self.field_property = StmtParser.field_property
-    self.parse_file_directive = StmtParser.parse_file_directive
-    self.parse_auto_body = StmtParser.parse_auto_body
-    self.synthesize_constructor = StmtParser.synthesize_constructor
-    self.is_injected_field = StmtParser.is_injected_field
-    self.field_type_node = StmtParser.field_type_node
-    self.parse_interface_body = StmtParser.parse_interface_body
-    self.parse_object_body = StmtParser.parse_object_body
-    self.parse_object_member = StmtParser.parse_object_member
-    self.parse_statement = StmtParser.parse_statement
-    self.parse_identifier_statement = StmtParser.parse_identifier_statement
-    self.parse_block = StmtParser.parse_block
-    self.parse_import = StmtParser.parse_import
-    self.parse_enum = StmtParser.parse_enum
-    self.parse_enum_variant = StmtParser.parse_enum_variant
-    self.parse_interface = StmtParser.parse_interface
-    self.parse_interface_member = StmtParser.parse_interface_member
-    self.parse_extern = StmtParser.parse_extern
-    self.parse_member = StmtParser.parse_member
-    self.parse_static = StmtParser.parse_static
-    self.parse_binding = StmtParser.parse_binding
-    self.parse_assignment = StmtParser.parse_assignment
-    self.local_binding = StmtParser.local_binding
-    self.parse_method = StmtParser.parse_method
-    self.parse_constructor = StmtParser.parse_constructor
-    self.parse_ctor_params = StmtParser.parse_ctor_params
-    self.field_param_assign = StmtParser.field_param_assign
-    self.parse_params = StmtParser.parse_params
-    self.param_type = StmtParser.param_type
-    self.parse_return_type = StmtParser.parse_return_type
-    self.parse_typed_local = StmtParser.parse_typed_local
-    self.parse_type_params = StmtParser.parse_type_params
-    self.parse_type = StmtParser.parse_type
-    self.parse_type_fn = StmtParser.parse_type_fn
-    self.looks_like_decl = StmtParser.looks_like_decl
-    self.parse_return = StmtParser.parse_return
-    self.parse_if = StmtParser.parse_if
-    self.parse_while = StmtParser.parse_while
-    self.parse_loop = StmtParser.parse_loop
-    self.parse_break = StmtParser.parse_break
-    self.starts_match = StmtParser.starts_match
-    self.parse_match = StmtParser.parse_match
-    self.parse_match_arm = StmtParser.parse_match_arm
-    self.variant_pattern_ahead = StmtParser.variant_pattern_ahead
-    self.parse_variant_bindings = StmtParser.parse_variant_bindings
-    self.is_variant_name = StmtParser.is_variant_name
-    self.parse_for = StmtParser.parse_for
-    self.parse_for_in = StmtParser.parse_for_in
-    self.parse_for_c = StmtParser.parse_for_c
-    self.looks_like_for_in = StmtParser.looks_like_for_in
-    self.parse_expr_statement = StmtParser.parse_expr_statement
-    self.make_assign = StmtParser.make_assign
-    self.compound = StmtParser.compound
-    self.cursor = cursor
-    self.exprs = exprs
-    return self
-end
 
 local Parser = {}
 
@@ -1711,9 +1700,6 @@ end
 
 local Symbol = {}
 
-function Symbol.set_noncallable(self, flag)
-    self.noncallable = flag
-end
 function Symbol.new(kind, mutable, noncallable)
     local self = {}
     self.set_noncallable = Symbol.set_noncallable
@@ -1722,9 +1708,23 @@ function Symbol.new(kind, mutable, noncallable)
     self.noncallable = noncallable
     return self
 end
+function Symbol.set_noncallable(self, flag)
+    self.noncallable = flag
+end
 
 local Scope = {}
 
+function Scope.new(parent, is_root)
+    local self = {}
+    self.child = Scope.child
+    self.declare = Scope.declare
+    self.declared_here = Scope.declared_here
+    self.lookup = Scope.lookup
+    self.names = __lz_map({})
+    self.parent = parent
+    self.is_root = is_root
+    return self
+end
 function Scope.root()
     return Scope.new(0, true)
 end
@@ -1747,23 +1747,9 @@ function Scope.lookup(self, name)
     end
     return self.parent:lookup(name)
 end
-function Scope.new(parent, is_root)
-    local self = {}
-    self.child = Scope.child
-    self.declare = Scope.declare
-    self.declared_here = Scope.declared_here
-    self.lookup = Scope.lookup
-    self.names = __lz_map({})
-    self.parent = parent
-    self.is_root = is_root
-    return self
-end
 
 local Frame = {}
 
-function Frame.in_loop_body(self)
-    return Frame.new(self.in_function, true, self.in_constructor)
-end
 function Frame.new(in_function, in_loop, in_constructor)
     local self = {}
     self.in_loop_body = Frame.in_loop_body
@@ -1771,6 +1757,9 @@ function Frame.new(in_function, in_loop, in_constructor)
     self.in_loop = in_loop
     self.in_constructor = in_constructor
     return self
+end
+function Frame.in_loop_body(self)
+    return Frame.new(self.in_function, true, self.in_constructor)
 end
 
 local Booleanity = {}
@@ -1817,6 +1806,27 @@ end
 
 local ExprChecker = {}
 
+function ExprChecker.new(source, properties, methods, variant_owner)
+    local self = {}
+    self.set_instance = ExprChecker.set_instance
+    self.instance_flag = ExprChecker.instance_flag
+    self.check = ExprChecker.check
+    self.check_comprehension = ExprChecker.check_comprehension
+    self.check_condition = ExprChecker.check_condition
+    self.check_identifier = ExprChecker.check_identifier
+    self.check_call = ExprChecker.check_call
+    self.check_member = ExprChecker.check_member
+    self.check_self = ExprChecker.check_self
+    self.check_list = ExprChecker.check_list
+    self.check_map = ExprChecker.check_map
+    self.fail = ExprChecker.fail
+    self.in_instance = false
+    self.source = source
+    self.properties = properties
+    self.methods = methods
+    self.variant_owner = variant_owner
+    return self
+end
 function ExprChecker.set_instance(self, flag)
     self.in_instance = flag
 end
@@ -1927,27 +1937,6 @@ end
 function ExprChecker.fail(self, node, message, span)
     Error.new("SemanticError", message, node:line(), node:col(), self.source, span):raise()
 end
-function ExprChecker.new(source, properties, methods, variant_owner)
-    local self = {}
-    self.set_instance = ExprChecker.set_instance
-    self.instance_flag = ExprChecker.instance_flag
-    self.check = ExprChecker.check
-    self.check_comprehension = ExprChecker.check_comprehension
-    self.check_condition = ExprChecker.check_condition
-    self.check_identifier = ExprChecker.check_identifier
-    self.check_call = ExprChecker.check_call
-    self.check_member = ExprChecker.check_member
-    self.check_self = ExprChecker.check_self
-    self.check_list = ExprChecker.check_list
-    self.check_map = ExprChecker.check_map
-    self.fail = ExprChecker.fail
-    self.in_instance = false
-    self.source = source
-    self.properties = properties
-    self.methods = methods
-    self.variant_owner = variant_owner
-    return self
-end
 
 local Naming = {}
 
@@ -1988,6 +1977,41 @@ end
 
 local StmtChecker = {}
 
+function StmtChecker.new(source, exprs, variant_owner, enums, variant_arity)
+    local self = {}
+    self.check_block = StmtChecker.check_block
+    self.check_statement = StmtChecker.check_statement
+    self.check_variable = StmtChecker.check_variable
+    self.declare_binding = StmtChecker.declare_binding
+    self.reassign_binding = StmtChecker.reassign_binding
+    self.check_optional_value = StmtChecker.check_optional_value
+    self.value_noncallable = StmtChecker.value_noncallable
+    self.check_function = StmtChecker.check_function
+    self.check_constructor = StmtChecker.check_constructor
+    self.check_callable_body = StmtChecker.check_callable_body
+    self.bind_params = StmtChecker.bind_params
+    self.check_return = StmtChecker.check_return
+    self.check_break = StmtChecker.check_break
+    self.check_expr_statement = StmtChecker.check_expr_statement
+    self.check_assign = StmtChecker.check_assign
+    self.check_if = StmtChecker.check_if
+    self.check_while = StmtChecker.check_while
+    self.check_loop = StmtChecker.check_loop
+    self.check_for = StmtChecker.check_for
+    self.check_for_init = StmtChecker.check_for_init
+    self.check_for_in = StmtChecker.check_for_in
+    self.check_match = StmtChecker.check_match
+    self.check_variant_arm = StmtChecker.check_variant_arm
+    self.declare_bindings = StmtChecker.declare_bindings
+    self.check_exhaustive = StmtChecker.check_exhaustive
+    self.fail = StmtChecker.fail
+    self.source = source
+    self.exprs = exprs
+    self.variant_owner = variant_owner
+    self.enums = enums
+    self.variant_arity = variant_arity
+    return self
+end
 function StmtChecker.check_block(self, stmts, scope, frame)
     local n = __lz_len(stmts)
     for i, stmt in __lz_each(stmts) do
@@ -2271,41 +2295,6 @@ end
 function StmtChecker.fail(self, node, message, span)
     Error.new("SemanticError", message, node:line(), node:col(), self.source, span):raise()
 end
-function StmtChecker.new(source, exprs, variant_owner, enums, variant_arity)
-    local self = {}
-    self.check_block = StmtChecker.check_block
-    self.check_statement = StmtChecker.check_statement
-    self.check_variable = StmtChecker.check_variable
-    self.declare_binding = StmtChecker.declare_binding
-    self.reassign_binding = StmtChecker.reassign_binding
-    self.check_optional_value = StmtChecker.check_optional_value
-    self.value_noncallable = StmtChecker.value_noncallable
-    self.check_function = StmtChecker.check_function
-    self.check_constructor = StmtChecker.check_constructor
-    self.check_callable_body = StmtChecker.check_callable_body
-    self.bind_params = StmtChecker.bind_params
-    self.check_return = StmtChecker.check_return
-    self.check_break = StmtChecker.check_break
-    self.check_expr_statement = StmtChecker.check_expr_statement
-    self.check_assign = StmtChecker.check_assign
-    self.check_if = StmtChecker.check_if
-    self.check_while = StmtChecker.check_while
-    self.check_loop = StmtChecker.check_loop
-    self.check_for = StmtChecker.check_for
-    self.check_for_init = StmtChecker.check_for_init
-    self.check_for_in = StmtChecker.check_for_in
-    self.check_match = StmtChecker.check_match
-    self.check_variant_arm = StmtChecker.check_variant_arm
-    self.declare_bindings = StmtChecker.declare_bindings
-    self.check_exhaustive = StmtChecker.check_exhaustive
-    self.fail = StmtChecker.fail
-    self.source = source
-    self.exprs = exprs
-    self.variant_owner = variant_owner
-    self.enums = enums
-    self.variant_arity = variant_arity
-    return self
-end
 
 local Schematic = {}
 
@@ -2351,6 +2340,18 @@ end
 
 local Type = {}
 
+function Type.new(kind, name, params, result)
+    local self = {}
+    self.is_dynamic = Type.is_dynamic
+    self.is_numeric = Type.is_numeric
+    self.equals = Type.equals
+    self.describe = Type.describe
+    self.kind = kind
+    self.name = name
+    self.params = params
+    self.result = result
+    return self
+end
 function Type.base(kind)
     return Type.new(kind, "", __lz_list(), 0)
 end
@@ -2422,18 +2423,6 @@ function Type.describe(self)
         return ((self.name .. "<") .. inner) .. ">"
     end
     return self.kind
-end
-function Type.new(kind, name, params, result)
-    local self = {}
-    self.is_dynamic = Type.is_dynamic
-    self.is_numeric = Type.is_numeric
-    self.equals = Type.equals
-    self.describe = Type.describe
-    self.kind = kind
-    self.name = name
-    self.params = params
-    self.result = result
-    return self
 end
 
 local Typecheck = {}
@@ -3555,6 +3544,14 @@ end
 
 local Constants = {}
 
+function Constants.new(entries)
+    local self = {}
+    self.record = Constants.record
+    self.lookup = Constants.lookup
+    self.child = Constants.child
+    self.entries = entries
+    return self
+end
 function Constants.empty()
     return Constants.new(__lz_map({}))
 end
@@ -3577,17 +3574,27 @@ function Constants.child(self, shadowed)
     end
     return Constants.new(copy)
 end
-function Constants.new(entries)
-    local self = {}
-    self.record = Constants.record
-    self.lookup = Constants.lookup
-    self.child = Constants.child
-    self.entries = entries
-    return self
-end
 
 local ExprFolder = {}
 
+function ExprFolder.new()
+    local self = {}
+    self.fold_count = ExprFolder.fold_count
+    self.fold = ExprFolder.fold
+    self.fold_comp_cond = ExprFolder.fold_comp_cond
+    self.fold_identifier = ExprFolder.fold_identifier
+    self.fold_binary = ExprFolder.fold_binary
+    self.foldable = ExprFolder.foldable
+    self.can_fold = ExprFolder.can_fold
+    self.is_number = ExprFolder.is_number
+    self.result_kind = ExprFolder.result_kind
+    self.apply = ExprFolder.apply
+    self.fold_call = ExprFolder.fold_call
+    self.fold_list = ExprFolder.fold_list
+    self.fold_map = ExprFolder.fold_map
+    self.folds = 0
+    return self
+end
 function ExprFolder.fold_count(self)
     return self.folds
 end
@@ -3719,27 +3726,24 @@ function ExprFolder.fold_map(self, node, constants)
     end
     return node
 end
-function ExprFolder.new()
-    local self = {}
-    self.fold_count = ExprFolder.fold_count
-    self.fold = ExprFolder.fold
-    self.fold_comp_cond = ExprFolder.fold_comp_cond
-    self.fold_identifier = ExprFolder.fold_identifier
-    self.fold_binary = ExprFolder.fold_binary
-    self.foldable = ExprFolder.foldable
-    self.can_fold = ExprFolder.can_fold
-    self.is_number = ExprFolder.is_number
-    self.result_kind = ExprFolder.result_kind
-    self.apply = ExprFolder.apply
-    self.fold_call = ExprFolder.fold_call
-    self.fold_list = ExprFolder.fold_list
-    self.fold_map = ExprFolder.fold_map
-    self.folds = 0
-    return self
-end
 
 local StmtFolder = {}
 
+function StmtFolder.new(exprs)
+    local self = {}
+    self.fold_block = StmtFolder.fold_block
+    self.fold_statement = StmtFolder.fold_statement
+    self.fold_variable = StmtFolder.fold_variable
+    self.fold_optional = StmtFolder.fold_optional
+    self.fold_assign = StmtFolder.fold_assign
+    self.fold_if = StmtFolder.fold_if
+    self.fold_for = StmtFolder.fold_for
+    self.fold_for_in = StmtFolder.fold_for_in
+    self.fold_match = StmtFolder.fold_match
+    self.is_value_arm = StmtFolder.is_value_arm
+    self.exprs = exprs
+    return self
+end
 function StmtFolder.fold_block(self, stmts, constants)
     for _, stmt in __lz_each(stmts) do
         StmtFolder.fold_statement(self, stmt, constants)
@@ -3843,24 +3847,16 @@ end
 function StmtFolder.is_value_arm(self, arm)
     return (not __lz_unwrap_or(arm:attr("is_wildcard"), false)) and (not __lz_unwrap_or(arm:attr("is_variant"), false))
 end
-function StmtFolder.new(exprs)
-    local self = {}
-    self.fold_block = StmtFolder.fold_block
-    self.fold_statement = StmtFolder.fold_statement
-    self.fold_variable = StmtFolder.fold_variable
-    self.fold_optional = StmtFolder.fold_optional
-    self.fold_assign = StmtFolder.fold_assign
-    self.fold_if = StmtFolder.fold_if
-    self.fold_for = StmtFolder.fold_for
-    self.fold_for_in = StmtFolder.fold_for_in
-    self.fold_match = StmtFolder.fold_match
-    self.is_value_arm = StmtFolder.is_value_arm
-    self.exprs = exprs
-    return self
-end
 
 local Optimizer = {}
 
+function Optimizer.new()
+    local self = {}
+    self.optimize = Optimizer.optimize
+    self.fold_count = Optimizer.fold_count
+    self.folds = 0
+    return self
+end
 function Optimizer.optimize(self, program)
     local exprs = ExprFolder.new()
     local stmts = StmtFolder.new(exprs)
@@ -3871,16 +3867,41 @@ end
 function Optimizer.fold_count(self)
     return self.folds
 end
-function Optimizer.new()
-    local self = {}
-    self.optimize = Optimizer.optimize
-    self.fold_count = Optimizer.fold_count
-    self.folds = 0
-    return self
-end
 
 local CgContext = {}
 
+function CgContext.new(cls, members, instance_methods, instance_order, properties, known_classes, externs, variant_owner)
+    local self = {}
+    self.fresh_temp = CgContext.fresh_temp
+    self.name = CgContext.name
+    self.instance_method_names = CgContext.instance_method_names
+    self.property_decls = CgContext.property_decls
+    self.is_member = CgContext.is_member
+    self.is_instance_method = CgContext.is_instance_method
+    self.is_construction = CgContext.is_construction
+    self.extern_target = CgContext.extern_target
+    self.mark_collections = CgContext.mark_collections
+    self.used_collections = CgContext.used_collections
+    self.push_scope = CgContext.push_scope
+    self.pop_scope = CgContext.pop_scope
+    self.declare_local = CgContext.declare_local
+    self.is_local = CgContext.is_local
+    self.is_variant = CgContext.is_variant
+    self.variant_qualified = CgContext.variant_qualified
+    self.emit_name = CgContext.emit_name
+    self.scopes = __lz_list(__lz_map({}))
+    self.collections = false
+    self.temp_seq = 0
+    self.cls = cls
+    self.members = members
+    self.instance_methods = instance_methods
+    self.instance_order = instance_order
+    self.properties = properties
+    self.known_classes = known_classes
+    self.externs = externs
+    self.variant_owner = variant_owner
+    return self
+end
 function CgContext.fresh_temp(self)
     self.temp_seq = self.temp_seq + 1
     return "__lz_m" .. self.temp_seq
@@ -3952,38 +3973,6 @@ function CgContext.emit_name(self, name)
     end
     return name
 end
-function CgContext.new(cls, members, instance_methods, instance_order, properties, known_classes, externs, variant_owner)
-    local self = {}
-    self.fresh_temp = CgContext.fresh_temp
-    self.name = CgContext.name
-    self.instance_method_names = CgContext.instance_method_names
-    self.property_decls = CgContext.property_decls
-    self.is_member = CgContext.is_member
-    self.is_instance_method = CgContext.is_instance_method
-    self.is_construction = CgContext.is_construction
-    self.extern_target = CgContext.extern_target
-    self.mark_collections = CgContext.mark_collections
-    self.used_collections = CgContext.used_collections
-    self.push_scope = CgContext.push_scope
-    self.pop_scope = CgContext.pop_scope
-    self.declare_local = CgContext.declare_local
-    self.is_local = CgContext.is_local
-    self.is_variant = CgContext.is_variant
-    self.variant_qualified = CgContext.variant_qualified
-    self.emit_name = CgContext.emit_name
-    self.scopes = __lz_list(__lz_map({}))
-    self.collections = false
-    self.temp_seq = 0
-    self.cls = cls
-    self.members = members
-    self.instance_methods = instance_methods
-    self.instance_order = instance_order
-    self.properties = properties
-    self.known_classes = known_classes
-    self.externs = externs
-    self.variant_owner = variant_owner
-    return self
-end
 
 local Text = {}
 
@@ -4039,6 +4028,31 @@ local ExprEmitter = {}
 ExprEmitter.op_map = __lz_map({["PLUS"] = "+", ["MINUS"] = "-", ["MULTIPLY"] = "*", ["DIVIDE"] = "/", ["POWER"] = "^", ["CONCAT"] = "..", ["EQ"] = "==", ["NEQ"] = "~=", ["LESS"] = "<", ["LESS_EQUAL"] = "<=", ["GREATER"] = ">", ["GREATER_EQUAL"] = ">=", ["AND"] = "and", ["OR"] = "or"})
 ExprEmitter.builtins = __lz_map({["len"] = "__lz_len", ["push"] = "__lz_push", ["pop"] = "__lz_pop", ["get"] = "__lz_get", ["has"] = "__lz_has", ["is_some"] = "__lz_is_some", ["is_none"] = "__lz_is_none", ["is_ok"] = "__lz_is_ok", ["is_err"] = "__lz_is_err", ["unwrap"] = "__lz_unwrap", ["unwrap_or"] = "__lz_unwrap_or", ["error"] = "__lz_error"})
 ExprEmitter.constructors = __lz_map({["Option.some"] = "__lz_some", ["Option.none"] = "__lz_none", ["Result.ok"] = "__lz_ok", ["Result.err"] = "__lz_err"})
+function ExprEmitter.new(ctx)
+    local self = {}
+    self.emit = ExprEmitter.emit
+    self.emit_list_comp = ExprEmitter.emit_list_comp
+    self.emit_map_comp = ExprEmitter.emit_map_comp
+    self.declare_loop_vars = ExprEmitter.declare_loop_vars
+    self.comp_body = ExprEmitter.comp_body
+    self.each_header = ExprEmitter.each_header
+    self.emit_identifier = ExprEmitter.emit_identifier
+    self.emit_literal = ExprEmitter.emit_literal
+    self.emit_field = ExprEmitter.emit_field
+    self.emit_list = ExprEmitter.emit_list
+    self.emit_map = ExprEmitter.emit_map
+    self.emit_index = ExprEmitter.emit_index
+    self.emit_unary = ExprEmitter.emit_unary
+    self.emit_binary = ExprEmitter.emit_binary
+    self.emit_call = ExprEmitter.emit_call
+    self.emit_operand = ExprEmitter.emit_operand
+    self.needs_parens = ExprEmitter.needs_parens
+    self.receiver_is_class = ExprEmitter.receiver_is_class
+    self.with_receiver = ExprEmitter.with_receiver
+    self.emit_args = ExprEmitter.emit_args
+    self.ctx = ctx
+    return self
+end
 function ExprEmitter.emit(self, node)
     local __lz_m1 = node.kind
     if __lz_m1 == "LiteralExpr" then
@@ -4237,34 +4251,40 @@ function ExprEmitter.emit_args(self, nodes)
     end
     return out
 end
-function ExprEmitter.new(ctx)
-    local self = {}
-    self.emit = ExprEmitter.emit
-    self.emit_list_comp = ExprEmitter.emit_list_comp
-    self.emit_map_comp = ExprEmitter.emit_map_comp
-    self.declare_loop_vars = ExprEmitter.declare_loop_vars
-    self.comp_body = ExprEmitter.comp_body
-    self.each_header = ExprEmitter.each_header
-    self.emit_identifier = ExprEmitter.emit_identifier
-    self.emit_literal = ExprEmitter.emit_literal
-    self.emit_field = ExprEmitter.emit_field
-    self.emit_list = ExprEmitter.emit_list
-    self.emit_map = ExprEmitter.emit_map
-    self.emit_index = ExprEmitter.emit_index
-    self.emit_unary = ExprEmitter.emit_unary
-    self.emit_binary = ExprEmitter.emit_binary
-    self.emit_call = ExprEmitter.emit_call
-    self.emit_operand = ExprEmitter.emit_operand
-    self.needs_parens = ExprEmitter.needs_parens
-    self.receiver_is_class = ExprEmitter.receiver_is_class
-    self.with_receiver = ExprEmitter.with_receiver
-    self.emit_args = ExprEmitter.emit_args
-    self.ctx = ctx
-    return self
-end
 
 local StmtEmitter = {}
 
+function StmtEmitter.new(ctx, exprs)
+    local self = {}
+    self.emit_member = StmtEmitter.emit_member
+    self.emit_enum = StmtEmitter.emit_enum
+    self.emit_variant_ctor = StmtEmitter.emit_variant_ctor
+    self.emit_stmt = StmtEmitter.emit_stmt
+    self.emit_match = StmtEmitter.emit_match
+    self.match_condition = StmtEmitter.match_condition
+    self.has_bindings = StmtEmitter.has_bindings
+    self.push_payload_body = StmtEmitter.push_payload_body
+    self.emit_block = StmtEmitter.emit_block
+    self.emit_fn_body = StmtEmitter.emit_fn_body
+    self.emit_variable = StmtEmitter.emit_variable
+    self.emit_index_assign = StmtEmitter.emit_index_assign
+    self.emit_local_function = StmtEmitter.emit_local_function
+    self.emit_return = StmtEmitter.emit_return
+    self.emit_if = StmtEmitter.emit_if
+    self.emit_while = StmtEmitter.emit_while
+    self.emit_loop = StmtEmitter.emit_loop
+    self.emit_for = StmtEmitter.emit_for
+    self.emit_for_in = StmtEmitter.emit_for_in
+    self.emit_method = StmtEmitter.emit_method
+    self.emit_static_field = StmtEmitter.emit_static_field
+    self.emit_constructor = StmtEmitter.emit_constructor
+    self.wrap_body = StmtEmitter.wrap_body
+    self.push_block = StmtEmitter.push_block
+    self.with_self = StmtEmitter.with_self
+    self.ctx = ctx
+    self.exprs = exprs
+    return self
+end
 function StmtEmitter.emit_member(self, node)
     local __lz_m1 = node.kind
     if __lz_m1 == "FunctionDecl" then
@@ -4592,37 +4612,6 @@ function StmtEmitter.with_self(self, params)
     end
     return out
 end
-function StmtEmitter.new(ctx, exprs)
-    local self = {}
-    self.emit_member = StmtEmitter.emit_member
-    self.emit_enum = StmtEmitter.emit_enum
-    self.emit_variant_ctor = StmtEmitter.emit_variant_ctor
-    self.emit_stmt = StmtEmitter.emit_stmt
-    self.emit_match = StmtEmitter.emit_match
-    self.match_condition = StmtEmitter.match_condition
-    self.has_bindings = StmtEmitter.has_bindings
-    self.push_payload_body = StmtEmitter.push_payload_body
-    self.emit_block = StmtEmitter.emit_block
-    self.emit_fn_body = StmtEmitter.emit_fn_body
-    self.emit_variable = StmtEmitter.emit_variable
-    self.emit_index_assign = StmtEmitter.emit_index_assign
-    self.emit_local_function = StmtEmitter.emit_local_function
-    self.emit_return = StmtEmitter.emit_return
-    self.emit_if = StmtEmitter.emit_if
-    self.emit_while = StmtEmitter.emit_while
-    self.emit_loop = StmtEmitter.emit_loop
-    self.emit_for = StmtEmitter.emit_for
-    self.emit_for_in = StmtEmitter.emit_for_in
-    self.emit_method = StmtEmitter.emit_method
-    self.emit_static_field = StmtEmitter.emit_static_field
-    self.emit_constructor = StmtEmitter.emit_constructor
-    self.wrap_body = StmtEmitter.wrap_body
-    self.push_block = StmtEmitter.push_block
-    self.with_self = StmtEmitter.with_self
-    self.ctx = ctx
-    self.exprs = exprs
-    return self
-end
 
 local Runtime = {}
 
@@ -4753,6 +4742,16 @@ end
 
 local Bundler = {}
 
+function Bundler.new(modules, entry_class, variant_owner)
+    local self = {}
+    self.bundle = Bundler.bundle
+    self.collect_externs = Bundler.collect_externs
+    self.is_extern_module = Bundler.is_extern_module
+    self.modules = modules
+    self.entry_class = entry_class
+    self.variant_owner = variant_owner
+    return self
+end
 function Bundler.bundle(self)
     local externs = Bundler.collect_externs(self)
     local blocks = __lz_list()
@@ -4809,16 +4808,6 @@ function Bundler.is_extern_module(self, m)
         end
     end
     return has_extern and (not has_other)
-end
-function Bundler.new(modules, entry_class, variant_owner)
-    local self = {}
-    self.bundle = Bundler.bundle
-    self.collect_externs = Bundler.collect_externs
-    self.is_extern_module = Bundler.is_extern_module
-    self.modules = modules
-    self.entry_class = entry_class
-    self.variant_owner = variant_owner
-    return self
 end
 
 local Module = {}

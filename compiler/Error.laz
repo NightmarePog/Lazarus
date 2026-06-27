@@ -2,16 +2,11 @@
 // `unknown:line:col` location, the message, and a source snippet with a caret
 // under the offending column. No exceptions, so `raise()` prints and exits.
 
-@auto
 import std.Str
 import std.Sys
 
-public kind: str
-public message: str
-public line: int
-public column: int
-public source: str
-public span: int
+@auto
+constructor(kind: str, message: str, line: int, column: int, source: str, span: int)
 
 public to_string(): str {
     return .format()
