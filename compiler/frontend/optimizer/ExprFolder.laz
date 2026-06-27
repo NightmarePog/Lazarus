@@ -19,34 +19,26 @@ public fold_count(): int {
 }
 
 public fold(node, constants): Node {
-    mut k = node.kind
-    if k == "IdentifierExpr" {
-        return .fold_identifier(node, constants)
-    }
-    if k == "BinaryExpr" {
-        return .fold_binary(node, constants)
-    }
-    if k == "CallExpr" {
-        return .fold_call(node, constants)
-    }
-    if k == "ListExpr" {
-        return .fold_list(node, constants)
-    }
-    if k == "MapExpr" {
-        return .fold_map(node, constants)
-    }
-    if k == "UnaryExpr" {
-        node.set("operand", .fold(node.child("operand"), constants))
-        return node
-    }
-    if k == "MemberExpr" {
-        node.set("object", .fold(node.child("object"), constants))
-        return node
-    }
-    if k == "IndexExpr" {
-        node.set("object", .fold(node.child("object"), constants))
-        node.set("index", .fold(node.child("index"), constants))
-        return node
+    match node.kind {
+        "IdentifierExpr" => { return .fold_identifier(node, constants) }
+        "BinaryExpr" => { return .fold_binary(node, constants) }
+        "CallExpr" => { return .fold_call(node, constants) }
+        "ListExpr" => { return .fold_list(node, constants) }
+        "MapExpr" => { return .fold_map(node, constants) }
+        "UnaryExpr" => {
+            node.set("operand", .fold(node.child("operand"), constants))
+            return node
+        }
+        "MemberExpr" => {
+            node.set("object", .fold(node.child("object"), constants))
+            return node
+        }
+        "IndexExpr" => {
+            node.set("object", .fold(node.child("object"), constants))
+            node.set("index", .fold(node.child("index"), constants))
+            return node
+        }
+        _ => {}
     }
     return node
 }

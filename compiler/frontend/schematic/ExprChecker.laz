@@ -31,27 +31,23 @@ public instance_flag(): bool {
 }
 
 public check(node, scope) {
-    mut k = node.kind
-    if k == "IdentifierExpr" {
-        .check_identifier(node, scope)
-    } else if k == "BinaryExpr" {
-        .check(node.child("left"), scope)
-        .check(node.child("right"), scope)
-    } else if k == "UnaryExpr" {
-        .check(node.child("operand"), scope)
-    } else if k == "CallExpr" {
-        .check_call(node, scope)
-    } else if k == "MemberExpr" {
-        .check_member(node, scope)
-    } else if k == "SelfExpr" {
-        .check_self(node)
-    } else if k == "ListExpr" {
-        .check_list(node, scope)
-    } else if k == "MapExpr" {
-        .check_map(node, scope)
-    } else if k == "IndexExpr" {
-        .check(node.child("object"), scope)
-        .check(node.child("index"), scope)
+    match node.kind {
+        "IdentifierExpr" => { .check_identifier(node, scope) }
+        "BinaryExpr" => {
+            .check(node.child("left"), scope)
+            .check(node.child("right"), scope)
+        }
+        "UnaryExpr" => { .check(node.child("operand"), scope) }
+        "CallExpr" => { .check_call(node, scope) }
+        "MemberExpr" => { .check_member(node, scope) }
+        "SelfExpr" => { .check_self(node) }
+        "ListExpr" => { .check_list(node, scope) }
+        "MapExpr" => { .check_map(node, scope) }
+        "IndexExpr" => {
+            .check(node.child("object"), scope)
+            .check(node.child("index"), scope)
+        }
+        _ => {}
     }
 }
 

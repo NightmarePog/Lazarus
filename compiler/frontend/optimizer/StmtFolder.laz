@@ -17,36 +17,26 @@ public fold_block(stmts, constants) {
 }
 
 private fold_statement(stmt, constants) {
-    mut k = stmt.kind
-    if k == "VariableDecl" {
-        .fold_variable(stmt, constants)
-    } else if k == "FunctionDecl" {
-        .fold_block(stmt.child("body"), constants.child(stmt.child("params")))
-    } else if k == "ConstructorDecl" {
-        .fold_block(stmt.child("body"), constants.child(stmt.child("params")))
-    } else if k == "ReturnStmt" {
-        .fold_optional(stmt, "value", constants)
-    } else if k == "ExpressionStmt" {
-        stmt.set("expression", .exprs.fold(stmt.child("expression"), constants))
-    } else if k == "FieldAssign" {
-        .fold_assign(stmt, constants)
-    } else if k == "IndexAssign" {
-        .fold_assign(stmt, constants)
-    } else if k == "IfStmt" {
-        .fold_if(stmt, constants)
-    } else if k == "WhileStmt" {
-        stmt.set("condition", .exprs.fold(stmt.child("condition"), constants))
-        .fold_block(stmt.child("body"), constants.child([]))
-    } else if k == "LoopStmt" {
-        .fold_block(stmt.child("body"), constants.child([]))
-    } else if k == "ForStmt" {
-        .fold_for(stmt, constants)
-    } else if k == "ForInStmt" {
-        .fold_for_in(stmt, constants)
-    } else if k == "MatchStmt" {
-        .fold_match(stmt, constants)
+    // ImportDecl / ExternDecl / InterfaceDecl / BreakStmt carry nothing to fold.
+    match stmt.kind {
+        "VariableDecl" => { .fold_variable(stmt, constants) }
+        "FunctionDecl" => { .fold_block(stmt.child("body"), constants.child(stmt.child("params"))) }
+        "ConstructorDecl" => { .fold_block(stmt.child("body"), constants.child(stmt.child("params"))) }
+        "ReturnStmt" => { .fold_optional(stmt, "value", constants) }
+        "ExpressionStmt" => { stmt.set("expression", .exprs.fold(stmt.child("expression"), constants)) }
+        "FieldAssign" => { .fold_assign(stmt, constants) }
+        "IndexAssign" => { .fold_assign(stmt, constants) }
+        "IfStmt" => { .fold_if(stmt, constants) }
+        "WhileStmt" => {
+            stmt.set("condition", .exprs.fold(stmt.child("condition"), constants))
+            .fold_block(stmt.child("body"), constants.child([]))
+        }
+        "LoopStmt" => { .fold_block(stmt.child("body"), constants.child([])) }
+        "ForStmt" => { .fold_for(stmt, constants) }
+        "ForInStmt" => { .fold_for_in(stmt, constants) }
+        "MatchStmt" => { .fold_match(stmt, constants) }
+        _ => {}
     }
-    // ImportDecl / ExternDecl / BreakStmt carry nothing to fold.
 }
 
 private fold_variable(stmt, constants) {

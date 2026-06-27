@@ -1703,27 +1703,28 @@ function ExprChecker.instance_flag(self)
     return self.in_instance
 end
 function ExprChecker.check(self, node, scope)
-    local k = node.kind
-    if k == "IdentifierExpr" then
+    local __lz_m1 = node.kind
+    if __lz_m1 == "IdentifierExpr" then
         ExprChecker.check_identifier(self, node, scope)
-    elseif k == "BinaryExpr" then
+    elseif __lz_m1 == "BinaryExpr" then
         ExprChecker.check(self, node:child("left"), scope)
         ExprChecker.check(self, node:child("right"), scope)
-    elseif k == "UnaryExpr" then
+    elseif __lz_m1 == "UnaryExpr" then
         ExprChecker.check(self, node:child("operand"), scope)
-    elseif k == "CallExpr" then
+    elseif __lz_m1 == "CallExpr" then
         ExprChecker.check_call(self, node, scope)
-    elseif k == "MemberExpr" then
+    elseif __lz_m1 == "MemberExpr" then
         ExprChecker.check_member(self, node, scope)
-    elseif k == "SelfExpr" then
+    elseif __lz_m1 == "SelfExpr" then
         ExprChecker.check_self(self, node)
-    elseif k == "ListExpr" then
+    elseif __lz_m1 == "ListExpr" then
         ExprChecker.check_list(self, node, scope)
-    elseif k == "MapExpr" then
+    elseif __lz_m1 == "MapExpr" then
         ExprChecker.check_map(self, node, scope)
-    elseif k == "IndexExpr" then
+    elseif __lz_m1 == "IndexExpr" then
         ExprChecker.check(self, node:child("object"), scope)
         ExprChecker.check(self, node:child("index"), scope)
+    else
     end
 end
 function ExprChecker.check_condition(self, node, scope)
@@ -3432,34 +3433,28 @@ function ExprFolder.fold_count(self)
     return self.folds
 end
 function ExprFolder.fold(self, node, constants)
-    local k = node.kind
-    if k == "IdentifierExpr" then
+    local __lz_m1 = node.kind
+    if __lz_m1 == "IdentifierExpr" then
         return ExprFolder.fold_identifier(self, node, constants)
-    end
-    if k == "BinaryExpr" then
+    elseif __lz_m1 == "BinaryExpr" then
         return ExprFolder.fold_binary(self, node, constants)
-    end
-    if k == "CallExpr" then
+    elseif __lz_m1 == "CallExpr" then
         return ExprFolder.fold_call(self, node, constants)
-    end
-    if k == "ListExpr" then
+    elseif __lz_m1 == "ListExpr" then
         return ExprFolder.fold_list(self, node, constants)
-    end
-    if k == "MapExpr" then
+    elseif __lz_m1 == "MapExpr" then
         return ExprFolder.fold_map(self, node, constants)
-    end
-    if k == "UnaryExpr" then
+    elseif __lz_m1 == "UnaryExpr" then
         node:set("operand", ExprFolder.fold(self, node:child("operand"), constants))
         return node
-    end
-    if k == "MemberExpr" then
+    elseif __lz_m1 == "MemberExpr" then
         node:set("object", ExprFolder.fold(self, node:child("object"), constants))
         return node
-    end
-    if k == "IndexExpr" then
+    elseif __lz_m1 == "IndexExpr" then
         node:set("object", ExprFolder.fold(self, node:child("object"), constants))
         node:set("index", ExprFolder.fold(self, node:child("index"), constants))
         return node
+    else
     end
     return node
 end
@@ -3570,34 +3565,35 @@ function StmtFolder.fold_block(self, stmts, constants)
     end
 end
 function StmtFolder.fold_statement(self, stmt, constants)
-    local k = stmt.kind
-    if k == "VariableDecl" then
+    local __lz_m1 = stmt.kind
+    if __lz_m1 == "VariableDecl" then
         StmtFolder.fold_variable(self, stmt, constants)
-    elseif k == "FunctionDecl" then
+    elseif __lz_m1 == "FunctionDecl" then
         StmtFolder.fold_block(self, stmt:child("body"), constants:child(stmt:child("params")))
-    elseif k == "ConstructorDecl" then
+    elseif __lz_m1 == "ConstructorDecl" then
         StmtFolder.fold_block(self, stmt:child("body"), constants:child(stmt:child("params")))
-    elseif k == "ReturnStmt" then
+    elseif __lz_m1 == "ReturnStmt" then
         StmtFolder.fold_optional(self, stmt, "value", constants)
-    elseif k == "ExpressionStmt" then
+    elseif __lz_m1 == "ExpressionStmt" then
         stmt:set("expression", self.exprs:fold(stmt:child("expression"), constants))
-    elseif k == "FieldAssign" then
+    elseif __lz_m1 == "FieldAssign" then
         StmtFolder.fold_assign(self, stmt, constants)
-    elseif k == "IndexAssign" then
+    elseif __lz_m1 == "IndexAssign" then
         StmtFolder.fold_assign(self, stmt, constants)
-    elseif k == "IfStmt" then
+    elseif __lz_m1 == "IfStmt" then
         StmtFolder.fold_if(self, stmt, constants)
-    elseif k == "WhileStmt" then
+    elseif __lz_m1 == "WhileStmt" then
         stmt:set("condition", self.exprs:fold(stmt:child("condition"), constants))
         StmtFolder.fold_block(self, stmt:child("body"), constants:child(__lz_list()))
-    elseif k == "LoopStmt" then
+    elseif __lz_m1 == "LoopStmt" then
         StmtFolder.fold_block(self, stmt:child("body"), constants:child(__lz_list()))
-    elseif k == "ForStmt" then
+    elseif __lz_m1 == "ForStmt" then
         StmtFolder.fold_for(self, stmt, constants)
-    elseif k == "ForInStmt" then
+    elseif __lz_m1 == "ForInStmt" then
         StmtFolder.fold_for_in(self, stmt, constants)
-    elseif k == "MatchStmt" then
+    elseif __lz_m1 == "MatchStmt" then
         StmtFolder.fold_match(self, stmt, constants)
+    else
     end
 end
 function StmtFolder.fold_variable(self, stmt, constants)
@@ -3850,6 +3846,7 @@ ExprEmitter.constructors = __lz_map({["Option.some"] = "__lz_some", ["Option.non
 function ExprEmitter.new(ctx)
     local self = {}
     self.emit = ExprEmitter.emit
+    self.emit_identifier = ExprEmitter.emit_identifier
     self.emit_literal = ExprEmitter.emit_literal
     self.emit_field = ExprEmitter.emit_field
     self.emit_list = ExprEmitter.emit_list
@@ -3867,42 +3864,37 @@ function ExprEmitter.new(ctx)
     return self
 end
 function ExprEmitter.emit(self, node)
-    local k = node.kind
-    if k == "LiteralExpr" then
+    local __lz_m1 = node.kind
+    if __lz_m1 == "LiteralExpr" then
         return ExprEmitter.emit_literal(self, node)
-    end
-    if k == "IdentifierExpr" then
-        local id = node:child("name")
-        if self.ctx:is_variant(id) then
-            return self.ctx:variant_qualified(id)
-        end
-        return self.ctx:emit_name(id)
-    end
-    if k == "SelfExpr" then
+    elseif __lz_m1 == "IdentifierExpr" then
+        return ExprEmitter.emit_identifier(self, node)
+    elseif __lz_m1 == "SelfExpr" then
         return "self"
-    end
-    if k == "MemberExpr" then
+    elseif __lz_m1 == "MemberExpr" then
         return ExprEmitter.emit_field(self, node)
-    end
-    if k == "ListExpr" then
+    elseif __lz_m1 == "ListExpr" then
         return ExprEmitter.emit_list(self, node)
-    end
-    if k == "MapExpr" then
+    elseif __lz_m1 == "MapExpr" then
         return ExprEmitter.emit_map(self, node)
-    end
-    if k == "IndexExpr" then
+    elseif __lz_m1 == "IndexExpr" then
         return ExprEmitter.emit_index(self, node)
-    end
-    if k == "CallExpr" then
+    elseif __lz_m1 == "CallExpr" then
         return ExprEmitter.emit_call(self, node)
-    end
-    if k == "UnaryExpr" then
+    elseif __lz_m1 == "UnaryExpr" then
         return ExprEmitter.emit_unary(self, node)
-    end
-    if k == "BinaryExpr" then
+    elseif __lz_m1 == "BinaryExpr" then
         return ExprEmitter.emit_binary(self, node)
+    else
     end
     return ""
+end
+function ExprEmitter.emit_identifier(self, node)
+    local id = node:child("name")
+    if self.ctx:is_variant(id) then
+        return self.ctx:variant_qualified(id)
+    end
+    return self.ctx:emit_name(id)
 end
 function ExprEmitter.emit_literal(self, node)
     local lit_kind = node:child("lit_kind")
