@@ -159,11 +159,7 @@ private emit_block(stmts): str {
     if stmts.len() == 0 {
         return ""
     }
-    mut lines = []
-    for stmt in stmts {
-        lines.push(.emit_stmt(stmt))
-    }
-    return Text.indent(Text.lines(lines))
+    return Text.indent(Text.lines([.emit_stmt(stmt) for stmt in stmts]))
 }
 
 // A function body with its parameters declared as locals in a fresh scope.

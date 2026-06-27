@@ -131,20 +131,12 @@ private apply(op: str, a, b) {
 
 private fold_call(node, constants): Node {
     node.set("callee", .fold(node.child("callee"), constants))
-    mut folded = []
-    for arg in node.child("args") {
-        folded.push(.fold(arg, constants))
-    }
-    node.set("args", folded)
+    node.set("args", [.fold(arg, constants) for arg in node.child("args")])
     return node
 }
 
 private fold_list(node, constants): Node {
-    mut folded = []
-    for element in node.child("elements") {
-        folded.push(.fold(element, constants))
-    }
-    node.set("elements", folded)
+    node.set("elements", [.fold(element, constants) for element in node.child("elements")])
     return node
 }
 
