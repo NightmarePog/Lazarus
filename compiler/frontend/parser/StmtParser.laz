@@ -27,10 +27,10 @@ constructor(cursor, exprs) {
 }
 
 public parse_program(): Node {
-    // A leading `@<kind>` directive makes the whole file that kind. Only
-    // `@interface` is recognised for now (the directive parser is extensible).
+    // A leading `@<kind>` directive makes the whole file that kind: `@interface`
+    // (a contract) or `@object` (a static module). The dispatch is extensible.
     if .cursor.check("AT") {
-        return .parse_interface_file()
+        return .parse_file_directive()
     }
     mut body = []
     loop {
@@ -42,15 +42,25 @@ public parse_program(): Node {
     return Ast.program(body)
 }
 
-// `@interface` → the whole file is one interface, named after the file (the empty
-// name is filled from the filename downstream). `import` lines are still allowed
-// (so a contract can reference types from other files); the Linker lifts them out,
-// leaving a body of only the interface decl. Any other `@x` is rejected.
-private parse_interface_file(): Node {
+// `@interface` uses the `interface` keyword; `@object` is `@` + the identifier
+// `object` (not a keyword, since `object` is used as a variable name). Imports are
+// still allowed in either form and lifted by the Linker.
+private parse_file_directive(): Node {
     mut at = .cursor.consume("AT", "Expected a file directive")
-    if not .cursor.match("INTERFACE") {
-        .cursor.fail("unknown file directive '@" ++ .cursor.current().value ++ "'")
+    if .cursor.match("INTERFACE") {
+        return .parse_interface_body(at)
     }
+    if .cursor.check("IDENTIFIER") and .cursor.current().value == "object" {
+        .cursor.advance()
+        return .parse_object_body()
+    }
+    .cursor.fail("unknown file directive '@" ++ .cursor.current().value ++ "'")
+    return Ast.program([])
+}
+
+// `@interface` body: signatures + property requirements (and imports), folded into
+// one interface decl named after the file (empty name filled in downstream).
+private parse_interface_body(at): Node {
     mut body = []
     mut methods = []
     mut properties = []
@@ -68,6 +78,45 @@ private parse_interface_file(): Node {
     }
     body.push(Ast.interface_decl("", methods, properties, [], at.line, at.column))
     return Ast.program(body)
+}
+
+// `@object` body: a static module — every member is forced static, so the file
+// emits a plain all-static class. `static` and `constructor` are rejected.
+private parse_object_body(): Node {
+    mut body = []
+    loop {
+        if .cursor.at_end() {
+            break
+        }
+        if .cursor.check("IMPORT") {
+            mut itok = .cursor.current()
+            .cursor.advance()
+            body.push(.parse_import(itok))
+        } else {
+            body.push(.parse_object_member())
+        }
+    }
+    return Ast.program(body)
+}
+
+private parse_object_member(): Node {
+    mut visibility = ""
+    if .cursor.match("PRIVATE") {
+        visibility = "private"
+    } else if .cursor.match("PUBLIC") {
+        visibility = "public"
+    }
+    if .cursor.check("STATIC") {
+        .cursor.fail("'static' is implied in an @object file; remove it")
+    }
+    if .cursor.check("CONSTRUCTOR") {
+        .cursor.fail("an @object file has no instances; remove the constructor")
+    }
+    if .cursor.check("IDENTIFIER") and .looks_like_decl() {
+        return .parse_method(visibility, true)
+    }
+    mut mutable = .cursor.match("MUTABLE")
+    return .parse_binding(visibility, mutable, "Expected a member name in the @object file", true)
 }
 
 private parse_statement(): Node {
