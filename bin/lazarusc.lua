@@ -905,6 +905,7 @@ function StmtParser.new(cursor, exprs)
     self.parse_object_body = StmtParser.parse_object_body
     self.parse_object_member = StmtParser.parse_object_member
     self.parse_statement = StmtParser.parse_statement
+    self.parse_identifier_statement = StmtParser.parse_identifier_statement
     self.parse_block = StmtParser.parse_block
     self.parse_import = StmtParser.parse_import
     self.parse_enum = StmtParser.parse_enum
@@ -1030,82 +1031,72 @@ function StmtParser.parse_object_member(self)
 end
 function StmtParser.parse_statement(self)
     local tok = self.cursor:current()
-    local k = tok.kind
-    if k == "IMPORT" then
+    local __lz_m1 = tok.kind
+    if __lz_m1 == "IMPORT" then
         self.cursor:advance()
         return StmtParser.parse_import(self, tok)
-    end
-    if k == "EXTERN" then
+    elseif __lz_m1 == "EXTERN" then
         self.cursor:advance()
         return StmtParser.parse_extern(self, tok)
-    end
-    if k == "ENUM" then
+    elseif __lz_m1 == "ENUM" then
         self.cursor:advance()
         return StmtParser.parse_enum(self, tok)
-    end
-    if k == "INTERFACE" then
+    elseif __lz_m1 == "INTERFACE" then
         self.cursor:advance()
         return StmtParser.parse_interface(self, tok)
-    end
-    if k == "PRIVATE" then
+    elseif __lz_m1 == "PRIVATE" then
         self.cursor:advance()
         return StmtParser.parse_member(self, "private")
-    end
-    if k == "PUBLIC" then
+    elseif __lz_m1 == "PUBLIC" then
         self.cursor:advance()
         return StmtParser.parse_member(self, "public")
-    end
-    if k == "MUTABLE" then
+    elseif __lz_m1 == "MUTABLE" then
         self.cursor:advance()
         return StmtParser.parse_binding(self, "", true, "Expected variable name after 'mut'", false)
-    end
-    if k == "STATIC" then
+    elseif __lz_m1 == "STATIC" then
         self.cursor:advance()
         return StmtParser.parse_static(self)
-    end
-    if k == "CONSTRUCTOR" then
+    elseif __lz_m1 == "CONSTRUCTOR" then
         self.cursor:advance()
         return StmtParser.parse_constructor(self, tok)
-    end
-    if k == "RETURN" then
+    elseif __lz_m1 == "RETURN" then
         self.cursor:advance()
         return StmtParser.parse_return(self, tok)
-    end
-    if k == "IF" then
+    elseif __lz_m1 == "IF" then
         self.cursor:advance()
         return StmtParser.parse_if(self, tok)
-    end
-    if k == "WHILE" then
+    elseif __lz_m1 == "WHILE" then
         self.cursor:advance()
         return StmtParser.parse_while(self, tok)
-    end
-    if k == "LOOP" then
+    elseif __lz_m1 == "LOOP" then
         self.cursor:advance()
         return StmtParser.parse_loop(self, tok)
-    end
-    if k == "FOR" then
+    elseif __lz_m1 == "FOR" then
         self.cursor:advance()
         return StmtParser.parse_for(self, tok)
-    end
-    if k == "BREAK" then
+    elseif __lz_m1 == "BREAK" then
         self.cursor:advance()
         return StmtParser.parse_break(self, tok)
+    elseif __lz_m1 == "IDENTIFIER" then
+        return StmtParser.parse_identifier_statement(self, tok)
+    else
     end
-    if k == "IDENTIFIER" then
-        if (tok.value == "match") and StmtParser.starts_match(self) then
-            self.cursor:advance()
-            return StmtParser.parse_match(self, tok)
-        end
-        if self.cursor:peek_next().kind == "COLON" then
-            return StmtParser.parse_typed_local(self, tok)
-        end
-        if StmtParser.looks_like_decl(self) then
-            return StmtParser.parse_method(self, "", false)
-        end
-        local nk = self.cursor:peek_next().kind
-        if (nk == "ASSIGN") or __lz_is_some(StmtParser.compound(self, nk)) then
-            return StmtParser.parse_assignment(self, "Expected variable name")
-        end
+    return StmtParser.parse_expr_statement(self, tok)
+end
+function StmtParser.parse_identifier_statement(self, tok)
+    if (tok.value == "match") and StmtParser.starts_match(self) then
+        self.cursor:advance()
+        return StmtParser.parse_match(self, tok)
+    end
+    if self.cursor:peek_next().kind == "COLON" then
+        return StmtParser.parse_typed_local(self, tok)
+    end
+    if StmtParser.looks_like_decl(self) then
+        return StmtParser.parse_method(self, "", false)
+    end
+    local nk = self.cursor:peek_next().kind
+    if (nk == "ASSIGN") or __lz_is_some(StmtParser.compound(self, nk)) then
+        return StmtParser.parse_assignment(self, "Expected variable name")
     end
     return StmtParser.parse_expr_statement(self, tok)
 end
@@ -1878,35 +1869,36 @@ function StmtChecker.check_block(self, stmts, scope, frame)
     end
 end
 function StmtChecker.check_statement(self, stmt, scope, frame, is_last)
-    local k = stmt.kind
-    if k == "VariableDecl" then
+    local __lz_m1 = stmt.kind
+    if __lz_m1 == "VariableDecl" then
         StmtChecker.check_variable(self, stmt, scope, frame)
-    elseif k == "FunctionDecl" then
+    elseif __lz_m1 == "FunctionDecl" then
         StmtChecker.check_function(self, stmt, scope, frame)
-    elseif k == "ConstructorDecl" then
+    elseif __lz_m1 == "ConstructorDecl" then
         StmtChecker.check_constructor(self, stmt, scope, frame)
-    elseif k == "ReturnStmt" then
+    elseif __lz_m1 == "ReturnStmt" then
         StmtChecker.check_return(self, stmt, scope, frame, is_last)
-    elseif k == "ExpressionStmt" then
+    elseif __lz_m1 == "ExpressionStmt" then
         StmtChecker.check_expr_statement(self, stmt, scope)
-    elseif k == "FieldAssign" then
+    elseif __lz_m1 == "FieldAssign" then
         StmtChecker.check_assign(self, stmt, scope)
-    elseif k == "IndexAssign" then
+    elseif __lz_m1 == "IndexAssign" then
         StmtChecker.check_assign(self, stmt, scope)
-    elseif k == "IfStmt" then
+    elseif __lz_m1 == "IfStmt" then
         StmtChecker.check_if(self, stmt, scope, frame)
-    elseif k == "WhileStmt" then
+    elseif __lz_m1 == "WhileStmt" then
         StmtChecker.check_while(self, stmt, scope, frame)
-    elseif k == "LoopStmt" then
+    elseif __lz_m1 == "LoopStmt" then
         StmtChecker.check_loop(self, stmt, scope, frame)
-    elseif k == "ForStmt" then
+    elseif __lz_m1 == "ForStmt" then
         StmtChecker.check_for(self, stmt, scope, frame)
-    elseif k == "ForInStmt" then
+    elseif __lz_m1 == "ForInStmt" then
         StmtChecker.check_for_in(self, stmt, scope, frame)
-    elseif k == "MatchStmt" then
+    elseif __lz_m1 == "MatchStmt" then
         StmtChecker.check_match(self, stmt, scope, frame)
-    elseif k == "BreakStmt" then
+    elseif __lz_m1 == "BreakStmt" then
         StmtChecker.check_break(self, stmt, frame, is_last)
+    else
     end
 end
 function StmtChecker.check_variable(self, stmt, scope, frame)
@@ -2414,34 +2406,35 @@ function Typecheck.type_block(self, stmts, scope, ret)
     end
 end
 function Typecheck.type_stmt(self, stmt, scope, ret)
-    local k = stmt.kind
-    if k == "VariableDecl" then
+    local __lz_m1 = stmt.kind
+    if __lz_m1 == "VariableDecl" then
         Typecheck.type_variable(self, stmt, scope)
-    elseif k == "FunctionDecl" then
+    elseif __lz_m1 == "FunctionDecl" then
         Typecheck.type_callable(self, stmt, scope)
-    elseif k == "ConstructorDecl" then
+    elseif __lz_m1 == "ConstructorDecl" then
         Typecheck.type_callable(self, stmt, scope)
-    elseif k == "ReturnStmt" then
+    elseif __lz_m1 == "ReturnStmt" then
         Typecheck.type_return(self, stmt, scope, ret)
-    elseif k == "ExpressionStmt" then
+    elseif __lz_m1 == "ExpressionStmt" then
         Typecheck.type_expr(self, stmt:child("expression"), scope)
-    elseif k == "FieldAssign" then
+    elseif __lz_m1 == "FieldAssign" then
         Typecheck.type_expr(self, stmt:child("value"), scope)
-    elseif k == "IndexAssign" then
+    elseif __lz_m1 == "IndexAssign" then
         Typecheck.type_expr(self, stmt:child("value"), scope)
-    elseif k == "IfStmt" then
+    elseif __lz_m1 == "IfStmt" then
         Typecheck.type_if(self, stmt, scope, ret)
-    elseif k == "WhileStmt" then
+    elseif __lz_m1 == "WhileStmt" then
         Typecheck.type_condition(self, stmt:child("condition"), scope)
         Typecheck.type_block(self, stmt:child("body"), scope:child(), ret)
-    elseif k == "LoopStmt" then
+    elseif __lz_m1 == "LoopStmt" then
         Typecheck.type_block(self, stmt:child("body"), scope:child(), ret)
-    elseif k == "ForStmt" then
+    elseif __lz_m1 == "ForStmt" then
         Typecheck.type_for(self, stmt, scope, ret)
-    elseif k == "ForInStmt" then
+    elseif __lz_m1 == "ForInStmt" then
         Typecheck.type_for_in(self, stmt, scope, ret)
-    elseif k == "MatchStmt" then
+    elseif __lz_m1 == "MatchStmt" then
         Typecheck.type_match(self, stmt, scope, ret)
+    else
     end
 end
 function Typecheck.type_variable(self, stmt, scope)
@@ -4067,18 +4060,16 @@ function StmtEmitter.new(ctx, exprs)
     return self
 end
 function StmtEmitter.emit_member(self, node)
-    local k = node.kind
-    if k == "FunctionDecl" then
+    local __lz_m1 = node.kind
+    if __lz_m1 == "FunctionDecl" then
         return StmtEmitter.emit_method(self, node)
-    end
-    if k == "VariableDecl" then
+    elseif __lz_m1 == "VariableDecl" then
         return StmtEmitter.emit_static_field(self, node)
-    end
-    if k == "ConstructorDecl" then
+    elseif __lz_m1 == "ConstructorDecl" then
         return StmtEmitter.emit_constructor(self, node)
-    end
-    if k == "EnumDecl" then
+    elseif __lz_m1 == "EnumDecl" then
         return StmtEmitter.emit_enum(self, node)
+    else
     end
     return StmtEmitter.emit_stmt(self, node)
 end
@@ -4108,45 +4099,34 @@ function StmtEmitter.emit_variant_ctor(self, name, fields)
     return Text.lines(__lz_list(header, Text.indent(("return { " .. Text.join(assigns, ", ")) .. " }"), "end"))
 end
 function StmtEmitter.emit_stmt(self, node)
-    local k = node.kind
-    if k == "VariableDecl" then
+    local __lz_m2 = node.kind
+    if __lz_m2 == "VariableDecl" then
         return StmtEmitter.emit_variable(self, node)
-    end
-    if k == "FieldAssign" then
+    elseif __lz_m2 == "FieldAssign" then
         return (self.exprs:emit(node:child("target")) .. " = ") .. self.exprs:emit(node:child("value"))
-    end
-    if k == "IndexAssign" then
+    elseif __lz_m2 == "IndexAssign" then
         return StmtEmitter.emit_index_assign(self, node)
-    end
-    if k == "ExpressionStmt" then
+    elseif __lz_m2 == "ExpressionStmt" then
         return self.exprs:emit(node:child("expression"))
-    end
-    if k == "FunctionDecl" then
+    elseif __lz_m2 == "FunctionDecl" then
         return StmtEmitter.emit_local_function(self, node)
-    end
-    if k == "ReturnStmt" then
+    elseif __lz_m2 == "ReturnStmt" then
         return StmtEmitter.emit_return(self, node)
-    end
-    if k == "IfStmt" then
+    elseif __lz_m2 == "IfStmt" then
         return StmtEmitter.emit_if(self, node)
-    end
-    if k == "WhileStmt" then
+    elseif __lz_m2 == "WhileStmt" then
         return StmtEmitter.emit_while(self, node)
-    end
-    if k == "LoopStmt" then
+    elseif __lz_m2 == "LoopStmt" then
         return StmtEmitter.emit_loop(self, node)
-    end
-    if k == "BreakStmt" then
+    elseif __lz_m2 == "BreakStmt" then
         return "break"
-    end
-    if k == "ForStmt" then
+    elseif __lz_m2 == "ForStmt" then
         return StmtEmitter.emit_for(self, node)
-    end
-    if k == "ForInStmt" then
+    elseif __lz_m2 == "ForInStmt" then
         return StmtEmitter.emit_for_in(self, node)
-    end
-    if k == "MatchStmt" then
+    elseif __lz_m2 == "MatchStmt" then
         return StmtEmitter.emit_match(self, node)
+    else
     end
     return ""
 end
