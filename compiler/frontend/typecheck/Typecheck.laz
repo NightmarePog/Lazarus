@@ -84,34 +84,24 @@ private type_block(stmts, scope, ret) {
 }
 
 private type_stmt(stmt, scope, ret) {
-    mut k = stmt.kind
-    if k == "VariableDecl" {
-        .type_variable(stmt, scope)
-    } else if k == "FunctionDecl" {
-        .type_callable(stmt, scope)
-    } else if k == "ConstructorDecl" {
-        .type_callable(stmt, scope)
-    } else if k == "ReturnStmt" {
-        .type_return(stmt, scope, ret)
-    } else if k == "ExpressionStmt" {
-        .type_expr(stmt.child("expression"), scope)
-    } else if k == "FieldAssign" {
-        .type_expr(stmt.child("value"), scope)
-    } else if k == "IndexAssign" {
-        .type_expr(stmt.child("value"), scope)
-    } else if k == "IfStmt" {
-        .type_if(stmt, scope, ret)
-    } else if k == "WhileStmt" {
-        .type_condition(stmt.child("condition"), scope)
-        .type_block(stmt.child("body"), scope.child(), ret)
-    } else if k == "LoopStmt" {
-        .type_block(stmt.child("body"), scope.child(), ret)
-    } else if k == "ForStmt" {
-        .type_for(stmt, scope, ret)
-    } else if k == "ForInStmt" {
-        .type_for_in(stmt, scope, ret)
-    } else if k == "MatchStmt" {
-        .type_match(stmt, scope, ret)
+    match stmt.kind {
+        "VariableDecl" => { .type_variable(stmt, scope) }
+        "FunctionDecl" => { .type_callable(stmt, scope) }
+        "ConstructorDecl" => { .type_callable(stmt, scope) }
+        "ReturnStmt" => { .type_return(stmt, scope, ret) }
+        "ExpressionStmt" => { .type_expr(stmt.child("expression"), scope) }
+        "FieldAssign" => { .type_expr(stmt.child("value"), scope) }
+        "IndexAssign" => { .type_expr(stmt.child("value"), scope) }
+        "IfStmt" => { .type_if(stmt, scope, ret) }
+        "WhileStmt" => {
+            .type_condition(stmt.child("condition"), scope)
+            .type_block(stmt.child("body"), scope.child(), ret)
+        }
+        "LoopStmt" => { .type_block(stmt.child("body"), scope.child(), ret) }
+        "ForStmt" => { .type_for(stmt, scope, ret) }
+        "ForInStmt" => { .type_for_in(stmt, scope, ret) }
+        "MatchStmt" => { .type_match(stmt, scope, ret) }
+        _ => {}
     }
 }
 

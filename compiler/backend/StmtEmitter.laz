@@ -19,18 +19,12 @@ constructor(ctx, exprs) {
 }
 
 public emit_member(node): str {
-    mut k = node.kind
-    if k == "FunctionDecl" {
-        return .emit_method(node)
-    }
-    if k == "VariableDecl" {
-        return .emit_static_field(node)
-    }
-    if k == "ConstructorDecl" {
-        return .emit_constructor(node)
-    }
-    if k == "EnumDecl" {
-        return .emit_enum(node)
+    match node.kind {
+        "FunctionDecl" => { return .emit_method(node) }
+        "VariableDecl" => { return .emit_static_field(node) }
+        "ConstructorDecl" => { return .emit_constructor(node) }
+        "EnumDecl" => { return .emit_enum(node) }
+        _ => {}
     }
     return .emit_stmt(node)
 }
@@ -65,45 +59,21 @@ private emit_variant_ctor(name: str, fields): str {
 }
 
 public emit_stmt(node): str {
-    mut k = node.kind
-    if k == "VariableDecl" {
-        return .emit_variable(node)
-    }
-    if k == "FieldAssign" {
-        return .exprs.emit(node.child("target")) ++ " = " ++ .exprs.emit(node.child("value"))
-    }
-    if k == "IndexAssign" {
-        return .emit_index_assign(node)
-    }
-    if k == "ExpressionStmt" {
-        return .exprs.emit(node.child("expression"))
-    }
-    if k == "FunctionDecl" {
-        return .emit_local_function(node)
-    }
-    if k == "ReturnStmt" {
-        return .emit_return(node)
-    }
-    if k == "IfStmt" {
-        return .emit_if(node)
-    }
-    if k == "WhileStmt" {
-        return .emit_while(node)
-    }
-    if k == "LoopStmt" {
-        return .emit_loop(node)
-    }
-    if k == "BreakStmt" {
-        return "break"
-    }
-    if k == "ForStmt" {
-        return .emit_for(node)
-    }
-    if k == "ForInStmt" {
-        return .emit_for_in(node)
-    }
-    if k == "MatchStmt" {
-        return .emit_match(node)
+    match node.kind {
+        "VariableDecl" => { return .emit_variable(node) }
+        "FieldAssign" => { return .exprs.emit(node.child("target")) ++ " = " ++ .exprs.emit(node.child("value")) }
+        "IndexAssign" => { return .emit_index_assign(node) }
+        "ExpressionStmt" => { return .exprs.emit(node.child("expression")) }
+        "FunctionDecl" => { return .emit_local_function(node) }
+        "ReturnStmt" => { return .emit_return(node) }
+        "IfStmt" => { return .emit_if(node) }
+        "WhileStmt" => { return .emit_while(node) }
+        "LoopStmt" => { return .emit_loop(node) }
+        "BreakStmt" => { return "break" }
+        "ForStmt" => { return .emit_for(node) }
+        "ForInStmt" => { return .emit_for_in(node) }
+        "MatchStmt" => { return .emit_match(node) }
+        _ => {}
     }
     return ""
 }

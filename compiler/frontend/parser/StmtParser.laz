@@ -121,86 +121,46 @@ private parse_object_member(): Node {
 
 private parse_statement(): Node {
     mut tok = .cursor.current()
-    mut k = tok.kind
+    match tok.kind {
+        "IMPORT" => { .cursor.advance() return .parse_import(tok) }
+        "EXTERN" => { .cursor.advance() return .parse_extern(tok) }
+        "ENUM" => { .cursor.advance() return .parse_enum(tok) }
+        "INTERFACE" => { .cursor.advance() return .parse_interface(tok) }
+        "PRIVATE" => { .cursor.advance() return .parse_member("private") }
+        "PUBLIC" => { .cursor.advance() return .parse_member("public") }
+        "MUTABLE" => { .cursor.advance() return .parse_binding("", true, "Expected variable name after 'mut'", false) }
+        "STATIC" => { .cursor.advance() return .parse_static() }
+        "CONSTRUCTOR" => { .cursor.advance() return .parse_constructor(tok) }
+        "RETURN" => { .cursor.advance() return .parse_return(tok) }
+        "IF" => { .cursor.advance() return .parse_if(tok) }
+        "WHILE" => { .cursor.advance() return .parse_while(tok) }
+        "LOOP" => { .cursor.advance() return .parse_loop(tok) }
+        "FOR" => { .cursor.advance() return .parse_for(tok) }
+        "BREAK" => { .cursor.advance() return .parse_break(tok) }
+        "IDENTIFIER" => { return .parse_identifier_statement(tok) }
+        _ => {}
+    }
+    return .parse_expr_statement(tok)
+}
 
-    if k == "IMPORT" {
+// At a statement head, an identifier may open a `match`, a typed local
+// `x: T = …`, a method declaration, a plain assignment, or an expression
+// statement — told apart by what follows.
+private parse_identifier_statement(tok): Node {
+    if tok.value == "match" and .starts_match() {
         .cursor.advance()
-        return .parse_import(tok)
+        return .parse_match(tok)
     }
-    if k == "EXTERN" {
-        .cursor.advance()
-        return .parse_extern(tok)
+    if .cursor.peek_next().kind == "COLON" {
+        return .parse_typed_local(tok)
     }
-    if k == "ENUM" {
-        .cursor.advance()
-        return .parse_enum(tok)
+    if .looks_like_decl() {
+        return .parse_method("", false)
     }
-    if k == "INTERFACE" {
-        .cursor.advance()
-        return .parse_interface(tok)
+    mut nk = .cursor.peek_next().kind
+    if nk == "ASSIGN" or .compound(nk).is_some() {
+        return .parse_assignment("Expected variable name")
     }
-    if k == "PRIVATE" {
-        .cursor.advance()
-        return .parse_member("private")
-    }
-    if k == "PUBLIC" {
-        .cursor.advance()
-        return .parse_member("public")
-    }
-    if k == "MUTABLE" {
-        .cursor.advance()
-        return .parse_binding("", true, "Expected variable name after 'mut'", false)
-    }
-    if k == "STATIC" {
-        .cursor.advance()
-        return .parse_static()
-    }
-    if k == "CONSTRUCTOR" {
-        .cursor.advance()
-        return .parse_constructor(tok)
-    }
-    if k == "RETURN" {
-        .cursor.advance()
-        return .parse_return(tok)
-    }
-    if k == "IF" {
-        .cursor.advance()
-        return .parse_if(tok)
-    }
-    if k == "WHILE" {
-        .cursor.advance()
-        return .parse_while(tok)
-    }
-    if k == "LOOP" {
-        .cursor.advance()
-        return .parse_loop(tok)
-    }
-    if k == "FOR" {
-        .cursor.advance()
-        return .parse_for(tok)
-    }
-    if k == "BREAK" {
-        .cursor.advance()
-        return .parse_break(tok)
-    }
-
-    if k == "IDENTIFIER" {
-        if tok.value == "match" and .starts_match() {
-            .cursor.advance()
-            return .parse_match(tok)
-        }
-        if .cursor.peek_next().kind == "COLON" {
-            return .parse_typed_local(tok)
-        }
-        if .looks_like_decl() {
-            return .parse_method("", false)
-        }
-        mut nk = .cursor.peek_next().kind
-        if nk == "ASSIGN" or .compound(nk).is_some() {
-            return .parse_assignment("Expected variable name")
-        }
-    }
-
     return .parse_expr_statement(tok)
 }
 

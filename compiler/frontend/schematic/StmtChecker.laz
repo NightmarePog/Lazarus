@@ -34,37 +34,24 @@ public check_block(stmts, scope, frame: Frame) {
 }
 
 private check_statement(stmt, scope, frame: Frame, is_last: bool) {
-    mut k = stmt.kind
-    if k == "VariableDecl" {
-        .check_variable(stmt, scope, frame)
-    } else if k == "FunctionDecl" {
-        .check_function(stmt, scope, frame)
-    } else if k == "ConstructorDecl" {
-        .check_constructor(stmt, scope, frame)
-    } else if k == "ReturnStmt" {
-        .check_return(stmt, scope, frame, is_last)
-    } else if k == "ExpressionStmt" {
-        .check_expr_statement(stmt, scope)
-    } else if k == "FieldAssign" {
-        .check_assign(stmt, scope)
-    } else if k == "IndexAssign" {
-        .check_assign(stmt, scope)
-    } else if k == "IfStmt" {
-        .check_if(stmt, scope, frame)
-    } else if k == "WhileStmt" {
-        .check_while(stmt, scope, frame)
-    } else if k == "LoopStmt" {
-        .check_loop(stmt, scope, frame)
-    } else if k == "ForStmt" {
-        .check_for(stmt, scope, frame)
-    } else if k == "ForInStmt" {
-        .check_for_in(stmt, scope, frame)
-    } else if k == "MatchStmt" {
-        .check_match(stmt, scope, frame)
-    } else if k == "BreakStmt" {
-        .check_break(stmt, frame, is_last)
+    // ImportDecl / ExternDecl / InterfaceDecl are metadata — nothing to check.
+    match stmt.kind {
+        "VariableDecl" => { .check_variable(stmt, scope, frame) }
+        "FunctionDecl" => { .check_function(stmt, scope, frame) }
+        "ConstructorDecl" => { .check_constructor(stmt, scope, frame) }
+        "ReturnStmt" => { .check_return(stmt, scope, frame, is_last) }
+        "ExpressionStmt" => { .check_expr_statement(stmt, scope) }
+        "FieldAssign" => { .check_assign(stmt, scope) }
+        "IndexAssign" => { .check_assign(stmt, scope) }
+        "IfStmt" => { .check_if(stmt, scope, frame) }
+        "WhileStmt" => { .check_while(stmt, scope, frame) }
+        "LoopStmt" => { .check_loop(stmt, scope, frame) }
+        "ForStmt" => { .check_for(stmt, scope, frame) }
+        "ForInStmt" => { .check_for_in(stmt, scope, frame) }
+        "MatchStmt" => { .check_match(stmt, scope, frame) }
+        "BreakStmt" => { .check_break(stmt, frame, is_last) }
+        _ => {}
     }
-    // ImportDecl / ExternDecl are linker metadata — nothing to check.
 }
 
 // A binding is a declaration (first sight, or any visibility/`mut` form) or a
