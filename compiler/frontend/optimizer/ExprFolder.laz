@@ -99,14 +99,11 @@ private result_kind(op: str, left, right): str {
 }
 
 private apply(op: str, a, b) {
-    if op == "PLUS" {
-        return a + b
-    }
-    if op == "MINUS" {
-        return a - b
-    }
-    if op == "MULTIPLY" {
-        return a * b
+    match op {
+        "PLUS" => { return a + b }
+        "MINUS" => { return a - b }
+        "MULTIPLY" => { return a * b }
+        _ => {}
     }
     return a / b
 }

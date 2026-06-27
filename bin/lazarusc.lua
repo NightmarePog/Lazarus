@@ -3490,14 +3490,14 @@ function ExprFolder.result_kind(self, op, left, right)
     return "number"
 end
 function ExprFolder.apply(self, op, a, b)
-    if op == "PLUS" then
+    local __lz_m2 = op
+    if __lz_m2 == "PLUS" then
         return a + b
-    end
-    if op == "MINUS" then
+    elseif __lz_m2 == "MINUS" then
         return a - b
-    end
-    if op == "MULTIPLY" then
+    elseif __lz_m2 == "MULTIPLY" then
         return a * b
+    else
     end
     return a / b
 end
