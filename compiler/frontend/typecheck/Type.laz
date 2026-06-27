@@ -1,12 +1,16 @@
 // A resolved type used by the checker, erased once checking is done.
 
+public kind: str
+public name: str
+public params: List<Type>
+public result: Option<Type>
 @auto
-constructor(kind: str, name: str, params, result)
+constructor(kind, name, params, result)
 
-// `result` is a real Type only for `fn`; every other kind passes 0 so the base
-// helpers never recurse.
+// `result` carries the return type only for a `fn`; every other kind is `none`, so
+// the base helpers never recurse into it.
 static base(kind: str): Type {
-    return Type(kind, "", [], 0)
+    return Type(kind, "", [], Option.none())
 }
 
 static dynamic(): Type {
@@ -33,26 +37,26 @@ static str(): Type {
     return Type.base("str")
 }
 
-static class_of(name: str, args): Type {
-    return Type("class", name, args, 0)
+static class_of(name: str, args: List<Type>): Type {
+    return Type("class", name, args, Option.none())
 }
 
-static enum_of(name: str, args): Type {
-    return Type("enum", name, args, 0)
+static enum_of(name: str, args: List<Type>): Type {
+    return Type("enum", name, args, Option.none())
 }
 
 // A structural-interface type; `args` are its `<…>` arguments. A class satisfies
 // it via the conformance check in Typecheck, not by nominal equality.
-static iface_of(name: str, args): Type {
-    return Type("iface", name, args, 0)
+static iface_of(name: str, args: List<Type>): Type {
+    return Type("iface", name, args, Option.none())
 }
 
-static fn(params, result): Type {
-    return Type("fn", "", params, result)
+static fn(params: List<Type>, result: Type): Type {
+    return Type("fn", "", params, Option.some(result))
 }
 
 static var(name: str): Type {
-    return Type("var", name, [], 0)
+    return Type("var", name, [], Option.none())
 }
 
 public is_dynamic(): bool {

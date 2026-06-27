@@ -3,6 +3,7 @@
 // the current constants but drops any name shadowed by a parameter or loop
 // variable (built by copying, since Lazarus maps cannot delete a key).
 
+private entries
 @auto
 constructor(entries)
 

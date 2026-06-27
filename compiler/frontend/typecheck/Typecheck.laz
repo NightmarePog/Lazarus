@@ -895,10 +895,10 @@ private substitute(t, subst): Type {
         return .subst_lookup(subst, t.name)
     }
     if t.kind == "fn" {
-        return Type.fn([.substitute(p, subst) for p in t.params], .substitute(t.result, subst))
+        return Type.fn([.substitute(p, subst) for p in t.params], .substitute(t.result.unwrap(), subst))
     }
     if (t.kind == "class" or t.kind == "enum") and t.params.len() > 0 {
-        return Type(t.kind, t.name, [.substitute(a, subst) for a in t.params], 0)
+        return Type(t.kind, t.name, [.substitute(a, subst) for a in t.params], t.result)
     }
     return t
 }

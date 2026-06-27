@@ -950,7 +950,8 @@ function StmtParser.new(cursor, exprs)
     self.parse_constructor = StmtParser.parse_constructor
     self.parse_ctor_params = StmtParser.parse_ctor_params
     self.field_param_assign = StmtParser.field_param_assign
-    self.all_field_params = StmtParser.all_field_params
+    self.declared_property_types = StmtParser.declared_property_types
+    self.resolve_auto_params = StmtParser.resolve_auto_params
     self.parse_params = StmtParser.parse_params
     self.param_type = StmtParser.param_type
     self.parse_return_type = StmtParser.parse_return_type
@@ -1005,11 +1006,15 @@ function StmtParser.is_file_directive(self)
     return false
 end
 function StmtParser.expand_field_params(self, body)
+    local prop_types = StmtParser.declared_property_types(self, body)
     local props = __lz_list()
     for _, stmt in __lz_each(body) do
         if stmt.kind == "ConstructorDecl" then
             for _, fp in __lz_each(__lz_unwrap_or(stmt:attr("field_params"), __lz_list())) do
                 __lz_push(props, StmtParser.field_property(self, fp))
+            end
+            if __lz_unwrap_or(stmt:attr("auto"), false) then
+                StmtParser.resolve_auto_params(self, stmt, prop_types)
             end
         end
     end
@@ -1346,19 +1351,22 @@ function StmtParser.parse_annotation(self)
     self.cursor:fail(("unknown annotation '@" .. name.value) .. "'")
     return Ast.constructor_decl(__lz_list(), __lz_list(), 0, 0, __lz_list(), __lz_list())
 end
-function StmtParser.parse_constructor(self, tok, all_fields)
+function StmtParser.parse_constructor(self, tok, auto)
     local type_params = StmtParser.parse_type_params(self)
     self.cursor:consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
     local param_types = __lz_list()
     local field_params = __lz_list()
     local params = StmtParser.parse_ctor_params(self, param_types, field_params)
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after parameters")
-    if all_fields then
-        field_params = StmtParser.all_field_params(self, params, param_types, tok)
-    end
     local body = __lz_list()
-    for _, fp in __lz_each(field_params) do
-        __lz_push(body, StmtParser.field_param_assign(self, fp))
+    if auto then
+        for _, name in __lz_each(params) do
+            __lz_push(body, StmtParser.field_param_assign(self, __lz_map({["name"] = name, ["line"] = tok.line, ["col"] = tok.column})))
+        end
+    else
+        for _, fp in __lz_each(field_params) do
+            __lz_push(body, StmtParser.field_param_assign(self, fp))
+        end
     end
     if self.cursor:check("BODY_START") then
         for _, stmt in __lz_each(StmtParser.parse_block(self, "constructor body")) do
@@ -1367,6 +1375,7 @@ function StmtParser.parse_constructor(self, tok, all_fields)
     end
     local node = Ast.constructor_decl(params, body, tok.line, tok.column, param_types, type_params)
     node:set("field_params", field_params)
+    node:set("auto", auto)
     return node
 end
 function StmtParser.parse_ctor_params(self, out_types, field_params)
@@ -1394,14 +1403,27 @@ function StmtParser.field_param_assign(self, fp)
     local c = __lz_unwrap(__lz_get(fp, "col"))
     return Ast.field_assign(Ast.member(Ast.self_expr(l, c), name, l, c), Ast.identifier(name, l, c), l, c)
 end
-function StmtParser.all_field_params(self, params, param_types, tok)
-    local out = __lz_list()
-    local i = 1
-    for _, name in __lz_each(params) do
-        __lz_push(out, __lz_map({["name"] = name, ["type"] = __lz_unwrap(__lz_get(param_types, i)), ["line"] = tok.line, ["col"] = tok.column}))
-        i = i + 1
+function StmtParser.declared_property_types(self, body)
+    local out = __lz_map({})
+    for _, stmt in __lz_each(body) do
+        if ((stmt.kind == "VariableDecl") and (__lz_unwrap_or(stmt:attr("visibility"), "") ~= "")) and (not __lz_unwrap_or(stmt:attr("is_static"), false)) then
+            __lz_idx_set(out, stmt:child("name"), __lz_unwrap_or(stmt:attr("type"), Ast.type_name("dynamic", __lz_list(), stmt:line(), stmt:col())))
+        end
     end
     return out
+end
+function StmtParser.resolve_auto_params(self, ctor, prop_types)
+    local new_types = __lz_list()
+    local i = 1
+    for _, name in __lz_each(ctor:child("params")) do
+        if __lz_has(prop_types, name) then
+            __lz_push(new_types, __lz_unwrap(__lz_get(prop_types, name)))
+        else
+            __lz_push(new_types, __lz_unwrap(__lz_get(ctor:child("param_types"), i)))
+        end
+        i = i + 1
+    end
+    ctor:set("param_types", new_types)
 end
 function StmtParser.parse_params(self, out_types)
     local params = __lz_list()
@@ -2353,7 +2375,7 @@ function Type.new(kind, name, params, result)
     return self
 end
 function Type.base(kind)
-    return Type.new(kind, "", __lz_list(), 0)
+    return Type.new(kind, "", __lz_list(), __lz_none())
 end
 function Type.dynamic()
     return Type.base("dynamic")
@@ -2374,19 +2396,19 @@ function Type.str()
     return Type.base("str")
 end
 function Type.class_of(name, args)
-    return Type.new("class", name, args, 0)
+    return Type.new("class", name, args, __lz_none())
 end
 function Type.enum_of(name, args)
-    return Type.new("enum", name, args, 0)
+    return Type.new("enum", name, args, __lz_none())
 end
 function Type.iface_of(name, args)
-    return Type.new("iface", name, args, 0)
+    return Type.new("iface", name, args, __lz_none())
 end
 function Type.fn(params, result)
-    return Type.new("fn", "", params, result)
+    return Type.new("fn", "", params, __lz_some(result))
 end
 function Type.var(name)
-    return Type.new("var", name, __lz_list(), 0)
+    return Type.new("var", name, __lz_list(), __lz_none())
 end
 function Type.is_dynamic(self)
     return self.kind == "dynamic"
@@ -3260,10 +3282,10 @@ function Typecheck.substitute(self, t, subst)
         return Typecheck.subst_lookup(self, subst, t.name)
     end
     if t.kind == "fn" then
-        return Type.fn((function() local __lz_m5 = __lz_list() for _, p in __lz_each(t.params) do __lz_push(__lz_m5, Typecheck.substitute(self, p, subst)) end return __lz_m5 end)(), Typecheck.substitute(self, t.result, subst))
+        return Type.fn((function() local __lz_m5 = __lz_list() for _, p in __lz_each(t.params) do __lz_push(__lz_m5, Typecheck.substitute(self, p, subst)) end return __lz_m5 end)(), Typecheck.substitute(self, __lz_unwrap(t.result), subst))
     end
     if ((t.kind == "class") or (t.kind == "enum")) and (__lz_len(t.params) > 0) then
-        return Type.new(t.kind, t.name, (function() local __lz_m6 = __lz_list() for _, a in __lz_each(t.params) do __lz_push(__lz_m6, Typecheck.substitute(self, a, subst)) end return __lz_m6 end)(), 0)
+        return Type.new(t.kind, t.name, (function() local __lz_m6 = __lz_list() for _, a in __lz_each(t.params) do __lz_push(__lz_m6, Typecheck.substitute(self, a, subst)) end return __lz_m6 end)(), t.result)
     end
     return t
 end
