@@ -2,19 +2,14 @@
 // sentinel token instead of an Option, so callers never guard for the end. The
 // cursor also raises syntax errors, since it holds the source and position.
 
+@auto
 import std.Str
 import Error
 import frontend.lexer.Token
 
 private tokens
 private source: str
-private pos: int
-
-constructor(tokens, source: str) {
-    .tokens = tokens
-    .source = source
-    .pos = 1
-}
+private pos: int = 1
 
 public position(): int {
     return .pos

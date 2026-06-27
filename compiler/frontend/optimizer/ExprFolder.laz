@@ -4,15 +4,12 @@
 // `+`/`-`/`*`/`/` over two numeric literals is evaluated now (division by a literal
 // zero is left for the runtime). Everything else just recurses.
 
+@auto
 import frontend.parser.Ast
 import frontend.parser.Node
 import std.Num
 
-private folds
-
-constructor() {
-    .folds = 0
-}
+private folds = 0
 
 public fold_count(): int {
     return .folds

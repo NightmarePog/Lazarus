@@ -453,28 +453,6 @@ end
 
 local TokenCursor = {}
 
-function TokenCursor.new(tokens, source)
-    local self = {}
-    self.position = TokenCursor.position
-    self.token_at = TokenCursor.token_at
-    self.current = TokenCursor.current
-    self.current_kind = TokenCursor.current_kind
-    self.peek_next = TokenCursor.peek_next
-    self.previous = TokenCursor.previous
-    self.at_end = TokenCursor.at_end
-    self.check = TokenCursor.check
-    self.advance = TokenCursor.advance
-    self.match = TokenCursor.match
-    self.consume = TokenCursor.consume
-    self.fail = TokenCursor.fail
-    self.fail_at = TokenCursor.fail_at
-    self.error_pos = TokenCursor.error_pos
-    self.eof = TokenCursor.eof
-    self.tokens = tokens
-    self.source = source
-    self.pos = 1
-    return self
-end
 function TokenCursor.position(self)
     return self.pos
 end
@@ -549,6 +527,28 @@ function TokenCursor.error_pos(self)
 end
 function TokenCursor.eof(self)
     return Token.new("EOF", "", 0, 0)
+end
+function TokenCursor.new(tokens, source)
+    local self = {}
+    self.position = TokenCursor.position
+    self.token_at = TokenCursor.token_at
+    self.current = TokenCursor.current
+    self.current_kind = TokenCursor.current_kind
+    self.peek_next = TokenCursor.peek_next
+    self.previous = TokenCursor.previous
+    self.at_end = TokenCursor.at_end
+    self.check = TokenCursor.check
+    self.advance = TokenCursor.advance
+    self.match = TokenCursor.match
+    self.consume = TokenCursor.consume
+    self.fail = TokenCursor.fail
+    self.fail_at = TokenCursor.fail_at
+    self.error_pos = TokenCursor.error_pos
+    self.eof = TokenCursor.eof
+    self.pos = 1
+    self.tokens = tokens
+    self.source = source
+    return self
 end
 
 local Node = {}
@@ -1677,6 +1677,9 @@ end
 
 local Symbol = {}
 
+function Symbol.set_noncallable(self, flag)
+    self.noncallable = flag
+end
 function Symbol.new(kind, mutable, noncallable)
     local self = {}
     self.set_noncallable = Symbol.set_noncallable
@@ -1684,9 +1687,6 @@ function Symbol.new(kind, mutable, noncallable)
     self.mutable = mutable
     self.noncallable = noncallable
     return self
-end
-function Symbol.set_noncallable(self, flag)
-    self.noncallable = flag
 end
 
 local Scope = {}
@@ -3475,14 +3475,6 @@ end
 
 local Constants = {}
 
-function Constants.new(entries)
-    local self = {}
-    self.record = Constants.record
-    self.lookup = Constants.lookup
-    self.child = Constants.child
-    self.entries = entries
-    return self
-end
 function Constants.empty()
     return Constants.new(__lz_map({}))
 end
@@ -3505,26 +3497,17 @@ function Constants.child(self, shadowed)
     end
     return Constants.new(copy)
 end
+function Constants.new(entries)
+    local self = {}
+    self.record = Constants.record
+    self.lookup = Constants.lookup
+    self.child = Constants.child
+    self.entries = entries
+    return self
+end
 
 local ExprFolder = {}
 
-function ExprFolder.new()
-    local self = {}
-    self.fold_count = ExprFolder.fold_count
-    self.fold = ExprFolder.fold
-    self.fold_identifier = ExprFolder.fold_identifier
-    self.fold_binary = ExprFolder.fold_binary
-    self.foldable = ExprFolder.foldable
-    self.can_fold = ExprFolder.can_fold
-    self.is_number = ExprFolder.is_number
-    self.result_kind = ExprFolder.result_kind
-    self.apply = ExprFolder.apply
-    self.fold_call = ExprFolder.fold_call
-    self.fold_list = ExprFolder.fold_list
-    self.fold_map = ExprFolder.fold_map
-    self.folds = 0
-    return self
-end
 function ExprFolder.fold_count(self)
     return self.folds
 end
@@ -3636,6 +3619,23 @@ function ExprFolder.fold_map(self, node, constants)
         entry:set("value", ExprFolder.fold(self, entry:child("value"), constants))
     end
     return node
+end
+function ExprFolder.new()
+    local self = {}
+    self.fold_count = ExprFolder.fold_count
+    self.fold = ExprFolder.fold
+    self.fold_identifier = ExprFolder.fold_identifier
+    self.fold_binary = ExprFolder.fold_binary
+    self.foldable = ExprFolder.foldable
+    self.can_fold = ExprFolder.can_fold
+    self.is_number = ExprFolder.is_number
+    self.result_kind = ExprFolder.result_kind
+    self.apply = ExprFolder.apply
+    self.fold_call = ExprFolder.fold_call
+    self.fold_list = ExprFolder.fold_list
+    self.fold_map = ExprFolder.fold_map
+    self.folds = 0
+    return self
 end
 
 local StmtFolder = {}
@@ -4116,37 +4116,6 @@ end
 
 local StmtEmitter = {}
 
-function StmtEmitter.new(ctx, exprs)
-    local self = {}
-    self.emit_member = StmtEmitter.emit_member
-    self.emit_enum = StmtEmitter.emit_enum
-    self.emit_variant_ctor = StmtEmitter.emit_variant_ctor
-    self.emit_stmt = StmtEmitter.emit_stmt
-    self.emit_match = StmtEmitter.emit_match
-    self.match_condition = StmtEmitter.match_condition
-    self.has_bindings = StmtEmitter.has_bindings
-    self.push_payload_body = StmtEmitter.push_payload_body
-    self.emit_block = StmtEmitter.emit_block
-    self.emit_fn_body = StmtEmitter.emit_fn_body
-    self.emit_variable = StmtEmitter.emit_variable
-    self.emit_index_assign = StmtEmitter.emit_index_assign
-    self.emit_local_function = StmtEmitter.emit_local_function
-    self.emit_return = StmtEmitter.emit_return
-    self.emit_if = StmtEmitter.emit_if
-    self.emit_while = StmtEmitter.emit_while
-    self.emit_loop = StmtEmitter.emit_loop
-    self.emit_for = StmtEmitter.emit_for
-    self.emit_for_in = StmtEmitter.emit_for_in
-    self.emit_method = StmtEmitter.emit_method
-    self.emit_static_field = StmtEmitter.emit_static_field
-    self.emit_constructor = StmtEmitter.emit_constructor
-    self.wrap_body = StmtEmitter.wrap_body
-    self.push_block = StmtEmitter.push_block
-    self.with_self = StmtEmitter.with_self
-    self.ctx = ctx
-    self.exprs = exprs
-    return self
-end
 function StmtEmitter.emit_member(self, node)
     local __lz_m1 = node.kind
     if __lz_m1 == "FunctionDecl" then
@@ -4473,6 +4442,37 @@ function StmtEmitter.with_self(self, params)
         __lz_push(out, param)
     end
     return out
+end
+function StmtEmitter.new(ctx, exprs)
+    local self = {}
+    self.emit_member = StmtEmitter.emit_member
+    self.emit_enum = StmtEmitter.emit_enum
+    self.emit_variant_ctor = StmtEmitter.emit_variant_ctor
+    self.emit_stmt = StmtEmitter.emit_stmt
+    self.emit_match = StmtEmitter.emit_match
+    self.match_condition = StmtEmitter.match_condition
+    self.has_bindings = StmtEmitter.has_bindings
+    self.push_payload_body = StmtEmitter.push_payload_body
+    self.emit_block = StmtEmitter.emit_block
+    self.emit_fn_body = StmtEmitter.emit_fn_body
+    self.emit_variable = StmtEmitter.emit_variable
+    self.emit_index_assign = StmtEmitter.emit_index_assign
+    self.emit_local_function = StmtEmitter.emit_local_function
+    self.emit_return = StmtEmitter.emit_return
+    self.emit_if = StmtEmitter.emit_if
+    self.emit_while = StmtEmitter.emit_while
+    self.emit_loop = StmtEmitter.emit_loop
+    self.emit_for = StmtEmitter.emit_for
+    self.emit_for_in = StmtEmitter.emit_for_in
+    self.emit_method = StmtEmitter.emit_method
+    self.emit_static_field = StmtEmitter.emit_static_field
+    self.emit_constructor = StmtEmitter.emit_constructor
+    self.wrap_body = StmtEmitter.wrap_body
+    self.push_block = StmtEmitter.push_block
+    self.with_self = StmtEmitter.with_self
+    self.ctx = ctx
+    self.exprs = exprs
+    return self
 end
 
 local Runtime = {}
