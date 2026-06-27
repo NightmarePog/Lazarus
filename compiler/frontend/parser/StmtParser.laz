@@ -27,6 +27,11 @@ constructor(cursor, exprs) {
 }
 
 public parse_program(): Node {
+    // A leading `@<kind>` directive makes the whole file that kind. Only
+    // `@interface` is recognised for now (the directive parser is extensible).
+    if .cursor.check("AT") {
+        return .parse_interface_file()
+    }
     mut body = []
     loop {
         if .cursor.at_end() {
@@ -34,6 +39,34 @@ public parse_program(): Node {
         }
         body.push(.parse_statement())
     }
+    return Ast.program(body)
+}
+
+// `@interface` → the whole file is one interface, named after the file (the empty
+// name is filled from the filename downstream). `import` lines are still allowed
+// (so a contract can reference types from other files); the Linker lifts them out,
+// leaving a body of only the interface decl. Any other `@x` is rejected.
+private parse_interface_file(): Node {
+    mut at = .cursor.consume("AT", "Expected a file directive")
+    if not .cursor.match("INTERFACE") {
+        .cursor.fail("unknown file directive '@" ++ .cursor.current().value ++ "'")
+    }
+    mut body = []
+    mut methods = []
+    mut properties = []
+    loop {
+        if .cursor.at_end() {
+            break
+        }
+        if .cursor.check("IMPORT") {
+            mut itok = .cursor.current()
+            .cursor.advance()
+            body.push(.parse_import(itok))
+        } else {
+            .parse_interface_member(methods, properties)
+        }
+    }
+    body.push(Ast.interface_decl("", methods, properties, [], at.line, at.column))
     return Ast.program(body)
 }
 
@@ -52,6 +85,10 @@ private parse_statement(): Node {
     if k == "ENUM" {
         .cursor.advance()
         return .parse_enum(tok)
+    }
+    if k == "INTERFACE" {
+        .cursor.advance()
+        return .parse_interface(tok)
     }
     if k == "PRIVATE" {
         .cursor.advance()
@@ -186,6 +223,46 @@ private parse_enum_variant(): Node {
         .cursor.consume("RIGHT_BRACKET", "Expected ')' after the variant payload types")
     }
     return Ast.enum_variant(v.value, fields, v.line, v.column)
+}
+
+// `interface Name<T> { fetch(): int  ;  name: str }` — a structural contract of
+// method signatures (no bodies) and property requirements. Shares the member
+// grammar with the `@interface` file form.
+private parse_interface(tok): Node {
+    mut name = .cursor.consume("IDENTIFIER", "Expected an interface name after 'interface'")
+    mut type_params = .parse_type_params()
+    mut open = .cursor.consume("BODY_START", "Expected '{' to open interface body")
+    mut methods = []
+    mut properties = []
+    loop {
+        if .cursor.check("BODY_END") {
+            break
+        }
+        if .cursor.at_end() {
+            .cursor.fail_at("Expected '}' to close interface body", open.line, open.column, 1)
+        }
+        .parse_interface_member(methods, properties)
+    }
+    .cursor.consume("BODY_END", "Expected '}' to close interface body")
+    return Ast.interface_decl(name.value, methods, properties, type_params, tok.line, tok.column)
+}
+
+// One interface requirement: a method signature `name<T>(params): ret` (a `<` or
+// `(` follows the name) or a property `name: Type`.
+private parse_interface_member(methods, properties) {
+    mut name = .cursor.consume("IDENTIFIER", "Expected a member name in the interface body")
+    if .cursor.check("LESS") or .cursor.check("LEFT_BRACKET") {
+        mut type_params = .parse_type_params()
+        .cursor.consume("LEFT_BRACKET", "Expected '(' in an interface method signature")
+        mut param_types = []
+        .parse_params(param_types)
+        .cursor.consume("RIGHT_BRACKET", "Expected ')' in an interface method signature")
+        mut return_type = .parse_return_type()
+        methods.push(Ast.interface_method(name.value, param_types, return_type, type_params))
+    } else {
+        .cursor.consume("COLON", "Expected ':' for an interface property requirement")
+        properties.push(Ast.interface_property(name.value, .parse_type()))
+    }
 }
 
 private parse_extern(tok): Node {

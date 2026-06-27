@@ -236,9 +236,9 @@ end
 
 local Keywords = {}
 
-Keywords.words = __lz_map({["import"] = "IMPORT", ["extern"] = "EXTERN", ["enum"] = "ENUM", ["private"] = "PRIVATE", ["public"] = "PUBLIC", ["mut"] = "MUTABLE", ["static"] = "STATIC", ["self"] = "SELF", ["constructor"] = "CONSTRUCTOR", ["return"] = "RETURN", ["if"] = "IF", ["else"] = "ELSE", ["while"] = "WHILE", ["loop"] = "LOOP", ["for"] = "FOR", ["in"] = "IN", ["break"] = "BREAK", ["true"] = "TRUE", ["false"] = "FALSE", ["and"] = "AND", ["or"] = "OR", ["not"] = "NOT"})
+Keywords.words = __lz_map({["import"] = "IMPORT", ["extern"] = "EXTERN", ["enum"] = "ENUM", ["interface"] = "INTERFACE", ["private"] = "PRIVATE", ["public"] = "PUBLIC", ["mut"] = "MUTABLE", ["static"] = "STATIC", ["self"] = "SELF", ["constructor"] = "CONSTRUCTOR", ["return"] = "RETURN", ["if"] = "IF", ["else"] = "ELSE", ["while"] = "WHILE", ["loop"] = "LOOP", ["for"] = "FOR", ["in"] = "IN", ["break"] = "BREAK", ["true"] = "TRUE", ["false"] = "FALSE", ["and"] = "AND", ["or"] = "OR", ["not"] = "NOT"})
 Keywords.ops2 = __lz_map({["++"] = "CONCAT", ["=>"] = "FAT_ARROW", ["->"] = "ARROW", ["=="] = "EQ", ["!="] = "NEQ", ["<="] = "LESS_EQUAL", [">="] = "GREATER_EQUAL", ["+="] = "PLUS_ASSIGN", ["-="] = "MINUS_ASSIGN", ["*="] = "STAR_ASSIGN", ["/="] = "SLASH_ASSIGN"})
-Keywords.ops1 = __lz_map({["="] = "ASSIGN", ["+"] = "PLUS", ["-"] = "MINUS", ["*"] = "MULTIPLY", ["/"] = "DIVIDE", ["%"] = "MODULO", ["^"] = "POWER", ["<"] = "LESS", [">"] = "GREATER", ["("] = "LEFT_BRACKET", [")"] = "RIGHT_BRACKET", ["{"] = "BODY_START", ["}"] = "BODY_END", [","] = "COMMA", [":"] = "COLON", ["."] = "DOT", [";"] = "SEMICOLON", ["["] = "LSQUARE", ["]"] = "RSQUARE"})
+Keywords.ops1 = __lz_map({["="] = "ASSIGN", ["+"] = "PLUS", ["-"] = "MINUS", ["*"] = "MULTIPLY", ["/"] = "DIVIDE", ["%"] = "MODULO", ["^"] = "POWER", ["<"] = "LESS", [">"] = "GREATER", ["("] = "LEFT_BRACKET", [")"] = "RIGHT_BRACKET", ["{"] = "BODY_START", ["}"] = "BODY_END", [","] = "COMMA", [":"] = "COLON", ["."] = "DOT", [";"] = "SEMICOLON", ["["] = "LSQUARE", ["]"] = "RSQUARE", ["@"] = "AT"})
 function Keywords.word_kind(word)
     return __lz_unwrap_or(__lz_get(Keywords.words, word), "IDENTIFIER")
 end
@@ -638,6 +638,15 @@ end
 function Ast.enum_variant(name, fields, line, col)
     return Node.new("EnumVariant", __lz_map({["name"] = name, ["fields"] = fields, ["line"] = line, ["col"] = col}))
 end
+function Ast.interface_decl(name, methods, properties, type_params, line, col)
+    return Node.new("InterfaceDecl", __lz_map({["name"] = name, ["methods"] = methods, ["properties"] = properties, ["type_params"] = type_params, ["line"] = line, ["col"] = col}))
+end
+function Ast.interface_method(name, param_types, return_type, type_params)
+    return Node.new("InterfaceMethod", __lz_map({["name"] = name, ["param_types"] = param_types, ["return_type"] = return_type, ["type_params"] = type_params}))
+end
+function Ast.interface_property(name, type)
+    return Node.new("InterfaceProperty", __lz_map({["name"] = name, ["type"] = type}))
+end
 function Ast.type_name(name, args, line, col)
     return Node.new("TypeName", __lz_map({["name"] = name, ["args"] = args, ["line"] = line, ["col"] = col}))
 end
@@ -891,11 +900,14 @@ StmtParser.compounds = __lz_map({["PLUS_ASSIGN"] = "PLUS", ["MINUS_ASSIGN"] = "M
 function StmtParser.new(cursor, exprs)
     local self = {}
     self.parse_program = StmtParser.parse_program
+    self.parse_interface_file = StmtParser.parse_interface_file
     self.parse_statement = StmtParser.parse_statement
     self.parse_block = StmtParser.parse_block
     self.parse_import = StmtParser.parse_import
     self.parse_enum = StmtParser.parse_enum
     self.parse_enum_variant = StmtParser.parse_enum_variant
+    self.parse_interface = StmtParser.parse_interface
+    self.parse_interface_member = StmtParser.parse_interface_member
     self.parse_extern = StmtParser.parse_extern
     self.parse_member = StmtParser.parse_member
     self.parse_static = StmtParser.parse_static
@@ -935,6 +947,9 @@ function StmtParser.new(cursor, exprs)
     return self
 end
 function StmtParser.parse_program(self)
+    if self.cursor:check("AT") then
+        return StmtParser.parse_interface_file(self)
+    end
     local body = __lz_list()
     while true do
         if self.cursor:at_end() then
@@ -942,6 +957,29 @@ function StmtParser.parse_program(self)
         end
         __lz_push(body, StmtParser.parse_statement(self))
     end
+    return Ast.program(body)
+end
+function StmtParser.parse_interface_file(self)
+    local at = self.cursor:consume("AT", "Expected a file directive")
+    if not self.cursor:match("INTERFACE") then
+        self.cursor:fail(("unknown file directive '@" .. self.cursor:current().value) .. "'")
+    end
+    local body = __lz_list()
+    local methods = __lz_list()
+    local properties = __lz_list()
+    while true do
+        if self.cursor:at_end() then
+            break
+        end
+        if self.cursor:check("IMPORT") then
+            local itok = self.cursor:current()
+            self.cursor:advance()
+            __lz_push(body, StmtParser.parse_import(self, itok))
+        else
+            StmtParser.parse_interface_member(self, methods, properties)
+        end
+    end
+    __lz_push(body, Ast.interface_decl("", methods, properties, __lz_list(), at.line, at.column))
     return Ast.program(body)
 end
 function StmtParser.parse_statement(self)
@@ -958,6 +996,10 @@ function StmtParser.parse_statement(self)
     if k == "ENUM" then
         self.cursor:advance()
         return StmtParser.parse_enum(self, tok)
+    end
+    if k == "INTERFACE" then
+        self.cursor:advance()
+        return StmtParser.parse_interface(self, tok)
     end
     if k == "PRIVATE" then
         self.cursor:advance()
@@ -1083,6 +1125,39 @@ function StmtParser.parse_enum_variant(self)
         self.cursor:consume("RIGHT_BRACKET", "Expected ')' after the variant payload types")
     end
     return Ast.enum_variant(v.value, fields, v.line, v.column)
+end
+function StmtParser.parse_interface(self, tok)
+    local name = self.cursor:consume("IDENTIFIER", "Expected an interface name after 'interface'")
+    local type_params = StmtParser.parse_type_params(self)
+    local open = self.cursor:consume("BODY_START", "Expected '{' to open interface body")
+    local methods = __lz_list()
+    local properties = __lz_list()
+    while true do
+        if self.cursor:check("BODY_END") then
+            break
+        end
+        if self.cursor:at_end() then
+            self.cursor:fail_at("Expected '}' to close interface body", open.line, open.column, 1)
+        end
+        StmtParser.parse_interface_member(self, methods, properties)
+    end
+    self.cursor:consume("BODY_END", "Expected '}' to close interface body")
+    return Ast.interface_decl(name.value, methods, properties, type_params, tok.line, tok.column)
+end
+function StmtParser.parse_interface_member(self, methods, properties)
+    local name = self.cursor:consume("IDENTIFIER", "Expected a member name in the interface body")
+    if self.cursor:check("LESS") or self.cursor:check("LEFT_BRACKET") then
+        local type_params = StmtParser.parse_type_params(self)
+        self.cursor:consume("LEFT_BRACKET", "Expected '(' in an interface method signature")
+        local param_types = __lz_list()
+        StmtParser.parse_params(self, param_types)
+        self.cursor:consume("RIGHT_BRACKET", "Expected ')' in an interface method signature")
+        local return_type = StmtParser.parse_return_type(self)
+        __lz_push(methods, Ast.interface_method(name.value, param_types, return_type, type_params))
+    else
+        self.cursor:consume("COLON", "Expected ':' for an interface property requirement")
+        __lz_push(properties, Ast.interface_property(name.value, StmtParser.parse_type(self)))
+    end
 end
 function StmtParser.parse_extern(self, tok)
     local name = self.cursor:consume("IDENTIFIER", "Expected a name after 'extern'")
@@ -2116,6 +2191,9 @@ end
 function Type.enum_of(name, args)
     return Type.new("enum", name, args, 0)
 end
+function Type.iface_of(name, args)
+    return Type.new("iface", name, args, 0)
+end
 function Type.fn(params, result)
     return Type.new("fn", "", params, result)
 end
@@ -2132,7 +2210,7 @@ function Type.equals(self, other)
     if self.kind ~= other.kind then
         return false
     end
-    if ((self.kind == "class") or (self.kind == "enum")) or (self.kind == "var") then
+    if (((self.kind == "class") or (self.kind == "enum")) or (self.kind == "var")) or (self.kind == "iface") then
         return self.name == other.name
     end
     return true
@@ -2141,7 +2219,7 @@ function Type.describe(self)
     if self.kind == "var" then
         return self.name
     end
-    if (self.kind == "class") or (self.kind == "enum") then
+    if ((self.kind == "class") or (self.kind == "enum")) or (self.kind == "iface") then
         if __lz_len(self.params) == 0 then
             return self.name
         end
@@ -2161,7 +2239,7 @@ end
 
 local Typecheck = {}
 
-function Typecheck.new(source, class_name, imports, enums, classes, variant_fields, variant_owner, enum_type_params)
+function Typecheck.new(source, class_name, imports, enums, classes, variant_fields, variant_owner, enum_type_params, interfaces)
     local self = {}
     self.check = Typecheck.check
     self.own_var_set = Typecheck.own_var_set
@@ -2232,6 +2310,15 @@ function Typecheck.new(source, class_name, imports, enums, classes, variant_fiel
     self.expect = Typecheck.expect
     self.compatible = Typecheck.compatible
     self.args_compatible = Typecheck.args_compatible
+    self.satisfies = Typecheck.satisfies
+    self.conforms = Typecheck.conforms
+    self.reject = Typecheck.reject
+    self.node_type = Typecheck.node_type
+    self.opt_node_type = Typecheck.opt_node_type
+    self.name_set = Typecheck.name_set
+    self.pair_subst = Typecheck.pair_subst
+    self.merge_vars = Typecheck.merge_vars
+    self.iface_method = Typecheck.iface_method
     self.fail = Typecheck.fail
     self.source = source
     self.class_name = class_name
@@ -2245,7 +2332,10 @@ function Typecheck.new(source, class_name, imports, enums, classes, variant_fiel
     self.variant_fields = variant_fields
     self.variant_owner = variant_owner
     self.enum_type_params = enum_type_params
+    self.interfaces = interfaces
     self.type_vars = __lz_map({})
+    self.checking = __lz_map({})
+    self.iface_reason = ""
     return self
 end
 function Typecheck.check(self, program)
@@ -2716,6 +2806,9 @@ function Typecheck.type_call(self, node, scope)
         if __lz_has(self.variant_owner, name) then
             return Typecheck.type_variant(self, name, args, scope, node)
         end
+        if (not __lz_is_some(scope:lookup(name))) and __lz_has(self.interfaces, name) then
+            Typecheck.fail(self, callee, ("cannot construct interface '" .. name) .. "'")
+        end
         if (not __lz_is_some(scope:lookup(name))) and __lz_has(self.classes, name) then
             return Typecheck.type_construction(self, name, args, scope, node)
         end
@@ -2750,6 +2843,9 @@ function Typecheck.type_method_call(self, member, args, scope, call)
     local recv = Typecheck.receiver_type(self, object, scope)
     if Typecheck.is_builtin_type(self, recv) then
         return Typecheck.builtin_method(self, recv, method, args, scope)
+    end
+    if recv.kind == "iface" then
+        return Typecheck.iface_method(self, recv, method, args, scope, call)
     end
     local cls = Typecheck.class_name_of(self, recv)
     if cls == "" then
@@ -3015,6 +3111,9 @@ function Typecheck.resolve(self, t)
     if __lz_has(self.enums, name) then
         return Type.enum_of(name, Typecheck.resolve_args(self, t, name))
     end
+    if __lz_has(self.interfaces, name) then
+        return Type.iface_of(name, Typecheck.resolve_args(self, t, name))
+    end
     if __lz_has(self.known_classes, name) or __lz_has(self.classes, name) then
         return Type.class_of(name, Typecheck.resolve_args(self, t, name))
     end
@@ -3045,6 +3144,9 @@ function Typecheck.declared_arity(self, name)
     if __lz_has(self.enum_type_params, name) then
         return __lz_len(__lz_unwrap(__lz_get(self.enum_type_params, name)))
     end
+    if __lz_has(self.interfaces, name) then
+        return __lz_len(__lz_unwrap_or(__lz_get(__lz_unwrap(__lz_get(self.interfaces, name)), "type_params"), __lz_list()))
+    end
     local centry = __lz_get(self.classes, name)
     if __lz_is_some(centry) then
         return __lz_len(__lz_unwrap_or(__lz_get(__lz_unwrap(centry), "type_params"), __lz_list()))
@@ -3053,6 +3155,9 @@ function Typecheck.declared_arity(self, name)
 end
 function Typecheck.expect(self, expected, actual, node, what)
     if not Typecheck.compatible(self, expected, actual) then
+        if (expected.kind == "iface") and (self.iface_reason ~= "") then
+            Typecheck.fail(self, node, (((actual:describe() .. " does not satisfy ") .. expected:describe()) .. ": ") .. self.iface_reason)
+        end
         Typecheck.fail(self, node, (((("type mismatch in " .. what) .. ": expected ") .. expected:describe()) .. ", found ") .. actual:describe())
     end
 end
@@ -3062,6 +3167,9 @@ function Typecheck.compatible(self, expected, actual)
     end
     if (expected.kind == "var") or (actual.kind == "var") then
         return true
+    end
+    if expected.kind == "iface" then
+        return Typecheck.satisfies(self, expected, actual)
     end
     if not expected:equals(actual) then
         return false
@@ -3087,6 +3195,143 @@ function Typecheck.args_compatible(self, a, b)
         i = i + 1
     end
     return true
+end
+function Typecheck.satisfies(self, iface, actual)
+    if actual:is_dynamic() or (actual.kind == "var") then
+        return true
+    end
+    if (actual.kind == "iface") and (actual.name == iface.name) then
+        return Typecheck.args_compatible(self, iface.params, actual.params)
+    end
+    if not __lz_has(self.interfaces, iface.name) then
+        return true
+    end
+    local key = (iface.name .. "<:") .. actual.name
+    if __lz_unwrap_or(__lz_get(self.checking, key), false) then
+        return true
+    end
+    __lz_idx_set(self.checking, key, true)
+    local ok = Typecheck.conforms(self, iface, actual)
+    __lz_idx_set(self.checking, key, false)
+    return ok
+end
+function Typecheck.conforms(self, iface, actual)
+    local centry = __lz_get(self.classes, actual.name)
+    if not __lz_is_some(centry) then
+        return true
+    end
+    local cls = __lz_unwrap(centry)
+    local cmethods = __lz_unwrap(__lz_get(cls, "methods"))
+    local cfields = __lz_unwrap(__lz_get(cls, "fields"))
+    local def = __lz_unwrap(__lz_get(self.interfaces, iface.name))
+    local ivars = Typecheck.name_set(self, __lz_unwrap_or(__lz_get(def, "type_params"), __lz_list()))
+    local isubst = Typecheck.pair_subst(self, __lz_unwrap_or(__lz_get(def, "type_params"), __lz_list()), iface.params)
+    local cvars = Typecheck.class_var_set(self, actual.name)
+    local csubst = Typecheck.receiver_subst(self, actual.name, actual)
+    for mname, msig in __lz_each(__lz_unwrap(__lz_get(def, "methods"))) do
+        local found = __lz_get(cmethods, mname)
+        if not __lz_is_some(found) then
+            return Typecheck.reject(self, iface, ("missing method '" .. mname) .. "'")
+        end
+        local csig = __lz_unwrap(found)
+        if __lz_unwrap_or(__lz_get(csig, "is_static"), false) then
+            return Typecheck.reject(self, iface, ("method '" .. mname) .. "' must be an instance method")
+        end
+        local iparams = __lz_unwrap(__lz_get(msig, "params"))
+        local cparams = __lz_unwrap(__lz_get(csig, "params"))
+        if __lz_len(iparams) ~= __lz_len(cparams) then
+            return Typecheck.reject(self, iface, ((("method '" .. mname) .. "' expects ") .. Typecheck.count(self, __lz_len(iparams))) .. " parameter(s)")
+        end
+        local imvars = Typecheck.merge_vars(self, ivars, __lz_unwrap_or(__lz_get(msig, "type_params"), __lz_list()))
+        local cmvars = Typecheck.merge_vars(self, cvars, __lz_unwrap_or(__lz_get(csig, "type_params"), __lz_list()))
+        local i = 1
+        for _, ip in __lz_each(iparams) do
+            local it = Typecheck.substitute(self, Typecheck.resolve_with(self, ip, imvars), isubst)
+            local ct = Typecheck.substitute(self, Typecheck.resolve_with(self, __lz_unwrap(__lz_get(cparams, i)), cmvars), csubst)
+            if not Typecheck.compatible(self, it, ct) then
+                return Typecheck.reject(self, iface, (((((("method '" .. mname) .. "' parameter ") .. Typecheck.count(self, i)) .. " is ") .. ct:describe()) .. ", expected ") .. it:describe())
+            end
+            i = i + 1
+        end
+        local iret = Typecheck.substitute(self, Typecheck.resolve_with(self, __lz_unwrap(__lz_get(msig, "result")), imvars), isubst)
+        local cret = Typecheck.node_type(self, __lz_unwrap_or(__lz_get(csig, "result"), 0), cmvars, csubst)
+        if not Typecheck.compatible(self, iret, cret) then
+            return Typecheck.reject(self, iface, (((("method '" .. mname) .. "' returns ") .. cret:describe()) .. ", expected ") .. iret:describe())
+        end
+    end
+    for pname, pnode in __lz_each(__lz_unwrap(__lz_get(def, "properties"))) do
+        local pf = __lz_get(cfields, pname)
+        if not __lz_is_some(pf) then
+            return Typecheck.reject(self, iface, ("missing property '" .. pname) .. "'")
+        end
+        local it = Typecheck.substitute(self, Typecheck.resolve_with(self, pnode, ivars), isubst)
+        local ct = Typecheck.opt_node_type(self, __lz_unwrap(pf), cvars, csubst)
+        if not Typecheck.compatible(self, it, ct) then
+            return Typecheck.reject(self, iface, (((("property '" .. pname) .. "' is ") .. ct:describe()) .. ", expected ") .. it:describe())
+        end
+    end
+    return true
+end
+function Typecheck.reject(self, iface, why)
+    self.iface_reason = why
+    return false
+end
+function Typecheck.node_type(self, node, vars, subst)
+    if node == 0 then
+        return Type.dynamic()
+    end
+    return Typecheck.substitute(self, Typecheck.resolve_with(self, node, vars), subst)
+end
+function Typecheck.opt_node_type(self, opt, vars, subst)
+    if not __lz_is_some(opt) then
+        return Type.dynamic()
+    end
+    return Typecheck.node_type(self, __lz_unwrap(opt), vars, subst)
+end
+function Typecheck.name_set(self, names)
+    local out = __lz_map({})
+    for _, n in __lz_each(names) do
+        __lz_idx_set(out, n, true)
+    end
+    return out
+end
+function Typecheck.pair_subst(self, names, types)
+    local out = __lz_map({})
+    local i = 1
+    for _, n in __lz_each(names) do
+        local t = __lz_get(types, i)
+        if __lz_is_some(t) then
+            __lz_idx_set(out, n, __lz_unwrap(t))
+        end
+        i = i + 1
+    end
+    return out
+end
+function Typecheck.merge_vars(self, base, names)
+    local out = __lz_map({})
+    for k, v in __lz_each(base) do
+        __lz_idx_set(out, k, v)
+    end
+    for _, n in __lz_each(names) do
+        __lz_idx_set(out, n, true)
+    end
+    return out
+end
+function Typecheck.iface_method(self, recv, method, args, scope, call)
+    local def = __lz_unwrap(__lz_get(self.interfaces, recv.name))
+    local msig_opt = __lz_get(__lz_unwrap(__lz_get(def, "methods")), method)
+    if not __lz_is_some(msig_opt) then
+        Typecheck.fail(self, call, (("no method '" .. method) .. "' on interface ") .. recv.name)
+    end
+    local msig = __lz_unwrap(msig_opt)
+    local vars = Typecheck.merge_vars(self, Typecheck.name_set(self, __lz_unwrap_or(__lz_get(def, "type_params"), __lz_list())), __lz_unwrap_or(__lz_get(msig, "type_params"), __lz_list()))
+    local subst = Typecheck.pair_subst(self, __lz_unwrap_or(__lz_get(def, "type_params"), __lz_list()), recv.params)
+    Typecheck.infer_and_check(self, __lz_unwrap(__lz_get(msig, "params")), vars, args, scope, call, subst)
+    local result = __lz_unwrap_or(__lz_get(msig, "result"), 0)
+    if result == 0 then
+        return Type.dynamic()
+    end
+    return Typecheck.substitute(self, Typecheck.resolve_with(self, result, vars), subst)
 end
 function Typecheck.fail(self, node, message)
     Error.new("TypeError", message, node:line(), node:col(), self.source, 1):raise()
@@ -4223,6 +4468,9 @@ function Codegen.is_emittable(self, stmt)
     if k == "ExternDecl" then
         return false
     end
+    if k == "InterfaceDecl" then
+        return false
+    end
     if (k == "VariableDecl") and Codegen.is_property(self, stmt) then
         return false
     end
@@ -4259,7 +4507,7 @@ function Bundler.bundle(self)
     local entry_has_ctor = false
     local entry_source = ""
     for _, m in __lz_each(self.modules) do
-        if not Bundler.is_extern_module(self, m) then
+        if (not Bundler.is_extern_module(self, m)) and (not m.is_interface) then
             local cg = Codegen.new(m.class_name, m.imports, externs, self.variant_owner)
             __lz_push(blocks, cg:class_block(m.ast))
             if cg:uses_collections() then
@@ -4312,13 +4560,14 @@ end
 
 local Module = {}
 
-function Module.new(path, class_name, source, ast, imports)
+function Module.new(path, class_name, source, ast, imports, is_interface)
     local self = {}
     self.path = path
     self.class_name = class_name
     self.source = source
     self.ast = ast
     self.imports = imports
+    self.is_interface = is_interface
     return self
 end
 
@@ -4381,6 +4630,7 @@ function Linker.new(entry)
     self.link = Linker.link
     self.entry_class = Linker.entry_class
     self.load = Linker.load
+    self.body_is_interface = Linker.body_is_interface
     self.entry = entry
     self.root = Path.dirname(entry)
     self.loaded = __lz_map({})
@@ -4423,8 +4673,19 @@ function Linker.load(self, path, origin_source, origin_line, origin_col, origin_
         end
     end
     program:set("body", body)
-    __lz_push(self.ordered, Module.new(path, class_name, source, program, imports))
+    __lz_push(self.ordered, Module.new(path, class_name, source, program, imports, Linker.body_is_interface(self, body)))
     __lz_idx_set(self.loaded, path, true)
+end
+function Linker.body_is_interface(self, body)
+    if __lz_len(body) == 0 then
+        return false
+    end
+    for _, node in __lz_each(body) do
+        if node.kind ~= "InterfaceDecl" then
+            return false
+        end
+    end
+    return true
 end
 
 local Main = {}
@@ -4448,14 +4709,20 @@ function Main.build_file(path)
     local variant_fields = __lz_map({})
     local enum_type_params = __lz_map({})
     local classes = __lz_map({})
+    local interfaces = __lz_map({})
     for _, m in __lz_each(modules) do
         Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
-        Main.collect_signatures(m.ast, m.class_name, classes)
+        Main.collect_interfaces(m.ast, interfaces, m.class_name)
+        if not m.is_interface then
+            Main.collect_signatures(m.ast, m.class_name, classes)
+        end
     end
     for _, m in __lz_each(modules) do
-        Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity)
-        Typecheck.new(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params):check(m.ast)
-        Optimizer.new():optimize(m.ast)
+        if not m.is_interface then
+            Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity)
+            Typecheck.new(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, interfaces):check(m.ast)
+            Optimizer.new():optimize(m.ast)
+        end
     end
     local file = __lz_unwrap(__lz_wrap(io.open("Main.lua", "w")))
     file:write(Bundler.new(modules, linker:entry_class(), variant_owner):bundle())
@@ -4503,6 +4770,25 @@ function Main.collect_signatures(ast, class_name, classes)
         end
     end
     __lz_idx_set(classes, class_name, __lz_map({["fields"] = fields, ["methods"] = methods, ["ctor"] = ctor, ["type_params"] = type_params}))
+end
+function Main.collect_interfaces(ast, interfaces, class_name)
+    for _, stmt in __lz_each(ast:child("body")) do
+        if stmt.kind == "InterfaceDecl" then
+            local name = stmt:child("name")
+            if name == "" then
+                name = class_name
+            end
+            local methods = __lz_map({})
+            for _, m in __lz_each(stmt:child("methods")) do
+                __lz_idx_set(methods, m:child("name"), __lz_map({["params"] = m:child("param_types"), ["result"] = m:child("return_type"), ["type_params"] = m:child("type_params")}))
+            end
+            local properties = __lz_map({})
+            for _, p in __lz_each(stmt:child("properties")) do
+                __lz_idx_set(properties, p:child("name"), p:child("type"))
+            end
+            __lz_idx_set(interfaces, name, __lz_map({["methods"] = methods, ["properties"] = properties, ["type_params"] = stmt:child("type_params")}))
+        end
+    end
 end
 
 return Main.new(...)

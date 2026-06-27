@@ -21,9 +21,12 @@ private classes
 private variant_fields
 private variant_owner
 private enum_type_params
+private interfaces
 private type_vars
+private checking
+private iface_reason: str
 
-constructor(source, class_name, imports, enums, classes, variant_fields, variant_owner, enum_type_params) {
+constructor(source, class_name, imports, enums, classes, variant_fields, variant_owner, enum_type_params, interfaces) {
     .source = source
     .class_name = class_name
     .known_classes = [:]
@@ -36,7 +39,10 @@ constructor(source, class_name, imports, enums, classes, variant_fields, variant
     .variant_fields = variant_fields
     .variant_owner = variant_owner
     .enum_type_params = enum_type_params
+    .interfaces = interfaces
     .type_vars = [:]
+    .checking = [:]
+    .iface_reason = ""
 }
 
 public check(program) {
@@ -579,6 +585,9 @@ private type_call(node, scope): Type {
         if .variant_owner.has(name) {
             return .type_variant(name, args, scope, node)
         }
+        if not scope.lookup(name).is_some() and .interfaces.has(name) {
+            .fail(callee, "cannot construct interface '" ++ name ++ "'")
+        }
         if not scope.lookup(name).is_some() and .classes.has(name) {
             return .type_construction(name, args, scope, node)
         }
@@ -620,6 +629,9 @@ private type_method_call(member, args, scope, call): Type {
     mut recv = .receiver_type(object, scope)
     if .is_builtin_type(recv) {
         return .builtin_method(recv, method, args, scope)
+    }
+    if recv.kind == "iface" {
+        return .iface_method(recv, method, args, scope, call)
     }
     mut cls = .class_name_of(recv)
     if cls == "" {
@@ -946,6 +958,9 @@ private resolve(t): Type {
     if .enums.has(name) {
         return Type.enum_of(name, .resolve_args(t, name))
     }
+    if .interfaces.has(name) {
+        return Type.iface_of(name, .resolve_args(t, name))
+    }
     if .known_classes.has(name) or .classes.has(name) {
         return Type.class_of(name, .resolve_args(t, name))
     }
@@ -980,6 +995,9 @@ private declared_arity(name): int {
     if .enum_type_params.has(name) {
         return .enum_type_params.get(name).unwrap().len()
     }
+    if .interfaces.has(name) {
+        return .interfaces.get(name).unwrap().get("type_params").unwrap_or([]).len()
+    }
     mut centry = .classes.get(name)
     if centry.is_some() {
         return centry.unwrap().get("type_params").unwrap_or([]).len()
@@ -989,6 +1007,9 @@ private declared_arity(name): int {
 
 private expect(expected, actual, node, what: str) {
     if not .compatible(expected, actual) {
+        if expected.kind == "iface" and .iface_reason != "" {
+            .fail(node, actual.describe() ++ " does not satisfy " ++ expected.describe() ++ ": " ++ .iface_reason)
+        }
         .fail(node, "type mismatch in " ++ what ++ ": expected " ++ expected.describe() ++ ", found " ++ actual.describe())
     }
 }
@@ -1003,6 +1024,9 @@ private compatible(expected, actual): bool {
     }
     if expected.kind == "var" or actual.kind == "var" {
         return true
+    }
+    if expected.kind == "iface" {
+        return .satisfies(expected, actual)
     }
     if not expected.equals(actual) {
         return false
@@ -1029,6 +1053,171 @@ private args_compatible(a, b): bool {
         i = i + 1
     }
     return true
+}
+
+// ---- interface conformance (interface-directed structural subtyping) ----
+
+// Does `actual` satisfy interface `iface`? A `dynamic`/`var`/unknown actual defers
+// (true); the same interface compares args; a class is checked structurally. A
+// coinductive visited-pair guard makes mutually-referential interfaces terminate.
+private satisfies(iface, actual): bool {
+    if actual.is_dynamic() or actual.kind == "var" {
+        return true
+    }
+    if actual.kind == "iface" and actual.name == iface.name {
+        return .args_compatible(iface.params, actual.params)
+    }
+    if not .interfaces.has(iface.name) {
+        return true
+    }
+    mut key = iface.name ++ "<:" ++ actual.name
+    if .checking.get(key).unwrap_or(false) {
+        return true
+    }
+    .checking[key] = true
+    mut ok = .conforms(iface, actual)
+    .checking[key] = false
+    return ok
+}
+
+// Structural check: `actual` (a known class) must have every method and property
+// the interface requires, with compatible signatures once both sides' type
+// parameters are substituted (interface args, then the class's instantiation).
+private conforms(iface, actual): bool {
+    mut centry = .classes.get(actual.name)
+    if not centry.is_some() {
+        return true
+    }
+    mut cls = centry.unwrap()
+    mut cmethods = cls.get("methods").unwrap()
+    mut cfields = cls.get("fields").unwrap()
+    mut def = .interfaces.get(iface.name).unwrap()
+
+    mut ivars = .name_set(def.get("type_params").unwrap_or([]))
+    mut isubst = .pair_subst(def.get("type_params").unwrap_or([]), iface.params)
+    mut cvars = .class_var_set(actual.name)
+    mut csubst = .receiver_subst(actual.name, actual)
+
+    for mname, msig in def.get("methods").unwrap() {
+        mut found = cmethods.get(mname)
+        if not found.is_some() {
+            return .reject(iface, "missing method '" ++ mname ++ "'")
+        }
+        mut csig = found.unwrap()
+        if csig.get("is_static").unwrap_or(false) {
+            return .reject(iface, "method '" ++ mname ++ "' must be an instance method")
+        }
+        mut iparams = msig.get("params").unwrap()
+        mut cparams = csig.get("params").unwrap()
+        if iparams.len() != cparams.len() {
+            return .reject(iface, "method '" ++ mname ++ "' expects " ++ .count(iparams.len()) ++ " parameter(s)")
+        }
+        mut imvars = .merge_vars(ivars, msig.get("type_params").unwrap_or([]))
+        mut cmvars = .merge_vars(cvars, csig.get("type_params").unwrap_or([]))
+        mut i = 1
+        for ip in iparams {
+            mut it = .substitute(.resolve_with(ip, imvars), isubst)
+            mut ct = .substitute(.resolve_with(cparams.get(i).unwrap(), cmvars), csubst)
+            if not .compatible(it, ct) {
+                return .reject(iface, "method '" ++ mname ++ "' parameter " ++ .count(i) ++ " is " ++ ct.describe() ++ ", expected " ++ it.describe())
+            }
+            i = i + 1
+        }
+        mut iret = .substitute(.resolve_with(msig.get("result").unwrap(), imvars), isubst)
+        mut cret = .node_type(csig.get("result").unwrap_or(0), cmvars, csubst)
+        if not .compatible(iret, cret) {
+            return .reject(iface, "method '" ++ mname ++ "' returns " ++ cret.describe() ++ ", expected " ++ iret.describe())
+        }
+    }
+
+    for pname, pnode in def.get("properties").unwrap() {
+        mut pf = cfields.get(pname)
+        if not pf.is_some() {
+            return .reject(iface, "missing property '" ++ pname ++ "'")
+        }
+        mut it = .substitute(.resolve_with(pnode, ivars), isubst)
+        mut ct = .opt_node_type(pf.unwrap(), cvars, csubst)
+        if not .compatible(it, ct) {
+            return .reject(iface, "property '" ++ pname ++ "' is " ++ ct.describe() ++ ", expected " ++ it.describe())
+        }
+    }
+    return true
+}
+
+// Record why conformance failed and report not-satisfied. The reason is read back
+// by `expect` to build the precise diagnostic at the use site.
+private reject(iface, why: str): bool {
+    .iface_reason = why
+    return false
+}
+
+// Resolve a type node (0 → dynamic) under a var set, then apply a substitution.
+private node_type(node, vars, subst): Type {
+    if node == 0 {
+        return Type.dynamic()
+    }
+    return .substitute(.resolve_with(node, vars), subst)
+}
+
+// A class field's stored type is an Option of a type node; an absent or `0` slot
+// is dynamic.
+private opt_node_type(opt, vars, subst): Type {
+    if not opt.is_some() {
+        return Type.dynamic()
+    }
+    return .node_type(opt.unwrap(), vars, subst)
+}
+
+private name_set(names) {
+    mut out = [:]
+    for n in names {
+        out[n] = true
+    }
+    return out
+}
+
+private pair_subst(names, types) {
+    mut out = [:]
+    mut i = 1
+    for n in names {
+        mut t = types.get(i)
+        if t.is_some() {
+            out[n] = t.unwrap()
+        }
+        i = i + 1
+    }
+    return out
+}
+
+private merge_vars(base, names) {
+    mut out = [:]
+    for k, v in base {
+        out[k] = v
+    }
+    for n in names {
+        out[n] = true
+    }
+    return out
+}
+
+// A call on an interface-typed receiver: look the method up in the interface's
+// contract, check the args against its declared params (with the receiver's type
+// args bound), and return the declared result type substituted through.
+private iface_method(recv, method, args, scope, call): Type {
+    mut def = .interfaces.get(recv.name).unwrap()
+    mut msig_opt = def.get("methods").unwrap().get(method)
+    if not msig_opt.is_some() {
+        .fail(call, "no method '" ++ method ++ "' on interface " ++ recv.name)
+    }
+    mut msig = msig_opt.unwrap()
+    mut vars = .merge_vars(.name_set(def.get("type_params").unwrap_or([])), msig.get("type_params").unwrap_or([]))
+    mut subst = .pair_subst(def.get("type_params").unwrap_or([]), recv.params)
+    .infer_and_check(msig.get("params").unwrap(), vars, args, scope, call, subst)
+    mut result = msig.get("result").unwrap_or(0)
+    if result == 0 {
+        return Type.dynamic()
+    }
+    return .substitute(.resolve_with(result, vars), subst)
 }
 
 private fail(node, message: str) {

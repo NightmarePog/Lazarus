@@ -38,15 +38,21 @@ static build_file(path: str) {
     mut variant_fields = [:]
     mut enum_type_params = [:]
     mut classes = [:]
+    mut interfaces = [:]
     for m in modules {
         Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
-        Main.collect_signatures(m.ast, m.class_name, classes)
+        Main.collect_interfaces(m.ast, interfaces, m.class_name)
+        if not m.is_interface {
+            Main.collect_signatures(m.ast, m.class_name, classes)
+        }
     }
 
     for m in modules {
-        Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity)
-        Typecheck(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params).check(m.ast)
-        Optimizer().optimize(m.ast)
+        if not m.is_interface {
+            Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity)
+            Typecheck(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, interfaces).check(m.ast)
+            Optimizer().optimize(m.ast)
+        }
     }
     file = Sys.open("Main.lua", "w").unwrap()
     file.write(Bundler(modules, linker.entry_class(), variant_owner).bundle())
@@ -105,4 +111,29 @@ static collect_signatures(ast, class_name: str, classes) {
         }
     }
     classes[class_name] = ["fields": fields, "methods": methods, "ctor": ctor, "type_params": type_params]
+}
+
+// Gather every interface declaration (inline or a `@interface` file, whose decl
+// carries an empty name filled here from the filename) into the program-wide
+// `interfaces` registry, so the checker can resolve interface annotations and run
+// structural conformance. Each entry holds `methods` (name -> {params, result,
+// type_params}), `properties` (name -> type node) and the interface's `type_params`.
+static collect_interfaces(ast, interfaces, class_name: str) {
+    for stmt in ast.child("body") {
+        if stmt.kind == "InterfaceDecl" {
+            mut name = stmt.child("name")
+            if name == "" {
+                name = class_name
+            }
+            mut methods = [:]
+            for m in stmt.child("methods") {
+                methods[m.child("name")] = ["params": m.child("param_types"), "result": m.child("return_type"), "type_params": m.child("type_params")]
+            }
+            mut properties = [:]
+            for p in stmt.child("properties") {
+                properties[p.child("name")] = p.child("type")
+            }
+            interfaces[name] = ["methods": methods, "properties": properties, "type_params": stmt.child("type_params")]
+        }
+    }
 }
