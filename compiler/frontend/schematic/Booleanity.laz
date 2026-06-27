@@ -20,34 +20,38 @@ private non_bool_builtin = [
 ]
 
 non_bool_reason(node): str {
-    mut k = node.kind
-    if k == "LiteralExpr" {
-        mut lit_kind = node.child("lit_kind")
-        if lit_kind == "number" or lit_kind == "float" {
-            return "a number"
+    match node.kind {
+        "LiteralExpr" => { return Booleanity.literal_reason(node.child("lit_kind")) }
+        "ListExpr" => { return "a list" }
+        "MapExpr" => { return "a map" }
+        "BinaryExpr" => { return Booleanity.binary_reason(node.child("op")) }
+        "CallExpr" => {
+            mut callee = node.child("callee")
+            if callee.kind == "MemberExpr" {
+                return Booleanity.non_bool_builtin.get(callee.child("field")).unwrap_or("")
+            }
         }
-        if lit_kind == "string" {
-            return "a string"
-        }
-        return ""
-    } else if k == "ListExpr" {
-        return "a list"
-    } else if k == "MapExpr" {
-        return "a map"
-    } else if k == "BinaryExpr" {
-        mut op = node.child("op")
-        if Booleanity.arithmetic.has(op) {
-            return "an arithmetic value"
-        }
-        if op == "CONCAT" {
-            return "a string"
-        }
-        return ""
-    } else if k == "CallExpr" {
-        mut callee = node.child("callee")
-        if callee.kind == "MemberExpr" {
-            return Booleanity.non_bool_builtin.get(callee.child("field")).unwrap_or("")
-        }
+        _ => {}
+    }
+    return ""
+}
+
+private literal_reason(lit_kind: str): str {
+    if lit_kind == "number" or lit_kind == "float" {
+        return "a number"
+    }
+    if lit_kind == "string" {
+        return "a string"
+    }
+    return ""
+}
+
+private binary_reason(op: str): str {
+    if Booleanity.arithmetic.has(op) {
+        return "an arithmetic value"
+    }
+    if op == "CONCAT" {
+        return "a string"
     }
     return ""
 }
