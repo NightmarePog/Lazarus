@@ -4,7 +4,6 @@
 // The instance context (`in_instance` + the class's properties/methods) lets a
 // `.field` / `self` access be checked; the statement checker toggles it.
 
-@auto
 import std.Str
 import Error
 import frontend.parser.Node
@@ -12,10 +11,8 @@ import frontend.schematic.Symbol
 import frontend.schematic.Scope
 import frontend.schematic.Booleanity
 
-private source
-private properties
-private methods
-private variant_owner
+@auto
+constructor(source, properties, methods, variant_owner)
 private in_instance = false
 
 public set_instance(flag: bool) {

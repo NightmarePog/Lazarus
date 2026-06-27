@@ -5,14 +5,7 @@
 // the scope chain is an explicit list searched outward).
 
 @auto
-private cls: str
-private members
-private instance_methods
-private instance_order
-private properties
-private known_classes
-private externs
-private variant_owner
+constructor(cls: str, members, instance_methods, instance_order, properties, known_classes, externs, variant_owner)
 private scopes = [[:]]
 private collections = false
 private temp_seq = 0

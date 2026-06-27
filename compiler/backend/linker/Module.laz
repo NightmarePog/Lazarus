@@ -4,9 +4,4 @@
 // `is_interface` (the body is only interface declarations — no class is emitted).
 
 @auto
-public path
-public class_name
-public source
-public ast
-public imports
-public is_interface
+constructor(path, class_name, source, ast, imports, is_interface)

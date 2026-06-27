@@ -5,7 +5,6 @@
 // -> `C.m(self, ...)`; any other instance call -> Lua colon `obj:m(...)`;
 // everything else -> a plain call.
 
-@auto
 import std.Str
 import backend.Text
 import frontend.parser.Node
@@ -54,7 +53,8 @@ private static constructors = [
     "Result.err": "__lz_err"
 ]
 
-private ctx
+@auto
+constructor(ctx)
 
 public emit(node): str {
     match node.kind {

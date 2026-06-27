@@ -10,19 +10,29 @@ Remove the pervasive constructor boilerplate (`private x` decl + `constructor(x)
 normal `ConstructorDecl` plus property `VariableDecl`s, so the checker, codegen,
 linker, and registries need **no changes** (same approach as `@object`).
 
-## Form A — `@auto` (synthesized constructor)
+## Form A — `@auto constructor(...)` (parameter properties for every param)
 
-A file-head directive. The file is a normal class, but its constructor is
-synthesized from the declared instance fields:
+> **Revised 2026-06-27:** `@auto` was originally a *file-head* directive that
+> synthesized the constructor from separately-declared fields. Per user feedback it
+> is now an annotation **directly above the constructor**, where every parameter
+> becomes a parameter-property (declared + assigned). This reads better (the params
+> are visible) and is just "`.` on every param". The 21 classes migrated to the old
+> form were re-migrated; the file-head form was removed. The migration used the
+> 3-step self-host dance (add-both → re-migrate → remove-old).
 
 ```laz
 @auto
-import frontend.parser.Ast
-private cursor
-private exprs
-private depth = 0
-// synthesized:
-//   constructor(cursor, exprs) { .cursor = cursor  .exprs = exprs  .depth = 0 }
+constructor(cursor, exprs)            // => private cursor; private exprs; .cursor=cursor; .exprs=exprs
+constructor(a: int, b: int) { .c = .a + .b }   // typed, with extra body
+```
+
+Default/computed fields are declared normally alongside; they are not constructor
+params:
+
+```laz
+@auto
+constructor(cls: str, members, externs)
+private scopes = [[:]]                 // default, seeded by codegen
 ```
 
 Rules:

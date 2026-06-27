@@ -3,9 +3,7 @@
 // judged. Immutable — a nested context derives a fresh Frame.
 
 @auto
-public in_function: bool
-public in_loop: bool
-public in_constructor: bool
+constructor(in_function: bool, in_loop: bool, in_constructor: bool)
 
 // The frame for a loop body: like this one, but with `break` now legal.
 public in_loop_body(): Frame {

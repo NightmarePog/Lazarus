@@ -1,12 +1,9 @@
 // A lexical token: its `kind` tag, raw `value` text, and 1-based start position.
 
-@auto
 import std.Str
 
-public kind: str
-public value: str
-public line: int
-public column: int
+@auto
+constructor(kind: str, value: str, line: int, column: int)
 
 public to_string(): str {
     return Str.format("%s('%s', %d:%d)", .kind, .value, .line, .column).unwrap_or("<token>")

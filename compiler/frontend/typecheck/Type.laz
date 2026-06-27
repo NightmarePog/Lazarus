@@ -1,10 +1,7 @@
 // A resolved type used by the checker, erased once checking is done.
 
 @auto
-public kind: str
-public name: str
-public params
-public result
+constructor(kind: str, name: str, params, result)
 
 // `result` is a real Type only for `fn`; every other kind passes 0 so the base
 // helpers never recurse.
