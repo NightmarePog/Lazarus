@@ -7,6 +7,7 @@
 // `while_stmt`) would be mis-compiled into a self-call, since a call's field name
 // resolves against the current class before the receiver.
 
+@auto
 import frontend.parser.Ast
 import frontend.parser.Node
 import std.Str
@@ -20,11 +21,6 @@ private static compounds = [
 
 private cursor
 private exprs
-
-constructor(cursor, exprs) {
-    .cursor = cursor
-    .exprs = exprs
-}
 
 public parse_program(): Node {
     // A leading `@<kind>` directive makes the whole file that kind: `@interface`

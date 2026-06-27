@@ -3,6 +3,7 @@
 // delegating expression checks to the held ExprChecker; entering a method or
 // constructor toggles the receiver flag so `.field` accesses resolve.
 
+@auto
 import std.Str
 import Error
 import frontend.schematic.Symbol
@@ -15,14 +16,6 @@ private exprs
 private variant_owner
 private enums
 private variant_arity
-
-constructor(source, exprs, variant_owner, enums, variant_arity) {
-    .source = source
-    .exprs = exprs
-    .variant_owner = variant_owner
-    .enums = enums
-    .variant_arity = variant_arity
-}
 
 // Walk a block, marking each statement with whether it is the block's last (the
 // placement rule for `return` / `break`).

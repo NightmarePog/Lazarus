@@ -2,15 +2,10 @@
 // a loop, and/or a constructor, so `return` / `break` / `self` placement can be
 // judged. Immutable — a nested context derives a fresh Frame.
 
-public in_function
-public in_loop
-public in_constructor
-
-constructor(in_function: bool, in_loop: bool, in_constructor: bool) {
-    .in_function = in_function
-    .in_loop = in_loop
-    .in_constructor = in_constructor
-}
+@auto
+public in_function: bool
+public in_loop: bool
+public in_constructor: bool
 
 // The frame for a loop body: like this one, but with `break` now legal.
 public in_loop_body(): Frame {
