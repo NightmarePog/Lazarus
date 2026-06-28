@@ -4,25 +4,27 @@
 // that call using the member set and a stack of local scopes (no metatables, so
 // the scope chain is an explicit list searched outward).
 
+import frontend.parser.Node
+
 private cls: str
-private members
-private instance_methods
-private instance_order
-private properties
-private known_classes
-private externs
-private variant_owner
+private members: Map<str, bool>
+private instance_methods: Map<str, bool>
+private instance_order: List<str>
+private properties: List<Node>
+private known_classes: Map<str, bool>
+private externs: Map<str, Map<str, str>>
+private variant_owner: Map<str, str>
 @auto
-constructor(cls, members, instance_methods, instance_order, properties, known_classes, externs, variant_owner)
-private scopes = [[:]]
-private collections = false
-private temp_seq = 0
+constructor(cls: str, members: Map<str, bool>, instance_methods: Map<str, bool>, instance_order: List<str>, properties: List<Node>, known_classes: Map<str, bool>, externs: Map<str, Map<str, str>>, variant_owner: Map<str, str>)
+private scopes: List<Map<str, bool>> = [[:]]
+private collections: bool = false
+private temp_seq: int = 0
 
 // A fresh, collision-free local name for a generated temporary (e.g. a `match`
 // scrutinee). Unique within this class block.
 public fresh_temp(): str {
     .temp_seq = .temp_seq + 1
-    return "__lz_m" ++ .temp_seq
+    return f"__lz_m{.temp_seq}"
 }
 
 public name(): str {
@@ -30,12 +32,12 @@ public name(): str {
 }
 
 // Instance-method names in declaration order (for the `self.m = C.m` copies).
-public instance_method_names() {
+public instance_method_names(): List<str> {
     return .instance_order
 }
 
 // The instance-property declarations, whose defaults seed `C.new`.
-public property_decls() {
+public property_decls(): List<Node> {
     return .properties
 }
 
@@ -66,7 +68,7 @@ public extern_target(ns: str, member: str) {
     return table.unwrap().get(member)
 }
 
-public mark_collections() {
+public mark_collections(): unit {
     .collections = true
 }
 
@@ -74,15 +76,15 @@ public used_collections(): bool {
     return .collections
 }
 
-public push_scope() {
+public push_scope(): unit {
     .scopes.push([:])
 }
 
-public pop_scope() {
+public pop_scope(): unit {
     .scopes.pop()
 }
 
-public declare_local(name: str) {
+public declare_local(name: str): unit {
     mut top = .scopes.get(.scopes.len()).unwrap()
     top[name] = true
 }

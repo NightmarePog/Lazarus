@@ -6,6 +6,7 @@
 // everything else -> a plain call.
 
 import std.Str
+import backend.CgContext
 import backend.Text
 import frontend.parser.Node
 
@@ -53,9 +54,9 @@ private static constructors = [
     "Result.err": "__lz_err"
 ]
 
-private ctx
+private ctx: CgContext
 @auto
-constructor(ctx)
+constructor(ctx: CgContext)
 
 public emit(node: Node): str {
     match node.kind {
@@ -265,7 +266,7 @@ private receiver_is_class(object: Node): bool {
 
 // The argument list with the receiver prepended (built-in and instance-method
 // calls pass the receiver as the first argument).
-private with_receiver(object: Node, args) {
+private with_receiver(object: Node, args: List<str>): List<str> {
     mut out = [.emit_operand(object)]
     for arg in args {
         out.push(arg)
@@ -273,7 +274,7 @@ private with_receiver(object: Node, args) {
     return out
 }
 
-private emit_args(nodes) {
+private emit_args(nodes: List<Node>): List<str> {
     return [.emit(node) for node in nodes]
 }
 

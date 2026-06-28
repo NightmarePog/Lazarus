@@ -14,20 +14,20 @@ import frontend.parser.Node
 import frontend.schematic.Scope
 import frontend.typecheck.Type
 
-private source
-private class_name
-private known_classes
-private enums
-private classes
-private variant_fields
-private variant_owner
-private enum_type_params
-private interfaces
-private type_vars
-private checking
+private source: str
+private class_name: str
+private known_classes: Map<str, bool>
+private enums: Map<str, List<str>>
+private classes: Map<str, dynamic>
+private variant_fields: Map<str, List<Node>>
+private variant_owner: Map<str, str>
+private enum_type_params: Map<str, List<str>>
+private interfaces: Map<str, dynamic>
+private type_vars: Map<str, bool>
+private checking: Map<str, bool>
 private iface_reason: str
 
-constructor(source: str, class_name: str, imports, enums, classes, variant_fields, variant_owner, enum_type_params, interfaces) {
+constructor(source: str, class_name: str, imports: List<str>, enums: Map<str, List<str>>, classes: Map<str, dynamic>, variant_fields: Map<str, List<Node>>, variant_owner: Map<str, str>, enum_type_params: Map<str, List<str>>, interfaces: Map<str, dynamic>) {
     .source = source
     .class_name = class_name
     .known_classes = [:]
@@ -54,7 +54,7 @@ public check(program: Node): unit {
 // The generic type variables of the current module's class/enum, in scope for
 // every member: a generic class's `constructor<T>` params plus a generic enum's
 // `<T>` header params.
-private own_var_set() {
+private own_var_set(): Map<str, bool> {
     mut out = [:]
     for p in .own_type_params() {
         out[p] = true
@@ -62,7 +62,7 @@ private own_var_set() {
     return out
 }
 
-private own_type_params() {
+private own_type_params(): List<str> {
     mut out = []
     mut centry = .classes.get(.class_name)
     if centry.is_some() {
@@ -78,7 +78,7 @@ private own_type_params() {
 
 // ---- statements ----
 
-private type_block(stmts, scope, ret: Type): unit {
+private type_block(stmts: List<Node>, scope: Scope, ret: Type): unit {
     for stmt in stmts {
         .type_stmt(stmt, scope, ret)
     }
@@ -789,7 +789,7 @@ private field_type(opt): Type {
 
 // The current class's own type params as type-variable arguments, so `self` is
 // `Box<T>` (not bare `Box`) and members typed in `T` flow.
-private self_args() {
+private self_args(): List<Type> {
     return [Type.var(p) for p in .own_type_params()]
 }
 
@@ -803,7 +803,7 @@ private enum_instance(owner: str, subst): Type {
 
 // Read a declaration's type args off an inference solution: each param maps to its
 // solved type, or `dynamic` when inference left it unbound.
-private solved_args(params, subst) {
+private solved_args(params: List<str>, subst: Map<str, Type>): List<Type> {
     return [.subst_lookup(subst, p) for p in params]
 }
 
@@ -815,7 +815,7 @@ private subst_lookup(subst, name: str): Type {
     return Type.dynamic()
 }
 
-private class_params(name: str) {
+private class_params(name: str): List<str> {
     mut centry = .classes.get(name)
     if centry.is_some() {
         return centry.unwrap().get("type_params").unwrap_or([])
@@ -823,7 +823,7 @@ private class_params(name: str) {
     return []
 }
 
-private class_var_set(name: str) {
+private class_var_set(name: str): Map<str, bool> {
     mut out = [:]
     for p in .class_params(name) {
         out[p] = true
@@ -831,7 +831,7 @@ private class_var_set(name: str) {
     return out
 }
 
-private enum_var_set(name: str) {
+private enum_var_set(name: str): Map<str, bool> {
     mut out = [:]
     for p in .enum_type_params.get(name).unwrap_or([]) {
         out[p] = true
@@ -1146,7 +1146,7 @@ private opt_node_type(opt, vars, subst): Type {
     return .node_type(opt.unwrap(), vars, subst)
 }
 
-private name_set(names) {
+private name_set(names: List<str>): Map<str, bool> {
     mut out = [:]
     for n in names {
         out[n] = true
@@ -1154,7 +1154,7 @@ private name_set(names) {
     return out
 }
 
-private pair_subst(names, types) {
+private pair_subst(names: List<str>, types: List<Type>): Map<str, Type> {
     mut out = [:]
     mut i = 1
     for n in names {
@@ -1167,7 +1167,7 @@ private pair_subst(names, types) {
     return out
 }
 
-private merge_vars(base, names) {
+private merge_vars(base: Map<str, bool>, names: List<str>): Map<str, bool> {
     mut out = [:]
     for k, v in base {
         out[k] = v

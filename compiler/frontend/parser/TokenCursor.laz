@@ -6,10 +6,10 @@ import std.Str
 import Error
 import frontend.lexer.Token
 
-private tokens
+private tokens: List<Token>
 private source: str
 @auto
-constructor(tokens, source)
+constructor(tokens: List<Token>, source: str)
 private pos: int = 1
 
 public position(): int {

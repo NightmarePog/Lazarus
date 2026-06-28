@@ -7,9 +7,11 @@
 // `while_stmt`) would be mis-compiled into a self-call, since a call's field name
 // resolves against the current class before the receiver.
 
-import frontend.parser.Ast
-import frontend.parser.Node
 import frontend.lexer.Token
+import frontend.parser.Ast
+import frontend.parser.ExprParser
+import frontend.parser.Node
+import frontend.parser.TokenCursor
 import std.Str
 
 private static compounds = [
@@ -19,10 +21,10 @@ private static compounds = [
     "SLASH_ASSIGN": "DIVIDE"
 ]
 
-private cursor
-private exprs
+private cursor: TokenCursor
+private exprs: ExprParser
 @auto
-constructor(cursor, exprs)
+constructor(cursor: TokenCursor, exprs: ExprParser)
 
 public parse_program(): Node {
     // A leading `#<kind>` directive makes the whole file that kind: `#interface`
@@ -58,7 +60,7 @@ private is_file_directive(): bool {
 // field too: inject a private instance-property for each, so the rest of the
 // pipeline sees an ordinary class. The `.f = f` assignments are added in
 // `parse_constructor`.
-private expand_field_params(body) {
+private expand_field_params(body: List<Node>): List<Node> {
     mut prop_types = .declared_property_types(body)
     mut props = []
     for stmt in body {
@@ -459,7 +461,7 @@ private parse_constructor(tok: Token, auto: bool): Node {
 
 // Like `parse_params`, but a leading `.` marks a parameter property: the param is
 // also recorded as a field to declare and assign.
-private parse_ctor_params(out_types, field_params) {
+private parse_ctor_params(out_types: List<Node>, field_params: List<Map<str, dynamic>>): List<str> {
     mut params = []
     if not .cursor.check("RIGHT_BRACKET") {
         loop {
@@ -489,7 +491,7 @@ private field_param_assign(fp): Node {
 // Every constructor parameter as a field param (for `@auto constructor(...)`).
 // The declared instance properties' type nodes, keyed by name — the source of an
 // `@auto` constructor's parameter types.
-private declared_property_types(body) {
+private declared_property_types(body: List<Node>): Map<str, Node> {
     mut out = [:]
     for stmt in body {
         if stmt.kind == "VariableDecl" and stmt.attr("visibility").unwrap_or("") != "" and not stmt.attr("is_static").unwrap_or(false) {
@@ -520,7 +522,7 @@ private resolve_auto_params(ctor: Node, prop_types: Map<str, Node>) {
 // A comma-separated parameter list, the opening `(` consumed. Names are returned;
 // each name's optional `: Type` (or `dynamic` when absent) is pushed onto
 // `out_types`, kept aligned with the names.
-private parse_params(out_types) {
+private parse_params(out_types: List<Node>): List<str> {
     mut params = []
     if not .cursor.check("RIGHT_BRACKET") {
         loop {
@@ -559,7 +561,7 @@ private parse_typed_local(tok: Token): Node {
 }
 
 // Optional generic parameters `<T, U>` after an enum (or class) name.
-private parse_type_params() {
+private parse_type_params(): List<str> {
     mut params = []
     if .cursor.match("LESS") {
         loop {
@@ -742,7 +744,7 @@ private variant_pattern_ahead(): bool {
 }
 
 // The optional `( a, b )` binding names after a payload variant pattern.
-private parse_variant_bindings() {
+private parse_variant_bindings(): List<str> {
     mut bindings = []
     if .cursor.match("LEFT_BRACKET") {
         if not .cursor.check("RIGHT_BRACKET") {

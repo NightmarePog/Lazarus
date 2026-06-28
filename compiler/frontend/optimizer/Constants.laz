@@ -3,25 +3,27 @@
 // the current constants but drops any name shadowed by a parameter or loop
 // variable (built by copying, since Lazarus maps cannot delete a key).
 
-private entries
+import frontend.parser.Node
+
+private entries: Map<str, Node>
 @auto
-constructor(entries)
+constructor(entries: Map<str, Node>)
 
 static empty(): Constants {
     return Constants([:])
 }
 
-public record(name: str, literal): unit {
+public record(name: str, literal: Node): unit {
     .entries[name] = literal
 }
 
 // The literal bound to `name`, or a None when it is not a known constant.
-public lookup(name: str) {
+public lookup(name: str): Option<Node> {
     return .entries.get(name)
 }
 
 // A child carrying every current constant except the `shadowed` names.
-public child(shadowed): Constants {
+public child(shadowed: List<str>): Constants {
     mut blocked = [:]
     for name in shadowed {
         blocked[name] = true

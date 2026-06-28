@@ -8,13 +8,15 @@
 // member references stay qualified while locals stay bare.
 
 import std.Num
+import backend.CgContext
+import backend.ExprEmitter
 import backend.Text
 import frontend.parser.Node
 
-private ctx
-private exprs
+private ctx: CgContext
+private exprs: ExprEmitter
 @auto
-constructor(ctx, exprs)
+constructor(ctx: CgContext, exprs: ExprEmitter)
 
 public emit_member(node: Node): str {
     match node.kind {
@@ -362,7 +364,7 @@ private push_block(parts, stmts): unit {
     }
 }
 
-private with_self(params) {
+private with_self(params: List<str>): List<str> {
     mut out = ["self"]
     for param in params {
         out.push(param)

@@ -9,7 +9,7 @@ public path: str
 public class_name: str
 public source: str
 public ast: Node
-public imports
+public imports: List<str>
 public is_interface: bool
 @auto
-constructor(path: str, class_name: str, source: str, ast: Node, imports, is_interface: bool)
+constructor(path: str, class_name: str, source: str, ast: Node, imports: List<str>, is_interface: bool)

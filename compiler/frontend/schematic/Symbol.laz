@@ -6,7 +6,7 @@ public kind: str
 public mutable: bool
 public noncallable: bool
 @auto
-constructor(kind, mutable, noncallable)
+constructor(kind: str, mutable: bool, noncallable: bool)
 
 // Refresh the callability fact after a reassignment changes the bound value.
 public set_noncallable(flag: bool): unit {

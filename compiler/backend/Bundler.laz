@@ -12,11 +12,11 @@ import backend.Text
 import backend.linker.Module
 import Error
 
-private modules
+private modules: List<Module>
 private entry_class: str
-private variant_owner
+private variant_owner: Map<str, str>
 @auto
-constructor(modules, entry_class, variant_owner)
+constructor(modules: List<Module>, entry_class: str, variant_owner: Map<str, str>)
 
 public bundle(): str {
     mut externs = .collect_externs()
@@ -55,7 +55,7 @@ public bundle(): str {
 }
 
 // Gather the extern-only modules into `externs[class_name][member] = target`.
-private collect_externs() {
+private collect_externs(): Map<str, Map<str, str>> {
     mut externs = [:]
     for m in .modules {
         if .is_extern_module(m) {

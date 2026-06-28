@@ -22,7 +22,7 @@ constructor(source: str) {
     .current = .char_at(1)
 }
 
-public scan() {
+public scan(): List<Token> {
     mut tokens = []
     loop {
         .skip_trivia()
@@ -116,7 +116,7 @@ private skip_comment(): bool {
 
 // Routes f-strings and triple-quoted strings to their dedicated paths; all
 // other tokens fall through to `next_token()` as a single-element list.
-private next_tokens() {
+private next_tokens(): List<Token> {
     mut is_f = .current == "f" and Char.is_quote(.peek())
     if is_f {
         .advance()
