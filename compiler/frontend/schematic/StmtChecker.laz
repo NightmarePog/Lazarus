@@ -5,22 +5,23 @@
 
 import std.Str
 import Error
+import frontend.schematic.ExprChecker
 import frontend.schematic.Symbol
 import frontend.schematic.Frame
 import frontend.schematic.Naming
 import frontend.schematic.Callability
 
-private source
-private exprs
-private variant_owner
-private enums
-private variant_arity
+private source: str
+private exprs: ExprChecker
+private variant_owner: Map<str, str>
+private enums: Map<str, List<str>>
+private variant_arity: Map<str, int>
 @auto
-constructor(source, exprs, variant_owner, enums, variant_arity)
+constructor(source: str, exprs: ExprChecker, variant_owner: Map<str, str>, enums: Map<str, List<str>>, variant_arity: Map<str, int>)
 
 // Walk a block, marking each statement with whether it is the block's last (the
 // placement rule for `return` / `break`).
-public check_block(stmts, scope: Scope, frame: Frame): unit {
+public check_block(stmts: List<Node>, scope: Scope, frame: Frame): unit {
     mut n = stmts.len()
     for i, stmt in stmts {
         .check_statement(stmt, scope, frame, i == n - 1)
@@ -315,7 +316,7 @@ private check_variant_arm(stmt: Node, arm: Node, enum_name: str, covered): str {
     mut arity = .variant_arity.get(v).unwrap_or(0)
     mut bound = arm.child("bindings").len()
     if bound != arity {
-        .fail(stmt, "Variant '" ++ v ++ "' carries " ++ arity ++ " value(s), but the pattern binds " ++ bound, Str.len(v).unwrap_or(1))
+        .fail(stmt, f"Variant '{v}' carries {arity} value(s), but the pattern binds {bound}", Str.len(v).unwrap_or(1))
     }
     covered[v] = true
     return owner.unwrap()

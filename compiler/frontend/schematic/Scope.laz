@@ -3,11 +3,11 @@
 // `is_root` flag and a placeholder parent, so a miss there returns None without
 // dereferencing it (the Null Object idea applied to the chain's end).
 
-private names = [:]
+private names: Map<str, Symbol> = [:]
 private parent
 private is_root: bool
 @auto
-constructor(parent, is_root)
+constructor(parent, is_root: bool)
 
 static root(): Scope {
     return Scope(0, true)

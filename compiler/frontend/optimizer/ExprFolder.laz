@@ -9,7 +9,7 @@ import frontend.parser.Node
 import frontend.optimizer.Constants
 import std.Num
 
-private folds = 0
+private folds: int = 0
 constructor()
 
 public fold_count(): int {

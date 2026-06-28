@@ -15,7 +15,7 @@ import frontend.schematic.StmtChecker
 // `enums` maps an enum name to its variant names and `variant_owner` each variant
 // back to its enum — gathered across all modules, so an imported enum is still
 // known here. They drive `match` exhaustiveness checking.
-analyze(program: Node, source: str, class_name: str, imports, variant_owner, enums, variant_arity): unit {
+analyze(program: Node, source: str, class_name: str, imports: List<str>, variant_owner: Map<str, str>, enums: Map<str, List<str>>, variant_arity: Map<str, int>): unit {
     mut properties = [:]
     mut methods = [:]
     Schematic.collect_members(program, properties, methods, source)
@@ -38,7 +38,7 @@ analyze(program: Node, source: str, class_name: str, imports, variant_owner, enu
 
 // Gather instance properties (top-level visible non-static bindings) and instance
 // methods (non-static functions), rejecting duplicate properties.
-private collect_members(program: Node, properties, methods, source: str): unit {
+private collect_members(program: Node, properties: Map<str, bool>, methods: Map<str, bool>, source: str): unit {
     for stmt in program.child("body") {
         mut k = stmt.kind
         if k == "VariableDecl" {
@@ -51,7 +51,7 @@ private collect_members(program: Node, properties, methods, source: str): unit {
     }
 }
 
-private collect_property(stmt: Node, properties, source: str): unit {
+private collect_property(stmt: Node, properties: Map<str, bool>, source: str): unit {
     mut visibility = stmt.attr("visibility").unwrap_or("")
     mut is_static = stmt.attr("is_static").unwrap_or(false)
     if visibility != "" and not is_static {

@@ -6,9 +6,10 @@
 // `binary`) would be mis-compiled into a self-call, since a call's field name
 // resolves against the current class before the receiver.
 
+import frontend.lexer.Token
 import frontend.parser.Ast
 import frontend.parser.Node
-import frontend.lexer.Token
+import frontend.parser.TokenCursor
 
 private static precedences = [
     "OR": 1,
@@ -28,9 +29,9 @@ private static precedences = [
     "POWER": 6
 ]
 
-private cursor
+private cursor: TokenCursor
 @auto
-constructor(cursor)
+constructor(cursor: TokenCursor)
 
 public expression(): Node {
     return .parse_binary(1)
@@ -109,7 +110,7 @@ private continues_line(): bool {
 }
 
 // Call arguments after the opening `(`, up to and including the closing `)`.
-private parse_arguments() {
+private parse_arguments(): List<Node> {
     mut args = []
     if not .cursor.check("RIGHT_BRACKET") {
         loop {

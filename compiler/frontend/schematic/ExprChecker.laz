@@ -11,15 +11,15 @@ import frontend.schematic.Symbol
 import frontend.schematic.Scope
 import frontend.schematic.Booleanity
 
-private source
-private properties
-private methods
-private variant_owner
+private source: str
+private properties: Map<str, bool>
+private methods: Map<str, bool>
+private variant_owner: Map<str, str>
 @auto
-constructor(source, properties, methods, variant_owner)
-private in_instance = false
+constructor(source: str, properties: Map<str, bool>, methods: Map<str, bool>, variant_owner: Map<str, str>)
+private in_instance: bool = false
 
-public set_instance(flag: bool) {
+public set_instance(flag: bool): unit {
     .in_instance = flag
 }
 

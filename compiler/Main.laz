@@ -64,7 +64,7 @@ static build_file(path: str): unit {
 // `match` is checked for exhaustiveness against an enum imported from any file:
 // `enums[name]` is the variant list, `variant_owner[variant]` its enum, and
 // `variant_fields[variant]` its payload type nodes (to type pattern bindings).
-static collect_enums(ast: Node, variant_owner, enums, variant_arity, variant_fields, enum_type_params): unit {
+static collect_enums(ast: Node, variant_owner: Map<str, str>, enums: Map<str, List<str>>, variant_arity: Map<str, int>, variant_fields: Map<str, List<Node>>, enum_type_params: Map<str, List<str>>): unit {
     for stmt in ast.child("body") {
         if stmt.kind == "EnumDecl" {
             mut name = stmt.child("name")
@@ -87,7 +87,7 @@ static collect_enums(ast: Node, variant_owner, enums, variant_arity, variant_fie
 // Each entry carries `fields` (property name -> Option of its type node), `methods`
 // (name -> {params, result, is_static, type_params}), `ctor` (the constructor's
 // param-type nodes, or 0 when the class declares none) and `type_params`.
-static collect_signatures(ast: Node, class_name: str, classes): unit {
+static collect_signatures(ast: Node, class_name: str, classes: Map<str, dynamic>): unit {
     mut fields = [:]
     mut methods = [:]
     mut ctor = 0
@@ -119,7 +119,7 @@ static collect_signatures(ast: Node, class_name: str, classes): unit {
 // `interfaces` registry, so the checker can resolve interface annotations and run
 // structural conformance. Each entry holds `methods` (name -> {params, result,
 // type_params}), `properties` (name -> type node) and the interface's `type_params`.
-static collect_interfaces(ast: Node, interfaces, class_name: str): unit {
+static collect_interfaces(ast: Node, interfaces: Map<str, dynamic>, class_name: str): unit {
     for stmt in ast.child("body") {
         if stmt.kind == "InterfaceDecl" {
             mut name = stmt.child("name")

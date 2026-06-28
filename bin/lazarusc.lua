@@ -2614,7 +2614,7 @@ function StmtChecker.check_variant_arm(self, stmt, arm, enum_name, covered)
     local arity = __lz_unwrap_or(__lz_get(self.variant_arity, v), 0)
     local bound = __lz_len(arm:child("bindings"))
     if bound ~= arity then
-        StmtChecker.fail(self, stmt, (((("Variant '" .. v) .. "' carries ") .. arity) .. " value(s), but the pattern binds ") .. bound, __lz_unwrap_or(__lz_wrap(string.len(v)), 1))
+        StmtChecker.fail(self, stmt, ("Variant '" .. tostring(v) .. "' carries " .. tostring(arity) .. " value(s), but the pattern binds " .. tostring(bound)), __lz_unwrap_or(__lz_wrap(string.len(v)), 1))
     end
     __lz_idx_set(covered, v, true)
     return __lz_unwrap(owner)
@@ -4221,7 +4221,7 @@ function CgContext.new(cls, members, instance_methods, instance_order, propertie
 end
 function CgContext.fresh_temp(self)
     self.temp_seq = self.temp_seq + 1
-    return "__lz_m" .. self.temp_seq
+    return ("__lz_m" .. tostring(self.temp_seq))
 end
 function CgContext.name(self)
     return self.cls

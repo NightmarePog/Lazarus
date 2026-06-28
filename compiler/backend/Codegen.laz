@@ -14,12 +14,12 @@ import frontend.parser.Node
 import Meta
 
 private class_name: str
-private known_classes
-private externs
-private variant_owner
-private collections_used
+private known_classes: Map<str, bool>
+private externs: Map<str, Map<str, str>>
+private variant_owner: Map<str, str>
+private collections_used: bool
 
-constructor(class_name: str, imports, externs, variant_owner) {
+constructor(class_name: str, imports: List<str>, externs: Map<str, Map<str, str>>, variant_owner: Map<str, str>) {
     .class_name = class_name
     .known_classes = [:]
     for name in imports {
@@ -73,7 +73,7 @@ public uses_collections(): bool {
 
 // Classify the top-level declarations into the member set, the instance-method set
 // (and order), and the instance-property declarations.
-private build_context(body): CgContext {
+private build_context(body: List<Node>): CgContext {
     mut members = [:]
     mut instance_methods = [:]
     mut instance_order = []
@@ -122,7 +122,7 @@ private is_emittable(stmt: Node): bool {
     return true
 }
 
-public has_constructor(body): bool {
+public has_constructor(body: List<Node>): bool {
     for stmt in body {
         if stmt.kind == "ConstructorDecl" {
             return true

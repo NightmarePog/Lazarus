@@ -7,6 +7,7 @@
 import std.Str
 import std.Sys
 import frontend.lexer.Lexer
+import frontend.parser.Node
 import frontend.parser.Parser
 import backend.linker.Module
 import backend.linker.Path
@@ -14,9 +15,9 @@ import Error
 
 private entry: str
 private root: str
-private loaded
-private visiting
-private ordered
+private loaded: Map<str, bool>
+private visiting: Map<str, bool>
+private ordered: List<Module>
 
 constructor(entry: str) {
     .entry = entry
@@ -27,7 +28,7 @@ constructor(entry: str) {
 }
 
 // The full module set reachable from the entry file, dependencies-first.
-public link() {
+public link(): List<Module> {
     .load(.entry, "", 0, 0, 1)
     return .ordered
 }
@@ -39,7 +40,7 @@ public entry_class(): str {
 // Load `path` and everything it imports, appending each dependency before its
 // user. The `origin_*` describe the `import` that referenced this file so a read
 // failure points at the source.
-private load(path: str, origin_source: str, origin_line: int, origin_col: int, origin_span: int) {
+private load(path: str, origin_source: str, origin_line: int, origin_col: int, origin_span: int): unit {
     if .loaded.has(path) {
         return
     }
@@ -80,7 +81,7 @@ private load(path: str, origin_source: str, origin_line: int, origin_col: int, o
 // A module is an interface when its body holds only interface declarations (a
 // `#interface` file, or a file whose sole content is `interface` blocks): it
 // contributes a contract to the checker but no class table.
-private body_is_interface(body): bool {
+private body_is_interface(body: List<Node>): bool {
     if body.len() == 0 {
         return false
     }

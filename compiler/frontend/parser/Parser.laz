@@ -2,13 +2,14 @@
 // AST out. A shared TokenCursor (navigation + errors) is handed to both the
 // ExprParser and the StmtParser so they advance a single position.
 
+import frontend.lexer.Token
 import frontend.parser.TokenCursor
 import frontend.parser.ExprParser
 import frontend.parser.StmtParser
 
-private stmts
+private stmts: StmtParser
 
-constructor(tokens, source: str) {
+constructor(tokens: List<Token>, source: str) {
     mut cursor = TokenCursor(tokens, source)
     mut exprs = ExprParser(cursor)
     .stmts = StmtParser(cursor, exprs)

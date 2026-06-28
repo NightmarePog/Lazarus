@@ -6,12 +6,13 @@
 
 import frontend.parser.Node
 import frontend.optimizer.Constants
+import frontend.optimizer.ExprFolder
 
-private exprs
+private exprs: ExprFolder
 @auto
-constructor(exprs)
+constructor(exprs: ExprFolder)
 
-public fold_block(stmts, constants: Constants): unit {
+public fold_block(stmts: List<Node>, constants: Constants): unit {
     for stmt in stmts {
         .fold_statement(stmt, constants)
     }
