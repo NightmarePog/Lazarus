@@ -8,6 +8,7 @@
 import std.Str
 import std.Sys
 import frontend.lexer.Lexer
+import frontend.parser.Node
 import frontend.parser.Parser
 import frontend.schematic.Schematic
 import frontend.typecheck.Typecheck
@@ -28,7 +29,7 @@ constructor() {
 
 // A file entry point: follow its imports and bundle the whole program. Each
 // module is analysed and optimised on its own before the bundler composes them.
-static build_file(path: str) {
+static build_file(path: str): unit {
     mut linker = Linker(path)
     mut modules = linker.link()
 
@@ -63,7 +64,7 @@ static build_file(path: str) {
 // `match` is checked for exhaustiveness against an enum imported from any file:
 // `enums[name]` is the variant list, `variant_owner[variant]` its enum, and
 // `variant_fields[variant]` its payload type nodes (to type pattern bindings).
-static collect_enums(ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params) {
+static collect_enums(ast: Node, variant_owner, enums, variant_arity, variant_fields, enum_type_params): unit {
     for stmt in ast.child("body") {
         if stmt.kind == "EnumDecl" {
             mut name = stmt.child("name")
@@ -86,7 +87,7 @@ static collect_enums(ast, variant_owner, enums, variant_arity, variant_fields, e
 // Each entry carries `fields` (property name -> Option of its type node), `methods`
 // (name -> {params, result, is_static, type_params}), `ctor` (the constructor's
 // param-type nodes, or 0 when the class declares none) and `type_params`.
-static collect_signatures(ast, class_name: str, classes) {
+static collect_signatures(ast: Node, class_name: str, classes): unit {
     mut fields = [:]
     mut methods = [:]
     mut ctor = 0
@@ -113,12 +114,12 @@ static collect_signatures(ast, class_name: str, classes) {
     classes[class_name] = ["fields": fields, "methods": methods, "ctor": ctor, "type_params": type_params]
 }
 
-// Gather every interface declaration (inline or a `@interface` file, whose decl
+// Gather every interface declaration (inline or a \`#interface\` file, whose decl
 // carries an empty name filled here from the filename) into the program-wide
 // `interfaces` registry, so the checker can resolve interface annotations and run
 // structural conformance. Each entry holds `methods` (name -> {params, result,
 // type_params}), `properties` (name -> type node) and the interface's `type_params`.
-static collect_interfaces(ast, interfaces, class_name: str) {
+static collect_interfaces(ast: Node, interfaces, class_name: str): unit {
     for stmt in ast.child("body") {
         if stmt.kind == "InterfaceDecl" {
             mut name = stmt.child("name")

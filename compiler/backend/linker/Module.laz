@@ -3,11 +3,13 @@
 // (a Program node with imports stripped), `imports` (the visible class names), and
 // `is_interface` (the body is only interface declarations — no class is emitted).
 
-public path
-public class_name
-public source
-public ast
+import frontend.parser.Node
+
+public path: str
+public class_name: str
+public source: str
+public ast: Node
 public imports
-public is_interface
+public is_interface: bool
 @auto
-constructor(path, class_name, source, ast, imports, is_interface)
+constructor(path: str, class_name: str, source: str, ast: Node, imports, is_interface: bool)

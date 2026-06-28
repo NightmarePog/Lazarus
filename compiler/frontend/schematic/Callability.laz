@@ -2,7 +2,7 @@
 // on it can be rejected. Literals, operator/`not` results and collection literals
 // are never functions; anything else (a call, a name, a field) is possibly one.
 
-@object
+#object
 private non_function = [
     "LiteralExpr": true,
     "BinaryExpr": true,
@@ -11,6 +11,6 @@ private non_function = [
     "MapExpr": true
 ]
 
-is_noncallable(node): bool {
+is_noncallable(node: Node): bool {
     return Callability.non_function.has(node.kind)
 }

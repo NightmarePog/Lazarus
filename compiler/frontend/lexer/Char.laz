@@ -2,7 +2,7 @@
 // patterns). Each predicate takes a one-char string; the empty string (EOF) has
 // no byte, so `code_of` is None and `unwrap_or(0)` makes every predicate false.
 
-@object
+#object
 import std.Str
 
 code_of(c: str): Option<int> {

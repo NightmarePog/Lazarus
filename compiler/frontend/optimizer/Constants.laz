@@ -11,7 +11,7 @@ static empty(): Constants {
     return Constants([:])
 }
 
-public record(name: str, literal) {
+public record(name: str, literal): unit {
     .entries[name] = literal
 }
 

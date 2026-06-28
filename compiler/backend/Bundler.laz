@@ -9,6 +9,7 @@
 import backend.Codegen
 import backend.Runtime
 import backend.Text
+import backend.linker.Module
 import Error
 
 private modules
@@ -70,7 +71,7 @@ private collect_externs() {
 
 // A module is an extern namespace when its body holds extern declarations and
 // nothing else — it contributes bindings but no class table.
-private is_extern_module(m): bool {
+private is_extern_module(m: Module): bool {
     mut has_extern = false
     mut has_other = false
     for node in m.ast.child("body") {

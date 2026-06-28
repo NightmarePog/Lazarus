@@ -238,7 +238,7 @@ local Keywords = {}
 
 Keywords.words = __lz_map({["import"] = "IMPORT", ["extern"] = "EXTERN", ["enum"] = "ENUM", ["interface"] = "INTERFACE", ["private"] = "PRIVATE", ["public"] = "PUBLIC", ["mut"] = "MUTABLE", ["static"] = "STATIC", ["self"] = "SELF", ["constructor"] = "CONSTRUCTOR", ["return"] = "RETURN", ["if"] = "IF", ["else"] = "ELSE", ["while"] = "WHILE", ["loop"] = "LOOP", ["for"] = "FOR", ["in"] = "IN", ["break"] = "BREAK", ["true"] = "TRUE", ["false"] = "FALSE", ["and"] = "AND", ["or"] = "OR", ["not"] = "NOT"})
 Keywords.ops2 = __lz_map({["++"] = "CONCAT", ["=>"] = "FAT_ARROW", ["->"] = "ARROW", ["=="] = "EQ", ["!="] = "NEQ", ["<="] = "LESS_EQUAL", [">="] = "GREATER_EQUAL", ["+="] = "PLUS_ASSIGN", ["-="] = "MINUS_ASSIGN", ["*="] = "STAR_ASSIGN", ["/="] = "SLASH_ASSIGN"})
-Keywords.ops1 = __lz_map({["="] = "ASSIGN", ["+"] = "PLUS", ["-"] = "MINUS", ["*"] = "MULTIPLY", ["/"] = "DIVIDE", ["%"] = "MODULO", ["^"] = "POWER", ["<"] = "LESS", [">"] = "GREATER", ["("] = "LEFT_BRACKET", [")"] = "RIGHT_BRACKET", ["{"] = "BODY_START", ["}"] = "BODY_END", [","] = "COMMA", [":"] = "COLON", ["."] = "DOT", [";"] = "SEMICOLON", ["["] = "LSQUARE", ["]"] = "RSQUARE", ["@"] = "AT"})
+Keywords.ops1 = __lz_map({["="] = "ASSIGN", ["+"] = "PLUS", ["-"] = "MINUS", ["*"] = "MULTIPLY", ["/"] = "DIVIDE", ["%"] = "MODULO", ["^"] = "POWER", ["<"] = "LESS", [">"] = "GREATER", ["("] = "LEFT_BRACKET", [")"] = "RIGHT_BRACKET", ["{"] = "BODY_START", ["}"] = "BODY_END", [","] = "COMMA", [":"] = "COLON", ["."] = "DOT", [";"] = "SEMICOLON", ["["] = "LSQUARE", ["]"] = "RSQUARE", ["@"] = "AT", ["#"] = "HASH"})
 function Keywords.word_kind(word)
     return __lz_unwrap_or(__lz_get(Keywords.words, word), "IDENTIFIER")
 end
@@ -275,11 +275,23 @@ function Lexer.new(source)
     self.advance = Lexer.advance
     self.skip_trivia = Lexer.skip_trivia
     self.skip_comment = Lexer.skip_comment
+    self.next_tokens = Lexer.next_tokens
     self.next_token = Lexer.next_token
     self.read_identifier = Lexer.read_identifier
     self.read_number = Lexer.read_number
     self.read_string = Lexer.read_string
     self.read_symbol = Lexer.read_symbol
+    self.read_interp = Lexer.read_interp
+    self.scan_interp_expr = Lexer.scan_interp_expr
+    self.scan_str_segment = Lexer.scan_str_segment
+    self.read_triple = Lexer.read_triple
+    self.scan_triple_raw = Lexer.scan_triple_raw
+    self.read_triple_interp = Lexer.read_triple_interp
+    self.split_on_sentinel = Lexer.split_on_sentinel
+    self.strip_indent = Lexer.strip_indent
+    self.split_lines = Lexer.split_lines
+    self.is_blank = Lexer.is_blank
+    self.leading_spaces = Lexer.leading_spaces
     self.source = source
     self.pos = 1
     self.line = 1
@@ -294,7 +306,9 @@ function Lexer.scan(self)
         if Lexer.at_end(self) then
             break
         end
-        __lz_push(tokens, Lexer.next_token(self))
+        for _, tok in __lz_each(Lexer.next_tokens(self)) do
+            __lz_push(tokens, tok)
+        end
     end
     return tokens
 end
@@ -366,6 +380,27 @@ function Lexer.skip_comment(self)
         end
     end
     return false
+end
+function Lexer.next_tokens(self)
+    local is_f = (self.current == "f") and Char.is_quote(Lexer.peek(self))
+    if is_f then
+        Lexer.advance(self)
+    end
+    if Char.is_quote(self.current) then
+        local line = self.line
+        local col = self.col
+        if Char.is_quote(Lexer.peek(self)) and Char.is_quote(Lexer.char_at(self, self.pos + 2)) then
+            Lexer.advance(self)
+            Lexer.advance(self)
+            Lexer.advance(self)
+            return Lexer.read_triple(self, is_f, line, col)
+        end
+        if is_f then
+            Lexer.advance(self)
+            return Lexer.read_interp(self, line, col)
+        end
+    end
+    return __lz_list(Lexer.next_token(self))
 end
 function Lexer.next_token(self)
     if Char.is_ident_start(self.current) then
@@ -449,6 +484,287 @@ function Lexer.read_symbol(self)
     end
     Error.new("UnexpectedChar", ("unexpected character '" .. ch) .. "'", line, col, self.source, 1):raise()
     return Token.new("ERROR", ch, line, col)
+end
+function Lexer.read_interp(self, line, col)
+    local result = __lz_list()
+    local seg = Lexer.scan_str_segment(self, false)
+    if Char.is_quote(self.current) then
+        Lexer.advance(self)
+        __lz_push(result, Token.new("STRING", seg, line, col))
+        return result
+    end
+    __lz_push(result, Token.new("ISTR_HEAD", seg, line, col))
+    while true do
+        for _, tok in __lz_each(Lexer.scan_interp_expr(self, line, col)) do
+            __lz_push(result, tok)
+        end
+        seg = Lexer.scan_str_segment(self, false)
+        if Char.is_quote(self.current) then
+            Lexer.advance(self)
+            __lz_push(result, Token.new("ISTR_TAIL", seg, line, col))
+            break
+        end
+        __lz_push(result, Token.new("ISTR_MID", seg, line, col))
+    end
+    return result
+end
+function Lexer.scan_interp_expr(self, err_line, err_col)
+    Lexer.advance(self)
+    local result = __lz_list()
+    local depth = 1
+    while depth > 0 do
+        Lexer.skip_trivia(self)
+        if Lexer.at_end(self) then
+            Error.new("UnterminatedInterpolation", "unclosed '{' in string interpolation", err_line, err_col, self.source, 1):raise()
+        end
+        local tok = Lexer.next_token(self)
+        if tok.kind == "BODY_START" then
+            depth = depth + 1
+            __lz_push(result, tok)
+        elseif tok.kind == "BODY_END" then
+            depth = depth - 1
+            if depth > 0 then
+                __lz_push(result, tok)
+            end
+        else
+            __lz_push(result, tok)
+        end
+    end
+    return result
+end
+function Lexer.scan_str_segment(self, multiline)
+    local result = ""
+    while true do
+        if Lexer.at_end(self) then
+            Error.new("UnterminatedString", "unterminated string literal", self.line, self.col, self.source, 1):raise()
+        end
+        if (not multiline) and Char.is_newline(self.current) then
+            Error.new("UnterminatedString", "unterminated string literal", self.line, self.col, self.source, 1):raise()
+        end
+        if self.current == "{" then
+            if Lexer.peek(self) == "{" then
+                result = result .. "{"
+                Lexer.advance(self)
+                Lexer.advance(self)
+            else
+                break
+            end
+        elseif Char.is_quote(self.current) then
+            break
+        else
+            result = result .. self.current
+            Lexer.advance(self)
+        end
+    end
+    return result
+end
+function Lexer.read_triple(self, is_f, line, col)
+    if is_f then
+        return Lexer.read_triple_interp(self, line, col)
+    end
+    local content = Lexer.strip_indent(self, Lexer.scan_triple_raw(self))
+    return __lz_list(Token.new("STRING", content, line, col))
+end
+function Lexer.scan_triple_raw(self)
+    local result = ""
+    while true do
+        if Lexer.at_end(self) then
+            Error.new("UnterminatedString", "unterminated triple-quoted string", self.line, self.col, self.source, 3):raise()
+        end
+        if (Char.is_quote(self.current) and Char.is_quote(Lexer.peek(self))) and Char.is_quote(Lexer.char_at(self, self.pos + 2)) then
+            Lexer.advance(self)
+            Lexer.advance(self)
+            Lexer.advance(self)
+            break
+        end
+        result = result .. self.current
+        Lexer.advance(self)
+    end
+    return result
+end
+function Lexer.read_triple_interp(self, line, col)
+    local raw = ""
+    local hole_tokens = __lz_list()
+    local sentinel = __lz_unwrap_or(__lz_wrap(string.char(1)), "")
+    while true do
+        if Lexer.at_end(self) then
+            Error.new("UnterminatedString", "unterminated triple-quoted string", self.line, self.col, self.source, 3):raise()
+        end
+        if (Char.is_quote(self.current) and Char.is_quote(Lexer.peek(self))) and Char.is_quote(Lexer.char_at(self, self.pos + 2)) then
+            Lexer.advance(self)
+            Lexer.advance(self)
+            Lexer.advance(self)
+            break
+        end
+        if self.current == "{" then
+            if Lexer.peek(self) == "{" then
+                raw = raw .. "{"
+                Lexer.advance(self)
+                Lexer.advance(self)
+            else
+                local idx = __lz_unwrap_or(__lz_wrap(string.format("%d", __lz_len(hole_tokens))), "0")
+                raw = (raw .. sentinel) .. idx
+                __lz_push(hole_tokens, Lexer.scan_interp_expr(self, line, col))
+            end
+        else
+            raw = raw .. self.current
+            Lexer.advance(self)
+        end
+    end
+    local stripped = Lexer.strip_indent(self, raw)
+    local segs = Lexer.split_on_sentinel(self, stripped, sentinel)
+    local result = __lz_list()
+    local n = __lz_len(segs)
+    if n == 1 then
+        __lz_push(result, Token.new("STRING", __lz_unwrap(__lz_get(segs, 1)), line, col))
+        return result
+    end
+    __lz_push(result, Token.new("ISTR_HEAD", __lz_unwrap(__lz_get(segs, 1)), line, col))
+    local i = 2
+    while i <= n do
+        for _, tok in __lz_each(__lz_unwrap(__lz_get(hole_tokens, i - 1))) do
+            __lz_push(result, tok)
+        end
+        if i == n then
+            __lz_push(result, Token.new("ISTR_TAIL", __lz_unwrap(__lz_get(segs, i)), line, col))
+        else
+            __lz_push(result, Token.new("ISTR_MID", __lz_unwrap(__lz_get(segs, i)), line, col))
+        end
+        i = i + 1
+    end
+    return result
+end
+function Lexer.split_on_sentinel(self, content, sentinel)
+    local result = __lz_list()
+    local n = __lz_unwrap_or(__lz_wrap(string.len(content)), 0)
+    local i = 1
+    local seg_start = 1
+    while i <= n do
+        if __lz_unwrap_or(__lz_wrap(string.sub(content, i, i)), "") == sentinel then
+            __lz_push(result, __lz_unwrap_or(__lz_wrap(string.sub(content, seg_start, i - 1)), ""))
+            i = i + 1
+            while (i <= n) and Char.is_digit(__lz_unwrap_or(__lz_wrap(string.sub(content, i, i)), "")) do
+                i = i + 1
+            end
+            seg_start = i
+        else
+            i = i + 1
+        end
+    end
+    __lz_push(result, __lz_unwrap_or(__lz_wrap(string.sub(content, seg_start, n)), ""))
+    return result
+end
+function Lexer.strip_indent(self, content)
+    local lines = Lexer.split_lines(self, content)
+    local nlines = __lz_len(lines)
+    if nlines == 0 then
+        return ""
+    end
+    local start = 1
+    if Lexer.is_blank(self, __lz_unwrap(__lz_get(lines, 1))) then
+        start = 2
+    end
+    local last = __lz_unwrap(__lz_get(lines, nlines))
+    local strip = Lexer.leading_spaces(self, last)
+    local last_idx = nlines
+    if Lexer.is_blank(self, last) then
+        last_idx = nlines - 1
+    end
+    local nl = __lz_unwrap_or(__lz_wrap(string.char(10)), "")
+    local result = ""
+    local i = start
+    while i <= last_idx do
+        local ln = __lz_unwrap(__lz_get(lines, i))
+        local stripped_line = ""
+        if not Lexer.is_blank(self, ln) then
+            local ln_len = __lz_unwrap_or(__lz_wrap(string.len(ln)), 0)
+            local s = strip + 1
+            if s > ln_len then
+                s = ln_len + 1
+            end
+            stripped_line = __lz_unwrap_or(__lz_wrap(string.sub(ln, s, ln_len)), "")
+        end
+        if i > start then
+            result = result .. nl
+        end
+        result = result .. stripped_line
+        i = i + 1
+    end
+    return result
+end
+function Lexer.split_lines(self, s)
+    local result = __lz_list()
+    local n = __lz_unwrap_or(__lz_wrap(string.len(s)), 0)
+    local i = 1
+    local seg_start = 1
+    while i <= n do
+        if Char.is_newline(__lz_unwrap_or(__lz_wrap(string.sub(s, i, i)), "")) then
+            __lz_push(result, __lz_unwrap_or(__lz_wrap(string.sub(s, seg_start, i - 1)), ""))
+            seg_start = i + 1
+        end
+        i = i + 1
+    end
+    __lz_push(result, __lz_unwrap_or(__lz_wrap(string.sub(s, seg_start, n)), ""))
+    return result
+end
+function Lexer.is_blank(self, s)
+    local n = __lz_unwrap_or(__lz_wrap(string.len(s)), 0)
+    local i = 1
+    while i <= n do
+        if __lz_unwrap_or(__lz_wrap(string.sub(s, i, i)), "") ~= " " then
+            return false
+        end
+        i = i + 1
+    end
+    return true
+end
+function Lexer.leading_spaces(self, s)
+    local n = __lz_unwrap_or(__lz_wrap(string.len(s)), 0)
+    local i = 1
+    while i <= n do
+        if __lz_unwrap_or(__lz_wrap(string.sub(s, i, i)), "") ~= " " then
+            return i - 1
+        end
+        i = i + 1
+    end
+    return n
+end
+
+local Node = {}
+
+function Node.new(kind, attrs)
+    local self = {}
+    self.attr = Node.attr
+    self.child = Node.child
+    self.line = Node.line
+    self.col = Node.col
+    self.set = Node.set
+    self.summary = Node.summary
+    self.kind = kind
+    self.attrs = attrs
+    return self
+end
+function Node.attr(self, name)
+    return __lz_get(self.attrs, name)
+end
+function Node.child(self, name)
+    return __lz_unwrap(__lz_get(self.attrs, name))
+end
+function Node.line(self)
+    return __lz_unwrap_or(__lz_get(self.attrs, "line"), 0)
+end
+function Node.col(self)
+    return __lz_unwrap_or(__lz_get(self.attrs, "col"), 0)
+end
+function Node.set(self, name, value)
+    __lz_idx_set(self.attrs, name, value)
+end
+function Node.summary(self)
+    local named = __lz_get(self.attrs, "name")
+    if __lz_is_some(named) then
+        return (self.kind .. " ") .. __lz_unwrap(named)
+    end
+    return self.kind
 end
 
 local TokenCursor = {}
@@ -549,43 +865,6 @@ function TokenCursor.error_pos(self)
 end
 function TokenCursor.eof(self)
     return Token.new("EOF", "", 0, 0)
-end
-
-local Node = {}
-
-function Node.new(kind, attrs)
-    local self = {}
-    self.attr = Node.attr
-    self.child = Node.child
-    self.line = Node.line
-    self.col = Node.col
-    self.set = Node.set
-    self.summary = Node.summary
-    self.kind = kind
-    self.attrs = attrs
-    return self
-end
-function Node.attr(self, name)
-    return __lz_get(self.attrs, name)
-end
-function Node.child(self, name)
-    return __lz_unwrap(__lz_get(self.attrs, name))
-end
-function Node.line(self)
-    return __lz_unwrap_or(__lz_get(self.attrs, "line"), 0)
-end
-function Node.col(self)
-    return __lz_unwrap_or(__lz_get(self.attrs, "col"), 0)
-end
-function Node.set(self, name, value)
-    __lz_idx_set(self.attrs, name, value)
-end
-function Node.summary(self)
-    local named = __lz_get(self.attrs, "name")
-    if __lz_is_some(named) then
-        return (self.kind .. " ") .. __lz_unwrap(named)
-    end
-    return self.kind
 end
 
 local Ast = {}
@@ -698,6 +977,9 @@ end
 function Ast.map(entries, line, col)
     return Node.new("MapExpr", __lz_map({["entries"] = entries, ["line"] = line, ["col"] = col}))
 end
+function Ast.interp_string(parts, line, col)
+    return Node.new("InterpolatedString", __lz_map({["parts"] = parts, ["line"] = line, ["col"] = col}))
+end
 
 local ExprParser = {}
 
@@ -720,6 +1002,7 @@ function ExprParser.new(cursor)
     self.parse_comp_clause = ExprParser.parse_comp_clause
     self.parse_map_rest = ExprParser.parse_map_rest
     self.parse_list_rest = ExprParser.parse_list_rest
+    self.parse_interp_string = ExprParser.parse_interp_string
     self.precedence = ExprParser.precedence
     self.cursor = cursor
     return self
@@ -817,6 +1100,8 @@ function ExprParser.parse_primary(self)
     elseif __lz_m1 == "STRING" then
         self.cursor:advance()
         return Ast.literal("string", tok.value, tok.line, tok.column)
+    elseif __lz_m1 == "ISTR_HEAD" then
+        return ExprParser.parse_interp_string(self)
     elseif __lz_m1 == "TRUE" then
         self.cursor:advance()
         return Ast.literal("boolean", true, tok.line, tok.column)
@@ -914,6 +1199,27 @@ function ExprParser.parse_list_rest(self, first, open)
     self.cursor:consume("RSQUARE", "Expected ']' to close the list literal")
     return Ast.list(elements, open.line, open.column)
 end
+function ExprParser.parse_interp_string(self)
+    local head = self.cursor:advance()
+    local parts = __lz_list(Ast.literal("string", head.value, head.line, head.column))
+    while true do
+        __lz_push(parts, ExprParser.expression(self))
+        local next = self.cursor:current()
+        if next.kind == "ISTR_TAIL" then
+            self.cursor:advance()
+            __lz_push(parts, Ast.literal("string", next.value, next.line, next.column))
+            break
+        end
+        if next.kind == "ISTR_MID" then
+            self.cursor:advance()
+            __lz_push(parts, Ast.literal("string", next.value, next.line, next.column))
+        else
+            self.cursor:fail("Expected end of string interpolation")
+            break
+        end
+    end
+    return Ast.interp_string(parts, head.line, head.column)
+end
 function ExprParser.precedence(self, kind)
     return __lz_get(ExprParser.precedences, kind)
 end
@@ -983,7 +1289,7 @@ function StmtParser.new(cursor, exprs)
     return self
 end
 function StmtParser.parse_program(self)
-    if self.cursor:check("AT") and StmtParser.is_file_directive(self) then
+    if self.cursor:check("HASH") and StmtParser.is_file_directive(self) then
         return StmtParser.parse_file_directive(self)
     end
     local body = __lz_list()
@@ -1034,7 +1340,7 @@ function StmtParser.field_property(self, fp)
     return Ast.node("VariableDecl", __lz_map({["name"] = __lz_unwrap(__lz_get(fp, "name")), ["visibility"] = "private", ["mutable"] = false, ["is_static"] = false, ["type"] = __lz_unwrap(__lz_get(fp, "type")), ["line"] = __lz_unwrap(__lz_get(fp, "line")), ["col"] = __lz_unwrap(__lz_get(fp, "col"))}))
 end
 function StmtParser.parse_file_directive(self)
-    local at = self.cursor:consume("AT", "Expected a file directive")
+    local at = self.cursor:consume("HASH", "Expected a file directive")
     if self.cursor:match("INTERFACE") then
         return StmtParser.parse_interface_body(self, at)
     end
@@ -1042,7 +1348,7 @@ function StmtParser.parse_file_directive(self)
         self.cursor:advance()
         return StmtParser.parse_object_body(self)
     end
-    self.cursor:fail(("unknown file directive '@" .. self.cursor:current().value) .. "'")
+    self.cursor:fail(("unknown file directive '#" .. self.cursor:current().value) .. "'")
     return Ast.program(__lz_list())
 end
 function StmtParser.parse_interface_body(self, at)
@@ -1088,16 +1394,16 @@ function StmtParser.parse_object_member(self)
         visibility = "public"
     end
     if self.cursor:check("STATIC") then
-        self.cursor:fail("'static' is implied in an @object file; remove it")
+        self.cursor:fail("'static' is implied in an #object file; remove it")
     end
     if self.cursor:check("CONSTRUCTOR") then
-        self.cursor:fail("an @object file has no instances; remove the constructor")
+        self.cursor:fail("an #object file has no instances; remove the constructor")
     end
     if self.cursor:check("IDENTIFIER") and StmtParser.looks_like_decl(self) then
         return StmtParser.parse_method(self, visibility, true)
     end
     local mutable = self.cursor:match("MUTABLE")
-    return StmtParser.parse_binding(self, visibility, mutable, "Expected a member name in the @object file", true)
+    return StmtParser.parse_binding(self, visibility, mutable, "Expected a member name in the #object file", true)
 end
 function StmtParser.parse_statement(self)
     local tok = self.cursor:current()
@@ -1338,7 +1644,13 @@ function StmtParser.parse_method(self, visibility, is_static)
     local params = StmtParser.parse_params(self, param_types)
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after parameters")
     local return_type = StmtParser.parse_return_type(self)
-    local body = StmtParser.parse_block(self, "method body")
+    local body = __lz_list()
+    if self.cursor:match("ASSIGN") then
+        local expr = self.exprs:expression()
+        body = __lz_list(Ast.node("ReturnStmt", __lz_map({["value"] = expr, ["line"] = expr:line(), ["col"] = expr:col()})))
+    else
+        body = StmtParser.parse_block(self, "method body")
+    end
     return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column, param_types, return_type, type_params)
 end
 function StmtParser.parse_annotation(self)
@@ -1881,6 +2193,13 @@ function ExprChecker.check(self, node, scope)
         ExprChecker.check_comprehension(self, node, scope, __lz_list("element"))
     elseif __lz_m1 == "MapComp" then
         ExprChecker.check_comprehension(self, node, scope, __lz_list("key", "value"))
+    elseif __lz_m1 == "InterpolatedString" then
+        local parts = node:child("parts")
+        local i = 2
+        while i <= __lz_len(parts) do
+            ExprChecker.check(self, __lz_unwrap(__lz_get(parts, i)), scope)
+            i = i + 2
+        end
     else
     end
 end
@@ -2789,6 +3108,14 @@ function Typecheck.type_expr(self, node, scope)
         return Typecheck.type_list_comp(self, node, scope)
     elseif __lz_m2 == "MapComp" then
         return Typecheck.type_map_comp(self, node, scope)
+    elseif __lz_m2 == "InterpolatedString" then
+        local parts = node:child("parts")
+        local i = 2
+        while i <= __lz_len(parts) do
+            Typecheck.type_expr(self, __lz_unwrap(__lz_get(parts, i)), scope)
+            i = i + 2
+        end
+        return Type.str()
     else
     end
     return Type.dynamic()
@@ -4040,6 +4367,8 @@ function ExprEmitter.new(ctx)
     self.receiver_is_class = ExprEmitter.receiver_is_class
     self.with_receiver = ExprEmitter.with_receiver
     self.emit_args = ExprEmitter.emit_args
+    self.lua_quote_str = ExprEmitter.lua_quote_str
+    self.emit_interp = ExprEmitter.emit_interp
     self.ctx = ctx
     return self
 end
@@ -4069,6 +4398,8 @@ function ExprEmitter.emit(self, node)
         return ExprEmitter.emit_list_comp(self, node)
     elseif __lz_m1 == "MapComp" then
         return ExprEmitter.emit_map_comp(self, node)
+    elseif __lz_m1 == "InterpolatedString" then
+        return ExprEmitter.emit_interp(self, node)
     else
     end
     return ""
@@ -4124,7 +4455,7 @@ function ExprEmitter.emit_literal(self, node)
     local lit_kind = node:child("lit_kind")
     local value = node:child("value")
     if lit_kind == "string" then
-        return __lz_unwrap_or(__lz_wrap(string.format("%q", value)), "''")
+        return ExprEmitter.lua_quote_str(self, value)
     end
     if lit_kind == "boolean" then
         if value then
@@ -4233,6 +4564,55 @@ function ExprEmitter.with_receiver(self, object, args)
 end
 function ExprEmitter.emit_args(self, nodes)
     return (function() local __lz_m3 = __lz_list() for _, node in __lz_each(nodes) do __lz_push(__lz_m3, ExprEmitter.emit(self, node)) end return __lz_m3 end)()
+end
+function ExprEmitter.lua_quote_str(self, value)
+    local n = __lz_unwrap_or(__lz_wrap(string.len(value)), 0)
+    local dq = __lz_unwrap_or(__lz_wrap(string.char(34)), "")
+    local bs = __lz_unwrap_or(__lz_wrap(string.char(92)), "")
+    local lf = __lz_unwrap_or(__lz_wrap(string.char(10)), "")
+    local cr = __lz_unwrap_or(__lz_wrap(string.char(13)), "")
+    local result = ""
+    local i = 1
+    while i <= n do
+        local c = __lz_unwrap_or(__lz_wrap(string.sub(value, i, i)), "")
+        if c == dq then
+            result = (result .. bs) .. dq
+        elseif c == lf then
+            result = (result .. bs) .. "n"
+        elseif c == cr then
+            result = (result .. bs) .. "r"
+        elseif c == bs then
+            result = (result .. bs) .. bs
+        else
+            result = result .. c
+        end
+        i = i + 1
+    end
+    return (dq .. result) .. dq
+end
+function ExprEmitter.emit_interp(self, node)
+    local parts = node:child("parts")
+    local pieces = __lz_list()
+    local i = 1
+    while i <= __lz_len(parts) do
+        local part = __lz_unwrap(__lz_get(parts, i))
+        if (part.kind == "LiteralExpr") and (part:child("lit_kind") == "string") then
+            local v = part:child("value")
+            if v ~= "" then
+                __lz_push(pieces, ExprEmitter.lua_quote_str(self, v))
+            end
+        else
+            __lz_push(pieces, ("tostring(" .. ExprEmitter.emit(self, part)) .. ")")
+        end
+        i = i + 1
+    end
+    if __lz_len(pieces) == 0 then
+        return "''"
+    end
+    if __lz_len(pieces) == 1 then
+        return __lz_unwrap(__lz_get(pieces, 1))
+    end
+    return ("(" .. Text.join(pieces, " .. ")) .. ")"
 end
 
 local StmtEmitter = {}
@@ -4600,15 +4980,9 @@ end
 
 local Meta = {}
 
-function Meta.name()
-    return "Lazarus"
-end
-function Meta.version()
-    return "1.0"
-end
-function Meta.target()
-    return "Lua 5.1"
-end
+Meta.name = "Lazarus"
+Meta.version = "1.0"
+Meta.target = "Lua 5.1"
 
 local Codegen = {}
 
@@ -4711,7 +5085,20 @@ function Codegen.has_constructor(self, body)
     return false
 end
 function Codegen.header()
-    return Text.lines(__lz_list("--------------------------------------------------------------------", ((("-- Generated by the " .. Meta.name()) .. " compiler v") .. Meta.version()) .. " (self-hosted)", "-- Target runtime: " .. Meta.target(), "-- This file is auto-generated. Do not edit by hand.", "--------------------------------------------------------------------"))
+    return Text.lines(__lz_list("--------------------------------------------------------------------", ((("-- Generated by the " .. Meta.name) .. " compiler v") .. Meta.version) .. " (self-hosted)", "-- Target runtime: " .. Meta.target, "-- This file is auto-generated. Do not edit by hand.", "--------------------------------------------------------------------"))
+end
+
+local Module = {}
+
+function Module.new(path, class_name, source, ast, imports, is_interface)
+    local self = {}
+    self.path = path
+    self.class_name = class_name
+    self.source = source
+    self.ast = ast
+    self.imports = imports
+    self.is_interface = is_interface
+    return self
 end
 
 local Bundler = {}
@@ -4782,19 +5169,6 @@ function Bundler.is_extern_module(self, m)
         end
     end
     return has_extern and (not has_other)
-end
-
-local Module = {}
-
-function Module.new(path, class_name, source, ast, imports, is_interface)
-    local self = {}
-    self.path = path
-    self.class_name = class_name
-    self.source = source
-    self.ast = ast
-    self.imports = imports
-    self.is_interface = is_interface
-    return self
 end
 
 local Path = {}

@@ -4,17 +4,20 @@
 // so its locals do not leak, and parameters / loop variables are shadowed out.
 // Runs after schematic, which sets the `reassign` annotation this relies on.
 
+import frontend.parser.Node
+import frontend.optimizer.Constants
+
 private exprs
 @auto
 constructor(exprs)
 
-public fold_block(stmts, constants) {
+public fold_block(stmts, constants: Constants): unit {
     for stmt in stmts {
         .fold_statement(stmt, constants)
     }
 }
 
-private fold_statement(stmt, constants) {
+private fold_statement(stmt: Node, constants: Constants): unit {
     // ImportDecl / ExternDecl / InterfaceDecl / BreakStmt carry nothing to fold.
     match stmt.kind {
         "VariableDecl" => { .fold_variable(stmt, constants) }
@@ -37,7 +40,7 @@ private fold_statement(stmt, constants) {
     }
 }
 
-private fold_variable(stmt, constants) {
+private fold_variable(stmt: Node, constants: Constants): unit {
     .fold_optional(stmt, "value", constants)
     mut mutable = stmt.attr("mutable").unwrap_or(false)
     mut reassign = stmt.attr("reassign").unwrap_or(false)
@@ -50,19 +53,19 @@ private fold_variable(stmt, constants) {
 }
 
 // Fold an optional expression attribute (a `return`/`init` value) in place.
-private fold_optional(stmt, key: str, constants) {
+private fold_optional(stmt: Node, key: str, constants: Constants): unit {
     mut value = stmt.attr(key)
     if value.is_some() {
         stmt.set(key, .exprs.fold(value.unwrap(), constants))
     }
 }
 
-private fold_assign(stmt, constants) {
+private fold_assign(stmt: Node, constants: Constants): unit {
     stmt.set("target", .exprs.fold(stmt.child("target"), constants))
     stmt.set("value", .exprs.fold(stmt.child("value"), constants))
 }
 
-private fold_if(stmt, constants) {
+private fold_if(stmt: Node, constants: Constants): unit {
     for clause in stmt.child("clauses") {
         clause.set("condition", .exprs.fold(clause.child("condition"), constants))
         .fold_block(clause.child("body"), constants.child([]))
@@ -76,7 +79,7 @@ private fold_if(stmt, constants) {
 // The loop variable is mutable across iterations, so it is never recorded: its
 // initialiser folds against the outer scope, and its name is shadowed out of the
 // child scope used for the condition, step and body.
-private fold_for(stmt, constants) {
+private fold_for(stmt: Node, constants: Constants): unit {
     mut shadowed = []
     mut init = stmt.attr("init")
     if init.is_some() {
@@ -96,14 +99,14 @@ private fold_for(stmt, constants) {
     .fold_block(stmt.child("body"), inner)
 }
 
-private fold_for_in(stmt, constants) {
+private fold_for_in(stmt: Node, constants: Constants): unit {
     stmt.set("iter", .exprs.fold(stmt.child("iter"), constants))
     .fold_block(stmt.child("body"), constants.child(stmt.child("vars")))
 }
 
 // The scrutinee and each value arm's pattern fold against the current scope; each
 // arm body runs in a child constant scope so its locals do not leak between arms.
-private fold_match(stmt, constants) {
+private fold_match(stmt: Node, constants: Constants): unit {
     stmt.set("scrutinee", .exprs.fold(stmt.child("scrutinee"), constants))
     for arm in stmt.child("arms") {
         if .is_value_arm(arm) {
@@ -114,6 +117,6 @@ private fold_match(stmt, constants) {
 }
 
 // Only a value arm carries a foldable `pattern`; variant and `_` arms do not.
-private is_value_arm(arm): bool {
+private is_value_arm(arm: Node): bool {
     return not arm.attr("is_wildcard").unwrap_or(false) and not arm.attr("is_variant").unwrap_or(false)
 }

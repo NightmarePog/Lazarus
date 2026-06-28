@@ -29,7 +29,9 @@ public scan() {
         if .at_end() {
             break
         }
-        tokens.push(.next_token())
+        for tok in .next_tokens() {
+            tokens.push(tok)
+        }
     }
     return tokens
 }
@@ -47,7 +49,7 @@ private at_end(): bool {
     return .current == ""
 }
 
-private advance() {
+private advance(): unit {
     if Char.is_newline(.current) {
         .line = .line + 1
         .col = 1
@@ -59,7 +61,7 @@ private advance() {
 }
 
 // Whitespace and comments may alternate, so loop until neither remains.
-private skip_trivia() {
+private skip_trivia(): unit {
     loop {
         while Char.is_space(.current) {
             .advance()
@@ -110,6 +112,30 @@ private skip_comment(): bool {
         }
     }
     return false
+}
+
+// Routes f-strings and triple-quoted strings to their dedicated paths; all
+// other tokens fall through to `next_token()` as a single-element list.
+private next_tokens() {
+    mut is_f = .current == "f" and Char.is_quote(.peek())
+    if is_f {
+        .advance()
+    }
+    if Char.is_quote(.current) {
+        mut line = .line
+        mut col = .col
+        if Char.is_quote(.peek()) and Char.is_quote(.char_at(.pos + 2)) {
+            .advance()
+            .advance()
+            .advance()
+            return .read_triple(is_f, line, col)
+        }
+        if is_f {
+            .advance()
+            return .read_interp(line, col)
+        }
+    }
+    return [.next_token()]
 }
 
 private next_token(): Token {
@@ -201,4 +227,283 @@ private read_symbol(): Token {
     }
     Error("UnexpectedChar", "unexpected character '" ++ ch ++ "'", line, col, .source, 1).raise()
     return Token("ERROR", ch, line, col)
+}
+
+// ---- f-string interpolation ----
+
+// Reads an f-string body after the opening `"` has been consumed. Produces
+// ISTR_HEAD / expression tokens / ISTR_MID... / ISTR_TAIL; or a plain STRING
+// when no `{...}` hole is present.
+private read_interp(line: int, col: int) {
+    mut result = []
+    mut seg = .scan_str_segment(false)
+    if Char.is_quote(.current) {
+        .advance()
+        result.push(Token("STRING", seg, line, col))
+        return result
+    }
+    result.push(Token("ISTR_HEAD", seg, line, col))
+    loop {
+        for tok in .scan_interp_expr(line, col) {
+            result.push(tok)
+        }
+        seg = .scan_str_segment(false)
+        if Char.is_quote(.current) {
+            .advance()
+            result.push(Token("ISTR_TAIL", seg, line, col))
+            break
+        }
+        result.push(Token("ISTR_MID", seg, line, col))
+    }
+    return result
+}
+
+// Scans the tokens inside one `{...}` hole. Consumes the opening `{` (which
+// must be current on entry) and the balancing `}`.
+private scan_interp_expr(err_line: int, err_col: int) {
+    .advance()
+    mut result = []
+    mut depth = 1
+    while depth > 0 {
+        .skip_trivia()
+        if .at_end() {
+            Error("UnterminatedInterpolation", "unclosed '{' in string interpolation", err_line, err_col, .source, 1).raise()
+        }
+        mut tok = .next_token()
+        if tok.kind == "BODY_START" {
+            depth = depth + 1
+            result.push(tok)
+        } else if tok.kind == "BODY_END" {
+            depth = depth - 1
+            if depth > 0 {
+                result.push(tok)
+            }
+        } else {
+            result.push(tok)
+        }
+    }
+    return result
+}
+
+// Scans raw text up to the next `{` or closing `"`. `{{` collapses to a
+// literal `{`; a bare newline in single-line mode is an error.
+private scan_str_segment(multiline: bool): str {
+    mut result = ""
+    loop {
+        if .at_end() {
+            Error("UnterminatedString", "unterminated string literal", .line, .col, .source, 1).raise()
+        }
+        if not multiline and Char.is_newline(.current) {
+            Error("UnterminatedString", "unterminated string literal", .line, .col, .source, 1).raise()
+        }
+        if .current == "{" {
+            if .peek() == "{" {
+                result = result ++ "{"
+                .advance()
+                .advance()
+            } else {
+                break
+            }
+        } else if Char.is_quote(.current) {
+            break
+        } else {
+            result = result ++ .current
+            .advance()
+        }
+    }
+    return result
+}
+
+// ---- triple-quoted strings ----
+
+// Dispatches plain `"""..."""` vs `f"""..."""` after `"""` has been consumed.
+private read_triple(is_f: bool, line: int, col: int) {
+    if is_f {
+        return .read_triple_interp(line, col)
+    }
+    mut content = .strip_indent(.scan_triple_raw())
+    return [Token("STRING", content, line, col)]
+}
+
+// Scans raw content until the closing `"""` (consumed).
+private scan_triple_raw(): str {
+    mut result = ""
+    loop {
+        if .at_end() {
+            Error("UnterminatedString", "unterminated triple-quoted string", .line, .col, .source, 3).raise()
+        }
+        if Char.is_quote(.current) and Char.is_quote(.peek()) and Char.is_quote(.char_at(.pos + 2)) {
+            .advance()
+            .advance()
+            .advance()
+            break
+        }
+        result = result ++ .current
+        .advance()
+    }
+    return result
+}
+
+// Reads an `f"""..."""` string: collects content with byte-1 sentinels for
+// interpolation holes, strips indentation, then splits on sentinels to
+// produce interleaved ISTR_* and expression tokens.
+private read_triple_interp(line: int, col: int) {
+    mut raw = ""
+    mut hole_tokens = []
+    mut sentinel = Str.char(1).unwrap_or("")
+    loop {
+        if .at_end() {
+            Error("UnterminatedString", "unterminated triple-quoted string", .line, .col, .source, 3).raise()
+        }
+        if Char.is_quote(.current) and Char.is_quote(.peek()) and Char.is_quote(.char_at(.pos + 2)) {
+            .advance()
+            .advance()
+            .advance()
+            break
+        }
+        if .current == "{" {
+            if .peek() == "{" {
+                raw = raw ++ "{"
+                .advance()
+                .advance()
+            } else {
+                mut idx = Str.format("%d", hole_tokens.len()).unwrap_or("0")
+                raw = raw ++ sentinel ++ idx
+                hole_tokens.push(.scan_interp_expr(line, col))
+            }
+        } else {
+            raw = raw ++ .current
+            .advance()
+        }
+    }
+    mut stripped = .strip_indent(raw)
+    mut segs = .split_on_sentinel(stripped, sentinel)
+    mut result = []
+    mut n = segs.len()
+    if n == 1 {
+        result.push(Token("STRING", segs.get(1).unwrap(), line, col))
+        return result
+    }
+    result.push(Token("ISTR_HEAD", segs.get(1).unwrap(), line, col))
+    mut i = 2
+    while i <= n {
+        for tok in hole_tokens.get(i - 1).unwrap() {
+            result.push(tok)
+        }
+        if i == n {
+            result.push(Token("ISTR_TAIL", segs.get(i).unwrap(), line, col))
+        } else {
+            result.push(Token("ISTR_MID", segs.get(i).unwrap(), line, col))
+        }
+        i = i + 1
+    }
+    return result
+}
+
+// Splits `content` on `sentinel{decimal-digits}` sequences, returning one
+// more segment than the number of holes (in order, 1-indexed).
+private split_on_sentinel(content: str, sentinel: str) {
+    mut result = []
+    mut n = Str.len(content).unwrap_or(0)
+    mut i = 1
+    mut seg_start = 1
+    while i <= n {
+        if Str.sub(content, i, i).unwrap_or("") == sentinel {
+            result.push(Str.sub(content, seg_start, i - 1).unwrap_or(""))
+            i = i + 1
+            while i <= n and Char.is_digit(Str.sub(content, i, i).unwrap_or("")) {
+                i = i + 1
+            }
+            seg_start = i
+        } else {
+            i = i + 1
+        }
+    }
+    result.push(Str.sub(content, seg_start, n).unwrap_or(""))
+    return result
+}
+
+// ---- indentation stripping ----
+
+// Strips common leading indentation from a triple-quote body. The opening
+// blank line (immediately after `"""`) and the final all-space line (the
+// closing `"""` indentation) are removed; remaining lines are stripped by
+// the space-count of that closing line. Lists are 1-indexed.
+private strip_indent(content: str): str {
+    mut lines = .split_lines(content)
+    mut nlines = lines.len()
+    if nlines == 0 {
+        return ""
+    }
+    mut start = 1
+    if .is_blank(lines.get(1).unwrap()) {
+        start = 2
+    }
+    mut last = lines.get(nlines).unwrap()
+    mut strip = .leading_spaces(last)
+    mut last_idx = nlines
+    if .is_blank(last) {
+        last_idx = nlines - 1
+    }
+    mut nl = Str.char(10).unwrap_or("")
+    mut result = ""
+    mut i = start
+    while i <= last_idx {
+        mut ln = lines.get(i).unwrap()
+        mut stripped_line = ""
+        if not .is_blank(ln) {
+            mut ln_len = Str.len(ln).unwrap_or(0)
+            mut s = strip + 1
+            if s > ln_len {
+                s = ln_len + 1
+            }
+            stripped_line = Str.sub(ln, s, ln_len).unwrap_or("")
+        }
+        if i > start {
+            result = result ++ nl
+        }
+        result = result ++ stripped_line
+        i = i + 1
+    }
+    return result
+}
+
+private split_lines(s: str) {
+    mut result = []
+    mut n = Str.len(s).unwrap_or(0)
+    mut i = 1
+    mut seg_start = 1
+    while i <= n {
+        if Char.is_newline(Str.sub(s, i, i).unwrap_or("")) {
+            result.push(Str.sub(s, seg_start, i - 1).unwrap_or(""))
+            seg_start = i + 1
+        }
+        i = i + 1
+    }
+    result.push(Str.sub(s, seg_start, n).unwrap_or(""))
+    return result
+}
+
+private is_blank(s: str): bool {
+    mut n = Str.len(s).unwrap_or(0)
+    mut i = 1
+    while i <= n {
+        if Str.sub(s, i, i).unwrap_or("") != " " {
+            return false
+        }
+        i = i + 1
+    }
+    return true
+}
+
+private leading_spaces(s: str): int {
+    mut n = Str.len(s).unwrap_or(0)
+    mut i = 1
+    while i <= n {
+        if Str.sub(s, i, i).unwrap_or("") != " " {
+            return i - 1
+        }
+        i = i + 1
+    }
+    return n
 }

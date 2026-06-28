@@ -12,13 +12,13 @@ public column: int
 public source: str
 public span: int
 @auto
-constructor(kind, message, line, column, source, span)
+constructor(kind: str, message: str, line: int, column: int, source: str, span: int)
 
 public to_string(): str {
     return .format()
 }
 
-public raise() {
+public raise(): unit {
     Sys.print(.format())
     Sys.exit(1)
 }

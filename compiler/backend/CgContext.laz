@@ -20,7 +20,7 @@ private temp_seq = 0
 
 // A fresh, collision-free local name for a generated temporary (e.g. a `match`
 // scrutinee). Unique within this class block.
-public fresh_temp() {
+public fresh_temp(): str {
     .temp_seq = .temp_seq + 1
     return "__lz_m" ++ .temp_seq
 }

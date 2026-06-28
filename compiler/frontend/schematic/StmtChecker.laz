@@ -20,14 +20,14 @@ constructor(source, exprs, variant_owner, enums, variant_arity)
 
 // Walk a block, marking each statement with whether it is the block's last (the
 // placement rule for `return` / `break`).
-public check_block(stmts, scope, frame: Frame) {
+public check_block(stmts, scope: Scope, frame: Frame): unit {
     mut n = stmts.len()
     for i, stmt in stmts {
         .check_statement(stmt, scope, frame, i == n - 1)
     }
 }
 
-private check_statement(stmt, scope, frame: Frame, is_last: bool) {
+private check_statement(stmt: Node, scope: Scope, frame: Frame, is_last: bool): unit {
     // ImportDecl / ExternDecl / InterfaceDecl are metadata — nothing to check.
     match stmt.kind {
         "VariableDecl" => { .check_variable(stmt, scope, frame) }
@@ -51,7 +51,7 @@ private check_statement(stmt, scope, frame: Frame, is_last: bool) {
 // A binding is a declaration (first sight, or any visibility/`mut` form) or a
 // reassignment (a bare name already in scope). A top-level visibility binding is
 // an instance property: validated, but not bound as a bare name.
-private check_variable(stmt, scope, frame: Frame) {
+private check_variable(stmt: Node, scope: Scope, frame: Frame): unit {
     mut name = stmt.child("name")
     mut visibility = stmt.attr("visibility").unwrap_or("")
     mut is_static = stmt.attr("is_static").unwrap_or(false)
@@ -72,7 +72,7 @@ private check_variable(stmt, scope, frame: Frame) {
     }
 }
 
-private declare_binding(stmt, scope, frame: Frame, name: str, visibility: str) {
+private declare_binding(stmt: Node, scope: Scope, frame: Frame, name: str, visibility: str): unit {
     if not frame.in_function and visibility == "" {
         .fail(stmt, "Top-level binding '" ++ name ++ "' must declare visibility ('private' or 'public')", Str.len(name).unwrap_or(1))
     }
@@ -91,7 +91,7 @@ private declare_binding(stmt, scope, frame: Frame, name: str, visibility: str) {
     stmt.set("reassign", false)
 }
 
-private reassign_binding(stmt, scope, name: str, existing) {
+private reassign_binding(stmt: Node, scope: Scope, name: str, existing: Symbol): unit {
     if not existing.mutable {
         .fail(stmt, "Cannot assign to immutable binding '" ++ name ++ "'", Str.len(name).unwrap_or(1))
     }
@@ -104,14 +104,14 @@ private reassign_binding(stmt, scope, name: str, existing) {
 }
 
 // Validate a binding's initialiser when present (a `mut` binding may omit it).
-private check_optional_value(stmt, scope) {
+private check_optional_value(stmt: Node, scope: Scope): unit {
     mut value = stmt.attr("value")
     if value.is_some() {
         .exprs.check(value.unwrap(), scope)
     }
 }
 
-private value_noncallable(stmt): bool {
+private value_noncallable(stmt: Node): bool {
     mut value = stmt.attr("value")
     if value.is_none() {
         return false
@@ -121,7 +121,7 @@ private value_noncallable(stmt): bool {
 
 // The name is bound before the body is walked, so a function may recurse. A
 // top-level instance method (not static, not nested) is analysed with a receiver.
-private check_function(stmt, scope, frame: Frame) {
+private check_function(stmt: Node, scope: Scope, frame: Frame): unit {
     mut name = stmt.child("name")
     if scope.declared_here(name) {
         .fail(stmt, "Duplicate declaration '" ++ name ++ "'", Str.len(name).unwrap_or(1))
@@ -135,7 +135,7 @@ private check_function(stmt, scope, frame: Frame) {
 }
 
 // A constructor is class-level, has a receiver, and must not `return`.
-private check_constructor(stmt, scope, frame: Frame) {
+private check_constructor(stmt: Node, scope: Scope, frame: Frame): unit {
     if frame.in_function {
         .fail(stmt, "'constructor' must be at the top level of a class", 11)
     }
@@ -144,7 +144,7 @@ private check_constructor(stmt, scope, frame: Frame) {
 
 // Bind params in a child scope, then walk the body with the receiver flag set for
 // an instance context.
-private check_callable_body(stmt, scope, frame: Frame, is_instance: bool) {
+private check_callable_body(stmt: Node, scope: Scope, frame: Frame, is_instance: bool): unit {
     mut inner = scope.child()
     .bind_params(stmt, inner)
     mut outer = .exprs.instance_flag()
@@ -153,7 +153,7 @@ private check_callable_body(stmt, scope, frame: Frame, is_instance: bool) {
     .exprs.set_instance(outer)
 }
 
-private bind_params(stmt, scope) {
+private bind_params(stmt: Node, scope: Scope): unit {
     for param in stmt.child("params") {
         if scope.declared_here(param) {
             .fail(stmt, "Duplicate parameter '" ++ param ++ "'", Str.len(param).unwrap_or(1))
@@ -163,7 +163,7 @@ private bind_params(stmt, scope) {
     }
 }
 
-private check_return(stmt, scope, frame: Frame, is_last: bool) {
+private check_return(stmt: Node, scope: Scope, frame: Frame, is_last: bool): unit {
     if frame.in_constructor {
         .fail(stmt, "'return' is not allowed in a constructor; the instance is returned implicitly", 6)
     }
@@ -179,7 +179,7 @@ private check_return(stmt, scope, frame: Frame, is_last: bool) {
     }
 }
 
-private check_break(stmt, frame: Frame, is_last: bool) {
+private check_break(stmt: Node, frame: Frame, is_last: bool): unit {
     if not frame.in_loop {
         .fail(stmt, "'break' outside of a loop", 5)
     }
@@ -189,7 +189,7 @@ private check_break(stmt, frame: Frame, is_last: bool) {
 }
 
 // A call is the only expression valid as a statement; anything else has no effect.
-private check_expr_statement(stmt, scope) {
+private check_expr_statement(stmt: Node, scope: Scope): unit {
     mut expr = stmt.child("expression")
     .exprs.check(expr, scope)
     if expr.kind != "CallExpr" {
@@ -197,7 +197,7 @@ private check_expr_statement(stmt, scope) {
     }
 }
 
-private check_assign(stmt, scope) {
+private check_assign(stmt: Node, scope: Scope): unit {
     .exprs.check(stmt.child("target"), scope)
     .exprs.check(stmt.child("value"), scope)
 }
@@ -205,7 +205,7 @@ private check_assign(stmt, scope) {
 // Each clause condition is validated; each branch is a child scope so a binding
 // in one neither leaks nor collides. The frame is inherited so `return` / `break`
 // inside a branch are judged by the enclosing context.
-private check_if(stmt, scope, frame: Frame) {
+private check_if(stmt: Node, scope: Scope, frame: Frame): unit {
     for clause in stmt.child("clauses") {
         .exprs.check_condition(clause.child("condition"), scope)
         .check_block(clause.child("body"), scope.child(), frame)
@@ -216,19 +216,19 @@ private check_if(stmt, scope, frame: Frame) {
     }
 }
 
-private check_while(stmt, scope, frame: Frame) {
+private check_while(stmt: Node, scope: Scope, frame: Frame): unit {
     .exprs.check_condition(stmt.child("condition"), scope)
     .check_block(stmt.child("body"), scope.child(), frame.in_loop_body())
 }
 
-private check_loop(stmt, scope, frame: Frame) {
+private check_loop(stmt: Node, scope: Scope, frame: Frame): unit {
     .check_block(stmt.child("body"), scope.child(), frame.in_loop_body())
 }
 
 // The `init` loop variable is loop-local and implicitly mutable (the step may
 // reassign it); condition, step and body all see it, and the body runs in a
 // further child scope so its own declarations do not leak.
-private check_for(stmt, scope, frame: Frame) {
+private check_for(stmt: Node, scope: Scope, frame: Frame): unit {
     mut inner = scope.child()
     mut loop_frame = frame.in_loop_body()
 
@@ -247,7 +247,7 @@ private check_for(stmt, scope, frame: Frame) {
     .check_block(stmt.child("body"), inner.child(), loop_frame)
 }
 
-private check_for_init(init, scope) {
+private check_for_init(init: Node, scope: Scope): unit {
     mut name = init.child("name")
     Naming.check_value(name, init.line(), init.col(), .source, "Loop variable")
     mut value = init.attr("value")
@@ -262,7 +262,7 @@ private check_for_init(init, scope) {
 
 // The iterated value is checked in the enclosing scope; the body sees the fresh,
 // immutable loop variable(s) — one (value) or two (key/index and value).
-private check_for_in(stmt, scope, frame: Frame) {
+private check_for_in(stmt: Node, scope: Scope, frame: Frame): unit {
     .exprs.check(stmt.child("iter"), scope)
     mut inner = scope.child()
     for name in stmt.child("vars") {
@@ -277,7 +277,7 @@ private check_for_in(stmt, scope, frame: Frame) {
 
 // The scrutinee is validated, then each arm body in its own child scope. Variant
 // arms resolve to a single enum and, absent a `_`, must cover every variant.
-private check_match(stmt, scope, frame: Frame) {
+private check_match(stmt: Node, scope: Scope, frame: Frame): unit {
     .exprs.check(stmt.child("scrutinee"), scope)
     mut enum_name = ""
     mut covered = [:]
@@ -300,7 +300,7 @@ private check_match(stmt, scope, frame: Frame) {
 }
 
 // Resolve one variant arm: a known variant, all arms from the same enum, no repeat.
-private check_variant_arm(stmt, arm, enum_name: str, covered): str {
+private check_variant_arm(stmt: Node, arm: Node, enum_name: str, covered): str {
     mut v = arm.child("variant")
     mut owner = .variant_owner.get(v)
     if owner.is_none() {
@@ -322,7 +322,7 @@ private check_variant_arm(stmt, arm, enum_name: str, covered): str {
 }
 
 // Bind a payload pattern's field names in the arm scope (`_` ignores a field).
-private declare_bindings(arm, scope) {
+private declare_bindings(arm: Node, scope: Scope): unit {
     for name in arm.child("bindings") {
         if name != "_" {
             scope.declare(name, Symbol("variable", false, false))
@@ -330,7 +330,7 @@ private declare_bindings(arm, scope) {
     }
 }
 
-private check_exhaustive(stmt, enum_name: str, covered) {
+private check_exhaustive(stmt: Node, enum_name: str, covered): unit {
     for variant in .enums.get(enum_name).unwrap() {
         if not covered.has(variant) {
             .fail(stmt, "Non-exhaustive match on enum '" ++ enum_name ++ "': missing variant '" ++ variant ++ "' (add it, or a '_' arm)", 1)
@@ -338,6 +338,6 @@ private check_exhaustive(stmt, enum_name: str, covered) {
     }
 }
 
-private fail(node, message: str, span: int) {
+private fail(node: Node, message: str, span: int): unit {
     Error("SemanticError", message, node.line(), node.col(), .source, span).raise()
 }

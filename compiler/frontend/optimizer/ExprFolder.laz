@@ -16,7 +16,7 @@ public fold_count(): int {
     return .folds
 }
 
-public fold(node, constants): Node {
+public fold(node: Node, constants: Constants): Node {
     match node.kind {
         "IdentifierExpr" => { return .fold_identifier(node, constants) }
         "BinaryExpr" => { return .fold_binary(node, constants) }
@@ -64,7 +64,7 @@ private fold_comp_cond(node: Node, constants: Constants) {
     }
 }
 
-private fold_identifier(node, constants): Node {
+private fold_identifier(node: Node, constants: Constants): Node {
     mut hit = constants.lookup(node.child("name"))
     if hit.is_some() {
         .folds = .folds + 1
@@ -73,7 +73,7 @@ private fold_identifier(node, constants): Node {
     return node
 }
 
-private fold_binary(node, constants): Node {
+private fold_binary(node: Node, constants: Constants): Node {
     mut left = .fold(node.child("left"), constants)
     mut right = .fold(node.child("right"), constants)
     mut op = node.child("op")
@@ -91,7 +91,7 @@ private fold_binary(node, constants): Node {
     return node
 }
 
-private foldable(op: str, left, right): bool {
+private foldable(op: str, left: Node, right: Node): bool {
     return .can_fold(op) and .is_number(left) and .is_number(right)
 }
 
@@ -99,7 +99,7 @@ private can_fold(op: str): bool {
     return op == "PLUS" or op == "MINUS" or op == "MULTIPLY" or op == "DIVIDE"
 }
 
-private is_number(node): bool {
+private is_number(node: Node): bool {
     if node.kind != "LiteralExpr" {
         return false
     }
@@ -109,7 +109,7 @@ private is_number(node): bool {
 
 // Division always yields a `float`; otherwise the result is a `float` only if
 // either operand is one (int op int stays int).
-private result_kind(op: str, left, right): str {
+private result_kind(op: str, left: Node, right: Node): str {
     if op == "DIVIDE" {
         return "float"
     }
@@ -129,18 +129,18 @@ private apply(op: str, a, b) {
     return a / b
 }
 
-private fold_call(node, constants): Node {
+private fold_call(node: Node, constants: Constants): Node {
     node.set("callee", .fold(node.child("callee"), constants))
     node.set("args", [.fold(arg, constants) for arg in node.child("args")])
     return node
 }
 
-private fold_list(node, constants): Node {
+private fold_list(node: Node, constants: Constants): Node {
     node.set("elements", [.fold(element, constants) for element in node.child("elements")])
     return node
 }
 
-private fold_map(node, constants): Node {
+private fold_map(node: Node, constants: Constants): Node {
     for entry in node.child("entries") {
         entry.set("key", .fold(entry.child("key"), constants))
         entry.set("value", .fold(entry.child("value"), constants))

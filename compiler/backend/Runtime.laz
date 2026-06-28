@@ -8,7 +8,7 @@
 // helper serves both. Tag strings are single-quoted in the emitted Lua, keeping
 // them plain inside these double-quoted Lazarus literals.
 
-@object
+#object
 import backend.Text
 
 prelude(): str {
