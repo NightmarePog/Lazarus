@@ -25,10 +25,10 @@ private exprs
 constructor(cursor, exprs)
 
 public parse_program(): Node {
-    // A leading `@<kind>` directive makes the whole file that kind: `@interface`
-    // (a contract) or `@object` (a static module). `@auto constructor(...)` is a
-    // statement annotation, not a file directive, so it is parsed in the body loop.
-    if .cursor.check("AT") and .is_file_directive() {
+    // A leading `#<kind>` directive makes the whole file that kind: `#interface`
+    // (a contract) or `#object` (a static module). `@auto constructor(...)` is a
+    // statement annotation (uses `@`, not `#`), parsed in the body loop.
+    if .cursor.check("HASH") and .is_file_directive() {
         return .parse_file_directive()
     }
     mut body = []
@@ -41,9 +41,8 @@ public parse_program(): Node {
     return Ast.program(.expand_field_params(body))
 }
 
-// True when the leading `@` opens a whole-file directive (`@interface`/`@object`,
-// or legacy `@auto` followed by field declarations) rather than an `@auto` that
-// annotates a constructor.
+// True when the leading `#` opens a whole-file directive (`#interface`/`#object`)
+// rather than something else at the start of the file.
 private is_file_directive(): bool {
     mut after = .cursor.peek_next()
     if after.kind == "INTERFACE" {
@@ -89,11 +88,11 @@ private field_property(fp): Node {
     return Ast.node("VariableDecl", ["name": fp.get("name").unwrap(), "visibility": "private", "mutable": false, "is_static": false, "type": fp.get("type").unwrap(), "line": fp.get("line").unwrap(), "col": fp.get("col").unwrap()])
 }
 
-// `@interface` uses the `interface` keyword; `@object` is `@` + the identifier
+// `#interface` uses the `interface` keyword; `#object` is `#` + the identifier
 // `object` (not a keyword, since `object` is used as a variable name). Imports are
 // still allowed in either form and lifted by the Linker.
 private parse_file_directive(): Node {
-    mut at = .cursor.consume("AT", "Expected a file directive")
+    mut at = .cursor.consume("HASH", "Expected a file directive")
     if .cursor.match("INTERFACE") {
         return .parse_interface_body(at)
     }
@@ -101,13 +100,13 @@ private parse_file_directive(): Node {
         .cursor.advance()
         return .parse_object_body()
     }
-    .cursor.fail("unknown file directive '@" ++ .cursor.current().value ++ "'")
+    .cursor.fail("unknown file directive '#" ++ .cursor.current().value ++ "'")
     return Ast.program([])
 }
 
-// `@interface` body: signatures + property requirements (and imports), folded into
+// `#interface` body: signatures + property requirements (and imports), folded into
 // one interface decl named after the file (empty name filled in downstream).
-private parse_interface_body(at): Node {
+private parse_interface_body(at: Token): Node {
     mut body = []
     mut methods = []
     mut properties = []
@@ -127,7 +126,7 @@ private parse_interface_body(at): Node {
     return Ast.program(body)
 }
 
-// `@object` body: a static module — every member is forced static, so the file
+// `#object` body: a static module — every member is forced static, so the file
 // emits a plain all-static class. `static` and `constructor` are rejected.
 private parse_object_body(): Node {
     mut body = []
@@ -154,16 +153,16 @@ private parse_object_member(): Node {
         visibility = "public"
     }
     if .cursor.check("STATIC") {
-        .cursor.fail("'static' is implied in an @object file; remove it")
+        .cursor.fail("'static' is implied in an #object file; remove it")
     }
     if .cursor.check("CONSTRUCTOR") {
-        .cursor.fail("an @object file has no instances; remove the constructor")
+        .cursor.fail("an #object file has no instances; remove the constructor")
     }
     if .cursor.check("IDENTIFIER") and .looks_like_decl() {
         return .parse_method(visibility, true)
     }
     mut mutable = .cursor.match("MUTABLE")
-    return .parse_binding(visibility, mutable, "Expected a member name in the @object file", true)
+    return .parse_binding(visibility, mutable, "Expected a member name in the #object file", true)
 }
 
 private parse_statement(): Node {
@@ -194,7 +193,7 @@ private parse_statement(): Node {
 // At a statement head, an identifier may open a `match`, a typed local
 // `x: T = …`, a method declaration, a plain assignment, or an expression
 // statement — told apart by what follows.
-private parse_identifier_statement(tok): Node {
+private parse_identifier_statement(tok: Token): Node {
     if tok.value == "match" and .starts_match() {
         .cursor.advance()
         return .parse_match(tok)
@@ -229,7 +228,7 @@ private parse_block(context: str) {
     return body
 }
 
-private parse_import(tok): Node {
+private parse_import(tok: Token): Node {
     mut first = .cursor.consume("IDENTIFIER", "Expected a name after 'import'")
     mut segments = [first.value]
     mut last = first.value
@@ -246,7 +245,7 @@ private parse_import(tok): Node {
 
 // `enum Name { A, B(T), C }` — PascalCase variant names, optionally carrying
 // payload types, separated by a newline or an optional comma.
-private parse_enum(tok): Node {
+private parse_enum(tok: Token): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected an enum name after 'enum'")
     mut type_params = .parse_type_params()
     mut open = .cursor.consume("BODY_START", "Expected '{' to open enum body")
@@ -284,8 +283,8 @@ private parse_enum_variant(): Node {
 
 // `interface Name<T> { fetch(): int  ;  name: str }` — a structural contract of
 // method signatures (no bodies) and property requirements. Shares the member
-// grammar with the `@interface` file form.
-private parse_interface(tok): Node {
+// grammar with the `#interface` file form.
+private parse_interface(tok: Token): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected an interface name after 'interface'")
     mut type_params = .parse_type_params()
     mut open = .cursor.consume("BODY_START", "Expected '{' to open interface body")
@@ -306,7 +305,7 @@ private parse_interface(tok): Node {
 
 // One interface requirement: a method signature `name<T>(params): ret` (a `<` or
 // `(` follows the name) or a property `name: Type`.
-private parse_interface_member(methods, properties) {
+private parse_interface_member(methods, properties): unit {
     mut name = .cursor.consume("IDENTIFIER", "Expected a member name in the interface body")
     if .cursor.check("LESS") or .cursor.check("LEFT_BRACKET") {
         mut type_params = .parse_type_params()
@@ -322,7 +321,7 @@ private parse_interface_member(methods, properties) {
     }
 }
 
-private parse_extern(tok): Node {
+private parse_extern(tok: Token): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected a name after 'extern'")
     .cursor.consume("LEFT_BRACKET", "Expected '(' after extern name")
     mut params = .parse_params([])
@@ -391,7 +390,7 @@ private parse_assignment(name_err: str): Node {
     return Ast.node("VariableDecl", ["name": name.value, "visibility": "", "mutable": false, "is_static": false])
 }
 
-private local_binding(name, value): Node {
+private local_binding(name: Token, value: Node): Node {
     return Ast.node("VariableDecl", ["name": name.value, "value": value, "visibility": "", "mutable": false, "is_static": false, "line": name.line, "col": name.column])
 }
 
@@ -403,7 +402,13 @@ private parse_method(visibility: str, is_static: bool): Node {
     mut params = .parse_params(param_types)
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after parameters")
     mut return_type = .parse_return_type()
-    mut body = .parse_block("method body")
+    mut body = []
+    if .cursor.match("ASSIGN") {
+        mut expr = .exprs.expression()
+        body = [Ast.node("ReturnStmt", ["value": expr, "line": expr.line(), "col": expr.col()])]
+    } else {
+        body = .parse_block("method body")
+    }
     return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column, param_types, return_type, type_params)
 }
 
@@ -484,7 +489,7 @@ private field_param_assign(fp): Node {
 // Every constructor parameter as a field param (for `@auto constructor(...)`).
 // The declared instance properties' type nodes, keyed by name — the source of an
 // `@auto` constructor's parameter types.
-private declared_property_types(body): Map<str, Node> {
+private declared_property_types(body) {
     mut out = [:]
     for stmt in body {
         if stmt.kind == "VariableDecl" and stmt.attr("visibility").unwrap_or("") != "" and not stmt.attr("is_static").unwrap_or(false) {
@@ -530,7 +535,7 @@ private parse_params(out_types) {
     return params
 }
 
-private param_type(name_tok): Node {
+private param_type(name_tok: Token): Node {
     if .cursor.match("COLON") {
         return .parse_type()
     }
@@ -544,7 +549,7 @@ private parse_return_type(): Node {
     return Ast.type_name("dynamic", [], 0, 0)
 }
 
-private parse_typed_local(tok): Node {
+private parse_typed_local(tok: Token): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected variable name")
     .cursor.consume("COLON", "Expected ':' before the type")
     mut ty = .parse_type()
@@ -644,7 +649,7 @@ private looks_like_decl(): bool {
     }
 }
 
-private parse_return(tok): Node {
+private parse_return(tok: Token): Node {
     mut attrs = ["line": tok.line, "col": tok.column]
     if not .cursor.check("BODY_END") and not .cursor.at_end() {
         attrs["value"] = .exprs.expression()
@@ -652,7 +657,7 @@ private parse_return(tok): Node {
     return Ast.node("ReturnStmt", attrs)
 }
 
-private parse_if(tok): Node {
+private parse_if(tok: Token): Node {
     mut clauses = [Ast.if_clause(.exprs.expression(), .parse_block("if body"))]
     mut attrs = ["clauses": clauses, "line": tok.line, "col": tok.column]
     loop {
@@ -669,17 +674,17 @@ private parse_if(tok): Node {
     return Ast.node("IfStmt", attrs)
 }
 
-private parse_while(tok): Node {
+private parse_while(tok: Token): Node {
     mut condition = .exprs.expression()
     mut body = .parse_block("while body")
     return Ast.while_stmt(condition, body, tok.line, tok.column)
 }
 
-private parse_loop(tok): Node {
+private parse_loop(tok: Token): Node {
     return Ast.loop_stmt(.parse_block("loop body"), tok.line, tok.column)
 }
 
-private parse_break(tok): Node {
+private parse_break(tok: Token): Node {
     return Ast.break_stmt(tok.line, tok.column)
 }
 
@@ -694,7 +699,7 @@ private starts_match(): bool {
     return .compound(nk).is_none()
 }
 
-private parse_match(tok): Node {
+private parse_match(tok: Token): Node {
     mut scrutinee = .exprs.expression()
     mut open = .cursor.consume("BODY_START", "Expected '{' to open match body")
     mut arms = []
@@ -763,14 +768,14 @@ private is_variant_name(name: str): bool {
 
 // The two `for` forms: `for x in …` / `for k, v in …` versus the C-style
 // `for <init>; <cond>; <step> { … }`, told apart by lookahead.
-private parse_for(tok): Node {
+private parse_for(tok: Token): Node {
     if .looks_like_for_in() {
         return .parse_for_in(tok)
     }
     return .parse_for_c(tok)
 }
 
-private parse_for_in(tok): Node {
+private parse_for_in(tok: Token): Node {
     mut first = .cursor.consume("IDENTIFIER", "Expected a loop variable after 'for'")
     mut vars = [first.value]
     if .cursor.match("COMMA") {
@@ -783,7 +788,7 @@ private parse_for_in(tok): Node {
     return Ast.for_in(vars, iter, body, tok.line, tok.column)
 }
 
-private parse_for_c(tok): Node {
+private parse_for_c(tok: Token): Node {
     mut attrs = ["line": tok.line, "col": tok.column]
     if not .cursor.check("SEMICOLON") {
         attrs["init"] = .parse_assignment("Expected loop variable in for-init")
@@ -810,7 +815,7 @@ private looks_like_for_in(): bool {
 
 // A bare expression statement — or, when it is a field/index access followed by
 // `=` (or a compound `+=`), an assignment to that target.
-private parse_expr_statement(tok): Node {
+private parse_expr_statement(tok: Token): Node {
     mut expr = .exprs.expression()
     mut assignable = expr.kind == "MemberExpr" or expr.kind == "IndexExpr"
     if not assignable {
@@ -828,7 +833,7 @@ private parse_expr_statement(tok): Node {
     return Ast.expression_stmt(expr, tok.line, tok.column)
 }
 
-private make_assign(target, value, tok): Node {
+private make_assign(target: Node, value: Node, tok: Token): Node {
     if target.kind == "MemberExpr" {
         return Ast.field_assign(target, value, tok.line, tok.column)
     }

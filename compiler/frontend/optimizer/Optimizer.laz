@@ -2,6 +2,7 @@
 // statement folder over a fresh constant scope, mutating the AST in place; the
 // number of rewrites is exposed via `fold_count`.
 
+import frontend.parser.Node
 import frontend.optimizer.Constants
 import frontend.optimizer.ExprFolder
 import frontend.optimizer.StmtFolder
@@ -9,7 +10,7 @@ import frontend.optimizer.StmtFolder
 private folds = 0
 constructor()
 
-public optimize(program) {
+public optimize(program: Node): Node {
     mut exprs = ExprFolder()
     mut stmts = StmtFolder(exprs)
     stmts.fold_block(program.child("body"), Constants.empty())

@@ -2,7 +2,7 @@
 // two-character operators win over their leading character (maximal munch).
 
 
-@object
+#object
 private words = [
     "import": "IMPORT",
     "extern": "EXTERN",
@@ -63,7 +63,8 @@ private ops1 = [
     ";": "SEMICOLON",
     "[": "LSQUARE",
     "]": "RSQUARE",
-    "@": "AT"
+    "@": "AT",
+    "#": "HASH"
 ]
 
 public word_kind(word: str): str {

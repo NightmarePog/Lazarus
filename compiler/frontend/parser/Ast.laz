@@ -1,7 +1,7 @@
 // Ast — the factory for AST nodes: one named constructor per node kind, so every
 // Node is built here and the parser stays free of stringly-typed map literals.
 
-@object
+#object
 import frontend.parser.Node
 
 // The generic escape hatch: a node from a kind and a ready-made attrs map, for
@@ -77,7 +77,7 @@ enum_variant(name: str, fields, line: int, col: int): Node {
 }
 
 // An interface `interface Name<T> { sig…; prop… }` — a structural contract. A
-// `@interface` file desugars to one of these with an empty `name`, filled in from
+// \`#interface\` file desugars to one of these with an empty `name`, filled in from
 // the filename. `methods` are signatures (no body), `properties` requirements.
 // Fully erased at codegen.
 interface_decl(name: str, methods, properties, type_params, line: int, col: int): Node {
@@ -163,4 +163,9 @@ list(elements, line: int, col: int): Node {
 
 map(entries, line: int, col: int): Node {
     return Node("MapExpr", ["entries": entries, "line": line, "col": col])
+}
+
+// An f-string: alternating LiteralExpr (string segments) and expression nodes.
+interp_string(parts, line: int, col: int): Node {
+    return Node("InterpolatedString", ["parts": parts, "line": line, "col": col])
 }

@@ -57,7 +57,7 @@ private ctx
 @auto
 constructor(ctx)
 
-public emit(node): str {
+public emit(node: Node): str {
     match node.kind {
         "LiteralExpr" => { return .emit_literal(node) }
         "IdentifierExpr" => { return .emit_identifier(node) }
@@ -71,6 +71,7 @@ public emit(node): str {
         "BinaryExpr" => { return .emit_binary(node) }
         "ListComp" => { return .emit_list_comp(node) }
         "MapComp" => { return .emit_map_comp(node) }
+        "InterpolatedString" => { return .emit_interp(node) }
         _ => {}
     }
     return ""
@@ -131,7 +132,7 @@ private each_header(vars: List<str>, iter: str): str {
 
 // A bare name: a nullary enum variant lowers to its owner-qualified form, anything
 // else to the context's resolved name (local, member, or extern).
-private emit_identifier(node): str {
+private emit_identifier(node: Node): str {
     mut id = node.child("name")
     if .ctx.is_variant(id) {
         return .ctx.variant_qualified(id)
@@ -139,11 +140,11 @@ private emit_identifier(node): str {
     return .ctx.emit_name(id)
 }
 
-private emit_literal(node): str {
+private emit_literal(node: Node): str {
     mut lit_kind = node.child("lit_kind")
     mut value = node.child("value")
     if lit_kind == "string" {
-        return Str.format("%q", value).unwrap_or("''")
+        return .lua_quote_str(value)
     }
     if lit_kind == "boolean" {
         if value {
@@ -154,31 +155,31 @@ private emit_literal(node): str {
     return value
 }
 
-private emit_field(node): str {
+private emit_field(node: Node): str {
     return .emit_operand(node.child("object")) ++ "." ++ node.child("field")
 }
 
-private emit_list(node): str {
+private emit_list(node: Node): str {
     .ctx.mark_collections()
     return "__lz_list(" ++ Text.join(.emit_args(node.child("elements")), ", ") ++ ")"
 }
 
-private emit_map(node): str {
+private emit_map(node: Node): str {
     .ctx.mark_collections()
     mut parts = ["[" ++ .emit(entry.child("key")) ++ "] = " ++ .emit(entry.child("value")) for entry in node.child("entries")]
     return "__lz_map({" ++ Text.join(parts, ", ") ++ "})"
 }
 
-private emit_index(node): str {
+private emit_index(node: Node): str {
     .ctx.mark_collections()
     return "__lz_idx_get(" ++ .emit(node.child("object")) ++ ", " ++ .emit(node.child("index")) ++ ")"
 }
 
-private emit_unary(node): str {
+private emit_unary(node: Node): str {
     return "not " ++ .emit_operand(node.child("operand"))
 }
 
-private emit_binary(node): str {
+private emit_binary(node: Node): str {
     mut left = .emit_operand(node.child("left"))
     mut right = .emit_operand(node.child("right"))
     mut op = node.child("op")
@@ -188,7 +189,7 @@ private emit_binary(node): str {
     return left ++ " " ++ ExprEmitter.op_map.get(op).unwrap_or(op) ++ " " ++ right
 }
 
-private emit_call(node): str {
+private emit_call(node: Node): str {
     mut callee = node.child("callee")
     mut args = .emit_args(node.child("args"))
 
@@ -243,7 +244,7 @@ private emit_call(node): str {
 
 // Emit an operand, parenthesising a binary/unary expression that would otherwise
 // bind wrongly as an indexed/called/operated value.
-private emit_operand(node): str {
+private emit_operand(node: Node): str {
     mut src = .emit(node)
     if .needs_parens(node) {
         return "(" ++ src ++ ")"
@@ -251,11 +252,11 @@ private emit_operand(node): str {
     return src
 }
 
-private needs_parens(node): bool {
+private needs_parens(node: Node): bool {
     return node.kind == "BinaryExpr" or node.kind == "UnaryExpr"
 }
 
-private receiver_is_class(object): bool {
+private receiver_is_class(object: Node): bool {
     if object.kind != "IdentifierExpr" {
         return false
     }
@@ -264,7 +265,7 @@ private receiver_is_class(object): bool {
 
 // The argument list with the receiver prepended (built-in and instance-method
 // calls pass the receiver as the first argument).
-private with_receiver(object, args) {
+private with_receiver(object: Node, args) {
     mut out = [.emit_operand(object)]
     for arg in args {
         out.push(arg)
@@ -274,4 +275,61 @@ private with_receiver(object, args) {
 
 private emit_args(nodes) {
     return [.emit(node) for node in nodes]
+}
+
+// Produces a Lua double-quoted string literal for `value`, escaping `"`, `\`,
+// LF (→ \n), and CR (→ \r) manually so embedded newlines never produce the
+// Lua 5.1 %q line-continuation form, which picks up surrounding indentation.
+private lua_quote_str(value: str): str {
+    mut n = Str.len(value).unwrap_or(0)
+    mut dq = Str.char(34).unwrap_or("")
+    mut bs = Str.char(92).unwrap_or("")
+    mut lf = Str.char(10).unwrap_or("")
+    mut cr = Str.char(13).unwrap_or("")
+    mut result = ""
+    mut i = 1
+    while i <= n {
+        mut c = Str.sub(value, i, i).unwrap_or("")
+        if c == dq {
+            result = result ++ bs ++ dq
+        } else if c == lf {
+            result = result ++ bs ++ "n"
+        } else if c == cr {
+            result = result ++ bs ++ "r"
+        } else if c == bs {
+            result = result ++ bs ++ bs
+        } else {
+            result = result ++ c
+        }
+        i = i + 1
+    }
+    return dq ++ result ++ dq
+}
+
+// Emits an InterpolatedString as a Lua concatenation expression. Empty string
+// segments are skipped; a single piece is emitted unwrapped; all string
+// segments use %q quoting; expression parts are wrapped in `tostring(...)`.
+private emit_interp(node: Node): str {
+    mut parts = node.child("parts")
+    mut pieces = []
+    mut i = 1
+    while i <= parts.len() {
+        mut part = parts.get(i).unwrap()
+        if part.kind == "LiteralExpr" and part.child("lit_kind") == "string" {
+            mut v = part.child("value")
+            if v != "" {
+                pieces.push(.lua_quote_str(v))
+            }
+        } else {
+            pieces.push("tostring(" ++ .emit(part) ++ ")")
+        }
+        i = i + 1
+    }
+    if pieces.len() == 0 {
+        return "''"
+    }
+    if pieces.len() == 1 {
+        return pieces.get(1).unwrap()
+    }
+    return "(" ++ Text.join(pieces, " .. ") ++ ")"
 }

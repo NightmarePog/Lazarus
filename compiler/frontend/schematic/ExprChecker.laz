@@ -27,7 +27,7 @@ public instance_flag(): bool {
     return .in_instance
 }
 
-public check(node, scope) {
+public check(node: Node, scope: Scope): unit {
     match node.kind {
         "IdentifierExpr" => { .check_identifier(node, scope) }
         "BinaryExpr" => {
@@ -46,6 +46,14 @@ public check(node, scope) {
         }
         "ListComp" => { .check_comprehension(node, scope, ["element"]) }
         "MapComp" => { .check_comprehension(node, scope, ["key", "value"]) }
+        "InterpolatedString" => {
+            mut parts = node.child("parts")
+            mut i = 2
+            while i <= parts.len() {
+                .check(parts.get(i).unwrap(), scope)
+                i = i + 2
+            }
+        }
         _ => {}
     }
 }
@@ -69,7 +77,7 @@ private check_comprehension(node: Node, scope: Scope, value_keys: List<str>) {
 }
 
 // A condition must not be provably non-boolean (the language has no truthiness).
-public check_condition(node, scope) {
+public check_condition(node: Node, scope: Scope): unit {
     .check(node, scope)
     mut reason = Booleanity.non_bool_reason(node)
     if reason != "" {
@@ -77,14 +85,14 @@ public check_condition(node, scope) {
     }
 }
 
-private check_identifier(node, scope) {
+private check_identifier(node: Node, scope: Scope): unit {
     mut name = node.child("name")
     if scope.lookup(name).is_none() and not .variant_owner.has(name) {
         .fail(node, "Undeclared identifier '" ++ name ++ "'", Str.len(name).unwrap_or(1))
     }
 }
 
-private check_call(node, scope) {
+private check_call(node: Node, scope: Scope): unit {
     mut callee = node.child("callee")
     .check(callee, scope)
     if callee.kind == "IdentifierExpr" {
@@ -102,7 +110,7 @@ private check_call(node, scope) {
 // A leading-dot `.field` parses to a member over `self`: valid only where a
 // receiver exists, and must name a declared instance property or method. Any other
 // object's field is a dynamic key, so only the object is validated.
-private check_member(node, scope) {
+private check_member(node: Node, scope: Scope): unit {
     mut object = node.child("object")
     if object.kind == "SelfExpr" {
         mut field = node.child("field")
@@ -118,25 +126,25 @@ private check_member(node, scope) {
     }
 }
 
-private check_self(node) {
+private check_self(node: Node): unit {
     if not .in_instance {
         .fail(node, "'self' has no receiver here; it is valid only inside an instance method or constructor", 4)
     }
 }
 
-private check_list(node, scope) {
+private check_list(node: Node, scope: Scope): unit {
     for element in node.child("elements") {
         .check(element, scope)
     }
 }
 
-private check_map(node, scope) {
+private check_map(node: Node, scope: Scope): unit {
     for entry in node.child("entries") {
         .check(entry.child("key"), scope)
         .check(entry.child("value"), scope)
     }
 }
 
-private fail(node, message: str, span: int) {
+private fail(node: Node, message: str, span: int): unit {
     Error("SemanticError", message, node.line(), node.col(), .source, span).raise()
 }

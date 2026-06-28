@@ -85,19 +85,19 @@ private parse_call(): Node {
     return expr
 }
 
-private finish_call(callee): Node {
+private finish_call(callee: Node): Node {
     mut paren = .cursor.advance()
     mut args = .parse_arguments()
     return Ast.call(callee, args, paren.line, paren.column)
 }
 
-private finish_member(object): Node {
+private finish_member(object: Node): Node {
     mut dot = .cursor.advance()
     mut field = .cursor.consume("IDENTIFIER", "Expected a field name after '.'")
     return Ast.member(object, field.value, dot.line, dot.column)
 }
 
-private finish_index(object): Node {
+private finish_index(object: Node): Node {
     mut bracket = .cursor.advance()
     mut index = .expression()
     .cursor.consume("RSQUARE", "Expected ']' after an index expression")
@@ -137,6 +137,7 @@ private parse_primary(): Node {
         "NUMBER" => { .cursor.advance() return Ast.literal("number", tok.value, tok.line, tok.column) }
         "FLOAT" => { .cursor.advance() return Ast.literal("float", tok.value, tok.line, tok.column) }
         "STRING" => { .cursor.advance() return Ast.literal("string", tok.value, tok.line, tok.column) }
+        "ISTR_HEAD" => { return .parse_interp_string() }
         "TRUE" => { .cursor.advance() return Ast.literal("boolean", true, tok.line, tok.column) }
         "FALSE" => { .cursor.advance() return Ast.literal("boolean", false, tok.line, tok.column) }
         "IDENTIFIER" => { .cursor.advance() return Ast.identifier(tok.value, tok.line, tok.column) }
@@ -225,7 +226,7 @@ private parse_map_rest(first: Node, value: Node, open: Token): Node {
     return Ast.map(entries, open.line, open.column)
 }
 
-private parse_list_rest(first, open): Node {
+private parse_list_rest(first: Node, open: Token): Node {
     mut elements = [first]
     loop {
         if not .cursor.match("COMMA") {
@@ -235,6 +236,30 @@ private parse_list_rest(first, open): Node {
     }
     .cursor.consume("RSQUARE", "Expected ']' to close the list literal")
     return Ast.list(elements, open.line, open.column)
+}
+
+// Parses an f-string after ISTR_HEAD is current. Builds an InterpolatedString
+// node whose `parts` alternate: LiteralExpr (text segments) and expressions.
+private parse_interp_string(): Node {
+    mut head = .cursor.advance()
+    mut parts = [Ast.literal("string", head.value, head.line, head.column)]
+    loop {
+        parts.push(.expression())
+        mut next = .cursor.current()
+        if next.kind == "ISTR_TAIL" {
+            .cursor.advance()
+            parts.push(Ast.literal("string", next.value, next.line, next.column))
+            break
+        }
+        if next.kind == "ISTR_MID" {
+            .cursor.advance()
+            parts.push(Ast.literal("string", next.value, next.line, next.column))
+        } else {
+            .cursor.fail("Expected end of string interpolation")
+            break
+        }
+    }
+    return Ast.interp_string(parts, head.line, head.column)
 }
 
 private precedence(kind: str): Option<int> {

@@ -78,7 +78,7 @@ public consume(kind: str, message: str): Token {
 }
 
 // Raise a syntax error at the current token (else the last consumed one).
-public fail(message: str) {
+public fail(message: str): unit {
     mut t = .error_pos()
     mut span = Str.len(t.value).unwrap_or(1)
     if span < 1 {
@@ -87,7 +87,7 @@ public fail(message: str) {
     .fail_at(message, t.line, t.column, span)
 }
 
-public fail_at(message: str, line: int, col: int, span: int) {
+public fail_at(message: str, line: int, col: int, span: int): unit {
     Error("SyntaxError", message, line, col, .source, span).raise()
 }
 

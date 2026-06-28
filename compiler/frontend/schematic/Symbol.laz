@@ -9,6 +9,6 @@ public noncallable: bool
 constructor(kind, mutable, noncallable)
 
 // Refresh the callability fact after a reassignment changes the bound value.
-public set_noncallable(flag: bool) {
+public set_noncallable(flag: bool): unit {
     .noncallable = flag
 }
