@@ -1,12 +1,12 @@
-# Collection HOF Implementation Plan
+# Collection HOF Implementation Plan (v2 — compile-time dispatch)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add `map`, `filter`, `fold`, `any`, `all`, `find` to `std/List.laz` and `std/Map.laz` as generic static HOF, plus a shared `Iterable<T>` interface for user-defined collection classes.
+**Goal:** Add `map`, `filter`, `fold`, `any`, `all`, `find` to `List<T>` and `Map<K,V>` with OOP method syntax (`xs.map(f)`) that compiles to a static dispatch (`List.map(xs, f)`) at zero runtime cost — C++-style, no metatables, no method copying.
 
-**Architecture:** Three pure-additive stdlib files. No compiler changes. `std/Iterable.laz` holds only an `interface Iterable<T>` inline declaration (the `#interface` file form is non-generic, so inline is required). `std/List.laz` and `std/Map.laz` are `#object` static modules whose function bodies use existing `for-in` + built-in `push`/`Option.some/none`. All HOF are generic — the parser already supports `<T, U>` on function declarations; `callable_var_set` threads them through the type checker.
+**Architecture:** `std/List.laz` and `std/Map.laz` are `#object` static modules whose HOF take the collection as the first param. The type checker, when it sees `xs.map(f)` on a built-in type, looks up the method in the imported class's static methods, annotates the call node with `dispatch_class`, and the emitter uses that annotation to emit `List.map(xs, f)`. `std/Iterable.laz` (already done) holds the `Iterable<T>` interface for user-defined collection classes. `dynamic` receivers do not dispatch (compile error).
 
-**Tech Stack:** Lazarus, Lua 5.1 runtime, `lua bin/lazarusc.lua` to compile, `lua Main.lua` to run.
+**Tech Stack:** Lazarus compiler (self-hosted). Relevant files: `compiler/frontend/typecheck/Typecheck.laz`, `compiler/backend/ExprEmitter.laz`, `std/List.laz`, `std/Map.laz`. Verify with `make selfhost`.
 
 ---
 
@@ -14,53 +14,16 @@
 
 | File | Action | Responsibility |
 |---|---|---|
-| `std/Iterable.laz` | Create | Inline `interface Iterable<T>` — contract for user-defined collection classes |
-| `std/List.laz` | Create | `#object` with 6 generic HOF for `List<T>` |
-| `std/Map.laz` | Create | `#object` with 6 generic HOF for `Map<K,V>` |
-| `examples/CollectionHOF.laz` | Create | Integration test program — compiles + runs to verify correctness |
+| `std/Iterable.laz` | ✅ Done | `interface Iterable<T>` — contract for user-defined collection classes |
+| `std/List.laz` | Create | `#object` with 6 generic HOF; first param is the receiver list |
+| `std/Map.laz` | Create | `#object` with 6 generic HOF; first param is the receiver map |
+| `compiler/frontend/typecheck/Typecheck.laz` | Modify | Extend `type_method_call` to dispatch HOF on built-in types to static class methods |
+| `compiler/backend/ExprEmitter.laz` | Modify | Read `dispatch_class` annotation and emit `Class.method(receiver, args...)` |
+| `examples/CollectionHOF.laz` | Create | Integration test using `xs.map(f)` syntax; compiles and runs |
 
 ---
 
-## Task 1: `std/Iterable.laz`
-
-**Files:**
-- Create: `std/Iterable.laz`
-
-- [ ] **Step 1: Create the file**
-
-```laz
-interface Iterable<T> {
-    map<U>(f: (T) -> U): List<U>
-    filter(f: (T) -> bool): List<T>
-    fold<A>(init: A, f: (A, T) -> A): A
-    any(f: (T) -> bool): bool
-    all(f: (T) -> bool): bool
-    find(f: (T) -> bool): Option<T>
-}
-```
-
-The file body is a single `InterfaceDecl` node. The linker's `body_is_interface` check returns `true` for this (all nodes are `InterfaceDecl`), so it skips Schematic + Typecheck + Codegen — nothing is emitted. `Main.collect_interfaces` registers `Iterable` in the program-wide `interfaces` map; any class importing this file and matching the signatures satisfies it structurally.
-
-- [ ] **Step 2: Smoke-test the import**
-
-Write a one-liner test file to confirm the file parses and loads:
-
-```
-lua bin/lazarusc.lua std/Iterable.laz
-```
-
-Expected: `Main.lua` written (empty class, no errors). Run `lua Main.lua` → silent exit.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add std/Iterable.laz
-git commit -m "feat(std): Iterable<T> interface — contract for collection classes"
-```
-
----
-
-## Task 2: `std/List.laz`
+## Task 1: `std/List.laz`
 
 **Files:**
 - Create: `std/List.laz`
@@ -104,31 +67,32 @@ find<T>(xs: List<T>, f: (T) -> bool): Option<T> {
 }
 ```
 
-Implementation notes:
-- `mut result = []` — unannotated local infers `dynamic`; gradual mode defers all checks on it. `return result` where return type is `List<U>` passes because dynamic defers.
-- `mut acc = init` — same: `init: A` is a type var; local is untyped; dynamic defers through.
-- `for x in xs` lowers to `for _, x in __lz_each(xs)` — already correct for `List<T>`.
-- `result.push(...)` on a dynamic local maps to the built-in list push helper.
+Notes:
+- `mut result = []` — unannotated local is `dynamic`; gradual mode defers all checks. Return type `List<U>` passes because `dynamic` defers.
+- `mut acc = init` — same: local is untyped; dynamic defers through.
+- `for x in xs` lowers to `for _, x in __lz_each(xs)` — correct for `List<T>`.
 - `Option.some(x)` / `Option.none()` are built-in emitter calls — no import needed.
 
-- [ ] **Step 2: Compile the file standalone**
+- [ ] **Step 2: Compile standalone**
 
 ```
+cd /home/nightmare/Github/Lazarus
 lua bin/lazarusc.lua std/List.laz
+lua Main.lua
 ```
 
-Expected: no type errors, `Main.lua` written. Run `lua Main.lua` → silent exit (the `#object` file emits an empty constructor body).
+Expected: no errors, `Main.lua` written (empty `#object` stub), silent exit.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add std/List.laz
-git commit -m "feat(std): List HOF — map, filter, fold, any, all, find"
+git commit -m "feat(std): List HOF static module — map, filter, fold, any, all, find"
 ```
 
 ---
 
-## Task 3: `std/Map.laz`
+## Task 2: `std/Map.laz`
 
 **Files:**
 - Create: `std/Map.laz`
@@ -172,31 +136,190 @@ find<K, V>(m: Map<K, V>, f: (K, V) -> bool): Option<V> {
 }
 ```
 
-Implementation notes:
-- `for k, v in m` lowers to `for k, v in __lz_each(m)` — already correct for `Map<K,V>`.
-- `mut result = [:]` — empty map literal; local is untyped dynamic; return type `Map<K,U>` defers.
-- `result[k] = f(k, v)` — index-assign on a dynamic local uses `__lz_idx_set`.
-- `Map.map` preserves keys and maps values → `Map<K,U>`. `find` returns the value, not the key → `Option<V>`.
-- `f: (K, V) -> U` is a 2-arg function type; `fold`'s `f: (A, K, V) -> A` is 3-arg. Both are valid `TypeFn` nodes (parser loops over params).
+Notes:
+- `for k, v in m` lowers to `for k, v in __lz_each(m)` — correct for `Map<K,V>`.
+- `mut result = [:]` — empty map literal; untyped local; return type defers.
+- `result[k] = f(k, v)` — index-assign on dynamic local uses `__lz_idx_set`.
+- `map` preserves keys and maps values → `Map<K,U>`. `find` returns the value → `Option<V>`.
+- `f: (K, V) -> U` is a 2-arg function type; `fold`'s `f: (A, K, V) -> A` is 3-arg. Both valid `TypeFn` nodes.
 
-- [ ] **Step 2: Compile the file standalone**
+- [ ] **Step 2: Compile standalone**
 
 ```
 lua bin/lazarusc.lua std/Map.laz
+lua Main.lua
 ```
 
-Expected: no type errors, `Main.lua` written. Run `lua Main.lua` → silent exit.
+Expected: no errors, silent exit.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add std/Map.laz
-git commit -m "feat(std): Map HOF — map, filter, fold, any, all, find"
+git commit -m "feat(std): Map HOF static module — map, filter, fold, any, all, find"
 ```
 
 ---
 
-## Task 4: Integration test
+## Task 3: Type checker dispatch
+
+**Files:**
+- Modify: `compiler/frontend/typecheck/Typecheck.laz`
+
+### Context
+
+`type_method_call` (line 726) currently routes all built-in type method calls through `builtin_method` which only knows about `push`, `pop`, `get`, `len`, `has`, etc. For HOF, we extend the path: if the method is NOT in the hardcoded built-in set, try the `classes` registry for `recv.name` (e.g., `classes["List"]`). If a matching static method is found, annotate the call node with `dispatch_class` and use `type_method_sig` for full generic inference.
+
+**Key insight:** The HOF methods take the collection as their FIRST param (`xs: List<T>`). We prepend the receiver AST node to the call args so `infer_and_check` sees the full argument list `[xs_node, f_node]` and can unify `T=int` from the first arg. `receiver_subst` returns `{}` for `#object` modules (no class-level type params), so all unification happens through `infer_and_check`.
+
+### What `type_method_call` looks like now (line 726–764)
+
+```laz
+private type_method_call(member: Node, args: List<Node>, scope: Scope, call: Node): Type {
+    mut object = member.child("object")
+    mut method = member.child("field")
+    mut recv = .receiver_type(object, scope)
+    if .is_builtin_type(recv) {
+        return .builtin_method(recv, method, args, scope)
+    }
+    // ... rest unchanged
+```
+
+### What it should look like after the change
+
+```laz
+private type_method_call(member: Node, args: List<Node>, scope: Scope, call: Node): Type {
+    mut object = member.child("object")
+    mut method = member.child("field")
+    mut recv = .receiver_type(object, scope)
+    if .is_builtin_type(recv) {
+        mut class_entry = .classes.get(recv.name)
+        if class_entry.is_some() {
+            mut sig = class_entry.unwrap().get("methods").unwrap().get(method)
+            if sig.is_some() and sig.unwrap().get("is_static").unwrap_or(false) {
+                call.set("dispatch_class", recv.name)
+                mut full_args = [object]
+                for arg in args { full_args.push(arg) }
+                return .type_method_sig(recv.name, recv, sig.unwrap(), full_args, scope, call)
+            }
+        }
+        return .builtin_method(recv, method, args, scope)
+    }
+    // ... rest unchanged
+```
+
+- [ ] **Step 1: Apply the change to `compiler/frontend/typecheck/Typecheck.laz`**
+
+Find the `type_method_call` function (around line 726). Change the `if .is_builtin_type(recv)` block from:
+
+```laz
+    if .is_builtin_type(recv) {
+        return .builtin_method(recv, method, args, scope)
+    }
+```
+
+To:
+
+```laz
+    if .is_builtin_type(recv) {
+        mut class_entry = .classes.get(recv.name)
+        if class_entry.is_some() {
+            mut sig = class_entry.unwrap().get("methods").unwrap().get(method)
+            if sig.is_some() and sig.unwrap().get("is_static").unwrap_or(false) {
+                call.set("dispatch_class", recv.name)
+                mut full_args = [object]
+                for arg in args { full_args.push(arg) }
+                return .type_method_sig(recv.name, recv, sig.unwrap(), full_args, scope, call)
+            }
+        }
+        return .builtin_method(recv, method, args, scope)
+    }
+```
+
+- [ ] **Step 2: Verify the compiler still self-hosts**
+
+```
+make selfhost
+```
+
+Expected: byte-exact fixpoint. The change is in the type checker source — self-hosting runs the existing binary to compile the new source, so this tests that the new source is valid Lazarus.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add compiler/frontend/typecheck/Typecheck.laz bin/lazarusc.lua
+git commit -m "feat(typecheck): dispatch HOF calls on built-in types to static class methods"
+```
+
+---
+
+## Task 4: Emitter dispatch
+
+**Files:**
+- Modify: `compiler/backend/ExprEmitter.laz`
+
+### Context
+
+`emit_call` (line 226) currently handles method calls on built-in types via `ExprEmitter.builtins` (a static map of method name → `__lz_*` helper). HOF names (`map`, `filter`, etc.) are NOT in that table. When the type checker sets `dispatch_class` on a call node, the emitter must use that to emit `List.map(receiver, args...)` instead of the fallthrough (`receiver:method(args)` which would crash since list tagged-tables have no `map` field).
+
+### The relevant section of `emit_call` (around line 246)
+
+```laz
+        mut helper = ExprEmitter.builtins.get(field)
+        if helper.is_some() {
+            .ctx.mark_collections()
+            return helper.unwrap() ++ "(" ++ Text.join(.with_receiver(object, args), ", ") ++ ")"
+        }
+    }
+    // ... falls through to other cases
+```
+
+### What to add right after the `builtins` check
+
+```laz
+        mut dispatch_cls = node.attr("dispatch_class")
+        if dispatch_cls.is_some() {
+            .ctx.mark_collections()
+            return dispatch_cls.unwrap() ++ "." ++ field ++ "(" ++ Text.join(.with_receiver(object, args), ", ") ++ ")"
+        }
+```
+
+- [ ] **Step 1: Apply the change to `compiler/backend/ExprEmitter.laz`**
+
+Find `emit_call` (line 226). After the `builtins` block (around line 251), inside the first `if callee.kind == "MemberExpr"` block, add the `dispatch_class` check:
+
+```laz
+        // existing builtins check:
+        mut helper = ExprEmitter.builtins.get(field)
+        if helper.is_some() {
+            .ctx.mark_collections()
+            return helper.unwrap() ++ "(" ++ Text.join(.with_receiver(object, args), ", ") ++ ")"
+        }
+        // NEW: compile-time dispatch for HOF on built-in types
+        mut dispatch_cls = node.attr("dispatch_class")
+        if dispatch_cls.is_some() {
+            .ctx.mark_collections()
+            return dispatch_cls.unwrap() ++ "." ++ field ++ "(" ++ Text.join(.with_receiver(object, args), ", ") ++ ")"
+        }
+    }
+```
+
+- [ ] **Step 2: Verify the compiler still self-hosts**
+
+```
+make selfhost
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add compiler/backend/ExprEmitter.laz bin/lazarusc.lua
+git commit -m "feat(emitter): use dispatch_class annotation to rewrite HOF calls to static dispatch"
+```
+
+---
+
+## Task 5: Integration test
 
 **Files:**
 - Create: `examples/CollectionHOF.laz`
@@ -213,63 +336,68 @@ constructor() {
     nums: List<int> = [1, 2, 3, 4, 5]
 
     // map
-    doubled = List.map(nums, fn(x: int): int { return x * 2 })
+    doubled = nums.map(fn(x: int): int { return x * 2 })
     if doubled.get(0).unwrap() != 2 { Sys.panic("map[0]") }
     if doubled.get(2).unwrap() != 6 { Sys.panic("map[2]") }
     if doubled.len() != 5 { Sys.panic("map len") }
 
     // filter
-    evens = List.filter(nums, fn(x: int): bool { return x % 2 == 0 })
+    evens = nums.filter(fn(x: int): bool { return x % 2 == 0 })
     if evens.len() != 2 { Sys.panic("filter len") }
     if evens.get(0).unwrap() != 2 { Sys.panic("filter[0]") }
     if evens.get(1).unwrap() != 4 { Sys.panic("filter[1]") }
 
     // fold
-    sum = List.fold(nums, 0, fn(acc: int, x: int): int { return acc + x })
+    sum = nums.fold(0, fn(acc: int, x: int): int { return acc + x })
     if sum != 15 { Sys.panic("fold sum") }
 
     // any
-    if !List.any(nums, fn(x: int): bool { return x > 4 }) { Sys.panic("any true") }
-    if List.any(nums, fn(x: int): bool { return x > 10 }) { Sys.panic("any false") }
+    if !nums.any(fn(x: int): bool { return x > 4 }) { Sys.panic("any true") }
+    if nums.any(fn(x: int): bool { return x > 10 }) { Sys.panic("any false") }
 
     // all
-    if !List.all(nums, fn(x: int): bool { return x > 0 }) { Sys.panic("all true") }
-    if List.all(nums, fn(x: int): bool { return x > 3 }) { Sys.panic("all false") }
+    if !nums.all(fn(x: int): bool { return x > 0 }) { Sys.panic("all true") }
+    if nums.all(fn(x: int): bool { return x > 3 }) { Sys.panic("all false") }
 
     // find
-    found = List.find(nums, fn(x: int): bool { return x > 3 })
+    found = nums.find(fn(x: int): bool { return x > 3 })
     if !found.is_some() { Sys.panic("find some") }
     if found.unwrap() != 4 { Sys.panic("find value") }
-    missing = List.find(nums, fn(x: int): bool { return x > 99 })
+    missing = nums.find(fn(x: int): bool { return x > 99 })
     if !missing.is_none() { Sys.panic("find none") }
+
+    // chaining: map then filter
+    big_doubled = nums.map(fn(x: int): int { return x * 2 }).filter(fn(x: int): bool { return x > 6 })
+    if big_doubled.len() != 2 { Sys.panic("chain len") }
+    if big_doubled.get(0).unwrap() != 8 { Sys.panic("chain[0]") }
 
     // ---- Map HOF ----
     scores: Map<str, int> = ["alice": 10, "bob": 5]
 
     // map
-    doubled_scores = Map.map(scores, fn(k: str, v: int): int { return v * 2 })
+    doubled_scores = scores.map(fn(k: str, v: int): int { return v * 2 })
     if doubled_scores.get("alice").unwrap() != 20 { Sys.panic("map.map alice") }
     if doubled_scores.get("bob").unwrap() != 10 { Sys.panic("map.map bob") }
 
     // filter
-    high = Map.filter(scores, fn(k: str, v: int): bool { return v > 7 })
+    high = scores.filter(fn(k: str, v: int): bool { return v > 7 })
     if !high.has("alice") { Sys.panic("filter has alice") }
     if high.has("bob") { Sys.panic("filter no bob") }
 
     // fold
-    total = Map.fold(scores, 0, fn(acc: int, k: str, v: int): int { return acc + v })
+    total = scores.fold(0, fn(acc: int, k: str, v: int): int { return acc + v })
     if total != 15 { Sys.panic("map.fold total") }
 
     // any
-    if !Map.any(scores, fn(k: str, v: int): bool { return v > 9 }) { Sys.panic("map.any true") }
-    if Map.any(scores, fn(k: str, v: int): bool { return v > 99 }) { Sys.panic("map.any false") }
+    if !scores.any(fn(k: str, v: int): bool { return v > 9 }) { Sys.panic("map.any true") }
+    if scores.any(fn(k: str, v: int): bool { return v > 99 }) { Sys.panic("map.any false") }
 
     // all
-    if !Map.all(scores, fn(k: str, v: int): bool { return v > 0 }) { Sys.panic("map.all true") }
-    if Map.all(scores, fn(k: str, v: int): bool { return v > 9 }) { Sys.panic("map.all false") }
+    if !scores.all(fn(k: str, v: int): bool { return v > 0 }) { Sys.panic("map.all true") }
+    if scores.all(fn(k: str, v: int): bool { return v > 9 }) { Sys.panic("map.all false") }
 
     // find
-    top = Map.find(scores, fn(k: str, v: int): bool { return v > 9 })
+    top = scores.find(fn(k: str, v: int): bool { return v > 9 })
     if !top.is_some() { Sys.panic("map.find some") }
     if top.unwrap() != 10 { Sys.panic("map.find value") }
 
@@ -283,7 +411,7 @@ constructor() {
 lua bin/lazarusc.lua examples/CollectionHOF.laz
 ```
 
-Expected: no type errors or parse errors. `Main.lua` written.
+Expected: no type errors. `Main.lua` written. If any TypeError appears, it points to which compiler change needs fixing.
 
 - [ ] **Step 3: Run**
 
@@ -291,53 +419,49 @@ Expected: no type errors or parse errors. `Main.lua` written.
 lua Main.lua
 ```
 
-Expected output:
+Expected:
 ```
 collection HOF: all assertions passed
 ```
 
-If any assertion panics, the error message tells you which HOF/case failed. Fix the corresponding stdlib function and recompile.
+Any `Sys.panic` message tells you exactly which case failed.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add examples/CollectionHOF.laz
-git commit -m "test(examples): CollectionHOF — integration test for List/Map HOF"
+git commit -m "test(examples): CollectionHOF — integration test for List/Map HOF with xs.map(f) syntax"
 ```
 
 ---
 
-## Task 5: Selfhost fixpoint
+## Task 6: Selfhost fixpoint
 
-The new stdlib files are purely additive — the compiler itself doesn't import them, so the selfhost fixpoint should be unaffected. Verify:
-
-- [ ] **Step 1: Run selfhost**
+- [ ] **Step 1: Run**
 
 ```
 make selfhost
 ```
 
-Expected: `stage1 == stage2` byte-exact fixpoint, binary installed to `bin/lazarusc.lua`. No errors.
+Expected: stage1 == stage2 byte-exact. Binary installed.
 
-- [ ] **Step 2: Commit if `bin/lazarusc.lua` changed**
-
-If the binary changed (unlikely but possible due to a compiler source file being on the branch), stage it:
+- [ ] **Step 2: Commit regenerated binary if changed**
 
 ```bash
 git add bin/lazarusc.lua
-git commit -m "chore: regenerate bin/lazarusc.lua after selfhost fixpoint"
+git commit -m "chore: regenerate bin/lazarusc.lua"
 ```
-
-If it did not change, no commit needed.
 
 ---
 
 ## Troubleshooting
 
-**"unknown annotation" or parse error in std/List.laz** — check that `#object` is the first token. The directive is parsed as `HASH` + identifier `object`; `object` is not a keyword so must appear immediately after `#` with no spaces lost.
+**TypeError "wrong number of arguments" on `xs.map(f)`** — `full_args` must be `[object, ...args]` (receiver prepended). Check that the receiver node is correctly built in `type_method_call`.
 
-**TypeError on `return result`** — the local `mut result = []` is typed `dynamic`; the return type is `List<U>`. The checker defers because `dynamic` is one side of the compatibility check. If this errors, add an explicit cast annotation: `mut result: List<U> = []` — but note `U` as a local annotation requires it to be in `type_vars` (it is, via `callable_var_set`).
+**TypeError "no method 'map' on List"** — The `dispatch_class` lookup ran but returned none. Check that `std.List` is actually imported in the test file AND that `collect_signatures` ran for it (the module must not be `is_interface`).
 
-**TypeError on `acc = f(acc, x)`** — `f` is typed as `(A, T) -> A`. If the checker can't call a `Type.func` value, check that `type_expr` for `CallExpr` handles `Type.func` receivers (it should — closures are already tested in the compiler).
+**Emitter produces `xs:map(f)` instead of `List.map(xs, f)`** — `dispatch_class` annotation not set (type checker change missing or not reaching the right branch). Add a print to debug.
 
-**`Sys.panic` fires at runtime** — the assertion message tells you which case. Check the corresponding function body and the Lua output in `Main.lua` to debug.
+**Chaining fails** — `xs.map(f)` returns a plain `List<U>` value. The `.filter(g)` call on it should resolve through the same dispatch mechanism since the return type is still `List<U>` (a built-in type). Verify the return type of `type_method_sig` is correct.
+
+**`make selfhost` fails after type checker change** — The compiler source uses `node.set(...)` and `node.attr(...)` already. The change adds one `call.set("dispatch_class", ...)` call — valid Lazarus. If it fails, check syntax around the new block.
