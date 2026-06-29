@@ -25,7 +25,12 @@ public bundle(): str {
     mut any_collections = false
     mut entry_has_ctor = false
     mut entry_source = ""
+    mut entry_is_interface = false
     for m in .modules {
+        if m.class_name == .entry_class {
+            entry_is_interface = m.is_interface
+            entry_source = m.source
+        }
         if not .is_extern_module(m) and not m.is_interface {
             mut cg = Codegen(m.class_name, m.imports, externs, .variant_owner)
             blocks.push(cg.class_block(m.ast))
@@ -34,12 +39,11 @@ public bundle(): str {
             }
             if m.class_name == .entry_class {
                 entry_has_ctor = cg.has_constructor(m.ast.child("body"))
-                entry_source = m.source
             }
         }
     }
 
-    if not entry_has_ctor {
+    if not entry_is_interface and not entry_has_ctor {
         Error("LinkError", "entry class '" ++ .entry_class ++ "' must define a constructor", 1, 1, entry_source, 1).raise()
     }
 
@@ -50,7 +54,11 @@ public bundle(): str {
     for block in blocks {
         sections.push(block)
     }
-    sections.push("return " ++ .entry_class ++ ".new(...)")
+    if entry_is_interface {
+        sections.push("return nil")
+    } else {
+        sections.push("return " ++ .entry_class ++ ".new(...)")
+    }
     return Text.join(sections, Text.nl() ++ Text.nl())
 }
 
