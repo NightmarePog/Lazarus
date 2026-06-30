@@ -1,0 +1,34 @@
+#object
+
+map<K, V, U>(m: Map<K, V>, f: (K, V) -> U): Map<K, U> {
+    mut result = [:]
+    for k, v in m { result[k] = f(k, v) }
+    return result
+}
+
+filter<K, V>(m: Map<K, V>, f: (K, V) -> bool): Map<K, V> {
+    mut result = [:]
+    for k, v in m { if f(k, v) { result[k] = v } }
+    return result
+}
+
+fold<K, V, A>(m: Map<K, V>, init: A, f: (A, K, V) -> A): A {
+    mut acc = init
+    for k, v in m { acc = f(acc, k, v) }
+    return acc
+}
+
+any<K, V>(m: Map<K, V>, f: (K, V) -> bool): bool {
+    for k, v in m { if f(k, v) { return true } }
+    return false
+}
+
+all<K, V>(m: Map<K, V>, f: (K, V) -> bool): bool {
+    for k, v in m { if not f(k, v) { return false } }
+    return true
+}
+
+find<K, V>(m: Map<K, V>, f: (K, V) -> bool): Option<V> {
+    for k, v in m { if f(k, v) { return Option.some(v) } }
+    return Option.none()
+}
