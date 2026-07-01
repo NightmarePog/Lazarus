@@ -2,12 +2,15 @@
 // chain outward; a declaration stays in the scope it is made. The root carries an
 // `is_root` flag and a placeholder parent, so a miss there returns None without
 // dereferencing it (the Null Object idea applied to the chain's end).
+//
+// Scope is shared between Schematic (stores Symbol) and Typecheck (stores Type);
+// the value slot is dynamic so both passes can reuse the same structure.
 
-private names: Map<str, Symbol> = [:]
-private parent
+private names: Map<str, dynamic> = [:]
+private parent: dynamic
 private is_root: bool
 @auto
-constructor(parent, is_root: bool)
+constructor(parent: dynamic, is_root: bool)
 
 static root(): Scope {
     return Scope(0, true)
@@ -17,7 +20,7 @@ public child(): Scope {
     return Scope(self, false)
 }
 
-public declare(name: str, symbol: Symbol): unit {
+public declare(name: str, symbol: dynamic): unit {
     .names[name] = symbol
 }
 
@@ -27,7 +30,7 @@ public declared_here(name: str): bool {
 }
 
 // The symbol bound to `name`, searching outward, or a None when unbound.
-public lookup(name: str): Option<Symbol> {
+public lookup(name: str): Option<dynamic> {
     mut here = .names.get(name)
     if here.is_some() {
         return here

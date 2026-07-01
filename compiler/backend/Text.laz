@@ -9,7 +9,7 @@ nl(): str {
     return Str.char(10).unwrap_or("")
 }
 
-join(parts, sep: str): str {
+join(parts: List<str>, sep: str): str {
     mut out = ""
     mut first = true
     for part in parts {
@@ -23,7 +23,7 @@ join(parts, sep: str): str {
     return out
 }
 
-lines(parts): str {
+lines(parts: List<str>): str {
     return Text.join(parts, Text.nl())
 }
 

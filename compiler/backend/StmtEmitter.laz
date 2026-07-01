@@ -44,7 +44,7 @@ private emit_enum(node: Node): str {
     return Text.lines(lines)
 }
 
-private emit_variant_ctor(name: str, fields): str {
+private emit_variant_ctor(name: str, fields: List<Node>): str {
     mut params = []
     mut assigns = ["kind = '" ++ name ++ "'"]
     mut i = 1
@@ -58,7 +58,19 @@ private emit_variant_ctor(name: str, fields): str {
     return Text.lines([header, Text.indent("return { " ++ Text.join(assigns, ", ") ++ " }"), "end"])
 }
 
+// Statement boundary: emit the node, then prepend any pending `?`-propagation
+// lines accumulated during expression emission.
 public emit_stmt(node: Node): str {
+    mut result = .emit_stmt_inner(node)
+    mut prefix = .exprs.take_pending()
+    if prefix.len() == 0 {
+        return result
+    }
+    prefix.push(result)
+    return Text.lines(prefix)
+}
+
+private emit_stmt_inner(node: Node): str {
     match node.kind {
         "VariableDecl" => { return .emit_variable(node) }
         "FieldAssign" => { return .exprs.emit(node.child("target")) ++ " = " ++ .exprs.emit(node.child("value")) }
@@ -81,16 +93,53 @@ public emit_stmt(node: Node): str {
 // A `match` lowers to an `if/elseif/else` ladder over a once-evaluated temp, so
 // the scrutinee runs exactly once. Each value arm becomes an `== pattern` test;
 // the `_` arm becomes the `else` (or a bare `do ... end` when it is the only arm).
+// Binding arms (`n if cond =>` or `n =>`) hoist `local n = temp` before the chain.
 private emit_match(node: Node): str {
     mut temp = .ctx.fresh_temp()
     mut parts = ["local " ++ temp ++ " = " ++ .exprs.emit(node.child("scrutinee"))]
+    // Hoist binding names so the guard condition and body both see them.
+    .ctx.push_scope()
+    for arm in node.child("arms") {
+        if arm.attr("is_binding").unwrap_or(false) {
+            mut bname = arm.child("pattern").child("name")
+            if not .ctx.is_local(bname) {
+                .ctx.declare_local(bname)
+                parts.push("local " ++ bname ++ " = " ++ temp)
+            }
+        }
+    }
     mut first = true
     mut has_default = false
     mut default_body = []
     for arm in node.child("arms") {
-        if arm.attr("is_wildcard").unwrap_or(false) {
-            has_default = true
-            default_body = arm.child("body")
+        if arm.attr("is_binding").unwrap_or(false) {
+            mut bguard = arm.attr("guard")
+            if bguard.is_some() {
+                mut keyword = "elseif "
+                if first {
+                    keyword = "if "
+                }
+                first = false
+                parts.push(keyword ++ .exprs.emit(bguard.unwrap()) ++ " then")
+                .push_block(parts, arm.child("body"))
+            } else {
+                has_default = true
+                default_body = arm.child("body")
+            }
+        } else if arm.attr("is_wildcard").unwrap_or(false) {
+            mut wguard = arm.attr("guard")
+            if wguard.is_some() {
+                mut keyword = "elseif "
+                if first {
+                    keyword = "if "
+                }
+                first = false
+                parts.push(keyword ++ .exprs.emit(wguard.unwrap()) ++ " then")
+                .push_block(parts, arm.child("body"))
+            } else {
+                has_default = true
+                default_body = arm.child("body")
+            }
         } else {
             mut keyword = "elseif "
             if first {
@@ -111,6 +160,7 @@ private emit_match(node: Node): str {
             .push_block(parts, default_body)
             parts.push("end")
         }
+        .ctx.pop_scope()
         return Text.lines(parts)
     }
     if has_default {
@@ -118,19 +168,29 @@ private emit_match(node: Node): str {
         .push_block(parts, default_body)
     }
     parts.push("end")
+    .ctx.pop_scope()
     return Text.lines(parts)
 }
 
 // A payload variant matches on the tagged table's `kind`; a nullary variant
 // compares against its name string; a value arm against its pattern.
+// A guard `if cond` appends `and <cond>` to the condition.
 private match_condition(temp: str, arm: Node): str {
+    mut base = ""
     if arm.attr("is_variant").unwrap_or(false) {
         if .has_bindings(arm) {
-            return temp ++ ".kind == '" ++ arm.child("variant") ++ "'"
+            base = temp ++ ".kind == '" ++ arm.child("variant") ++ "'"
+        } else {
+            base = temp ++ " == '" ++ arm.child("variant") ++ "'"
         }
-        return temp ++ " == '" ++ arm.child("variant") ++ "'"
+    } else {
+        base = temp ++ " == " ++ .exprs.emit(arm.child("pattern"))
     }
-    return temp ++ " == " ++ .exprs.emit(arm.child("pattern"))
+    mut guard = arm.attr("guard")
+    if guard.is_some() {
+        return base ++ " and " ++ .exprs.emit(guard.unwrap())
+    }
+    return base
 }
 
 private has_bindings(arm: Node): bool {
@@ -139,7 +199,7 @@ private has_bindings(arm: Node): bool {
 
 // A payload arm's body, preceded by `local <name> = <temp>._<n>` extractions for
 // each bound field (`_` skips one). Scoped so bindings don't leak between arms.
-private push_payload_body(parts, temp: str, arm: Node): unit {
+private push_payload_body(parts: List<str>, temp: str, arm: Node): unit {
     .ctx.push_scope()
     mut lines = []
     mut i = 1
@@ -160,7 +220,7 @@ private push_payload_body(parts, temp: str, arm: Node): unit {
 }
 
 // A statement list as an indented block, or "" when empty.
-private emit_block(stmts): str {
+private emit_block(stmts: List<Node>): str {
     if stmts.len() == 0 {
         return ""
     }
@@ -168,14 +228,41 @@ private emit_block(stmts): str {
 }
 
 // A function body with its parameters declared as locals in a fresh scope.
-private emit_fn_body(params, body): str {
+// `param_types` (without self) is used to emit nil-guards for default params.
+private emit_fn_body(params: List<str>, param_types: List<Node>, body: List<Node>): str {
     .ctx.push_scope()
     for param in params {
         .ctx.declare_local(param)
     }
-    mut out = .emit_block(body)
+    mut lines = .default_guards(params, param_types)
+    for stmt in body {
+        lines.push(.emit_stmt(stmt))
+    }
     .ctx.pop_scope()
-    return out
+    if lines.len() == 0 {
+        return ""
+    }
+    return Text.indent(Text.lines(lines))
+}
+
+// Emit `if p == nil then p = <default> end` for each param that has a default.
+// Skips "self" and aligns index into param_types (which never includes self).
+private default_guards(params: List<str>, param_types: List<Node>): List<str> {
+    mut lines = []
+    mut type_i = 1
+    for pname in params {
+        if pname != "self" {
+            mut pt = param_types.get(type_i)
+            if pt.is_some() {
+                mut def = pt.unwrap().attr("default")
+                if def.is_some() {
+                    lines.push("if " ++ pname ++ " == nil then " ++ pname ++ " = " ++ .exprs.emit(def.unwrap()) ++ " end")
+                }
+            }
+            type_i = type_i + 1
+        }
+    }
+    return lines
 }
 
 private emit_variable(node: Node): str {
@@ -204,7 +291,7 @@ private emit_index_assign(node: Node): str {
 private emit_local_function(node: Node): str {
     .ctx.declare_local(node.child("name"))
     mut header = "local function " ++ node.child("name") ++ "(" ++ Text.join(node.child("params"), ", ") ++ ")"
-    return .wrap_body(header, .emit_fn_body(node.child("params"), node.child("body")))
+    return .wrap_body(header, .emit_fn_body(node.child("params"), node.child("param_types"), node.child("body")))
 }
 
 private emit_return(node: Node): str {
@@ -305,11 +392,12 @@ private emit_for_in(node: Node): str {
 
 private emit_method(node: Node): str {
     mut params = node.child("params")
+    mut lua_params = params
     if not node.attr("is_static").unwrap_or(false) {
-        params = .with_self(params)
+        lua_params = .with_self(params)
     }
-    mut header = "function " ++ .ctx.name() ++ "." ++ node.child("name") ++ "(" ++ Text.join(params, ", ") ++ ")"
-    return .wrap_body(header, .emit_fn_body(params, node.child("body")))
+    mut header = "function " ++ .ctx.name() ++ "." ++ node.child("name") ++ "(" ++ Text.join(lua_params, ", ") ++ ")"
+    return .wrap_body(header, .emit_fn_body(lua_params, node.child("param_types"), node.child("body")))
 }
 
 private emit_static_field(node: Node): str {
@@ -329,6 +417,9 @@ private emit_constructor(node: Node): str {
     .ctx.declare_local("self")
 
     mut lines = ["local self = {}"]
+    for guard in .default_guards(node.child("params"), node.child("param_types")) {
+        lines.push(guard)
+    }
     for method in .ctx.instance_method_names() {
         lines.push("self." ++ method ++ " = " ++ .ctx.name() ++ "." ++ method)
     }
@@ -348,6 +439,11 @@ private emit_constructor(node: Node): str {
     return Text.lines([header, Text.indent(Text.lines(lines)), "end"])
 }
 
+public emit_closure(params: List<str>, param_types: List<Node>, body: List<Node>): str {
+    mut header = "function(" ++ Text.join(params, ", ") ++ ")"
+    return .wrap_body(header, .emit_fn_body(params, param_types, body))
+}
+
 // A header plus a (possibly empty) indented body, closed with `end`.
 private wrap_body(header: str, body: str): str {
     if body == "" {
@@ -357,7 +453,7 @@ private wrap_body(header: str, body: str): str {
 }
 
 // Append a block's emitted text to `parts` when it is non-empty.
-private push_block(parts, stmts): unit {
+private push_block(parts: List<str>, stmts: List<Node>): unit {
     mut body = .emit_block(stmts)
     if body != "" {
         parts.push(body)

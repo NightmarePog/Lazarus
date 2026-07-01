@@ -84,7 +84,7 @@ private type_block(stmts: List<Node>, scope: Scope, ret: Type): unit {
     }
 }
 
-private type_stmt(stmt: Node, scope, ret: Type): unit {
+private type_stmt(stmt: Node, scope: Scope, ret: Type): unit {
     match stmt.kind {
         "VariableDecl" => { .type_variable(stmt, scope) }
         "FunctionDecl" => { .type_callable(stmt, scope) }
@@ -109,7 +109,7 @@ private type_stmt(stmt: Node, scope, ret: Type): unit {
 // A declaration records the binding's type (annotation, else inferred from the
 // initialiser, else dynamic); an annotated initialiser is checked. A reassignment
 // only re-types its value, so untyped code is never rejected here.
-private type_variable(stmt: Node, scope): unit {
+private type_variable(stmt: Node, scope: Scope): unit {
     mut value = stmt.attr("value")
     if stmt.attr("reassign").unwrap_or(false) {
         if value.is_some() {
@@ -119,6 +119,21 @@ private type_variable(stmt: Node, scope): unit {
                 .expect(prior.unwrap(), actual, stmt, "reassignment")
             }
         }
+        return
+    }
+    if value.is_some() and value.unwrap().kind == "FnExpr" {
+        mut fn_node = value.unwrap()
+        mut ptypes = [.resolve(pt) for pt in fn_node.child("param_types")]
+        mut fn_ret = .return_type(fn_node)
+        mut fn_type = Type.func(ptypes, fn_ret)
+        mut fn_ann = stmt.attr("type")
+        if fn_ann.is_some() {
+            .expect(.resolve(fn_ann.unwrap()), fn_type, stmt, "binding")
+            scope.declare(stmt.child("name"), .resolve(fn_ann.unwrap()))
+        } else {
+            scope.declare(stmt.child("name"), fn_type)
+        }
+        .type_fn_expr(fn_node, scope)
         return
     }
     mut actual = Type.dynamic()
@@ -138,9 +153,10 @@ private type_variable(stmt: Node, scope): unit {
 
 // A method/constructor body is checked with the class's type vars plus the
 // callable's own generic params in scope, then the scope is restored.
-private type_callable(stmt: Node, scope): unit {
+private type_callable(stmt: Node, scope: Scope): unit {
     mut saved = .type_vars
     .type_vars = .callable_var_set(stmt)
+    .check_annotations(stmt)
     mut ret = Type.unit()
     if stmt.kind == "FunctionDecl" {
         ret = .return_type(stmt)
@@ -151,7 +167,22 @@ private type_callable(stmt: Node, scope): unit {
     .type_vars = saved
 }
 
-private callable_var_set(stmt: Node) {
+private check_annotations(stmt: Node): unit {
+    mut fname = stmt.attr("name").unwrap_or("constructor")
+    for pt in stmt.attr("param_types").unwrap_or([]) {
+        if pt.attr("inferred").unwrap_or(false) {
+            .fail(pt, f"missing type annotation on a parameter of '{fname}' — use ': dynamic' to opt out")
+        }
+    }
+    if stmt.kind == "FunctionDecl" {
+        mut rt = stmt.attr("return_type")
+        if rt.is_some() and rt.unwrap().attr("inferred").unwrap_or(false) {
+            .fail(stmt, f"missing return type on '{fname}' — use ': dynamic' to opt out")
+        }
+    }
+}
+
+private callable_var_set(stmt: Node): Map<str, bool> {
     mut out = .own_var_set()
     for p in stmt.attr("type_params").unwrap_or([]) {
         out[p] = true
@@ -159,7 +190,7 @@ private callable_var_set(stmt: Node) {
     return out
 }
 
-private bind_params(stmt: Node, scope): unit {
+private bind_params(stmt: Node, scope: Scope): unit {
     mut types = stmt.attr("param_types")
     mut i = 1
     for p in stmt.child("params") {
@@ -180,14 +211,14 @@ private return_type(stmt: Node): Type {
     return Type.dynamic()
 }
 
-private type_return(stmt: Node, scope, ret: Type): unit {
+private type_return(stmt: Node, scope: Scope, ret: Type): unit {
     mut value = stmt.attr("value")
     if value.is_some() {
         .expect(ret, .type_expr(value.unwrap(), scope), stmt, "return")
     }
 }
 
-private type_if(stmt: Node, scope, ret: Type): unit {
+private type_if(stmt: Node, scope: Scope, ret: Type): unit {
     for clause in stmt.child("clauses") {
         .type_condition(clause.child("condition"), scope)
         .type_block(clause.child("body"), scope.child(), ret)
@@ -198,14 +229,14 @@ private type_if(stmt: Node, scope, ret: Type): unit {
     }
 }
 
-private type_condition(node: Node, scope): unit {
+private type_condition(node: Node, scope: Scope): unit {
     mut t = .type_expr(node, scope)
     if not t.is_dynamic() and t.kind != "bool" {
         .fail(node, "a condition must be a bool, found " ++ t.describe())
     }
 }
 
-private type_for(stmt: Node, scope, ret: Type): unit {
+private type_for(stmt: Node, scope: Scope, ret: Type): unit {
     mut inner = scope.child()
     mut init = stmt.attr("init")
     if init.is_some() {
@@ -222,7 +253,7 @@ private type_for(stmt: Node, scope, ret: Type): unit {
     .type_block(stmt.child("body"), inner.child(), ret)
 }
 
-private type_for_in(stmt: Node, scope, ret: Type): unit {
+private type_for_in(stmt: Node, scope: Scope, ret: Type): unit {
     mut it = .type_expr(stmt.child("iter"), scope)
     mut inner = scope.child()
     .bind_loop_vars(stmt.child("vars"), it, inner)
@@ -231,7 +262,7 @@ private type_for_in(stmt: Node, scope, ret: Type): unit {
 
 // A loop variable over a `List<T>` binds `T` (a second var, the 0-based index, is
 // `int`); over a `Map<K,V>` a single var binds `V`, two bind `K` then `V`.
-private bind_loop_vars(vars, it: Type, scope): unit {
+private bind_loop_vars(vars: List<str>, it: Type, scope: Scope): unit {
     if it.kind == "class" and it.name == "List" {
         if vars.len() == 1 {
             scope.declare(vars.get(1).unwrap(), .type_arg(it, 1))
@@ -255,7 +286,7 @@ private bind_loop_vars(vars, it: Type, scope): unit {
     }
 }
 
-private type_match(stmt: Node, scope, ret: Type): unit {
+private type_match(stmt: Node, scope: Scope, ret: Type): unit {
     .type_expr(stmt.child("scrutinee"), scope)
     for arm in stmt.child("arms") {
         mut arm_scope = scope.child()
@@ -269,7 +300,15 @@ private type_match(stmt: Node, scope, ret: Type): unit {
                 i = i + 1
             }
         } else if not arm.attr("is_wildcard").unwrap_or(false) {
-            .type_expr(arm.child("pattern"), scope)
+            if arm.attr("is_binding").unwrap_or(false) {
+                arm_scope.declare(arm.child("pattern").child("name"), Type.dynamic())
+            } else {
+                .type_expr(arm.child("pattern"), scope)
+            }
+        }
+        mut arm_guard = arm.attr("guard")
+        if arm_guard.is_some() {
+            .type_condition(arm_guard.unwrap(), arm_scope)
         }
         .type_block(arm.child("body"), arm_scope, ret)
     }
@@ -277,7 +316,7 @@ private type_match(stmt: Node, scope, ret: Type): unit {
 
 // ---- expressions ----
 
-private type_expr(node: Node, scope): Type {
+private type_expr(node: Node, scope: Scope): Type {
     match node.kind {
         "LiteralExpr" => { return .literal_type(node) }
         "IdentifierExpr" => { return .identifier_type(node.child("name"), scope) }
@@ -303,26 +342,49 @@ private type_expr(node: Node, scope): Type {
             }
             return Type.str()
         }
+        "FnExpr" => { return .type_fn_expr(node, scope) }
+        "PropagateExpr" => {
+            .type_expr(node.child("inner"), scope)
+            return Type.dynamic()
+        }
         _ => {}
     }
     return Type.dynamic()
 }
 
+private type_fn_expr(node: Node, scope: Scope): Type {
+    for pt in node.child("param_types") {
+        if pt.attr("inferred").unwrap_or(false) {
+            .fail(pt, "missing type annotation on a 'fn' parameter — use ': dynamic' to opt out")
+        }
+    }
+    mut ptypes = [.resolve(pt) for pt in node.child("param_types")]
+    mut ret = .return_type(node)
+    mut inner = scope.child()
+    mut i = 1
+    for pname in node.child("params") {
+        inner.declare(pname, ptypes.get(i).unwrap_or(Type.dynamic()))
+        i = i + 1
+    }
+    .type_block(node.child("body"), inner, ret)
+    return Type.func(ptypes, ret)
+}
+
 // A comprehension binds its loop variables from the iterable's element type, then
 // the produced expression gives the result's element type(s).
-private type_list_comp(node: Node, scope): Type {
+private type_list_comp(node: Node, scope: Scope): Type {
     mut inner = .comp_scope(node, scope)
     return Type.class_of("List", [.type_expr(node.child("element"), inner)])
 }
 
-private type_map_comp(node: Node, scope): Type {
+private type_map_comp(node: Node, scope: Scope): Type {
     mut inner = .comp_scope(node, scope)
     mut k = .type_expr(node.child("key"), inner)
     mut v = .type_expr(node.child("value"), inner)
     return Type.class_of("Map", [k, v])
 }
 
-private comp_scope(node: Node, scope): Scope {
+private comp_scope(node: Node, scope: Scope): Scope {
     mut it = .type_expr(node.child("iter"), scope)
     mut inner = scope.child()
     .bind_loop_vars(node.child("vars"), it, inner)
@@ -369,7 +431,7 @@ private unify_elem(acc: Type, next: Type): Type {
     return acc
 }
 
-private type_list(node: Node, scope): Type {
+private type_list(node: Node, scope: Scope): Type {
     mut elem = Type.dynamic()
     for e in node.child("elements") {
         elem = .unify_elem(elem, .type_expr(e, scope))
@@ -377,7 +439,7 @@ private type_list(node: Node, scope): Type {
     return Type.class_of("List", [elem])
 }
 
-private type_map(node: Node, scope): Type {
+private type_map(node: Node, scope: Scope): Type {
     mut kt = Type.dynamic()
     mut vt = Type.dynamic()
     for entry in node.child("entries") {
@@ -387,7 +449,7 @@ private type_map(node: Node, scope): Type {
     return Type.class_of("Map", [kt, vt])
 }
 
-private type_index(node: Node, scope): Type {
+private type_index(node: Node, scope: Scope): Type {
     mut obj = .type_expr(node.child("object"), scope)
     .type_expr(node.child("index"), scope)
     if obj.kind == "class" and obj.name == "List" {
@@ -401,7 +463,7 @@ private type_index(node: Node, scope): Type {
 
 // `Option.some(v)` / `Result.ok(v)` carry their element type; `none`/`err` leave
 // it unbound (dynamic).
-private type_builtin_ctor(ns: str, field: str, args, scope): Type {
+private type_builtin_ctor(ns: str, field: str, args: List<Node>, scope: Scope): Type {
     mut elem = Type.dynamic()
     for arg in args {
         mut at = .type_expr(arg, scope)
@@ -422,7 +484,7 @@ private type_builtin_ctor(ns: str, field: str, args, scope): Type {
 }
 
 // Result types for the built-in methods of List/Map/Option/Result.
-private builtin_method(recv: Type, method: str, args, scope): Type {
+private builtin_method(recv: Type, method: str, args: List<Node>, scope: Scope): Type {
     for arg in args {
         .type_expr(arg, scope)
     }
@@ -483,7 +545,7 @@ private literal_type(node: Node): Type {
     return Type.dynamic()
 }
 
-private type_binary(node: Node, scope): Type {
+private type_binary(node: Node, scope: Scope): Type {
     mut lt = .type_expr(node.child("left"), scope)
     mut rt = .type_expr(node.child("right"), scope)
     mut op = node.child("op")
@@ -565,7 +627,7 @@ private arith_type(node: Node, op: str, lt: Type, rt: Type): Type {
 
 // An identifier is its bound type; a bare nullary variant (`None`) is its enum; a
 // bare class name used as a static receiver is the class; otherwise dynamic.
-private identifier_type(name: str, scope): Type {
+private identifier_type(name: str, scope: Scope): Type {
     mut found = scope.lookup(name)
     if found.is_some() {
         return found.unwrap()
@@ -581,7 +643,7 @@ private identifier_type(name: str, scope): Type {
 
 // A call is a bare variant construction (`Some(5)`), object construction
 // (`Class(args)`), a method call (`obj.m()`), or otherwise untyped.
-private type_call(node: Node, scope): Type {
+private type_call(node: Node, scope: Scope): Type {
     mut callee = node.child("callee")
     mut args = node.child("args")
     if callee.kind == "MemberExpr" {
@@ -603,42 +665,79 @@ private type_call(node: Node, scope): Type {
             return .type_construction(name, args, scope, node)
         }
     }
-    .type_expr(callee, scope)
+    if .is_labeled(args) {
+        .fail(node, "labeled arguments can only be used with a known method or constructor")
+    }
+    mut callee_type = .type_expr(callee, scope)
+    if callee_type.kind == "fn" {
+        return .type_fn_call(callee_type, args, scope, node)
+    }
     for arg in args {
         .type_expr(arg, scope)
     }
     return Type.dynamic()
 }
 
+private type_fn_call(fn_type: Type, args: List<Node>, scope: Scope, node: Node): Type {
+    mut params = fn_type.params
+    if args.len() != params.len() {
+        .fail(node, "wrong number of arguments: expected " ++ .count(params.len()) ++ ", found " ++ .count(args.len()))
+    }
+    mut i = 1
+    for arg in args {
+        mut expected = params.get(i).unwrap_or(Type.dynamic())
+        mut actual = .type_expr(arg, scope)
+        .expect(expected, actual, arg, "argument")
+        i = i + 1
+    }
+    return fn_type.result.unwrap_or(Type.dynamic())
+}
+
 // Object construction: unify the constructor's params (in the class's var scope)
 // against the args, then read the class's type args off the solution.
-private type_construction(name: str, args, scope, node: Node): Type {
+private type_construction(name: str, args: List<Node>, scope: Scope, node: Node): Type {
     mut ctor = .classes.get(name).unwrap().get("ctor").unwrap()
+    mut call_args = args
+    if .is_labeled(args) {
+        mut ctor_names = .classes.get(name).unwrap().get("ctor_names").unwrap_or([])
+        call_args = .resolve_labeled(ctor, ctor_names, args, node)
+        node.set("args", call_args)
+    }
     mut subst = [:]
     if ctor == 0 {
-        for arg in args {
+        for arg in call_args {
             .type_expr(arg, scope)
         }
     } else {
-        .infer_and_check(ctor, .class_var_set(name), args, scope, node, subst)
+        .infer_and_check(ctor, .class_var_set(name), call_args, scope, node, subst)
     }
     return .class_instance(name, subst)
 }
 
 // Bare variant construction `Some(args)`: unify the variant's payload types
 // against the args; the result is the owner enum.
-private type_variant(name: str, args, scope, node: Node): Type {
+private type_variant(name: str, args: List<Node>, scope: Scope, node: Node): Type {
     mut owner = .variant_owner.get(name).unwrap()
     mut subst = [:]
     .infer_and_check(.variant_fields.get(name).unwrap_or([]), .enum_var_set(owner), args, scope, node, subst)
     return .enum_instance(owner, subst)
 }
 
-private type_method_call(member: Node, args, scope, call: Node): Type {
+private type_method_call(member: Node, args: List<Node>, scope: Scope, call: Node): Type {
     mut object = member.child("object")
     mut method = member.child("field")
     mut recv = .receiver_type(object, scope)
     if .is_builtin_type(recv) {
+        mut class_entry = .classes.get(recv.name)
+        if class_entry.is_some() {
+            mut sig = class_entry.unwrap().get("methods").unwrap().get(method)
+            if sig.is_some() and sig.unwrap().get("is_static").unwrap_or(false) {
+                call.set("dispatch_class", recv.name)
+                mut full_args = [object]
+                for arg in args { full_args.push(arg) }
+                return .type_method_sig(recv.name, recv, sig.unwrap(), full_args, scope, call)
+            }
+        }
         return .builtin_method(recv, method, args, scope)
     }
     if recv.kind == "iface" {
@@ -653,6 +752,17 @@ private type_method_call(member: Node, args, scope, call: Node): Type {
     }
     mut sig = .classes.get(cls).unwrap().get("methods").unwrap().get(method)
     if not sig.is_some() {
+        mut fields = .classes.get(cls).unwrap().get("fields").unwrap()
+        mut field_opt = fields.get(method)
+        if field_opt.is_some() {
+            mut field_node_opt = field_opt.unwrap()
+            if field_node_opt.is_some() {
+                mut ft = .substitute(.resolve_with(field_node_opt.unwrap(), .class_var_set(cls)), .receiver_subst(cls, recv))
+                if ft.kind == "fn" {
+                    return .type_fn_call(ft, args, scope, call)
+                }
+            }
+        }
         if .static_receiver(object, scope) {
             for arg in args {
                 .type_expr(arg, scope)
@@ -666,10 +776,16 @@ private type_method_call(member: Node, args, scope, call: Node): Type {
 
 // A method call: the receiver's type args pre-bind the class params, the method's
 // own `<U>` are inferred from the call args, and the result is substituted through.
-private type_method_sig(cls: str, recv: Type, sig, args, scope, call: Node): Type {
+private type_method_sig(cls: str, recv: Type, sig: Map<str, dynamic>, args: List<Node>, scope: Scope, call: Node): Type {
+    mut call_args = args
+    if .is_labeled(args) {
+        mut names = sig.get("param_names").unwrap_or([])
+        call_args = .resolve_labeled(sig.get("params").unwrap(), names, args, call)
+        call.set("args", call_args)
+    }
     mut vars = .method_var_set(cls, sig)
     mut subst = .receiver_subst(cls, recv)
-    .infer_and_check(sig.get("params").unwrap(), vars, args, scope, call, subst)
+    .infer_and_check(sig.get("params").unwrap(), vars, call_args, scope, call, subst)
     mut result = sig.get("result").unwrap_or(0)
     if result == 0 {
         return Type.dynamic()
@@ -681,7 +797,7 @@ private type_method_sig(cls: str, recv: Type, sig, args, scope, call: Node): Typ
 // substituted in (so `value: T` on a `Box<int>` reads as `int`). An unknown member
 // on an instance receiver is an error; a method-as-value or static member is
 // dynamic.
-private type_member(node: Node, scope): Type {
+private type_member(node: Node, scope: Scope): Type {
     mut object = node.child("object")
     mut field = node.child("field")
     mut recv = .receiver_type(object, scope)
@@ -709,7 +825,7 @@ private type_member(node: Node, scope): Type {
 
 // The receiver's type: the current class (with its own params as vars) for
 // `self`/`.x`, a bare class name for a static access, the value's type, or dynamic.
-private receiver_type(object: Node, scope): Type {
+private receiver_type(object: Node, scope: Scope): Type {
     if object.kind == "SelfExpr" {
         return Type.class_of(.class_name, .self_args())
     }
@@ -736,19 +852,75 @@ private class_name_of(t: Type): str {
 // Whether a receiver is a bare class name (a static access like `Other.x`), as
 // opposed to `self` or a value typed as a class — used to stay lenient about
 // members the instance-side registry does not track.
-private static_receiver(object: Node, scope): bool {
+private static_receiver(object: Node, scope: Scope): bool {
     if object.kind != "IdentifierExpr" {
         return false
     }
     return not scope.lookup(object.child("name")).is_some() and .classes.has(object.child("name"))
 }
 
+private is_labeled(args: List<Node>): bool {
+    mut first = args.get(1)
+    if first.is_none() {
+        return false
+    }
+    return first.unwrap().kind == "LabeledArg"
+}
+
+// Reorder labeled args to match declaration order, fill nil for omitted defaults.
+// Mutates nothing — returns the resolved positional list.
+private resolve_labeled(param_nodes: List<Node>, param_names: List<str>, args: List<Node>, node: Node): List<Node> {
+    mut named = [:]
+    for arg in args {
+        mut label = arg.child("name")
+        if named.has(label) {
+            .fail(node, "duplicate labeled argument '" ++ label ++ "'")
+        }
+        named[label] = arg.child("value")
+    }
+    for label, _ in named {
+        mut found = false
+        for pname in param_names {
+            if pname == label {
+                found = true
+            }
+        }
+        if not found {
+            .fail(node, "unknown labeled argument '" ++ label ++ "'")
+        }
+    }
+    mut resolved = []
+    mut i = 1
+    for pname in param_names {
+        if named.has(pname) {
+            resolved.push(named.get(pname).unwrap())
+        } else {
+            if not param_nodes.get(i).unwrap().attr("default").is_some() {
+                .fail(node, "missing required argument '" ++ pname ++ "'")
+            }
+            resolved.push(Node("LiteralExpr", ["lit_kind": "nil", "value": 0, "line": node.line(), "col": node.col()]))
+        }
+        i = i + 1
+    }
+    return resolved
+}
+
 // Check args against parameter type nodes (resolved in the callee's var scope):
-// counts must match, each param is unified against its arg to solve type vars, then
-// each concrete (substituted) param must accept its arg.
-private infer_and_check(param_nodes, callee_vars, args, scope, node: Node, subst): unit {
-    if param_nodes.len() != args.len() {
+// counts must match (or trailing params have defaults), each param is unified
+// against its arg to solve type vars, then each concrete (substituted) param
+// must accept its arg.
+private infer_and_check(param_nodes: List<Node>, callee_vars: Map<str, bool>, args: List<Node>, scope: Scope, node: Node, subst: Map<str, Type>): unit {
+    if args.len() > param_nodes.len() {
         .fail(node, "wrong number of arguments: expected " ++ .count(param_nodes.len()) ++ ", found " ++ .count(args.len()))
+    }
+    if args.len() < param_nodes.len() {
+        mut i = args.len() + 1
+        while i <= param_nodes.len() {
+            if not param_nodes.get(i).unwrap().attr("default").is_some() {
+                .fail(node, "wrong number of arguments: expected " ++ .count(param_nodes.len()) ++ ", found " ++ .count(args.len()) ++ " (parameter " ++ .count(i) ++ " has no default)")
+            }
+            i = i + 1
+        }
     }
     mut ptypes = []
     mut atypes = []
@@ -774,15 +946,11 @@ private count(n: int): str {
 
 // Resolve an optional field/result type node — an absent or unannotated (0) slot
 // is `dynamic`.
-private field_type(opt): Type {
+private field_type(opt: Option<Node>): Type {
     if not opt.is_some() {
         return Type.dynamic()
     }
-    mut node = opt.unwrap()
-    if node == 0 {
-        return Type.dynamic()
-    }
-    return .resolve(node)
+    return .resolve(opt.unwrap())
 }
 
 // ---- generics ----
@@ -793,11 +961,11 @@ private self_args(): List<Type> {
     return [Type.var(p) for p in .own_type_params()]
 }
 
-private class_instance(name: str, subst): Type {
+private class_instance(name: str, subst: Map<str, Type>): Type {
     return Type.class_of(name, .solved_args(.class_params(name), subst))
 }
 
-private enum_instance(owner: str, subst): Type {
+private enum_instance(owner: str, subst: Map<str, Type>): Type {
     return Type.enum_of(owner, .solved_args(.enum_type_params.get(owner).unwrap_or([]), subst))
 }
 
@@ -807,7 +975,7 @@ private solved_args(params: List<str>, subst: Map<str, Type>): List<Type> {
     return [.subst_lookup(subst, p) for p in params]
 }
 
-private subst_lookup(subst, name: str): Type {
+private subst_lookup(subst: Map<str, Type>, name: str): Type {
     mut v = subst.get(name)
     if v.is_some() {
         return v.unwrap()
@@ -839,7 +1007,7 @@ private enum_var_set(name: str): Map<str, bool> {
     return out
 }
 
-private method_var_set(cls: str, sig) {
+private method_var_set(cls: str, sig: Map<str, dynamic>): Map<str, bool> {
     mut out = .class_var_set(cls)
     for p in sig.get("type_params").unwrap_or([]) {
         out[p] = true
@@ -852,7 +1020,7 @@ private method_var_set(cls: str, sig) {
 // receiver does not carry — a bare class name in a static call like
 // `Option.some(5)` — is left unbound, so the call's arguments can still solve it
 // (`T` = int) instead of collapsing to `dynamic`.
-private receiver_subst(cls: str, recv: Type) {
+private receiver_subst(cls: str, recv: Type): Map<str, Type> {
     mut subst = [:]
     mut i = 1
     for p in .class_params(cls) {
@@ -867,7 +1035,7 @@ private receiver_subst(cls: str, recv: Type) {
 
 // Resolve a type node with a specific set of type vars in scope (the callee's, not
 // the caller's), restoring afterward.
-private resolve_with(node: Node, vars): Type {
+private resolve_with(node: Node, vars: Map<str, bool>): Type {
     mut saved = .type_vars
     .type_vars = vars
     mut r = .resolve(node)
@@ -878,7 +1046,7 @@ private resolve_with(node: Node, vars): Type {
 // Solve type vars by matching a declared param type against a synthesized arg type.
 // Never fails: it only records solutions (first binding wins); a `dynamic` side or
 // a head mismatch yields no constraint.
-private unify(param: Type, arg: Type, subst): unit {
+private unify(param: Type, arg: Type, subst: Map<str, Type>): unit {
     if param.kind == "var" {
         if not subst.has(param.name) {
             subst[param.name] = arg
@@ -899,12 +1067,12 @@ private unify(param: Type, arg: Type, subst): unit {
 
 // Replace type vars with their solutions (unbound → dynamic), recursing into
 // function and generic-instance arguments.
-private substitute(t: Type, subst): Type {
+private substitute(t: Type, subst: Map<str, Type>): Type {
     if t.kind == "var" {
         return .subst_lookup(subst, t.name)
     }
     if t.kind == "fn" {
-        return Type.fn([.substitute(p, subst) for p in t.params], .substitute(t.result.unwrap(), subst))
+        return Type.func([.substitute(p, subst) for p in t.params], .substitute(t.result.unwrap(), subst))
     }
     if (t.kind == "class" or t.kind == "enum") and t.params.len() > 0 {
         return Type(t.kind, t.name, [.substitute(a, subst) for a in t.params], t.result)
@@ -918,8 +1086,11 @@ private substitute(t: Type, subst): Type {
 // type variable resolves to that `var`; a known class/enum to a (possibly generic)
 // instance; anything else to `dynamic`.
 private resolve(t: Node): Type {
+    if t.kind == "TypeUnion" {
+        return Type.union([.resolve(m) for m in t.child("members")])
+    }
     if t.kind == "TypeFn" {
-        return Type.fn([.resolve(p) for p in t.child("params")], .resolve(t.child("result")))
+        return Type.func([.resolve(p) for p in t.child("params")], .resolve(t.child("result")))
     }
     mut name = t.child("name")
     match name {
@@ -951,7 +1122,7 @@ private resolve(t: Node): Type {
 
 // Resolve a type node's explicit `<...>` arguments. A bare name (no args) yields
 // `[]` (lenient); when args ARE written, their count must match the declaration.
-private resolve_args(t: Node, name: str) {
+private resolve_args(t: Node, name: str): List<Type> {
     mut nodes = t.child("args")
     if nodes.len() == 0 {
         return []
@@ -1003,8 +1174,42 @@ private compatible(expected: Type, actual: Type): bool {
     if expected.kind == "var" or actual.kind == "var" {
         return true
     }
+    // Union on expected side: actual fits if it fits any member.
+    if expected.kind == "union" {
+        for m in expected.params {
+            if .compatible(m, actual) {
+                return true
+            }
+        }
+        return false
+    }
+    // Union on actual side: all members must fit expected.
+    if actual.kind == "union" {
+        for m in actual.params {
+            if not .compatible(expected, m) {
+                return false
+            }
+        }
+        return true
+    }
     if expected.kind == "iface" {
         return .satisfies(expected, actual)
+    }
+    if expected.kind == "fn" {
+        if actual.kind != "fn" {
+            return false
+        }
+        if expected.params.len() != actual.params.len() {
+            return false
+        }
+        mut i = 1
+        for p in expected.params {
+            if not .compatible(p, actual.params.get(i).unwrap_or(Type.dynamic())) {
+                return false
+            }
+            i = i + 1
+        }
+        return .compatible(expected.result.unwrap_or(Type.dynamic()), actual.result.unwrap_or(Type.dynamic()))
     }
     if not expected.equals(actual) {
         return false
@@ -1015,7 +1220,7 @@ private compatible(expected: Type, actual: Type): bool {
     return true
 }
 
-private args_compatible(a, b): bool {
+private args_compatible(a: List<Type>, b: List<Type>): bool {
     mut n = a.len()
     if b.len() > n {
         n = b.len()
@@ -1124,13 +1329,13 @@ private conforms(iface: Type, actual: Type): bool {
 
 // Record why conformance failed and report not-satisfied. The reason is read back
 // by `expect` to build the precise diagnostic at the use site.
-private reject(iface, why: str): bool {
+private reject(iface: Type, why: str): bool {
     .iface_reason = why
     return false
 }
 
 // Resolve a type node (0 → dynamic) under a var set, then apply a substitution.
-private node_type(node, vars, subst): Type {
+private node_type(node: dynamic, vars: Map<str, bool>, subst: Map<str, Type>): Type {
     if node == 0 {
         return Type.dynamic()
     }
@@ -1139,7 +1344,7 @@ private node_type(node, vars, subst): Type {
 
 // A class field's stored type is an Option of a type node; an absent or `0` slot
 // is dynamic.
-private opt_node_type(opt, vars, subst): Type {
+private opt_node_type(opt: Option<dynamic>, vars: Map<str, bool>, subst: Map<str, Type>): Type {
     if not opt.is_some() {
         return Type.dynamic()
     }
@@ -1181,7 +1386,7 @@ private merge_vars(base: Map<str, bool>, names: List<str>): Map<str, bool> {
 // A call on an interface-typed receiver: look the method up in the interface's
 // contract, check the args against its declared params (with the receiver's type
 // args bound), and return the declared result type substituted through.
-private iface_method(recv: Type, method: str, args, scope, call: Node): Type {
+private iface_method(recv: Type, method: str, args: List<Node>, scope: Scope, call: Node): Type {
     mut def = .interfaces.get(recv.name).unwrap()
     mut msig_opt = def.get("methods").unwrap().get(method)
     if not msig_opt.is_some() {

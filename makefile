@@ -15,3 +15,11 @@ selfbuild:
 
 doc:
 	doxygen doc/Doxyfile
+
+.PHONY: book book-serve
+
+book:
+	$(HOME)/.cargo/bin/mdbook build book
+
+book-serve:
+	$(HOME)/.cargo/bin/mdbook serve book

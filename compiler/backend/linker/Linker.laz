@@ -85,10 +85,15 @@ private body_is_interface(body: List<Node>): bool {
     if body.len() == 0 {
         return false
     }
+    mut has_interface_decl = false
+    mut has_object_module = false
     for node in body {
-        if node.kind != "InterfaceDecl" {
-            return false
+        if node.kind == "InterfaceDecl" {
+            has_interface_decl = true
+        }
+        if node.kind == "ObjectModule" {
+            has_object_module = true
         }
     }
-    return true
+    return has_interface_decl or has_object_module
 }

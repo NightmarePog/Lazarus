@@ -55,8 +55,22 @@ private static constructors = [
 ]
 
 private ctx: CgContext
+private stmt_emitter: dynamic
+private pending: List<str> = []
 @auto
 constructor(ctx: CgContext)
+
+public inject_stmts(s: dynamic): unit {
+    .stmt_emitter = s
+}
+
+// Drain any pending prefix statements accumulated by `?` propagation since the
+// last call. Called by StmtEmitter at each statement boundary.
+public take_pending(): List<str> {
+    mut out = .pending
+    .pending = []
+    return out
+}
 
 public emit(node: Node): str {
     match node.kind {
@@ -73,9 +87,25 @@ public emit(node: Node): str {
         "ListComp" => { return .emit_list_comp(node) }
         "MapComp" => { return .emit_map_comp(node) }
         "InterpolatedString" => { return .emit_interp(node) }
+        "FnExpr" => { return .emit_fn_expr(node) }
+        "PropagateExpr" => { return .emit_propagate(node) }
         _ => {}
     }
     return ""
+}
+
+// Lowers `expr?` by pushing a temp-assign and Err-check to the pending list,
+// then returning the unwrapped Ok value. The pending lines are prepended by
+// StmtEmitter at the next statement boundary.
+private emit_propagate(node: Node): str {
+    mut temp = .ctx.fresh_temp()
+    .pending.push("local " ++ temp ++ " = " ++ .emit(node.child("inner")))
+    .pending.push("if " ++ temp ++ ".kind == 'err' then return " ++ temp ++ " end")
+    return temp ++ ".value"
+}
+
+private emit_fn_expr(node: Node): str {
+    return .stmt_emitter.emit_closure(node.child("params"), node.child("param_types"), node.child("body"))
 }
 
 // A list comprehension lowers to an immediately-invoked function that builds a
@@ -106,7 +136,7 @@ private emit_map_comp(node: Node): str {
     return "(function() local " ++ temp ++ " = __lz_map({}) " ++ header ++ " " ++ body ++ " end return " ++ temp ++ " end)()"
 }
 
-private declare_loop_vars(vars: List<str>) {
+private declare_loop_vars(vars: List<str>): unit {
     for name in vars {
         .ctx.declare_local(name)
     }
@@ -152,6 +182,9 @@ private emit_literal(node: Node): str {
             return "true"
         }
         return "false"
+    }
+    if lit_kind == "nil" {
+        return "nil"
     }
     return value
 }
@@ -209,6 +242,12 @@ private emit_call(node: Node): str {
                 .ctx.mark_collections()
                 return ctor.unwrap() ++ "(" ++ Text.join(args, ", ") ++ ")"
             }
+        }
+
+        mut dispatch_cls = node.attr("dispatch_class")
+        if dispatch_cls.is_some() {
+            .ctx.mark_collections()
+            return dispatch_cls.unwrap() ++ "." ++ field ++ "(" ++ Text.join(.with_receiver(object, args), ", ") ++ ")"
         }
 
         mut helper = ExprEmitter.builtins.get(field)

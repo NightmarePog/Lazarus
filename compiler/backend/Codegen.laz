@@ -52,7 +52,9 @@ public generate(program: Node): str {
 public class_block(program: Node): str {
     mut body = program.child("body")
     mut ctx = .build_context(body)
-    mut stmts = StmtEmitter(ctx, ExprEmitter(ctx))
+    mut exprs = ExprEmitter(ctx)
+    mut stmts = StmtEmitter(ctx, exprs)
+    exprs.inject_stmts(stmts)
 
     mut member_lines = [stmts.emit_member(stmt) for stmt in body if .is_emittable(stmt)]
     .collections_used = ctx.used_collections()

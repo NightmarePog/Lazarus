@@ -60,7 +60,7 @@ public is_construction(name: str): bool {
 
 // The raw Lua target an extern member lowers to, or None when `ns`.`member` is
 // not an extern binding in scope.
-public extern_target(ns: str, member: str) {
+public extern_target(ns: str, member: str): Option<dynamic> {
     mut table = .externs.get(ns)
     if table.is_none() {
         return table

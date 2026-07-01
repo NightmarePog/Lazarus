@@ -13,6 +13,7 @@ constructor(tokens: List<Token>, source: str) {
     mut cursor = TokenCursor(tokens, source)
     mut exprs = ExprParser(cursor)
     .stmts = StmtParser(cursor, exprs)
+    exprs.inject_stmts(.stmts)
 }
 
 public parse(): Node {

@@ -28,6 +28,12 @@ public check_block(stmts: List<Node>, scope: Scope, frame: Frame): unit {
     }
 }
 
+// Called by ExprChecker when it encounters a closure body — uses an in-function
+// frame so `return` is legal, inheriting the outer instance context.
+public check_closure_body(stmts: List<Node>, scope: Scope): unit {
+    .check_block(stmts, scope, Frame(true, false, false))
+}
+
 private check_statement(stmt: Node, scope: Scope, frame: Frame, is_last: bool): unit {
     // ImportDecl / ExternDecl / InterfaceDecl are metadata — nothing to check.
     match stmt.kind {
@@ -81,14 +87,19 @@ private declare_binding(stmt: Node, scope: Scope, frame: Frame, name: str, visib
         .fail(stmt, "Duplicate declaration '" ++ name ++ "'", Str.len(name).unwrap_or(1))
     }
     Naming.check_value(name, stmt.line(), stmt.col(), .source, "Binding")
-    .check_optional_value(stmt, scope)
-
     mut mutable = stmt.attr("mutable").unwrap_or(false)
     mut kind = "constant"
     if mutable {
         kind = "variable"
     }
-    scope.declare(name, Symbol(kind, mutable, .value_noncallable(stmt)))
+    mut bvalue = stmt.attr("value")
+    if bvalue.is_some() and bvalue.unwrap().kind == "FnExpr" {
+        scope.declare(name, Symbol("function", false, false))
+        .check_optional_value(stmt, scope)
+    } else {
+        .check_optional_value(stmt, scope)
+        scope.declare(name, Symbol(kind, mutable, .value_noncallable(stmt)))
+    }
     stmt.set("reassign", false)
 }
 
@@ -286,12 +297,24 @@ private check_match(stmt: Node, scope: Scope, frame: Frame): unit {
     for arm in stmt.child("arms") {
         mut arm_scope = scope.child()
         if arm.attr("is_wildcard").unwrap_or(false) {
-            has_wildcard = true
+            if arm.attr("guard").is_none() {
+                has_wildcard = true
+            }
         } else if arm.attr("is_variant").unwrap_or(false) {
             enum_name = .check_variant_arm(stmt, arm, enum_name, covered)
             .declare_bindings(arm, arm_scope)
         } else {
-            .exprs.check(arm.child("pattern"), scope)
+            mut patt = arm.child("pattern")
+            if patt.kind == "IdentifierExpr" {
+                arm_scope.declare(patt.child("name"), Symbol("variable", false, false))
+                arm.set("is_binding", true)
+            } else {
+                .exprs.check(patt, scope)
+            }
+        }
+        mut guard = arm.attr("guard")
+        if guard.is_some() {
+            .exprs.check_condition(guard.unwrap(), arm_scope)
         }
         .check_block(arm.child("body"), arm_scope, frame)
     }
@@ -301,7 +324,7 @@ private check_match(stmt: Node, scope: Scope, frame: Frame): unit {
 }
 
 // Resolve one variant arm: a known variant, all arms from the same enum, no repeat.
-private check_variant_arm(stmt: Node, arm: Node, enum_name: str, covered): str {
+private check_variant_arm(stmt: Node, arm: Node, enum_name: str, covered: Map<str, bool>): str {
     mut v = arm.child("variant")
     mut owner = .variant_owner.get(v)
     if owner.is_none() {
@@ -331,7 +354,7 @@ private declare_bindings(arm: Node, scope: Scope): unit {
     }
 }
 
-private check_exhaustive(stmt: Node, enum_name: str, covered): unit {
+private check_exhaustive(stmt: Node, enum_name: str, covered: Map<str, bool>): unit {
     for variant in .enums.get(enum_name).unwrap() {
         if not covered.has(variant) {
             .fail(stmt, "Non-exhaustive match on enum '" ++ enum_name ++ "': missing variant '" ++ variant ++ "' (add it, or a '_' arm)", 1)
