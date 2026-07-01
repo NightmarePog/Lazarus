@@ -234,7 +234,7 @@ private read_symbol(): Token {
 // Reads an f-string body after the opening `"` has been consumed. Produces
 // ISTR_HEAD / expression tokens / ISTR_MID... / ISTR_TAIL; or a plain STRING
 // when no `{...}` hole is present.
-private read_interp(line: int, col: int) {
+private read_interp(line: int, col: int): List<Token> {
     mut result = []
     mut seg = .scan_str_segment(false)
     if Char.is_quote(.current) {
@@ -260,7 +260,7 @@ private read_interp(line: int, col: int) {
 
 // Scans the tokens inside one `{...}` hole. Consumes the opening `{` (which
 // must be current on entry) and the balancing `}`.
-private scan_interp_expr(err_line: int, err_col: int) {
+private scan_interp_expr(err_line: int, err_col: int): List<Token> {
     .advance()
     mut result = []
     mut depth = 1
@@ -317,7 +317,7 @@ private scan_str_segment(multiline: bool): str {
 // ---- triple-quoted strings ----
 
 // Dispatches plain `"""..."""` vs `f"""..."""` after `"""` has been consumed.
-private read_triple(is_f: bool, line: int, col: int) {
+private read_triple(is_f: bool, line: int, col: int): List<Token> {
     if is_f {
         return .read_triple_interp(line, col)
     }
@@ -347,7 +347,7 @@ private scan_triple_raw(): str {
 // Reads an `f"""..."""` string: collects content with byte-1 sentinels for
 // interpolation holes, strips indentation, then splits on sentinels to
 // produce interleaved ISTR_* and expression tokens.
-private read_triple_interp(line: int, col: int) {
+private read_triple_interp(line: int, col: int): List<Token> {
     mut raw = ""
     mut hole_tokens = []
     mut sentinel = Str.char(1).unwrap_or("")
@@ -402,7 +402,7 @@ private read_triple_interp(line: int, col: int) {
 
 // Splits `content` on `sentinel{decimal-digits}` sequences, returning one
 // more segment than the number of holes (in order, 1-indexed).
-private split_on_sentinel(content: str, sentinel: str) {
+private split_on_sentinel(content: str, sentinel: str): List<str> {
     mut result = []
     mut n = Str.len(content).unwrap_or(0)
     mut i = 1
@@ -468,7 +468,7 @@ private strip_indent(content: str): str {
     return result
 }
 
-private split_lines(s: str) {
+private split_lines(s: str): List<str> {
     mut result = []
     mut n = Str.len(s).unwrap_or(0)
     mut i = 1

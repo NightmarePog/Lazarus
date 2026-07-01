@@ -15,9 +15,15 @@ private source: str
 private properties: Map<str, bool>
 private methods: Map<str, bool>
 private variant_owner: Map<str, str>
+private gated_externs: Map<str, str>
 @auto
-constructor(source: str, properties: Map<str, bool>, methods: Map<str, bool>, variant_owner: Map<str, str>)
+constructor(source: str, properties: Map<str, bool>, methods: Map<str, bool>, variant_owner: Map<str, str>, gated_externs: Map<str, str>)
 private in_instance: bool = false
+private stmt_checker: dynamic
+
+public inject_stmts(s: dynamic): unit {
+    .stmt_checker = s
+}
 
 public set_instance(flag: bool): unit {
     .in_instance = flag
@@ -44,6 +50,8 @@ public check(node: Node, scope: Scope): unit {
             .check(node.child("object"), scope)
             .check(node.child("index"), scope)
         }
+        "FnExpr" => { .check_fn_expr(node, scope) }
+        "PropagateExpr" => { .check(node.child("inner"), scope) }
         "ListComp" => { .check_comprehension(node, scope, ["element"]) }
         "MapComp" => { .check_comprehension(node, scope, ["key", "value"]) }
         "InterpolatedString" => {
@@ -61,7 +69,7 @@ public check(node: Node, scope: Scope): unit {
 // A comprehension validates its iterable in the outer scope, then its produced
 // expression(s) and optional condition in a child scope where the loop variables
 // are declared (so they resolve rather than reading as undeclared).
-private check_comprehension(node: Node, scope: Scope, value_keys: List<str>) {
+private check_comprehension(node: Node, scope: Scope, value_keys: List<str>): unit {
     .check(node.child("iter"), scope)
     mut inner = scope.child()
     for name in node.child("vars") {
@@ -88,6 +96,10 @@ public check_condition(node: Node, scope: Scope): unit {
 private check_identifier(node: Node, scope: Scope): unit {
     mut name = node.child("name")
     if scope.lookup(name).is_none() and not .variant_owner.has(name) {
+        mut gated = .gated_externs.get(name)
+        if gated.is_some() {
+            .fail(node, "extern '" ++ name ++ "' is only available on platform '" ++ gated.unwrap() ++ "' — compile with --platform " ++ gated.unwrap(), Str.len(name).unwrap_or(1))
+        }
         .fail(node, "Undeclared identifier '" ++ name ++ "'", Str.len(name).unwrap_or(1))
     }
 }
@@ -103,7 +115,11 @@ private check_call(node: Node, scope: Scope): unit {
         }
     }
     for arg in node.child("args") {
-        .check(arg, scope)
+        if arg.kind == "LabeledArg" {
+            .check(arg.child("value"), scope)
+        } else {
+            .check(arg, scope)
+        }
     }
 }
 
@@ -136,6 +152,14 @@ private check_list(node: Node, scope: Scope): unit {
     for element in node.child("elements") {
         .check(element, scope)
     }
+}
+
+private check_fn_expr(node: Node, scope: Scope): unit {
+    mut inner = scope.child()
+    for name in node.child("params") {
+        inner.declare(name, Symbol("variable", false, false))
+    }
+    .stmt_checker.check_closure_body(node.child("body"), inner)
 }
 
 private check_map(node: Node, scope: Scope): unit {

@@ -51,12 +51,16 @@ static iface_of(name: str, args: List<Type>): Type {
     return Type("iface", name, args, Option.none())
 }
 
-static fn(params: List<Type>, result: Type): Type {
+static func(params: List<Type>, result: Type): Type {
     return Type("fn", "", params, Option.some(result))
 }
 
 static var(name: str): Type {
     return Type("var", name, [], Option.none())
+}
+
+static union(members: List<Type>): Type {
+    return Type("union", "", members, Option.none())
 }
 
 public is_dynamic(): bool {
@@ -85,6 +89,18 @@ public describe(): str {
     if .kind == "var" {
         return .name
     }
+    if .kind == "union" {
+        mut inner = ""
+        mut i = 1
+        for m in .params {
+            if i > 1 {
+                inner = inner ++ " | "
+            }
+            inner = inner ++ m.describe()
+            i = i + 1
+        }
+        return inner
+    }
     if .kind == "class" or .kind == "enum" or .kind == "iface" {
         if .params.len() == 0 {
             return .name
@@ -99,6 +115,18 @@ public describe(): str {
             i = i + 1
         }
         return .name ++ "<" ++ inner ++ ">"
+    }
+    if .kind == "fn" {
+        mut inner = ""
+        mut i = 1
+        for p in .params {
+            if i > 1 {
+                inner = inner ++ ", "
+            }
+            inner = inner ++ p.describe()
+            i = i + 1
+        }
+        return "(" ++ inner ++ ") -> " ++ .result.unwrap().describe()
     }
     return .kind
 }

@@ -21,7 +21,15 @@ import Error
 constructor() {
     mut path = Sys.argv(1)
     if path.is_some() {
-        Main.build_file(path.unwrap())
+        mut platform = ""
+        mut flag = Sys.argv(2)
+        if flag.is_some() and flag.unwrap() == "--platform" {
+            mut pname = Sys.argv(3)
+            if pname.is_some() {
+                platform = pname.unwrap()
+            }
+        }
+        Main.build_file(path.unwrap(), platform)
     } else {
         Error("NoFileAppended", "No file appended, use 'lazarus <FILE.laz>'", 0, 0, "", 2).raise()
     }
@@ -29,7 +37,7 @@ constructor() {
 
 // A file entry point: follow its imports and bundle the whole program. Each
 // module is analysed and optimised on its own before the bundler composes them.
-static build_file(path: str): unit {
+static build_file(path: str, platform: str): unit {
     mut linker = Linker(path)
     mut modules = linker.link()
 
@@ -40,17 +48,18 @@ static build_file(path: str): unit {
     mut enum_type_params = [:]
     mut classes = [:]
     mut interfaces = [:]
+    mut gated_externs = [:]
     for m in modules {
         Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
         Main.collect_interfaces(m.ast, interfaces, m.class_name)
         if not m.is_interface {
-            Main.collect_signatures(m.ast, m.class_name, classes)
+            Main.collect_signatures(m.ast, m.class_name, classes, platform, gated_externs)
         }
     }
 
     for m in modules {
         if not m.is_interface {
-            Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity)
+            Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity, gated_externs)
             Typecheck(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, interfaces).check(m.ast)
             Optimizer().optimize(m.ast)
         }
@@ -87,10 +96,11 @@ static collect_enums(ast: Node, variant_owner: Map<str, str>, enums: Map<str, Li
 // Each entry carries `fields` (property name -> Option of its type node), `methods`
 // (name -> {params, result, is_static, type_params}), `ctor` (the constructor's
 // param-type nodes, or 0 when the class declares none) and `type_params`.
-static collect_signatures(ast: Node, class_name: str, classes: Map<str, dynamic>): unit {
+static collect_signatures(ast: Node, class_name: str, classes: Map<str, dynamic>, platform: str, gated_externs: Map<str, str>): unit {
     mut fields = [:]
     mut methods = [:]
     mut ctor = 0
+    mut ctor_names = []
     mut type_params = []
     for stmt in ast.child("body") {
         mut k = stmt.kind
@@ -102,16 +112,35 @@ static collect_signatures(ast: Node, class_name: str, classes: Map<str, dynamic>
             }
         } else if k == "FunctionDecl" {
             mut params = stmt.attr("param_types").unwrap_or([])
+            mut param_names = stmt.child("params")
             mut result = stmt.attr("return_type").unwrap_or(0)
             mut is_static = stmt.attr("is_static").unwrap_or(false)
             mut mtype_params = stmt.attr("type_params").unwrap_or([])
-            methods[stmt.child("name")] = ["params": params, "result": result, "is_static": is_static, "type_params": mtype_params]
+            methods[stmt.child("name")] = ["params": params, "param_names": param_names, "result": result, "is_static": is_static, "type_params": mtype_params]
         } else if k == "ConstructorDecl" {
             ctor = stmt.attr("param_types").unwrap_or([])
+            ctor_names = stmt.child("params")
             type_params = stmt.attr("type_params").unwrap_or([])
+        } else if k == "ExternDecl" {
+            mut params = stmt.attr("param_types").unwrap_or([])
+            mut all_typed = true
+            for pt in params {
+                if pt.attr("inferred").unwrap_or(false) {
+                    all_typed = false
+                }
+            }
+            if all_typed and params.len() > 0 {
+                mut extern_platform = stmt.attr("platform").unwrap_or("")
+                if extern_platform == "" or extern_platform == platform {
+                    mut extern_result = stmt.attr("return_type").unwrap_or(0)
+                    methods[stmt.child("name")] = ["params": params, "result": extern_result, "is_static": true, "type_params": []]
+                } else {
+                    gated_externs[stmt.child("name")] = extern_platform
+                }
+            }
         }
     }
-    classes[class_name] = ["fields": fields, "methods": methods, "ctor": ctor, "type_params": type_params]
+    classes[class_name] = ["fields": fields, "methods": methods, "ctor": ctor, "ctor_names": ctor_names, "type_params": type_params]
 }
 
 // Gather every interface declaration (inline or a \`#interface\` file, whose decl

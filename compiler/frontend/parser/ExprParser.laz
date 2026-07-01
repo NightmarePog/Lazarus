@@ -30,8 +30,13 @@ private static precedences = [
 ]
 
 private cursor: TokenCursor
+private stmts: dynamic
 @auto
 constructor(cursor: TokenCursor)
+
+public inject_stmts(s: dynamic): unit {
+    .stmts = s
+}
 
 public expression(): Node {
     return .parse_binary(1)
@@ -79,6 +84,9 @@ private parse_call(): Node {
             expr = .finish_member(expr)
         } else if k == "LSQUARE" and .continues_line() {
             expr = .finish_index(expr)
+        } else if k == "QUESTION" and .continues_line() {
+            mut q = .cursor.advance()
+            expr = Ast.propagate_expr(expr, q.line, q.column)
         } else {
             break
         }
@@ -110,13 +118,25 @@ private continues_line(): bool {
 }
 
 // Call arguments after the opening `(`, up to and including the closing `)`.
+// A leading `name: expr` pattern switches to labeled mode for the whole list.
 private parse_arguments(): List<Node> {
     mut args = []
     if not .cursor.check("RIGHT_BRACKET") {
-        loop {
-            args.push(.expression())
-            if not .cursor.match("COMMA") {
-                break
+        if .cursor.check("IDENTIFIER") and .cursor.peek_next().kind == "COLON" {
+            loop {
+                mut name_tok = .cursor.consume("IDENTIFIER", "Expected a label name")
+                .cursor.consume("COLON", "Expected ':' after label name")
+                args.push(Ast.labeled_arg(name_tok.value, .expression(), name_tok.line, name_tok.column))
+                if not .cursor.match("COMMA") {
+                    break
+                }
+            }
+        } else {
+            loop {
+                args.push(.expression())
+                if not .cursor.match("COMMA") {
+                    break
+                }
             }
         }
     }
@@ -141,6 +161,7 @@ private parse_primary(): Node {
         "ISTR_HEAD" => { return .parse_interp_string() }
         "TRUE" => { .cursor.advance() return Ast.literal("boolean", true, tok.line, tok.column) }
         "FALSE" => { .cursor.advance() return Ast.literal("boolean", false, tok.line, tok.column) }
+        "FN" => { .cursor.advance() return .parse_fn_expr(tok) }
         "IDENTIFIER" => { .cursor.advance() return Ast.identifier(tok.value, tok.line, tok.column) }
         "SELF" => { .cursor.advance() return Ast.self_expr(tok.line, tok.column) }
         "LSQUARE" => { return .parse_collection() }
@@ -198,7 +219,7 @@ private parse_map_comp(key: Node, value: Node, open: Token): Node {
     return Ast.node("MapComp", attrs)
 }
 
-private parse_comp_clause(attrs: Map<str, dynamic>) {
+private parse_comp_clause(attrs: Map<str, dynamic>): unit {
     .cursor.consume("FOR", "Expected 'for' in a comprehension")
     mut vars = [.cursor.consume("IDENTIFIER", "Expected a loop variable after 'for'").value]
     if .cursor.match("COMMA") {
@@ -261,6 +282,22 @@ private parse_interp_string(): Node {
         }
     }
     return Ast.interp_string(parts, head.line, head.column)
+}
+
+private parse_fn_expr(tok: Token): Node {
+    .cursor.consume("LEFT_BRACKET", "Expected '(' after 'fn'")
+    mut param_types = []
+    mut params = .stmts.parse_params(param_types)
+    .cursor.consume("RIGHT_BRACKET", "Expected ')' after fn parameters")
+    mut return_type = .stmts.parse_return_type()
+    mut body = []
+    if .cursor.match("ASSIGN") {
+        mut expr = .expression()
+        body = [Ast.node("ReturnStmt", ["value": expr, "line": expr.line(), "col": expr.col()])]
+    } else {
+        body = .stmts.parse_block("fn body")
+    }
+    return Ast.fn_expr(params, param_types, return_type, body, tok.line, tok.column)
 }
 
 private precedence(kind: str): Option<int> {

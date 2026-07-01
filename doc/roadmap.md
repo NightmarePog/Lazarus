@@ -17,8 +17,8 @@ typing history see [`doc/self-hosting/TYPING-ROADMAP.md`](self-hosting/TYPING-RO
 - **Built-ins** — `List<T>`/`Map<K,V>`/`Option<T>`/`Result<T>` as fast tagged tables
   with intrinsic typing (no std files, no method-dispatch cost).
 - **Structural interfaces** — generic, interface-directed structural subtyping,
-  fully erased. Inline `interface` and `@interface` files. (Shipped 2026-06-27.)
-- **`@kind` file directives** — `@interface`, `@object` (static modules). Extensible.
+  fully erased. Inline `interface` and `#interface` files. (Shipped 2026-06-27.)
+- **`#kind` file directives** — `#interface`, `#object` (static modules). Extensible.
 - **Interop** — `extern` FFI to Lua; path-based module imports from the project root.
 - **Backend** — emits Lua 5.1; constant-folding optimizer.
 
@@ -33,7 +33,7 @@ fixpoint check before the next.
 |---|---------|-------------|-------|
 | **L1** | **Constructor param-properties** — `constructor(.cursor, .exprs)` declares + assigns the field in one stroke | Small, low risk | Kills the pervasive DI boilerplate (`private x` + `.x = x`). Fits the `.field` model. Parser + codegen only, no runtime cost. **Recommended first.** |
 | **L2** | **For-loop comprehensions** — `[f(x) for x in xs]`, `[x for x in xs if cond]`, `[k: f(v) for k, v in m]` | Medium, low risk | Pure compile-time sugar lowering to today's loops. **No closures needed.** Collapses ~85 map/filter loops measured in the compiler. |
-| **L3** | **Annotations / decorators** — `@name` on declarations | Medium | Composes with the `@kind` directive. Decide scope: *annotations* (readable metadata, e.g. `@deprecated`, `@test`) vs *decorators* (transform the decl — needs closures or AST transforms). |
+| **L3** | **Annotations / decorators** — `@name` on declarations | Medium | Composes with the `#kind` directive. Decide scope: *annotations* (readable metadata, e.g. `@deprecated`, `@test`) vs *decorators* (transform the decl — needs closures or AST transforms). |
 | **L4** | **Getters / setters** — computed properties | Medium, **design tension** | Collides with the no-metatables model: `obj.field` is a raw table read a getter can't intercept. Needs a decision first: compile-time access rewriting (typed call sites only) vs metatables for accessor classes (a perf cost). |
 | **L5** | **Macros** | Largest — defer | Deep design space (syntactic vs AST vs hygienic). A project unto itself; do last, if at all. |
 

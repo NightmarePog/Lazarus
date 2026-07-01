@@ -8,13 +8,13 @@ private attrs: Map<str, dynamic>
 constructor(kind: str, attrs: Map<str, dynamic>)
 
 // Named `attr`, not `get`, since `get` is a reserved built-in collection method.
-public attr(name: str) {
+public attr(name: str): Option<dynamic> {
     return .attrs.get(name)
 }
 
 // A required attribute, unwrapped: an absent key is a malformed node (compiler
 // bug), so the unwrap is intentional.
-public child(name: str) {
+public child(name: str): dynamic {
     return .attrs.get(name).unwrap()
 }
 
@@ -26,7 +26,7 @@ public col(): int {
     return .attrs.get("col").unwrap_or(0)
 }
 
-public set(name: str, value): unit {
+public set(name: str, value: dynamic): unit {
     .attrs[name] = value
 }
 

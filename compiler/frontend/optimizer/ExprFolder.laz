@@ -57,7 +57,7 @@ public fold(node: Node, constants: Constants): Node {
 }
 
 // Fold a comprehension's optional filter in the loop-variable-shadowed scope.
-private fold_comp_cond(node: Node, constants: Constants) {
+private fold_comp_cond(node: Node, constants: Constants): unit {
     mut cond = node.attr("cond")
     if cond.is_some() {
         node.set("cond", .fold(cond.unwrap(), constants))
@@ -119,7 +119,7 @@ private result_kind(op: str, left: Node, right: Node): str {
     return "number"
 }
 
-private apply(op: str, a, b) {
+private apply(op: str, a: dynamic, b: dynamic): dynamic {
     match op {
         "PLUS" => { return a + b }
         "MINUS" => { return a - b }

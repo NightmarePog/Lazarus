@@ -1,0 +1,33 @@
+import std.List
+import std.Map
+import std.Sys
+
+constructor() {
+    mut nums: List<int> = [1, 2, 3, 4, 5]
+
+    mut doubled = nums.map(fn(x: int): int { return x * 2 })
+    Sys.print(doubled)
+
+    mut evens = nums.filter(fn(x: int): bool { return x % 2 == 0 })
+    Sys.print(evens)
+
+    mut total = nums.fold(0, fn(acc: int, x: int): int { return acc + x })
+    Sys.print(total)
+
+    mut has_big = nums.any(fn(x: int): bool { return x > 4 })
+    Sys.print(has_big)
+
+    mut all_pos = nums.all(fn(x: int): bool { return x > 0 })
+    Sys.print(all_pos)
+
+    mut found = nums.find(fn(x: int): bool { return x == 3 })
+    Sys.print(found.unwrap())
+
+    mut scores: Map<str, int> = ["alice": 9, "bob": 7, "carol": 5]
+
+    mut big = scores.filter(fn(k: str, v: int): bool { return v >= 7 })
+    Sys.print(big)
+
+    mut total_score = scores.fold(0, fn(acc: int, k: str, v: int): int { return acc + v })
+    Sys.print(total_score)
+}

@@ -86,7 +86,7 @@ private expand_field_params(body: List<Node>): List<Node> {
     return out
 }
 
-private field_property(fp): Node {
+private field_property<A>(fp: A): Node {
     return Ast.node("VariableDecl", ["name": fp.get("name").unwrap(), "visibility": "private", "mutable": false, "is_static": false, "type": fp.get("type").unwrap(), "line": fp.get("line").unwrap(), "col": fp.get("col").unwrap()])
 }
 
@@ -214,7 +214,7 @@ private parse_identifier_statement(tok: Token): Node {
 }
 
 // A braced block `{ <statement>* }`; `context` names it for error messages.
-private parse_block(context: str) {
+private parse_block(context: str): List<Node> {
     mut open = .cursor.consume("BODY_START", "Expected '{' to open " ++ context)
     mut body = []
     loop {
@@ -307,7 +307,7 @@ private parse_interface(tok: Token): Node {
 
 // One interface requirement: a method signature `name<T>(params): ret` (a `<` or
 // `(` follows the name) or a property `name: Type`.
-private parse_interface_member(methods, properties): unit {
+private parse_interface_member(methods: List<Node>, properties: List<Node>): unit {
     mut name = .cursor.consume("IDENTIFIER", "Expected a member name in the interface body")
     if .cursor.check("LESS") or .cursor.check("LEFT_BRACKET") {
         mut type_params = .parse_type_params()
@@ -481,7 +481,7 @@ private parse_ctor_params(out_types: List<Node>, field_params: List<Map<str, dyn
     return params
 }
 
-private field_param_assign(fp): Node {
+private field_param_assign<A>(fp: A): Node {
     mut name = fp.get("name").unwrap()
     mut l = fp.get("line").unwrap()
     mut c = fp.get("col").unwrap()
@@ -505,7 +505,7 @@ private declared_property_types(body: List<Node>): Map<str, Node> {
 // properties. A param with no declared property keeps its own (untyped) annotation
 // — its synthesized `.p = p` assignment then fails the unknown-instance-member
 // check, so an `@auto` param must have a declared property.
-private resolve_auto_params(ctor: Node, prop_types: Map<str, Node>) {
+private resolve_auto_params(ctor: Node, prop_types: Map<str, Node>): unit {
     mut new_types = []
     mut i = 1
     for name in ctor.child("params") {

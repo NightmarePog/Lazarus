@@ -31,10 +31,10 @@ interface Container<T> {       // generic
 A method line is a signature with **no body**. A `name: Type` line is a property
 requirement. A file may declare interfaces alongside its own class members.
 
-### `@interface` file — the whole file is one interface
+### `#interface` file — the whole file is one interface
 
 ```laz
-@interface                     // must be the first token in the file
+#interface                     // must be the first token in the file
 import Animal                  // imports are allowed
 make(): Animal
 sound(): int
@@ -42,10 +42,10 @@ sound(): int
 
 The interface is named after the file (`Maker.laz` → `Maker`). The body is
 signatures and property requirements only — no constructor, no method bodies.
-`@interface` files are **non-generic**; use the inline form for `<T>`.
+`#interface` files are **non-generic**; use the inline form for `<T>`.
 
-`@interface` is one case of a general `@kind` file-head directive; an unknown
-`@x` is a parse error.
+`#interface` is one case of a general `#kind` file-head directive; an unknown
+`#x` is a parse error.
 
 ## Using an interface
 
@@ -91,7 +91,7 @@ When a requirement's return type is itself an interface, a class whose method
 returns a more specific (conforming) type satisfies it:
 
 ```laz
-@interface
+#interface
 make(): Animal          // Animal is an interface
 
 // CatMaker.make returns the concrete Cat, which satisfies Animal — accepted.
