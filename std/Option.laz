@@ -1,0 +1,42 @@
+import std.Sys
+
+enum Option<T> {
+    Some(T),
+    None
+}
+
+static some<T>(value: T): Option<T> {
+    return Some(value)
+}
+
+static none<T>(): Option<T> {
+    return None
+}
+
+static is_some<T>(opt: Option<T>): bool {
+    match opt {
+        Some(_) => { return true }
+        None => { return false }
+    }
+}
+
+static is_none<T>(opt: Option<T>): bool {
+    match opt {
+        None => { return true }
+        Some(_) => { return false }
+    }
+}
+
+static unwrap<T>(opt: Option<T>): T {
+    match opt {
+        Some(v) => { return v }
+        None => { Sys.panic("unwrap of None") }
+    }
+}
+
+static unwrap_or<T>(opt: Option<T>, default: T): T {
+    match opt {
+        Some(v) => { return v }
+        None => { return default }
+    }
+}

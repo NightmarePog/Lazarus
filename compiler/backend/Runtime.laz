@@ -1,12 +1,11 @@
 // Runtime — the primitive prelude emitted ahead of generated code.
 //
-// Lists, maps, Option and Result are lightweight tagged tables (`{ kind = … }`)
-// and every operation is a direct `__lz_*` helper — no method dispatch, no
-// per-instance method copies, so the hot allocate/access path stays cheap. Option
-// is `{kind='some', value}` / `{kind='none'}`; Result `{kind='ok', value}` /
-// `{kind='err', message}`. `unwrap`/`unwrap_or` dispatch on the tag, so the one
-// helper serves both. Tag strings are single-quoted in the emitted Lua, keeping
-// them plain inside these double-quoted Lazarus literals.
+// Lists, maps, Option and Result are lightweight tagged tables / strings. Option
+// is `{kind='Some', _1=v}` (Some) / the string `'None'`; Result is
+// `{kind='Ok', _1=v}` (Ok) / `{kind='Err', _1=m}` (Err). This matches the
+// enum variant lowering used by `std/Option.laz` and `std/Result.laz`, so
+// `match opt { Some(v) => … None => … }` works correctly. `unwrap`/`unwrap_or`
+// dispatch on the tag. Tag strings are single-quoted in the emitted Lua.
 
 #object
 import backend.Text
@@ -20,43 +19,44 @@ prelude(): str {
         "    return { kind = 'map', items = items }",
         "end",
         "local function __lz_some(v)",
-        "    return { kind = 'some', value = v }",
+        "    return { kind = 'Some', _1 = v }",
         "end",
         "local function __lz_none()",
-        "    return { kind = 'none' }",
+        "    return 'None'",
         "end",
         "local function __lz_ok(v)",
-        "    return { kind = 'ok', value = v }",
+        "    return { kind = 'Ok', _1 = v }",
         "end",
         "local function __lz_err(m)",
-        "    return { kind = 'err', message = m }",
+        "    return { kind = 'Err', _1 = m }",
         "end",
         "local function __lz_wrap(v)",
-        "    if v == nil then return { kind = 'none' } end",
-        "    return { kind = 'some', value = v }",
+        "    if v == nil then return 'None' end",
+        "    return { kind = 'Some', _1 = v }",
         "end",
         "local function __lz_is_some(o)",
-        "    return o.kind == 'some'",
+        "    return type(o) == 'table' and o.kind == 'Some'",
         "end",
         "local function __lz_is_none(o)",
-        "    return o.kind == 'none'",
+        "    return o == 'None'",
         "end",
         "local function __lz_is_ok(o)",
-        "    return o.kind == 'ok'",
+        "    return type(o) == 'table' and o.kind == 'Ok'",
         "end",
         "local function __lz_is_err(o)",
-        "    return o.kind == 'err'",
+        "    return type(o) == 'table' and o.kind == 'Err'",
         "end",
         "local function __lz_unwrap(o)",
-        "    if o.kind == 'some' or o.kind == 'ok' then return o.value end",
-        "    error(o.message or 'unwrap of a None value')",
+        "    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end",
+        "    if type(o) == 'table' and o.kind == 'Err' then error(o._1) end",
+        "    error('unwrap of a None value')",
         "end",
         "local function __lz_unwrap_or(o, d)",
-        "    if o.kind == 'some' or o.kind == 'ok' then return o.value end",
+        "    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end",
         "    return d",
         "end",
         "local function __lz_error(o)",
-        "    return o.message",
+        "    return o._1",
         "end",
         "local function __lz_len(c)",
         "    if c.kind == 'list' then return #c.items end",
@@ -69,15 +69,15 @@ prelude(): str {
         "end",
         "local function __lz_pop(c)",
         "    local n = #c.items",
-        "    if n == 0 then return { kind = 'none' } end",
+        "    if n == 0 then return 'None' end",
         "    local v = c.items[n]",
         "    c.items[n] = nil",
-        "    return { kind = 'some', value = v }",
+        "    return { kind = 'Some', _1 = v }",
         "end",
         "local function __lz_get(c, k)",
         "    local v = c.items[k]",
-        "    if v == nil then return { kind = 'none' } end",
-        "    return { kind = 'some', value = v }",
+        "    if v == nil then return 'None' end",
+        "    return { kind = 'Some', _1 = v }",
         "end",
         "local function __lz_has(c, k)",
         "    return c.items[k] ~= nil",

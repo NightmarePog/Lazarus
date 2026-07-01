@@ -401,9 +401,11 @@ private is_builtin_name(name: str): bool {
     return name == "Option" or name == "Result" or name == "List" or name == "Map"
 }
 
-// A built-in generic instance (List<int>, Option<str>, …).
+// A built-in generic instance (List<int>, Option<str>, …). Accepts both `class`
+// and `enum` kinds so that variant constructions (`Some(v)` → enum) still
+// dispatch through the builtin path alongside declared types (class).
 private is_builtin_type(t: Type): bool {
-    return t.kind == "class" and .is_builtin_name(t.name)
+    return (t.kind == "class" or t.kind == "enum") and .is_builtin_name(t.name)
 }
 
 // The i-th (1-based) type argument of a generic instance, or dynamic.
@@ -843,7 +845,7 @@ private receiver_type(object: Node, scope: Scope): Type {
 }
 
 private class_name_of(t: Type): str {
-    if t.kind == "class" {
+    if t.kind == "class" or t.kind == "enum" {
         return t.name
     }
     return ""
@@ -1210,6 +1212,13 @@ private compatible(expected: Type, actual: Type): bool {
             i = i + 1
         }
         return .compatible(expected.result.unwrap_or(Type.dynamic()), actual.result.unwrap_or(Type.dynamic()))
+    }
+    // class and enum with the same name are compatible: Option<T> is declared as
+    // class (is_builtin_name) but variant constructions (Some(v)) yield enum kind.
+    if (expected.kind == "class" or expected.kind == "enum") and
+       (actual.kind == "class" or actual.kind == "enum") and
+       expected.name == actual.name {
+        return .args_compatible(expected.params, actual.params)
     }
     if not expected.equals(actual) {
         return false

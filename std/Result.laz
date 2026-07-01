@@ -1,0 +1,49 @@
+import std.Sys
+
+enum Result<T> {
+    Ok(T),
+    Err(str)
+}
+
+static ok<T>(value: T): Result<T> {
+    return Ok(value)
+}
+
+static err<T>(message: str): Result<T> {
+    return Err(message)
+}
+
+static is_ok<T>(res: Result<T>): bool {
+    match res {
+        Ok(_) => { return true }
+        Err(_) => { return false }
+    }
+}
+
+static is_err<T>(res: Result<T>): bool {
+    match res {
+        Err(_) => { return true }
+        Ok(_) => { return false }
+    }
+}
+
+static unwrap<T>(res: Result<T>): T {
+    match res {
+        Ok(v) => { return v }
+        Err(m) => { Sys.panic(m) }
+    }
+}
+
+static unwrap_or<T>(res: Result<T>, default: T): T {
+    match res {
+        Ok(v) => { return v }
+        Err(_) => { return default }
+    }
+}
+
+static error<T>(res: Result<T>): str {
+    match res {
+        Err(m) => { return m }
+        Ok(_) => { return "" }
+    }
+}
