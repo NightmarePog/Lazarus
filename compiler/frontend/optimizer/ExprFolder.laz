@@ -78,9 +78,9 @@ private fold_binary(node: Node, constants: Constants): Node {
     mut right = .fold(node.child("right"), constants)
     mut op = node.child("op")
     if .foldable(op, left, right) {
-        mut lv = Num.to_number(left.child("value")).unwrap_or(0)
-        mut rv = Num.to_number(right.child("value")).unwrap_or(0)
-        if op != "DIVIDE" or rv != 0 {
+        mut lv = Num.to_number(left.child("value")).unwrap_or(0.0)
+        mut rv = Num.to_number(right.child("value")).unwrap_or(0.0)
+        if op != "DIVIDE" or rv != 0.0 {
             mut result = .apply(op, lv, rv)
             .folds = .folds + 1
             return Ast.literal(.result_kind(op, left, right), Num.to_text(result).unwrap_or("0"), node.line(), node.col())

@@ -125,7 +125,7 @@ static collect_signatures(ast: Node, class_name: str, classes: Map<str, dynamic>
             mut params = stmt.attr("param_types").unwrap_or([])
             mut all_typed = true
             for pt in params {
-                if pt.attr("inferred").unwrap_or(false) {
+                if pt.attr("inferred").unwrap_or(false) or pt.child("name") == "dynamic" {
                     all_typed = false
                 }
             }

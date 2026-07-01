@@ -326,11 +326,13 @@ private parse_interface_member(methods: List<Node>, properties: List<Node>): uni
 private parse_extern(tok: Token): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected a name after 'extern'")
     .cursor.consume("LEFT_BRACKET", "Expected '(' after extern name")
-    mut params = .parse_params([])
+    mut param_types = []
+    mut params = .parse_params(param_types)
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after extern parameters")
+    mut return_type = .parse_return_type()
     .cursor.consume("ASSIGN", "Expected '=' after extern parameters")
     mut target = .cursor.consume("STRING", "Expected a quoted Lua target after '='")
-    return Ast.extern_decl(name.value, params, target.value, tok.line, tok.column)
+    return Ast.extern_decl(name.value, params, param_types, return_type, target.value, tok.line, tok.column)
 }
 
 // A `private`/`public` declaration: a property, a class member, or a method.

@@ -18,8 +18,8 @@ import_decl(segments: List<str>, name: str, line: int, col: int): Node {
     return Node("ImportDecl", ["segments": segments, "name": name, "line": line, "col": col])
 }
 
-extern_decl(name: str, params: List<str>, target: str, line: int, col: int): Node {
-    return Node("ExternDecl", ["name": name, "params": params, "target": target, "line": line, "col": col])
+extern_decl(name: str, params: List<str>, param_types: List<Node>, return_type: Node, target: str, line: int, col: int): Node {
+    return Node("ExternDecl", ["name": name, "params": params, "param_types": param_types, "return_type": return_type, "target": target, "line": line, "col": col])
 }
 
 // `param_types`/`return_type` are Type nodes (default `dynamic`); `type_params`
