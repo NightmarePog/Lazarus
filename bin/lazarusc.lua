@@ -11,43 +11,44 @@ local function __lz_map(items)
     return { kind = 'map', items = items }
 end
 local function __lz_some(v)
-    return { kind = 'some', value = v }
+    return { kind = 'Some', _1 = v }
 end
 local function __lz_none()
-    return { kind = 'none' }
+    return 'None'
 end
 local function __lz_ok(v)
-    return { kind = 'ok', value = v }
+    return { kind = 'Ok', _1 = v }
 end
 local function __lz_err(m)
-    return { kind = 'err', message = m }
+    return { kind = 'Err', _1 = m }
 end
 local function __lz_wrap(v)
-    if v == nil then return { kind = 'none' } end
-    return { kind = 'some', value = v }
+    if v == nil then return 'None' end
+    return { kind = 'Some', _1 = v }
 end
 local function __lz_is_some(o)
-    return o.kind == 'some'
+    return type(o) == 'table' and o.kind == 'Some'
 end
 local function __lz_is_none(o)
-    return o.kind == 'none'
+    return o == 'None'
 end
 local function __lz_is_ok(o)
-    return o.kind == 'ok'
+    return type(o) == 'table' and o.kind == 'Ok'
 end
 local function __lz_is_err(o)
-    return o.kind == 'err'
+    return type(o) == 'table' and o.kind == 'Err'
 end
 local function __lz_unwrap(o)
-    if o.kind == 'some' or o.kind == 'ok' then return o.value end
-    error(o.message or 'unwrap of a None value')
+    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end
+    if type(o) == 'table' and o.kind == 'Err' then error(o._1) end
+    error('unwrap of a None value')
 end
 local function __lz_unwrap_or(o, d)
-    if o.kind == 'some' or o.kind == 'ok' then return o.value end
+    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end
     return d
 end
 local function __lz_error(o)
-    return o.message
+    return o._1
 end
 local function __lz_len(c)
     if c.kind == 'list' then return #c.items end
@@ -60,15 +61,15 @@ local function __lz_push(c, v)
 end
 local function __lz_pop(c)
     local n = #c.items
-    if n == 0 then return { kind = 'none' } end
+    if n == 0 then return 'None' end
     local v = c.items[n]
     c.items[n] = nil
-    return { kind = 'some', value = v }
+    return { kind = 'Some', _1 = v }
 end
 local function __lz_get(c, k)
     local v = c.items[k]
-    if v == nil then return { kind = 'none' } end
-    return { kind = 'some', value = v }
+    if v == nil then return 'None' end
+    return { kind = 'Some', _1 = v }
 end
 local function __lz_has(c, k)
     return c.items[k] ~= nil
@@ -3333,7 +3334,7 @@ function Typecheck.is_builtin_name(self, name)
     return (((name == "Option") or (name == "Result")) or (name == "List")) or (name == "Map")
 end
 function Typecheck.is_builtin_type(self, t)
-    return (t.kind == "class") and Typecheck.is_builtin_name(self, t.name)
+    return ((t.kind == "class") or (t.kind == "enum")) and Typecheck.is_builtin_name(self, t.name)
 end
 function Typecheck.type_arg(self, t, i)
     return __lz_unwrap_or(__lz_get(t.params, i), Type.dynamic())
@@ -3719,7 +3720,7 @@ function Typecheck.receiver_type(self, object, scope)
     return Typecheck.type_expr(self, object, scope)
 end
 function Typecheck.class_name_of(self, t)
-    if t.kind == "class" then
+    if (t.kind == "class") or (t.kind == "enum") then
         return t.name
     end
     return ""
@@ -4026,6 +4027,9 @@ function Typecheck.compatible(self, expected, actual)
             i = i + 1
         end
         return Typecheck.compatible(self, __lz_unwrap_or(expected.result, Type.dynamic()), __lz_unwrap_or(actual.result, Type.dynamic()))
+    end
+    if (((expected.kind == "class") or (expected.kind == "enum")) and ((actual.kind == "class") or (actual.kind == "enum"))) and (expected.name == actual.name) then
+        return Typecheck.args_compatible(self, expected.params, actual.params)
     end
     if not expected:equals(actual) then
         return false
@@ -5423,7 +5427,7 @@ end
 local Runtime = {}
 
 function Runtime.prelude()
-    return Text.lines(__lz_list("local function __lz_list(...)", "    return { kind = 'list', items = { ... } }", "end", "local function __lz_map(items)", "    return { kind = 'map', items = items }", "end", "local function __lz_some(v)", "    return { kind = 'some', value = v }", "end", "local function __lz_none()", "    return { kind = 'none' }", "end", "local function __lz_ok(v)", "    return { kind = 'ok', value = v }", "end", "local function __lz_err(m)", "    return { kind = 'err', message = m }", "end", "local function __lz_wrap(v)", "    if v == nil then return { kind = 'none' } end", "    return { kind = 'some', value = v }", "end", "local function __lz_is_some(o)", "    return o.kind == 'some'", "end", "local function __lz_is_none(o)", "    return o.kind == 'none'", "end", "local function __lz_is_ok(o)", "    return o.kind == 'ok'", "end", "local function __lz_is_err(o)", "    return o.kind == 'err'", "end", "local function __lz_unwrap(o)", "    if o.kind == 'some' or o.kind == 'ok' then return o.value end", "    error(o.message or 'unwrap of a None value')", "end", "local function __lz_unwrap_or(o, d)", "    if o.kind == 'some' or o.kind == 'ok' then return o.value end", "    return d", "end", "local function __lz_error(o)", "    return o.message", "end", "local function __lz_len(c)", "    if c.kind == 'list' then return #c.items end", "    local n = 0", "    for _ in pairs(c.items) do n = n + 1 end", "    return n", "end", "local function __lz_push(c, v)", "    c.items[#c.items + 1] = v", "end", "local function __lz_pop(c)", "    local n = #c.items", "    if n == 0 then return { kind = 'none' } end", "    local v = c.items[n]", "    c.items[n] = nil", "    return { kind = 'some', value = v }", "end", "local function __lz_get(c, k)", "    local v = c.items[k]", "    if v == nil then return { kind = 'none' } end", "    return { kind = 'some', value = v }", "end", "local function __lz_has(c, k)", "    return c.items[k] ~= nil", "end", "local function __lz_idx_get(c, i)", "    if c.kind == 'list' then return c.items[i + 1] end", "    return c.items[i]", "end", "local function __lz_idx_set(c, i, v)", "    if c.kind == 'list' then", "        c.items[i + 1] = v", "    else", "        c.items[i] = v", "    end", "end", "local function __lz_str_find(s, sub)", "    return (string.find(s, sub, 1, true))", "end", "local function __lz_argv(i)", "    if arg == nil then return nil end", "    return arg[i]", "end", "local function __lz_readfile(path)", "    local f = io.open(path, 'r')", "    if f == nil then return nil end", "    local data = f:read('*a')", "    f:close()", "    return data", "end", "local function __lz_each(c)", "    if c.kind == 'list' then", "        local i = 0", "        return function()", "            i = i + 1", "            if i > #c.items then return nil end", "            return i - 1, c.items[i]", "        end", "    end", "    return pairs(c.items)", "end"))
+    return Text.lines(__lz_list("local function __lz_list(...)", "    return { kind = 'list', items = { ... } }", "end", "local function __lz_map(items)", "    return { kind = 'map', items = items }", "end", "local function __lz_some(v)", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_none()", "    return 'None'", "end", "local function __lz_ok(v)", "    return { kind = 'Ok', _1 = v }", "end", "local function __lz_err(m)", "    return { kind = 'Err', _1 = m }", "end", "local function __lz_wrap(v)", "    if v == nil then return 'None' end", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_is_some(o)", "    return type(o) == 'table' and o.kind == 'Some'", "end", "local function __lz_is_none(o)", "    return o == 'None'", "end", "local function __lz_is_ok(o)", "    return type(o) == 'table' and o.kind == 'Ok'", "end", "local function __lz_is_err(o)", "    return type(o) == 'table' and o.kind == 'Err'", "end", "local function __lz_unwrap(o)", "    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end", "    if type(o) == 'table' and o.kind == 'Err' then error(o._1) end", "    error('unwrap of a None value')", "end", "local function __lz_unwrap_or(o, d)", "    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end", "    return d", "end", "local function __lz_error(o)", "    return o._1", "end", "local function __lz_len(c)", "    if c.kind == 'list' then return #c.items end", "    local n = 0", "    for _ in pairs(c.items) do n = n + 1 end", "    return n", "end", "local function __lz_push(c, v)", "    c.items[#c.items + 1] = v", "end", "local function __lz_pop(c)", "    local n = #c.items", "    if n == 0 then return 'None' end", "    local v = c.items[n]", "    c.items[n] = nil", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_get(c, k)", "    local v = c.items[k]", "    if v == nil then return 'None' end", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_has(c, k)", "    return c.items[k] ~= nil", "end", "local function __lz_idx_get(c, i)", "    if c.kind == 'list' then return c.items[i + 1] end", "    return c.items[i]", "end", "local function __lz_idx_set(c, i, v)", "    if c.kind == 'list' then", "        c.items[i + 1] = v", "    else", "        c.items[i] = v", "    end", "end", "local function __lz_str_find(s, sub)", "    return (string.find(s, sub, 1, true))", "end", "local function __lz_argv(i)", "    if arg == nil then return nil end", "    return arg[i]", "end", "local function __lz_readfile(path)", "    local f = io.open(path, 'r')", "    if f == nil then return nil end", "    local data = f:read('*a')", "    f:close()", "    return data", "end", "local function __lz_each(c)", "    if c.kind == 'list' then", "        local i = 0", "        return function()", "            i = i + 1", "            if i > #c.items then return nil end", "            return i - 1, c.items[i]", "        end", "    end", "    return pairs(c.items)", "end"))
 end
 
 local Meta = {}
