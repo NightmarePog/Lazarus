@@ -600,8 +600,11 @@ private ordering_type(node: Node, lt: Type, rt: Type): Type {
     if lt.is_dynamic() or rt.is_dynamic() {
         return Type.bool()
     }
+    if lt.kind == "str" and rt.kind == "str" {
+        return Type.bool()
+    }
     if not lt.is_numeric() or not rt.is_numeric() {
-        .fail(node, "ordering needs numbers, found " ++ lt.describe() ++ " and " ++ rt.describe())
+        .fail(node, "ordering needs numbers or strings, found " ++ lt.describe() ++ " and " ++ rt.describe())
     }
     if not lt.equals(rt) {
         .fail(node, "cannot order " ++ lt.describe() ++ " against " ++ rt.describe() ++ "; convert explicitly")

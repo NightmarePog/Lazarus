@@ -879,8 +879,8 @@ end
 function Ast.import_decl(segments, name, line, col)
     return Node.new("ImportDecl", __lz_map({["segments"] = segments, ["name"] = name, ["line"] = line, ["col"] = col}))
 end
-function Ast.extern_decl(name, params, target, line, col)
-    return Node.new("ExternDecl", __lz_map({["name"] = name, ["params"] = params, ["target"] = target, ["line"] = line, ["col"] = col}))
+function Ast.extern_decl(name, params, param_types, return_type, target, line, col)
+    return Node.new("ExternDecl", __lz_map({["name"] = name, ["params"] = params, ["param_types"] = param_types, ["return_type"] = return_type, ["target"] = target, ["line"] = line, ["col"] = col}))
 end
 function Ast.function_decl(name, params, body, is_static, visibility, line, col, param_types, return_type, type_params)
     return Node.new("FunctionDecl", __lz_map({["name"] = name, ["params"] = params, ["body"] = body, ["is_static"] = is_static, ["visibility"] = visibility, ["line"] = line, ["col"] = col, ["param_types"] = param_types, ["return_type"] = return_type, ["type_params"] = type_params}))
@@ -1618,11 +1618,13 @@ end
 function StmtParser.parse_extern(self, tok)
     local name = self.cursor:consume("IDENTIFIER", "Expected a name after 'extern'")
     self.cursor:consume("LEFT_BRACKET", "Expected '(' after extern name")
-    local params = StmtParser.parse_params(self, __lz_list())
+    local param_types = __lz_list()
+    local params = StmtParser.parse_params(self, param_types)
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after extern parameters")
+    local return_type = StmtParser.parse_return_type(self)
     self.cursor:consume("ASSIGN", "Expected '=' after extern parameters")
     local target = self.cursor:consume("STRING", "Expected a quoted Lua target after '='")
-    return Ast.extern_decl(name.value, params, target.value, tok.line, tok.column)
+    return Ast.extern_decl(name.value, params, param_types, return_type, target.value, tok.line, tok.column)
 end
 function StmtParser.parse_member(self, visibility)
     if self.cursor:match("STATIC") then
@@ -3502,8 +3504,11 @@ function Typecheck.ordering_type(self, node, lt, rt)
     if lt:is_dynamic() or rt:is_dynamic() then
         return Type.bool()
     end
+    if (lt.kind == "str") and (rt.kind == "str") then
+        return Type.bool()
+    end
     if (not lt:is_numeric()) or (not rt:is_numeric()) then
-        Typecheck.fail(self, node, (("ordering needs numbers, found " .. lt:describe()) .. " and ") .. rt:describe())
+        Typecheck.fail(self, node, (("ordering needs numbers or strings, found " .. lt:describe()) .. " and ") .. rt:describe())
     end
     if not lt:equals(rt) then
         Typecheck.fail(self, node, ((("cannot order " .. lt:describe()) .. " against ") .. rt:describe()) .. "; convert explicitly")
@@ -4311,9 +4316,9 @@ function ExprFolder.fold_binary(self, node, constants)
     local right = ExprFolder.fold(self, node:child("right"), constants)
     local op = node:child("op")
     if ExprFolder.foldable(self, op, left, right) then
-        local lv = __lz_unwrap_or(__lz_wrap(tonumber(left:child("value"))), 0)
-        local rv = __lz_unwrap_or(__lz_wrap(tonumber(right:child("value"))), 0)
-        if (op ~= "DIVIDE") or (rv ~= 0) then
+        local lv = __lz_unwrap_or(__lz_wrap(tonumber(left:child("value"))), 0.0)
+        local rv = __lz_unwrap_or(__lz_wrap(tonumber(right:child("value"))), 0.0)
+        if (op ~= "DIVIDE") or (rv ~= 0.0) then
             local result = ExprFolder.apply(self, op, lv, rv)
             self.folds = self.folds + 1
             return Ast.literal(ExprFolder.result_kind(self, op, left, right), __lz_unwrap_or(__lz_wrap(tostring(result)), "0"), node:line(), node:col())
@@ -5850,7 +5855,7 @@ function Main.collect_signatures(ast, class_name, classes, platform, gated_exter
             local params = __lz_unwrap_or(stmt:attr("param_types"), __lz_list())
             local all_typed = true
             for _, pt in __lz_each(params) do
-                if __lz_unwrap_or(pt:attr("inferred"), false) then
+                if __lz_unwrap_or(pt:attr("inferred"), false) or (pt:child("name") == "dynamic") then
                     all_typed = false
                 end
             end

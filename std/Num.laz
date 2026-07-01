@@ -1,15 +1,16 @@
 // Num — extern bindings to Lua's `math` library plus `tonumber` / `tostring`.
-// Calls forward their args (so variadic `max`/`min` take two or more) and wrap the
-// result at the Option boundary (`to_number` is None for a non-numeric string).
+// `to_number` wraps at the Option boundary (None for a non-numeric string).
+// to_text / to_int / to_float are left with untyped params because callers pass
+// both int and float — tostring/tonumber/math.floor accept any number in Lua.
 
-extern floor(x) = "math.floor"
-extern ceil(x) = "math.ceil"
-extern abs(x) = "math.abs"
+extern floor(x: float): Option<int> = "math.floor"
+extern ceil(x: float): Option<int> = "math.ceil"
+extern abs(x: float): Option<float> = "math.abs"
+// max/min are variadic in Lua — left untyped.
 extern max(a, b) = "math.max"
 extern min(a, b) = "math.min"
-extern to_number(s) = "tonumber"
-extern to_text(n) = "tostring"
-// Explicit int<->float conversion. `to_int` floors toward -inf; `to_float` is the
-// identity on a Lua number (the int/float split is a compile-time, erased fact).
-extern to_int(x) = "math.floor"
-extern to_float(x) = "tonumber"
+extern to_number(s: str): Option<float> = "tonumber"
+// to_text/to_int/to_float accept both int and float — left untyped.
+extern to_text(n): Option<str> = "tostring"
+extern to_int(x): Option<int> = "math.floor"
+extern to_float(x): Option<float> = "tonumber"

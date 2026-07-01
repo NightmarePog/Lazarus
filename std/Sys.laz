@@ -1,16 +1,15 @@
 // Sys — extern bindings to Lua's process / IO / runtime functions. Extern calls
-// forward their args (no arity check) and wrap their result at the Option boundary
-// (a Lua nil becomes `Option.none()`). `panic` binds to Lua's `error`, which never
-// returns — it is how `Option`/`Result.unwrap()` abort.
+// forward their args and wrap their result at the Option boundary (a Lua nil
+// becomes `Option.none()`). `panic` binds to Lua's `error`, which never returns.
 
-extern panic(message) = "error"
-extern print(s) = "print"
-extern write(s) = "io.write"
-extern read_line() = "io.read"
-extern read_all(fmt) = "io.read"
-extern argv(i) = "__lz_argv"
-extern read_file(path) = "__lz_readfile"
-extern time() = "os.time"
-extern clock() = "os.clock"
-extern exit(code) = "os.exit"
-extern open(s, mode) = "io.open"
+extern panic(message: str): unit = "error"
+extern print(s): unit = "print"
+extern write(s: str): unit = "io.write"
+extern read_line(): Option<str> = "io.read"
+extern read_all(fmt: str): Option<str> = "io.read"
+extern argv(i: int): Option<str> = "__lz_argv"
+extern read_file(path: str): Option<str> = "__lz_readfile"
+extern time(): Option<int> = "os.time"
+extern clock(): Option<float> = "os.clock"
+extern exit(code: int): unit = "os.exit"
+extern open(s: str, mode: str) = "io.open"
