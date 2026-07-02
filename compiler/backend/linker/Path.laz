@@ -3,6 +3,7 @@
 
 #object
 import std.Str
+import std.Sys
 import backend.Text
 import frontend.parser.Node
 
@@ -50,9 +51,17 @@ stem(path: str): str {
 }
 
 // Resolve one import node to a source path: `import a.b.Name` -> `<root>/a/b/Name.laz`.
-resolve(root: str, node: Node): str {
+// When a pkg_root is provided, the local root is tried first; if absent, pkg_root is used.
+resolve(root: str, pkg_root: str, node: Node): str {
     mut rel = Text.join(node.child("segments"), "/") ++ ".laz"
-    return Path.join(root, rel)
+    mut local_path = Path.join(root, rel)
+    if Sys.read_file(local_path).is_some() {
+        return local_path
+    }
+    if pkg_root != "" {
+        return Path.join(pkg_root, rel)
+    }
+    return local_path
 }
 
 // Join a directory and a relative path. An empty directory yields `rel` as-is.

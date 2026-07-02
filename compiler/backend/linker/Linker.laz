@@ -15,13 +15,15 @@ import Error
 
 private entry: str
 private root: str
+private pkg_root: str
 private loaded: Map<str, bool>
 private visiting: Map<str, bool>
 private ordered: List<Module>
 
-constructor(entry: str) {
+constructor(entry: str, pkg_root: str) {
     .entry = entry
     .root = Path.dirname(entry)
+    .pkg_root = pkg_root
     .loaded = [:]
     .visiting = [:]
     .ordered = []
@@ -66,7 +68,7 @@ private load(path: str, origin_source: str, origin_line: int, origin_col: int, o
     for node in program.child("body") {
         if node.kind == "ImportDecl" {
             mut span = Str.len(node.child("name")).unwrap_or(1)
-            .load(Path.resolve(.root, node), source, node.line(), node.col(), span)
+            .load(Path.resolve(.root, .pkg_root, node), source, node.line(), node.col(), span)
             imports.push(node.child("name"))
         } else {
             body.push(node)

@@ -22,14 +22,30 @@ constructor() {
     mut path = Sys.argv(1)
     if path.is_some() {
         mut platform = ""
-        mut flag = Sys.argv(2)
-        if flag.is_some() and flag.unwrap() == "--platform" {
-            mut pname = Sys.argv(3)
-            if pname.is_some() {
-                platform = pname.unwrap()
+        mut pkg_path = ""
+        mut i = 2
+        loop {
+            mut flag = Sys.argv(i)
+            if flag.is_none() {
+                break
             }
+            mut f = flag.unwrap()
+            if f == "--platform" {
+                i = i + 1
+                mut val = Sys.argv(i)
+                if val.is_some() {
+                    platform = val.unwrap()
+                }
+            } else if f == "--pkg-path" {
+                i = i + 1
+                mut val = Sys.argv(i)
+                if val.is_some() {
+                    pkg_path = val.unwrap()
+                }
+            }
+            i = i + 1
         }
-        Main.build_file(path.unwrap(), platform)
+        Main.build_file(path.unwrap(), platform, pkg_path)
     } else {
         Error("NoFileAppended", "No file appended, use 'lazarus <FILE.laz>'", 0, 0, "", 2).raise()
     }
@@ -37,8 +53,8 @@ constructor() {
 
 // A file entry point: follow its imports and bundle the whole program. Each
 // module is analysed and optimised on its own before the bundler composes them.
-static build_file(path: str, platform: str): unit {
-    mut linker = Linker(path)
+static build_file(path: str, platform: str, pkg_path: str): unit {
+    mut linker = Linker(path, pkg_path)
     mut modules = linker.link()
 
     mut variant_owner = [:]
