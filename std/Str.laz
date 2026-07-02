@@ -1,7 +1,12 @@
-// Str — extern bindings to Lua's `string` library. Typed params let the type
-// checker validate call sites. `find` uses a single-return shim (`__lz_str_find`)
-// since the language has no multiple returns: it yields the 1-based match start,
-// or None when absent. All string functions wrap their result at the Option boundary.
+// Str — string utilities: extern bindings to Lua's `string` library plus
+// pure-Lazarus functions built on them. `find` uses a single-return shim
+// (`__lz_str_find`) since the language has no multiple returns: it yields the
+// 1-based match start, or None when absent. Externs with an Option return wrap
+// at the boundary; `split` returns its list directly. All matching is
+// plain-text — no Lua patterns leak through this API.
+
+#object
+import std.Option
 
 extern upper(s: str): Option<str> = "string.upper"
 extern lower(s: str): Option<str> = "string.lower"
@@ -11,5 +16,120 @@ extern byte(s: str, i: int): Option<int> = "string.byte"
 extern char(n: int): Option<str> = "string.char"
 extern rep(s: str, n: int): Option<str> = "string.rep"
 extern find(s: str, sub: str): Option<int> = "__lz_str_find"
+extern split(s: str, sep: str): List<str> = "__lz_str_split"
+extern to_int(s: str): Option<int> = "__lz_str_to_int"
+extern to_float(s: str): Option<float> = "tonumber"
 // format is variadic in Lua — left untyped so callers can pass any number of args.
 extern format(fmt) = "string.format"
+
+// True when the byte at 1-based `i` is whitespace (space, tab, LF or CR).
+private is_space(s: str, i: int): bool {
+    mut b = Str.byte(s, i).unwrap_or(0)
+    return b == 32 or b == 9 or b == 10 or b == 13
+}
+
+trim_start(s: str): str {
+    mut n = Str.len(s).unwrap_or(0)
+    mut i = 1
+    while i <= n and Str.is_space(s, i) {
+        i = i + 1
+    }
+    if i > n {
+        return ""
+    }
+    return Str.sub(s, i, n).unwrap_or(s)
+}
+
+trim_end(s: str): str {
+    mut j = Str.len(s).unwrap_or(0)
+    while j >= 1 and Str.is_space(s, j) {
+        j = j - 1
+    }
+    if j < 1 {
+        return ""
+    }
+    return Str.sub(s, 1, j).unwrap_or(s)
+}
+
+trim(s: str): str {
+    return Str.trim_start(Str.trim_end(s))
+}
+
+// Left-pad with `fill` (a single character) until `s` is `width` long.
+pad_left(s: str, width: int, fill: str): str {
+    mut n = Str.len(s).unwrap_or(0)
+    if n >= width {
+        return s
+    }
+    return Str.rep(fill, width - n).unwrap_or("") ++ s
+}
+
+pad_right(s: str, width: int, fill: str): str {
+    mut n = Str.len(s).unwrap_or(0)
+    if n >= width {
+        return s
+    }
+    return s ++ Str.rep(fill, width - n).unwrap_or("")
+}
+
+is_prefix(s: str, prefix: str): bool {
+    mut pn = Str.len(prefix).unwrap_or(0)
+    return Str.sub(s, 1, pn).unwrap_or("") == prefix
+}
+
+is_suffix(s: str, suffix: str): bool {
+    mut n = Str.len(s).unwrap_or(0)
+    mut sn = Str.len(suffix).unwrap_or(0)
+    if sn > n {
+        return false
+    }
+    return Str.sub(s, n - sn + 1, n).unwrap_or("") == suffix
+}
+
+// Replace the first plain-text occurrence of `from`; `s` unchanged when absent.
+replace(s: str, from: str, to: str): str {
+    if from == "" {
+        return s
+    }
+    match Str.find(s, from) {
+        Some(pos) => {
+            mut n = Str.len(s).unwrap_or(0)
+            mut flen = Str.len(from).unwrap_or(0)
+            return Str.sub(s, 1, pos - 1).unwrap_or("") ++ to ++ Str.sub(s, pos + flen, n).unwrap_or("")
+        }
+        None => { return s }
+    }
+}
+
+// Replace every plain-text occurrence of `from`, scanning left to right; the
+// replacement itself is never rescanned.
+replace_all(s: str, from: str, to: str): str {
+    if from == "" {
+        return s
+    }
+    mut flen = Str.len(from).unwrap_or(0)
+    mut out = ""
+    mut rest = s
+    loop {
+        match Str.find(rest, from) {
+            Some(pos) => {
+                mut rlen = Str.len(rest).unwrap_or(0)
+                out = out ++ Str.sub(rest, 1, pos - 1).unwrap_or("") ++ to
+                rest = Str.sub(rest, pos + flen, rlen).unwrap_or("")
+            }
+            None => { return out ++ rest }
+        }
+    }
+}
+
+// One single-byte string per byte of `s` (byte-level, not UTF-8 aware).
+chars(s: str): List<str> {
+    mut out = []
+    mut n = Str.len(s).unwrap_or(0)
+    mut i = 1
+    while i <= n {
+        out.push(Str.sub(s, i, i).unwrap_or(""))
+        i = i + 1
+    }
+    return out
+}
