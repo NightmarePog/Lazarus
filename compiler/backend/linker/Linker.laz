@@ -4,13 +4,14 @@
 // stages see a plain single-class program. An already-loaded file is skipped,
 // breaking cycles; an unreadable import raises at its `import` line.
 
+import std.Path
 import std.Str
 import std.Sys
 import frontend.lexer.Lexer
 import frontend.parser.Node
 import frontend.parser.Parser
 import backend.linker.Module
-import backend.linker.Path
+import backend.Text
 import Error
 
 private entry: str
@@ -68,7 +69,7 @@ private load(path: str, origin_source: str, origin_line: int, origin_col: int, o
     for node in program.child("body") {
         if node.kind == "ImportDecl" {
             mut span = Str.len(node.child("name")).unwrap_or(1)
-            .load(Path.resolve(.root, .pkg_root, node), source, node.line(), node.col(), span)
+            .load(.resolve(node), source, node.line(), node.col(), span)
             imports.push(node.child("name"))
         } else {
             body.push(node)
@@ -78,6 +79,21 @@ private load(path: str, origin_source: str, origin_line: int, origin_col: int, o
 
     .ordered.push(Module(path, class_name, source, program, imports, .body_is_interface(body)))
     .loaded[path] = true
+}
+
+// Resolve one import node to a source path: `import a.b.Name` -> `<root>/a/b/Name.laz`.
+// When pkg_root is non-empty the local root is tried first; if the file is
+// absent there, pkg_root is used.
+private resolve(node: Node): str {
+    mut rel = Text.join(node.child("segments"), "/") ++ ".laz"
+    mut local_path = Path.join(.root, rel)
+    if Sys.file_exists(local_path) {
+        return local_path
+    }
+    if .pkg_root != "" {
+        return Path.join(.pkg_root, rel)
+    }
+    return local_path
 }
 
 // A module is an interface when its body holds only interface declarations (a
