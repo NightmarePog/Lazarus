@@ -110,6 +110,35 @@ local function __lz_each(c)
     end
     return pairs(c.items)
 end
+local function __lz_exec(cmd)
+    local ok = os.execute(cmd)
+    if ok == true or ok == 0 then return 0 end
+    return 1
+end
+local function __lz_popen(cmd)
+    local h = io.popen(cmd .. ' 2>&1')
+    if h == nil then return nil end
+    local s = h:read('*a')
+    h:close()
+    return s
+end
+local function __lz_write_file(path, content)
+    local f = io.open(path, 'w')
+    if f == nil then return false end
+    local ok = f:write(content)
+    f:close()
+    return ok ~= nil
+end
+local function __lz_exists(path)
+    local f = io.open(path, 'r')
+    if f then f:close(); return true end
+    local ok = os.rename(path, path)
+    return ok == true
+end
+local function __lz_mkdir(path)
+    local ok = os.execute('mkdir -p ' .. path)
+    return ok == true or ok == 0
+end
 
 local Error = {}
 
@@ -5432,7 +5461,7 @@ end
 local Runtime = {}
 
 function Runtime.prelude()
-    return Text.lines(__lz_list("local function __lz_list(...)", "    return { kind = 'list', items = { ... } }", "end", "local function __lz_map(items)", "    return { kind = 'map', items = items }", "end", "local function __lz_some(v)", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_none()", "    return 'None'", "end", "local function __lz_ok(v)", "    return { kind = 'Ok', _1 = v }", "end", "local function __lz_err(m)", "    return { kind = 'Err', _1 = m }", "end", "local function __lz_wrap(v)", "    if v == nil then return 'None' end", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_is_some(o)", "    return type(o) == 'table' and o.kind == 'Some'", "end", "local function __lz_is_none(o)", "    return o == 'None'", "end", "local function __lz_is_ok(o)", "    return type(o) == 'table' and o.kind == 'Ok'", "end", "local function __lz_is_err(o)", "    return type(o) == 'table' and o.kind == 'Err'", "end", "local function __lz_unwrap(o)", "    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end", "    if type(o) == 'table' and o.kind == 'Err' then error(o._1) end", "    error('unwrap of a None value')", "end", "local function __lz_unwrap_or(o, d)", "    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end", "    return d", "end", "local function __lz_error(o)", "    return o._1", "end", "local function __lz_len(c)", "    if c.kind == 'list' then return #c.items end", "    local n = 0", "    for _ in pairs(c.items) do n = n + 1 end", "    return n", "end", "local function __lz_push(c, v)", "    c.items[#c.items + 1] = v", "end", "local function __lz_pop(c)", "    local n = #c.items", "    if n == 0 then return 'None' end", "    local v = c.items[n]", "    c.items[n] = nil", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_get(c, k)", "    local v = c.items[k]", "    if v == nil then return 'None' end", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_has(c, k)", "    return c.items[k] ~= nil", "end", "local function __lz_idx_get(c, i)", "    if c.kind == 'list' then return c.items[i + 1] end", "    return c.items[i]", "end", "local function __lz_idx_set(c, i, v)", "    if c.kind == 'list' then", "        c.items[i + 1] = v", "    else", "        c.items[i] = v", "    end", "end", "local function __lz_str_find(s, sub)", "    return (string.find(s, sub, 1, true))", "end", "local function __lz_argv(i)", "    if arg == nil then return nil end", "    return arg[i]", "end", "local function __lz_readfile(path)", "    local f = io.open(path, 'r')", "    if f == nil then return nil end", "    local data = f:read('*a')", "    f:close()", "    return data", "end", "local function __lz_each(c)", "    if c.kind == 'list' then", "        local i = 0", "        return function()", "            i = i + 1", "            if i > #c.items then return nil end", "            return i - 1, c.items[i]", "        end", "    end", "    return pairs(c.items)", "end"))
+    return Text.lines(__lz_list("local function __lz_list(...)", "    return { kind = 'list', items = { ... } }", "end", "local function __lz_map(items)", "    return { kind = 'map', items = items }", "end", "local function __lz_some(v)", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_none()", "    return 'None'", "end", "local function __lz_ok(v)", "    return { kind = 'Ok', _1 = v }", "end", "local function __lz_err(m)", "    return { kind = 'Err', _1 = m }", "end", "local function __lz_wrap(v)", "    if v == nil then return 'None' end", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_is_some(o)", "    return type(o) == 'table' and o.kind == 'Some'", "end", "local function __lz_is_none(o)", "    return o == 'None'", "end", "local function __lz_is_ok(o)", "    return type(o) == 'table' and o.kind == 'Ok'", "end", "local function __lz_is_err(o)", "    return type(o) == 'table' and o.kind == 'Err'", "end", "local function __lz_unwrap(o)", "    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end", "    if type(o) == 'table' and o.kind == 'Err' then error(o._1) end", "    error('unwrap of a None value')", "end", "local function __lz_unwrap_or(o, d)", "    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end", "    return d", "end", "local function __lz_error(o)", "    return o._1", "end", "local function __lz_len(c)", "    if c.kind == 'list' then return #c.items end", "    local n = 0", "    for _ in pairs(c.items) do n = n + 1 end", "    return n", "end", "local function __lz_push(c, v)", "    c.items[#c.items + 1] = v", "end", "local function __lz_pop(c)", "    local n = #c.items", "    if n == 0 then return 'None' end", "    local v = c.items[n]", "    c.items[n] = nil", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_get(c, k)", "    local v = c.items[k]", "    if v == nil then return 'None' end", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_has(c, k)", "    return c.items[k] ~= nil", "end", "local function __lz_idx_get(c, i)", "    if c.kind == 'list' then return c.items[i + 1] end", "    return c.items[i]", "end", "local function __lz_idx_set(c, i, v)", "    if c.kind == 'list' then", "        c.items[i + 1] = v", "    else", "        c.items[i] = v", "    end", "end", "local function __lz_str_find(s, sub)", "    return (string.find(s, sub, 1, true))", "end", "local function __lz_argv(i)", "    if arg == nil then return nil end", "    return arg[i]", "end", "local function __lz_readfile(path)", "    local f = io.open(path, 'r')", "    if f == nil then return nil end", "    local data = f:read('*a')", "    f:close()", "    return data", "end", "local function __lz_each(c)", "    if c.kind == 'list' then", "        local i = 0", "        return function()", "            i = i + 1", "            if i > #c.items then return nil end", "            return i - 1, c.items[i]", "        end", "    end", "    return pairs(c.items)", "end", "local function __lz_exec(cmd)", "    local ok = os.execute(cmd)", "    if ok == true or ok == 0 then return 0 end", "    return 1", "end", "local function __lz_popen(cmd)", "    local h = io.popen(cmd .. ' 2>&1')", "    if h == nil then return nil end", "    local s = h:read('*a')", "    h:close()", "    return s", "end", "local function __lz_write_file(path, content)", "    local f = io.open(path, 'w')", "    if f == nil then return false end", "    local ok = f:write(content)", "    f:close()", "    return ok ~= nil", "end", "local function __lz_exists(path)", "    local f = io.open(path, 'r')", "    if f then f:close(); return true end", "    local ok = os.rename(path, path)", "    return ok == true", "end", "local function __lz_mkdir(path)", "    local ok = os.execute('mkdir -p ' .. path)", "    return ok == true or ok == 0", "end"))
 end
 
 local Meta = {}
@@ -5679,9 +5708,16 @@ function Path.stem(path)
     end
     return __lz_unwrap_or(__lz_wrap(string.sub(path, start, dot - 1)), path)
 end
-function Path.resolve(root, node)
+function Path.resolve(root, pkg_root, node)
     local rel = Text.join(node:child("segments"), "/") .. ".laz"
-    return Path.join(root, rel)
+    local local_path = Path.join(root, rel)
+    if __lz_wrap(__lz_exists(local_path)) then
+        return local_path
+    end
+    if pkg_root ~= "" then
+        return Path.join(pkg_root, rel)
+    end
+    return local_path
 end
 function Path.join(dir, rel)
     if dir == "" then
@@ -5692,7 +5728,7 @@ end
 
 local Linker = {}
 
-function Linker.new(entry)
+function Linker.new(entry, pkg_root)
     local self = {}
     self.link = Linker.link
     self.entry_class = Linker.entry_class
@@ -5700,6 +5736,7 @@ function Linker.new(entry)
     self.body_is_interface = Linker.body_is_interface
     self.entry = entry
     self.root = Path.dirname(entry)
+    self.pkg_root = pkg_root
     self.loaded = __lz_map({})
     self.visiting = __lz_map({})
     self.ordered = __lz_list()
@@ -5733,7 +5770,7 @@ function Linker.load(self, path, origin_source, origin_line, origin_col, origin_
     for _, node in __lz_each(program:child("body")) do
         if node.kind == "ImportDecl" then
             local span = __lz_unwrap_or(__lz_wrap(string.len(node:child("name"))), 1)
-            Linker.load(self, Path.resolve(self.root, node), source, node:line(), node:col(), span)
+            Linker.load(self, Path.resolve(self.root, self.pkg_root, node), source, node:line(), node:col(), span)
             __lz_push(imports, node:child("name"))
         else
             __lz_push(body, node)
@@ -5767,21 +5804,39 @@ function Main.new()
     local path = __lz_wrap(__lz_argv(1))
     if __lz_is_some(path) then
         local platform = ""
-        local flag = __lz_wrap(__lz_argv(2))
-        if __lz_is_some(flag) and (__lz_unwrap(flag) == "--platform") then
-            local pname = __lz_wrap(__lz_argv(3))
-            if __lz_is_some(pname) then
-                platform = __lz_unwrap(pname)
+        local pkg_path = ""
+        local i = 2
+        while true do
+            local flag = __lz_wrap(__lz_argv(i))
+            if __lz_is_none(flag) then
+                break
             end
+            local f = __lz_unwrap(flag)
+            if f == "--platform" then
+                i = i + 1
+                local val = __lz_wrap(__lz_argv(i))
+                if __lz_is_some(val) then
+                    platform = __lz_unwrap(val)
+                end
+            elseif f == "--pkg-path" then
+                i = i + 1
+                local val = __lz_wrap(__lz_argv(i))
+                if __lz_is_some(val) then
+                    pkg_path = __lz_unwrap(val)
+                else
+                    Error.new("MissingFlagValue", "--pkg-path requires a directory argument", 0, 0, "", 1):raise()
+                end
+            end
+            i = i + 1
         end
-        Main.build_file(__lz_unwrap(path), platform)
+        Main.build_file(__lz_unwrap(path), platform, pkg_path)
     else
         Error.new("NoFileAppended", "No file appended, use 'lazarus <FILE.laz>'", 0, 0, "", 2):raise()
     end
     return self
 end
-function Main.build_file(path, platform)
-    local linker = Linker.new(path)
+function Main.build_file(path, platform, pkg_path)
+    local linker = Linker.new(path, pkg_path)
     local modules = linker:link()
     local variant_owner = __lz_map({})
     local enums = __lz_map({})
