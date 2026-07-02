@@ -1,0 +1,1062 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>The Lazarus Language Reference</title>
+        <meta name="robots" content="noindex">
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">The Lazarus Language Reference</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/NightmarePog/Lazarus" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="the-lazarus-language-reference"><a class="header" href="#the-lazarus-language-reference">The Lazarus Language Reference</a></h1>
+<p>Lazarus is a statically-typed, class-oriented language that compiles to a single self-contained Lua file. It is designed to be a more readable, safer dialect of Lua with a modern type system that is fully erased at code generation — zero runtime type cost.</p>
+<h2 id="design-principles"><a class="header" href="#design-principles">Design principles</a></h2>
+<ul>
+<li><strong>File = class.</strong> Every <code>.laz</code> file is a class. The filename (in <code>PascalCase</code>) is the class name.</li>
+<li><strong>Static types, erased output.</strong> Types are checked at compile time and removed from the generated Lua. No type tables, no runtime overhead.</li>
+<li><strong>Compiles to one file.</strong> <code>lazarusc</code> bundles all imports into a single <code>.lua</code>. No runtime <code>require</code>.</li>
+<li><strong>Target runtime: Lua 5.x.</strong> The output is plain Lua 5.0-compatible code.</li>
+</ul>
+<h2 id="pipeline"><a class="header" href="#pipeline">Pipeline</a></h2>
+<pre><code>Source (.laz)
+  → Lexer       (tokens)
+  → Parser      (AST)
+  → Schematic   (name resolution, type checking)
+  → Optimizer   (constant folding)
+  → Codegen     (Lua source)
+</code></pre>
+<h2 id="status"><a class="header" href="#status">Status</a></h2>
+<p>This reference documents what the compiler currently implements. Features listed in the design documents but not yet compiled are not covered here.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h1>
+<h2 id="requirements"><a class="header" href="#requirements">Requirements</a></h2>
+<ul>
+<li>Lua 5.x installed and on your <code>PATH</code></li>
+<li>The Lazarus compiler binary: <code>bin/lazarusc.lua</code></li>
+</ul>
+<h2 id="compiling-a-file"><a class="header" href="#compiling-a-file">Compiling a file</a></h2>
+<pre><code class="language-sh">lua bin/lazarusc.lua MyProgram.laz
+</code></pre>
+<p>This writes <code>Main.lua</code> to the current working directory.</p>
+<pre><code class="language-sh">lua Main.lua
+</code></pre>
+<p>The makefile exposes a convenience target:</p>
+<pre><code class="language-sh">make selfbuild FILE=MyProgram.laz
+</code></pre>
+<h2 id="your-first-program"><a class="header" href="#your-first-program">Your first program</a></h2>
+<p>Create <code>Hello.laz</code>:</p>
+<pre><code class="language-lazarus">import std.Sys
+
+constructor() {
+    Sys.print("hello, world")
+}
+</code></pre>
+<p>Compile and run:</p>
+<pre><code class="language-sh">lua bin/lazarusc.lua Hello.laz
+lua Main.lua
+</code></pre>
+<h2 id="entry-point"><a class="header" href="#entry-point">Entry point</a></h2>
+<p>The compiler calls the constructor of the root file automatically. There is no separate <code>main</code> function — the constructor of the file you pass to <code>lazarusc</code> is the entry point.</p>
+<h2 id="naming-conventions"><a class="header" href="#naming-conventions">Naming conventions</a></h2>
+<p>The compiler enforces these naming rules:</p>
+<div class="table-wrapper"><table><thead><tr><th>Kind</th><th>Convention</th><th>Example</th></tr></thead><tbody>
+<tr><td>File / class</td><td><code>PascalCase</code></td><td><code>MyClass.laz</code></td></tr>
+<tr><td>Function / method</td><td><code>snake_case</code></td><td><code>do_thing</code></td></tr>
+<tr><td>Variable / binding</td><td><code>snake_case</code></td><td><code>my_value</code></td></tr>
+<tr><td>Enum variant</td><td><code>PascalCase</code></td><td><code>Some</code>, <code>None</code></td></tr>
+</tbody></table>
+</div><div style="break-before: page; page-break-before: always;"></div><h1 id="lexical-basics"><a class="header" href="#lexical-basics">Lexical Basics</a></h1>
+<h2 id="comments"><a class="header" href="#comments">Comments</a></h2>
+<pre><code class="language-lazarus">// This is a line comment
+
+/* This is a
+   block comment */
+</code></pre>
+<h2 id="identifiers"><a class="header" href="#identifiers">Identifiers</a></h2>
+<p>Identifiers start with a letter or underscore, followed by letters, digits, or underscores. The language enforces casing by convention (see <a href="getting-started.html">Getting Started</a>).</p>
+<h2 id="keywords"><a class="header" href="#keywords">Keywords</a></h2>
+<pre><code>import   extern   enum     interface
+fn       private  public   mut
+static   self     constructor
+return   if       else     while
+loop     for      in       break
+true     false    and      or      not
+</code></pre>
+<p><code>match</code> is a soft keyword — it is parsed as a statement opener only when not used as a function name or variable.</p>
+<h2 id="literals"><a class="header" href="#literals">Literals</a></h2>
+<h3 id="integers"><a class="header" href="#integers">Integers</a></h3>
+<pre><code class="language-lazarus">42
+0
+-7
+</code></pre>
+<h3 id="floats"><a class="header" href="#floats">Floats</a></h3>
+<pre><code class="language-lazarus">3.14
+0.5
+</code></pre>
+<p>Any number containing a <code>.</code> is a float; without it, an integer.</p>
+<h3 id="booleans"><a class="header" href="#booleans">Booleans</a></h3>
+<pre><code class="language-lazarus">true
+false
+</code></pre>
+<h3 id="strings"><a class="header" href="#strings">Strings</a></h3>
+<p>See the <a href="strings.html">Strings</a> chapter for full coverage of string literals including interpolation and triple-quoted strings.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="bindings"><a class="header" href="#bindings">Bindings</a></h1>
+<h2 id="immutable-locals"><a class="header" href="#immutable-locals">Immutable locals</a></h2>
+<p>A bare <code>name = expr</code> declares an immutable local. It cannot be reassigned.</p>
+<pre><code class="language-lazarus">x = 10
+label = "hello"
+</code></pre>
+<h2 id="mutable-locals"><a class="header" href="#mutable-locals">Mutable locals</a></h2>
+<p><code>mut name = expr</code> declares a mutable local that can be reassigned with <code>=</code> or a compound operator.</p>
+<pre><code class="language-lazarus">mut count = 0
+count = count + 1
+count += 1
+</code></pre>
+<h2 id="typed-locals"><a class="header" href="#typed-locals">Typed locals</a></h2>
+<p>Any binding can carry an explicit type annotation <code>name: Type = expr</code>.</p>
+<pre><code class="language-lazarus">n: int = 42
+name: str = "world"
+mut total: float = 0.0
+</code></pre>
+<p>When a type is omitted, the compiler infers it from the initialiser. Explicitly annotating with <code>dynamic</code> opts out of type checking for that binding.</p>
+<h2 id="compound-assignment"><a class="header" href="#compound-assignment">Compound assignment</a></h2>
+<p>Mutable bindings (and mutable fields) support compound operators:</p>
+<pre><code class="language-lazarus">mut x = 0
+x += 5    // x = x + 5
+x -= 1    // x = x - 1
+x *= 2    // x = x * 2
+x /= 4    // x = x / 4
+</code></pre>
+<h2 id="class-fields-vs-locals"><a class="header" href="#class-fields-vs-locals">Class fields vs locals</a></h2>
+<p>Bindings declared at the top level of a class file (outside any constructor or method) are <strong>fields</strong> when prefixed with a visibility keyword, or <strong>static members</strong> when also prefixed with <code>static</code>. Bare top-level bindings without a visibility keyword are local to the constructor.</p>
+<p>See <a href="classes.html">Classes</a> for details.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="types"><a class="header" href="#types">Types</a></h1>
+<p>The Lazarus type system is static and erased: all type information is checked at compile time and removed from the Lua output.</p>
+<h2 id="primitive-types"><a class="header" href="#primitive-types">Primitive types</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>Type</th><th>Description</th><th>Example literal</th></tr></thead><tbody>
+<tr><td><code>int</code></td><td>Integer number</td><td><code>42</code></td></tr>
+<tr><td><code>float</code></td><td>Floating-point number</td><td><code>3.14</code></td></tr>
+<tr><td><code>str</code></td><td>String</td><td><code>"hello"</code></td></tr>
+<tr><td><code>bool</code></td><td>Boolean</td><td><code>true</code>, <code>false</code></td></tr>
+</tbody></table>
+</div>
+<p><code>int</code> and <code>float</code> are distinct types. There is no automatic coercion between them.</p>
+<h2 id="dynamic"><a class="header" href="#dynamic"><code>dynamic</code></a></h2>
+<p><code>dynamic</code> opts out of type checking. A <code>dynamic</code> value can be used anywhere without a type error. This is the default for unannotated parameters and the return type of <code>extern</code> declarations.</p>
+<pre><code class="language-lazarus">process(x: dynamic): dynamic {
+    return x
+}
+</code></pre>
+<h2 id="unit"><a class="header" href="#unit"><code>unit</code></a></h2>
+<p><code>unit</code> is the return type of a method or function that returns nothing (analogous to <code>void</code>). It is written as <code>: unit</code> on the return type.</p>
+<pre><code class="language-lazarus">log(msg: str): unit {
+    Sys.print(msg)
+}
+</code></pre>
+<h2 id="optiont"><a class="header" href="#optiont"><code>Option&lt;T&gt;</code></a></h2>
+<p><code>Option</code> is a built-in generic type representing an optional value.</p>
+<ul>
+<li><code>Option.some(value)</code> — wraps a value</li>
+<li><code>Option.none()</code> — the absent case</li>
+</ul>
+<p>Common methods on <code>Option</code>:</p>
+<pre><code class="language-lazarus">mut v: Option&lt;int&gt; = Option.some(10)
+v.unwrap()          // returns the value or panics
+v.unwrap_or(0)      // returns the value or a default
+v.is_some()         // bool
+v.is_none()         // bool
+</code></pre>
+<h2 id="generic-types"><a class="header" href="#generic-types">Generic types</a></h2>
+<p>Class and enum names can be parameterised with <code>&lt;T&gt;</code>:</p>
+<pre><code class="language-lazarus">// Using a generic class
+mut items: List&lt;str&gt; = []
+mut table: Map&lt;str, int&gt; = [:]
+</code></pre>
+<p><code>List&lt;T&gt;</code> and <code>Map&lt;K, V&gt;</code> are built-in collection types. See <a href="classes.html">Classes</a> for how to declare generic classes.</p>
+<h2 id="union-types"><a class="header" href="#union-types">Union types</a></h2>
+<p>A union type <code>A | B</code> accepts either type. Union types are erased at codegen.</p>
+<pre><code class="language-lazarus">display(value: int | str): unit {
+    Sys.print(value)
+}
+</code></pre>
+<h2 id="function-types"><a class="header" href="#function-types">Function types</a></h2>
+<p>A function type <code>(P1, P2) -&gt; R</code> describes a callable value.</p>
+<pre><code class="language-lazarus">apply(f: (int) -&gt; int, x: int): int {
+    return f(x)
+}
+</code></pre>
+<h2 id="type-annotations-syntax"><a class="header" href="#type-annotations-syntax">Type annotations syntax</a></h2>
+<p>Type annotations appear after a <code>:</code> on bindings, parameters, fields, and return positions:</p>
+<pre><code class="language-lazarus">name: str = "Lazarus"
+
+greet(who: str): str {
+    return "hello " ++ who
+}
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="classes"><a class="header" href="#classes">Classes</a></h1>
+<h2 id="file--class"><a class="header" href="#file--class">File = class</a></h2>
+<p>Every <code>.laz</code> file is a class. The filename (without the extension, in <code>PascalCase</code>) is the class name. There is no <code>class</code> keyword.</p>
+<pre><code>Counter.laz   →   class Counter
+Vec2.laz      →   class Vec2
+</code></pre>
+<h2 id="fields"><a class="header" href="#fields">Fields</a></h2>
+<p>Instance fields are declared at the top level of the file with a visibility keyword. They are private by default.</p>
+<pre><code class="language-lazarus">private count: int
+private mut name: str
+public score: float
+</code></pre>
+<ul>
+<li>Fields without <code>mut</code> are immutable after construction.</li>
+<li>Fields are instance-level: each object has its own copy.</li>
+</ul>
+<h2 id="static-members"><a class="header" href="#static-members">Static members</a></h2>
+<p><code>static</code> declares a member shared across all instances, or a static function.</p>
+<pre><code class="language-lazarus">private static base = 100
+static max_size = 1000
+
+static default_name(): str {
+    return "unnamed"
+}
+</code></pre>
+<p>Static members are accessed qualified by class name from outside the file: <code>Counter.max_size</code>.</p>
+<h2 id="constructor"><a class="header" href="#constructor">Constructor</a></h2>
+<p>A <code>constructor(params) { ... }</code> block initialises the object. It is called when the class is used as a function: <code>Counter(5)</code>.</p>
+<pre><code class="language-lazarus">private count: int
+
+constructor(start: int) {
+    .count = start
+}
+</code></pre>
+<h3 id="auto-constructor"><a class="header" href="#auto-constructor"><code>@auto</code> constructor</a></h3>
+<p><code>@auto</code> before <code>constructor</code> automatically assigns each parameter to the same-named field, saving boilerplate:</p>
+<pre><code class="language-lazarus">private x: int
+private y: int
+
+@auto
+constructor(x: int, y: int)
+</code></pre>
+<p>This is equivalent to:</p>
+<pre><code class="language-lazarus">constructor(x: int, y: int) {
+    .x = x
+    .y = y
+}
+</code></pre>
+<h3 id="field-params-param"><a class="header" href="#field-params-param">Field params (<code>.param</code>)</a></h3>
+<p>A constructor parameter prefixed with <code>.</code> both declares the field and assigns it:</p>
+<pre><code class="language-lazarus">constructor(.x: int, .y: int)
+</code></pre>
+<h2 id="accessing-self"><a class="header" href="#accessing-self">Accessing <code>self</code></a></h2>
+<p>Inside a method or constructor, instance fields and methods are accessed with a leading <code>.</code>:</p>
+<pre><code class="language-lazarus">get_count(): int {
+    return .count
+}
+
+reset(): unit {
+    .count = 0
+}
+</code></pre>
+<p>There is no <code>self.</code> — the dot alone is the receiver.</p>
+<h2 id="visibility"><a class="header" href="#visibility">Visibility</a></h2>
+<ul>
+<li><code>private</code> — only accessible within the file.</li>
+<li><code>public</code> — accessible from outside (via an instance or via the class name for static members).</li>
+<li>No keyword — defaults to private for class members; for local bindings, scoped to the block.</li>
+</ul>
+<h2 id="generic-classes"><a class="header" href="#generic-classes">Generic classes</a></h2>
+<p>A class can declare type parameters on its constructor:</p>
+<pre><code class="language-lazarus">private value: T
+
+constructor&lt;T&gt;(v: T) {
+    .value = v
+}
+
+get(): T {
+    return .value
+}
+</code></pre>
+<p>The type parameter <code>T</code> scopes to the entire file.</p>
+<h2 id="example"><a class="header" href="#example">Example</a></h2>
+<pre><code class="language-lazarus">// Counter.laz
+private mut count: int
+private static step = 1
+
+@auto
+constructor(count: int)
+
+public increment(): unit {
+    .count = .count + Counter.step
+}
+
+public get(): int {
+    return .count
+}
+</code></pre>
+<p>Usage from another file:</p>
+<pre><code class="language-lazarus">import Counter
+
+constructor() {
+    c = Counter(0)
+    c.increment()
+    c.increment()
+    // c.get() == 2
+}
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="methods"><a class="header" href="#methods">Methods</a></h1>
+<h2 id="instance-methods"><a class="header" href="#instance-methods">Instance methods</a></h2>
+<p>An instance method is declared at the top level of a class file with a name, parameter list, and body. It receives the object via implicit <code>.</code> access.</p>
+<pre><code class="language-lazarus">greet(name: str): str {
+    return "hello, " ++ name ++ " from " ++ .label
+}
+</code></pre>
+<p>Methods can call other methods on <code>self</code> with a leading <code>.</code>:</p>
+<pre><code class="language-lazarus">describe(): str {
+    return .greet("world") ++ "!"
+}
+</code></pre>
+<h2 id="static-methods"><a class="header" href="#static-methods">Static methods</a></h2>
+<p><code>static</code> before the method name makes it a class-level function with no <code>self</code>:</p>
+<pre><code class="language-lazarus">static add(a: int, b: int): int {
+    return a + b
+}
+</code></pre>
+<p>Call with the class name: <code>Math.add(1, 2)</code>.</p>
+<h2 id="visibility-1"><a class="header" href="#visibility-1">Visibility</a></h2>
+<p><code>public</code> exports a method; without it the method is private.</p>
+<pre><code class="language-lazarus">public get_value(): int {
+    return .value
+}
+
+private helper(): str {
+    return "internal"
+}
+</code></pre>
+<h2 id="return-types"><a class="header" href="#return-types">Return types</a></h2>
+<p>A method's return type follows its parameter list after a <code>:</code>:</p>
+<pre><code class="language-lazarus">count(): int {
+    return .n
+}
+
+name(): str {
+    return .label
+}
+</code></pre>
+<p>Returning nothing uses <code>: unit</code>:</p>
+<pre><code class="language-lazarus">reset(): unit {
+    .n = 0
+}
+</code></pre>
+<h2 id="expression-body-shorthand"><a class="header" href="#expression-body-shorthand">Expression-body shorthand</a></h2>
+<p>A single-expression body can be written with <code>=</code> instead of <code>{ return ... }</code>:</p>
+<pre><code class="language-lazarus">double(n: int): int = n * 2
+label(): str = .name ++ " (" ++ .id ++ ")"
+</code></pre>
+<h2 id="generic-methods"><a class="header" href="#generic-methods">Generic methods</a></h2>
+<p>A method can declare its own type parameters with <code>&lt;T&gt;</code> after the name:</p>
+<pre><code class="language-lazarus">wrap&lt;T&gt;(value: T): Option&lt;T&gt; {
+    return Option.some(value)
+}
+</code></pre>
+<h2 id="function-expressions"><a class="header" href="#function-expressions">Function expressions</a></h2>
+<p>An anonymous function can be used as a value anywhere an expression is expected:</p>
+<pre><code class="language-lazarus">apply = fn(x: int): int { return x * 2 }
+result = apply(5)
+</code></pre>
+<p>The type of a function expression is <code>(ParamTypes) -&gt; ReturnType</code>:</p>
+<pre><code class="language-lazarus">transform: (int) -&gt; int = fn(x: int): int { return x + 1 }
+</code></pre>
+<h2 id="labeled-arguments"><a class="header" href="#labeled-arguments">Labeled arguments</a></h2>
+<p>Call sites can use labeled arguments for clarity. All arguments must be labeled if any are:</p>
+<pre><code class="language-lazarus">move(x: int, y: int): unit {
+    .pos_x = x
+    .pos_y = y
+}
+
+// called as:
+obj.move(x: 10, y: 20)
+</code></pre>
+<h2 id="local-functions"><a class="header" href="#local-functions">Local functions</a></h2>
+<p>A function can be declared inside a method body. It is a local binding scoped to that block:</p>
+<pre><code class="language-lazarus">compute(seed: int): int {
+    bump(x: int): int {
+        return x + 1
+    }
+    return bump(seed * 2)
+}
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="control-flow"><a class="header" href="#control-flow">Control Flow</a></h1>
+<h2 id="if--else-if--else"><a class="header" href="#if--else-if--else"><code>if</code> / <code>else if</code> / <code>else</code></a></h2>
+<pre><code class="language-lazarus">if x &gt; 0 {
+    Sys.print("positive")
+} else if x == 0 {
+    Sys.print("zero")
+} else {
+    Sys.print("negative")
+}
+</code></pre>
+<p>Conditions do not require parentheses. Braces are required.</p>
+<h2 id="while"><a class="header" href="#while"><code>while</code></a></h2>
+<p>Loops while the condition is true:</p>
+<pre><code class="language-lazarus">mut i = 0
+while i &lt; 10 {
+    i += 1
+}
+</code></pre>
+<h2 id="loop"><a class="header" href="#loop"><code>loop</code></a></h2>
+<p>An unconditional loop. Use <code>break</code> to exit:</p>
+<pre><code class="language-lazarus">loop {
+    mut line = Sys.read_line().unwrap_or("")
+    if line == "quit" {
+        break
+    }
+    Sys.print(line)
+}
+</code></pre>
+<h2 id="break"><a class="header" href="#break"><code>break</code></a></h2>
+<p>Exits the nearest enclosing <code>while</code> or <code>loop</code>:</p>
+<pre><code class="language-lazarus">mut found = false
+loop {
+    if .check() {
+        found = true
+        break
+    }
+}
+</code></pre>
+<h2 id="for--in"><a class="header" href="#for--in"><code>for ... in</code></a></h2>
+<p>Iterates over a collection. One variable binds the value; two variables bind key and value for maps:</p>
+<pre><code class="language-lazarus">// list
+for item in items {
+    Sys.print(item)
+}
+
+// map (key, value)
+for key, val in table {
+    Sys.print(key ++ ": " ++ val)
+}
+</code></pre>
+<h2 id="c-style-for"><a class="header" href="#c-style-for">C-style <code>for</code></a></h2>
+<p>A traditional init/condition/step loop:</p>
+<pre><code class="language-lazarus">for i = 0; i &lt; 10; i += 1 {
+    Sys.print(i)
+}
+</code></pre>
+<p>Any of the three parts may be omitted:</p>
+<pre><code class="language-lazarus">for ; .running ; {
+    .tick()
+}
+</code></pre>
+<h2 id="match"><a class="header" href="#match"><code>match</code></a></h2>
+<p>Pattern-matches a value against a list of arms. Arms are tried top-to-bottom; the first matching arm runs.</p>
+<pre><code class="language-lazarus">match status {
+    0 =&gt; { Sys.print("ok") }
+    1 =&gt; { Sys.print("error") }
+    _ =&gt; { Sys.print("unknown") }
+}
+</code></pre>
+<h3 id="value-patterns"><a class="header" href="#value-patterns">Value patterns</a></h3>
+<p>Any expression can be used as a pattern; it is compared with <code>==</code> to the scrutinee:</p>
+<pre><code class="language-lazarus">match code {
+    200 =&gt; { Sys.print("OK") }
+    404 =&gt; { Sys.print("not found") }
+    _   =&gt; { Sys.print("other") }
+}
+</code></pre>
+<h3 id="enum-variant-patterns"><a class="header" href="#enum-variant-patterns">Enum variant patterns</a></h3>
+<p><code>PascalCase</code> names are matched as enum variants (see <a href="enums.html">Enums</a>):</p>
+<pre><code class="language-lazarus">match opt {
+    Some(v) =&gt; { Sys.print(v) }
+    None    =&gt; { Sys.print("absent") }
+}
+</code></pre>
+<h3 id="guards"><a class="header" href="#guards">Guards</a></h3>
+<p>Any arm can carry an <code>if &lt;expr&gt;</code> guard that must also be true:</p>
+<pre><code class="language-lazarus">match n {
+    x if x &gt; 100 =&gt; { Sys.print("big") }
+    x if x &gt; 0   =&gt; { Sys.print("small") }
+    _             =&gt; { Sys.print("non-positive") }
+}
+</code></pre>
+<h3 id="wildcard-_"><a class="header" href="#wildcard-_">Wildcard <code>_</code></a></h3>
+<p><code>_</code> matches anything and must be the last arm:</p>
+<pre><code class="language-lazarus">match event {
+    Click =&gt; { .handle_click() }
+    _     =&gt; {}
+}
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="enums"><a class="header" href="#enums">Enums</a></h1>
+<p>An enum declares a closed set of named variants. Enums are declared inside a class file with the <code>enum</code> keyword.</p>
+<h2 id="declaration"><a class="header" href="#declaration">Declaration</a></h2>
+<pre><code class="language-lazarus">enum Color {
+    Red,
+    Green,
+    Blue
+}
+</code></pre>
+<p>Variant names must be <code>PascalCase</code>. Variants are separated by commas (or newlines).</p>
+<h2 id="payload-variants"><a class="header" href="#payload-variants">Payload variants</a></h2>
+<p>A variant can carry data, declared as a parenthesised list of types:</p>
+<pre><code class="language-lazarus">enum Shape {
+    Circle(float),
+    Rect(float, float),
+    Point
+}
+</code></pre>
+<h2 id="generic-enums"><a class="header" href="#generic-enums">Generic enums</a></h2>
+<p>Enums can be parameterised with type variables:</p>
+<pre><code class="language-lazarus">enum Result&lt;T&gt; {
+    Ok(T),
+    Err(str)
+}
+</code></pre>
+<h2 id="constructing-variants"><a class="header" href="#constructing-variants">Constructing variants</a></h2>
+<p>Nullary (no-payload) variants are accessed as <code>EnumName.VariantName</code>:</p>
+<pre><code class="language-lazarus">color = Color.Red
+</code></pre>
+<p>Payload variants are called like functions:</p>
+<pre><code class="language-lazarus">s = Shape.Circle(3.14)
+r = Shape.Rect(10.0, 5.0)
+</code></pre>
+<h2 id="matching-enums"><a class="header" href="#matching-enums">Matching enums</a></h2>
+<p>Use <code>match</code> to destructure enum values. Nullary variants match by name; payload variants bind their fields:</p>
+<pre><code class="language-lazarus">match shape {
+    Circle(r) =&gt; {
+        area = 3.14 * r * r
+    }
+    Rect(w, h) =&gt; {
+        area = w * h
+    }
+    Point =&gt; {
+        area = 0.0
+    }
+}
+</code></pre>
+<p>The binding names in <code>Variant(a, b)</code> are fresh variables scoped to the arm body.</p>
+<h2 id="enums-inside-a-class"><a class="header" href="#enums-inside-a-class">Enums inside a class</a></h2>
+<p>An enum declared in a file is scoped to that class. To use it from another file, import the containing class and prefix with the class name:</p>
+<pre><code class="language-lazarus">import Shapes
+
+// ...
+s = Shapes.Shape.Circle(1.0)
+</code></pre>
+<h2 id="example-option"><a class="header" href="#example-option">Example: <code>Option</code></a></h2>
+<p>The built-in <code>Option&lt;T&gt;</code> is a generic enum:</p>
+<pre><code class="language-lazarus">enum Option&lt;T&gt; {
+    Some(T),
+    None
+}
+</code></pre>
+<p>Use it to represent optional values:</p>
+<pre><code class="language-lazarus">find(items: List&lt;str&gt;, target: str): Option&lt;int&gt; {
+    mut i = 0
+    for item in items {
+        if item == target {
+            return Option.some(i)
+        }
+        i += 1
+    }
+    return Option.none()
+}
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="interfaces"><a class="header" href="#interfaces">Interfaces</a></h1>
+<p>An interface defines a structural contract: a set of methods and properties a class must provide. Interfaces are erased at codegen — they exist only at compile time.</p>
+<h2 id="declaring-an-interface"><a class="header" href="#declaring-an-interface">Declaring an interface</a></h2>
+<pre><code class="language-lazarus">interface Drawable {
+    draw(): unit
+    width: int
+    height: int
+}
+</code></pre>
+<ul>
+<li>Method signatures have no body.</li>
+<li>Property requirements list the name and type.</li>
+<li>Separated by semicolons or newlines.</li>
+</ul>
+<h2 id="generic-interfaces"><a class="header" href="#generic-interfaces">Generic interfaces</a></h2>
+<pre><code class="language-lazarus">interface Container&lt;T&gt; {
+    get(): Option&lt;T&gt;
+    size(): int
+}
+</code></pre>
+<h2 id="interface-files"><a class="header" href="#interface-files"><code>#interface</code> files</a></h2>
+<p>A file beginning with <code>#interface</code> is itself an interface declaration. The interface name is taken from the filename.</p>
+<pre><code class="language-lazarus">// Printable.laz
+#interface
+
+to_string(): str
+</code></pre>
+<p>This declares an interface named <code>Printable</code> with one method requirement.</p>
+<h2 id="implementing-an-interface"><a class="header" href="#implementing-an-interface">Implementing an interface</a></h2>
+<p>A class satisfies an interface structurally — no explicit <code>impl</code> declaration is required. If the class provides all required methods and properties with matching types, it conforms.</p>
+<pre><code class="language-lazarus">// Box.laz
+public width: int
+public height: int
+
+@auto
+constructor(width: int, height: int)
+
+public draw(): unit {
+    Sys.print("box " ++ width ++ "x" ++ height)
+}
+</code></pre>
+<p><code>Box</code> satisfies <code>Drawable</code> automatically because it has <code>draw()</code>, <code>width</code>, and <code>height</code>.</p>
+<h2 id="using-interface-types"><a class="header" href="#using-interface-types">Using interface types</a></h2>
+<p>An interface type can be used anywhere a type is expected. The compiler checks that the passed value conforms at the call site.</p>
+<pre><code class="language-lazarus">render(d: Drawable): unit {
+    d.draw()
+}
+</code></pre>
+<h2 id="inline-interface-declarations"><a class="header" href="#inline-interface-declarations">Inline interface declarations</a></h2>
+<p>An interface can also be declared inline inside a class file:</p>
+<pre><code class="language-lazarus">interface Serializable {
+    to_json(): str
+}
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="modules"><a class="header" href="#modules">Modules</a></h1>
+<h2 id="import"><a class="header" href="#import"><code>import</code></a></h2>
+<p><code>import</code> brings another class into scope. The path is a dotted sequence of directory names followed by the class name (filename without <code>.laz</code>), resolved from the project root.</p>
+<pre><code class="language-lazarus">import Counter
+import std.Str
+import actors.enemy.Enemy
+</code></pre>
+<p>After import, the class is referred to by its unqualified name:</p>
+<pre><code class="language-lazarus">import std.Str
+
+len = Str.len("hello")
+</code></pre>
+<p>Imports are hoisted — they can appear anywhere in the file but are always processed before the rest of the program.</p>
+<h2 id="extern"><a class="header" href="#extern"><code>extern</code></a></h2>
+<p><code>extern</code> declares a Lua function as a Lazarus-callable binding. It allows calling into the Lua standard library or other Lua code.</p>
+<pre><code class="language-lazarus">extern print(s: str): unit = "print"
+extern floor(x: float): float = "math.floor"
+</code></pre>
+<p>The string after <code>=</code> is the Lua function name (or dotted path). The result is wrapped in <code>Option</code> at the boundary — if the Lua function returns <code>nil</code>, the result is <code>Option.none()</code>.</p>
+<h3 id="typed-extern"><a class="header" href="#typed-extern">Typed <code>extern</code></a></h3>
+<p>Parameters and return types can be annotated:</p>
+<pre><code class="language-lazarus">extern len(s: str): int = "string.len"
+</code></pre>
+<h3 id="platform"><a class="header" href="#platform"><code>@platform</code></a></h3>
+<p><code>@platform(name)</code> annotates an extern with the target platform, for platform-specific bindings:</p>
+<pre><code class="language-lazarus">@platform(roblox)
+extern wait(t: float): unit = "task.wait"
+</code></pre>
+<h2 id="object"><a class="header" href="#object"><code>#object</code></a></h2>
+<p>A file beginning with <code>#object</code> is a static module: every member is implicitly static. There is no constructor and no instances.</p>
+<pre><code class="language-lazarus">// MathUtils.laz
+#object
+
+public clamp(x: int, lo: int, hi: int): int {
+    if x &lt; lo { return lo }
+    if x &gt; hi { return hi }
+    return x
+}
+
+private limit = 1000
+</code></pre>
+<p>Used from another file:</p>
+<pre><code class="language-lazarus">import MathUtils
+
+n = MathUtils.clamp(200, 0, 100)
+</code></pre>
+<p><code>static</code> and <code>constructor</code> are errors inside an <code>#object</code> file.</p>
+<h2 id="linking"><a class="header" href="#linking">Linking</a></h2>
+<p><code>lazarusc</code> bundles all imported files into the output <code>Main.lua</code> at compile time. There is no runtime <code>require</code>. Every file used by the program is inlined.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="strings-1"><a class="header" href="#strings-1">Strings</a></h1>
+<h2 id="basic-string-literals"><a class="header" href="#basic-string-literals">Basic string literals</a></h2>
+<p>Strings are delimited by double quotes:</p>
+<pre><code class="language-lazarus">greeting = "hello, world"
+path = "std/Str"
+</code></pre>
+<p>Supported escape sequences:</p>
+<div class="table-wrapper"><table><thead><tr><th>Escape</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>\n</code></td><td>Newline</td></tr>
+<tr><td><code>\t</code></td><td>Tab</td></tr>
+<tr><td><code>\"</code></td><td>Double quote</td></tr>
+<tr><td><code>\\</code></td><td>Backslash</td></tr>
+</tbody></table>
+</div>
+<h2 id="string-concatenation"><a class="header" href="#string-concatenation">String concatenation</a></h2>
+<p>Use <code>++</code> to concatenate strings. <code>+</code> is reserved for arithmetic.</p>
+<pre><code class="language-lazarus">full_name = first ++ " " ++ last
+</code></pre>
+<p>Non-string values can be concatenated by converting them first (see <a href="stdlib.html"><code>Num.to_text</code></a>):</p>
+<pre><code class="language-lazarus">import std.Num
+
+msg = "score: " ++ Num.to_text(score)
+</code></pre>
+<h2 id="interpolated-strings-f"><a class="header" href="#interpolated-strings-f">Interpolated strings (<code>f"..."</code>)</a></h2>
+<p>An <code>f</code> prefix before the opening <code>"</code> enables expression interpolation. Curly braces <code>{}</code> embed an expression whose value is converted to a string automatically.</p>
+<pre><code class="language-lazarus">import std.Sys
+
+name = "world"
+n = 42
+Sys.print(f"hello {name}, number {n + 1}")
+</code></pre>
+<p>Any expression is valid inside <code>{}</code>:</p>
+<pre><code class="language-lazarus">Sys.print(f"result: {compute(x) * 2}")
+</code></pre>
+<h2 id="triple-quoted-strings-"><a class="header" href="#triple-quoted-strings-">Triple-quoted strings (<code>"""..."""</code>)</a></h2>
+<p>Three double quotes open and close a multi-line string. Leading indentation is stripped automatically.</p>
+<pre><code class="language-lazarus">text = """
+    line one
+    line two
+    """
+</code></pre>
+<p>The indentation of the closing <code>"""</code> sets the baseline — all lines are dedented by that amount.</p>
+<h2 id="interpolated-triple-quoted-strings-f"><a class="header" href="#interpolated-triple-quoted-strings-f">Interpolated triple-quoted strings (<code>f"""..."""</code>)</a></h2>
+<p>Both features can be combined:</p>
+<pre><code class="language-lazarus">report = f"""
+    Name:  {user_name}
+    Score: {score}
+    """
+Sys.print(report)
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="standard-library"><a class="header" href="#standard-library">Standard Library</a></h1>
+<p>The standard library lives in the <code>std/</code> directory and is imported like any other class. Each module is a collection of <code>extern</code> bindings to Lua's built-in functions.</p>
+<h2 id="stdstr"><a class="header" href="#stdstr"><code>std.Str</code></a></h2>
+<p>String operations wrapping Lua's <code>string</code> library.</p>
+<pre><code class="language-lazarus">import std.Str
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th>Function</th><th>Signature</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>upper</code></td><td><code>(s: str): Option&lt;str&gt;</code></td><td>Uppercase</td></tr>
+<tr><td><code>lower</code></td><td><code>(s: str): Option&lt;str&gt;</code></td><td>Lowercase</td></tr>
+<tr><td><code>len</code></td><td><code>(s: str): Option&lt;int&gt;</code></td><td>String length</td></tr>
+<tr><td><code>sub</code></td><td><code>(s: str, i: int, j: int): Option&lt;str&gt;</code></td><td>Substring (<code>i</code>/<code>j</code> are 1-based)</td></tr>
+<tr><td><code>byte</code></td><td><code>(s: str, i: int): Option&lt;int&gt;</code></td><td>Byte value at index</td></tr>
+<tr><td><code>char</code></td><td><code>(n: int): Option&lt;str&gt;</code></td><td>Character from byte value</td></tr>
+<tr><td><code>rep</code></td><td><code>(s: str, n: int): Option&lt;str&gt;</code></td><td>Repeat string <code>n</code> times</td></tr>
+<tr><td><code>format</code></td><td><code>(fmt: str): Option&lt;str&gt;</code></td><td><code>string.format</code>-style formatting</td></tr>
+<tr><td><code>find</code></td><td><code>(s: str, sub: str): Option&lt;int&gt;</code></td><td>1-based index of <code>sub</code>, or <code>None</code></td></tr>
+</tbody></table>
+</div>
+<p>All functions return <code>Option</code> — call <code>.unwrap()</code> or <code>.unwrap_or(default)</code> on the result.</p>
+<pre><code class="language-lazarus">import std.Str
+
+upper = Str.upper("hello").unwrap()   // "HELLO"
+length = Str.len("hi").unwrap()       // 2
+first = Str.sub("abc", 1, 1).unwrap() // "a"
+</code></pre>
+<h2 id="stdsys"><a class="header" href="#stdsys"><code>std.Sys</code></a></h2>
+<p>I/O and process control wrapping Lua's runtime functions.</p>
+<pre><code class="language-lazarus">import std.Sys
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th>Function</th><th>Signature</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>print</code></td><td><code>(s: dynamic): unit</code></td><td>Print followed by newline (<code>print</code>)</td></tr>
+<tr><td><code>write</code></td><td><code>(s: dynamic): unit</code></td><td>Print without newline (<code>io.write</code>)</td></tr>
+<tr><td><code>read_line</code></td><td><code>(): Option&lt;str&gt;</code></td><td>Read one line from stdin</td></tr>
+<tr><td><code>read_all</code></td><td><code>(fmt: dynamic): Option&lt;str&gt;</code></td><td>Read all stdin</td></tr>
+<tr><td><code>argv</code></td><td><code>(i: int): Option&lt;str&gt;</code></td><td>Command-line argument at index <code>i</code></td></tr>
+<tr><td><code>read_file</code></td><td><code>(path: str): Option&lt;str&gt;</code></td><td>Read entire file contents</td></tr>
+<tr><td><code>time</code></td><td><code>(): Option&lt;int&gt;</code></td><td>Current Unix timestamp</td></tr>
+<tr><td><code>clock</code></td><td><code>(): Option&lt;float&gt;</code></td><td>CPU clock in seconds</td></tr>
+<tr><td><code>exit</code></td><td><code>(code: int): unit</code></td><td>Exit the process</td></tr>
+<tr><td><code>open</code></td><td><code>(s: str, mode: str): Option&lt;dynamic&gt;</code></td><td>Open a file handle</td></tr>
+<tr><td><code>panic</code></td><td><code>(message: str): unit</code></td><td>Abort with a Lua <code>error</code></td></tr>
+</tbody></table>
+</div>
+<pre><code class="language-lazarus">import std.Sys
+
+Sys.print("hello")
+line = Sys.read_line().unwrap_or("")
+Sys.exit(0)
+</code></pre>
+<h2 id="stdnum"><a class="header" href="#stdnum"><code>std.Num</code></a></h2>
+<p>Numeric utilities wrapping Lua's <code>math</code> library.</p>
+<pre><code class="language-lazarus">import std.Num
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th>Function</th><th>Signature</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>floor</code></td><td><code>(x: float): Option&lt;int&gt;</code></td><td>Round down</td></tr>
+<tr><td><code>ceil</code></td><td><code>(x: float): Option&lt;int&gt;</code></td><td>Round up</td></tr>
+<tr><td><code>abs</code></td><td><code>(x: dynamic): Option&lt;dynamic&gt;</code></td><td>Absolute value</td></tr>
+<tr><td><code>max</code></td><td><code>(a: dynamic, b: dynamic): Option&lt;dynamic&gt;</code></td><td>Maximum of two values</td></tr>
+<tr><td><code>min</code></td><td><code>(a: dynamic, b: dynamic): Option&lt;dynamic&gt;</code></td><td>Minimum of two values</td></tr>
+<tr><td><code>to_number</code></td><td><code>(s: str): Option&lt;float&gt;</code></td><td>Parse a string as a number, or <code>None</code></td></tr>
+<tr><td><code>to_text</code></td><td><code>(n: dynamic): Option&lt;str&gt;</code></td><td>Convert a number to its string representation</td></tr>
+<tr><td><code>to_int</code></td><td><code>(x: float): Option&lt;int&gt;</code></td><td>Floor to int</td></tr>
+<tr><td><code>to_float</code></td><td><code>(x: dynamic): Option&lt;float&gt;</code></td><td>Convert to float</td></tr>
+</tbody></table>
+</div>
+<pre><code class="language-lazarus">import std.Num
+
+floored = Num.floor(3.7).unwrap()   // 3
+text = Num.to_text(42).unwrap()     // "42"
+parsed = Num.to_number("3.14").unwrap_or(0.0)
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="operators"><a class="header" href="#operators">Operators</a></h1>
+<h2 id="arithmetic"><a class="header" href="#arithmetic">Arithmetic</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>Operator</th><th>Description</th><th>Example</th></tr></thead><tbody>
+<tr><td><code>+</code></td><td>Addition</td><td><code>a + b</code></td></tr>
+<tr><td><code>-</code></td><td>Subtraction / unary negation</td><td><code>a - b</code>, <code>-x</code></td></tr>
+<tr><td><code>*</code></td><td>Multiplication</td><td><code>a * b</code></td></tr>
+<tr><td><code>/</code></td><td>Division</td><td><code>a / b</code></td></tr>
+<tr><td><code>%</code></td><td>Modulo</td><td><code>a % b</code></td></tr>
+<tr><td><code>^</code></td><td>Exponentiation</td><td><code>a ^ b</code></td></tr>
+</tbody></table>
+</div>
+<p><code>+</code> is numeric-only. For string concatenation use <code>++</code>.</p>
+<h2 id="comparison"><a class="header" href="#comparison">Comparison</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>Operator</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>==</code></td><td>Equal</td></tr>
+<tr><td><code>!=</code></td><td>Not equal</td></tr>
+<tr><td><code>&lt;</code></td><td>Less than</td></tr>
+<tr><td><code>&lt;=</code></td><td>Less than or equal</td></tr>
+<tr><td><code>&gt;</code></td><td>Greater than</td></tr>
+<tr><td><code>&gt;=</code></td><td>Greater than or equal</td></tr>
+</tbody></table>
+</div>
+<h2 id="logical"><a class="header" href="#logical">Logical</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>Operator</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>and</code></td><td>Logical AND</td></tr>
+<tr><td><code>or</code></td><td>Logical OR</td></tr>
+<tr><td><code>not</code></td><td>Logical NOT (prefix)</td></tr>
+</tbody></table>
+</div>
+<h2 id="string"><a class="header" href="#string">String</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>Operator</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>++</code></td><td>String concatenation</td></tr>
+</tbody></table>
+</div>
+<h2 id="compound-assignment-1"><a class="header" href="#compound-assignment-1">Compound assignment</a></h2>
+<p>These desugar to <code>x = x OP expr</code> and require <code>mut</code>:</p>
+<div class="table-wrapper"><table><thead><tr><th>Operator</th><th>Desugars to</th></tr></thead><tbody>
+<tr><td><code>+=</code></td><td><code>x = x + …</code></td></tr>
+<tr><td><code>-=</code></td><td><code>x = x - …</code></td></tr>
+<tr><td><code>*=</code></td><td><code>x = x * …</code></td></tr>
+<tr><td><code>/=</code></td><td><code>x = x / …</code></td></tr>
+</tbody></table>
+</div>
+<h2 id="operator-precedence"><a class="header" href="#operator-precedence">Operator precedence</a></h2>
+<p>Higher numbers bind tighter:</p>
+<div class="table-wrapper"><table><thead><tr><th>Precedence</th><th>Operators</th></tr></thead><tbody>
+<tr><td>6</td><td><code>^</code></td></tr>
+<tr><td>5</td><td><code>* / %</code></td></tr>
+<tr><td>4</td><td><code>+ - ++</code></td></tr>
+<tr><td>3</td><td><code>== != &lt; &lt;= &gt; &gt;=</code></td></tr>
+<tr><td>2</td><td><code>and</code></td></tr>
+<tr><td>1</td><td><code>or</code></td></tr>
+</tbody></table>
+</div>
+<p>All binary operators are left-associative. Parentheses override precedence.</p>
+<h2 id="postfix"><a class="header" href="#postfix">Postfix</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>Operator</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>expr.field</code></td><td>Field / method access</td></tr>
+<tr><td><code>expr[index]</code></td><td>Index access</td></tr>
+<tr><td><code>expr(args)</code></td><td>Call</td></tr>
+<tr><td><code>expr?</code></td><td>Result propagation (unwrap or early-return)</td></tr>
+</tbody></table>
+</div>
+<p><code>.field</code> and <code>[index]</code> on a new line are treated as a new statement, not a chain. They must be on the same line as the preceding expression to chain.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+
+    </div>
+    </body>
+</html>
