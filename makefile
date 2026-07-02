@@ -16,7 +16,11 @@ selfbuild:
 doc:
 	doxygen doc/Doxyfile
 
-.PHONY: book book-serve
+# Compile the documentation generator from compiler/DocGen.laz.
+docgen:
+	lua bin/lazarusc.lua compiler/DocGen.laz && mv Main.lua bin/lazarusdoc.lua
+
+.PHONY: selfhost selfbuild docgen book book-serve
 
 book:
 	$(HOME)/.cargo/bin/mdbook build book
