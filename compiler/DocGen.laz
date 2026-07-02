@@ -1,0 +1,330 @@
+// DocGen — documentation generator. Reads a .laz source file, parses it, and
+// emits Markdown with typed signatures and leading `//` doc comments for each
+// public declaration. Usage: lua bin/lazarusdoc.lua path/to/File.laz
+
+import std.Str
+import std.Sys
+import frontend.lexer.Lexer
+import frontend.parser.Node
+import frontend.parser.Parser
+import backend.Text
+import backend.linker.Path
+
+constructor() {
+    mut path_opt = Sys.argv(1)
+    if path_opt.is_none() {
+        Sys.panic("usage: lazarusdoc <file.laz>")
+    }
+    mut path = path_opt.unwrap()
+    mut src_opt = Sys.read_file(path)
+    if src_opt.is_none() {
+        Sys.panic("cannot read: " ++ path)
+    }
+    mut source = src_opt.unwrap()
+    mut tokens = Lexer(source).scan()
+    mut ast = Parser(tokens, source).parse()
+    mut comments = DocGen.extract_comments(source)
+    Sys.write(DocGen.render(ast, Path.stem(path), comments))
+}
+
+// -- comment extraction --
+
+// Build a map from 1-based line number to the text of that `//` comment (after
+// the `// ` prefix). Only whole-line comments are recorded.
+static extract_comments(source: str): Map<int, str> {
+    mut out = [:]
+    mut nl = Text.nl()
+    mut n = Str.len(source).unwrap_or(0)
+    mut line = ""
+    mut num = 1
+    mut i = 1
+    loop {
+        if i > n {
+            DocGen.try_record(line, num, out)
+            break
+        }
+        mut ch = Str.sub(source, i, i).unwrap_or("")
+        if ch == nl {
+            DocGen.try_record(line, num, out)
+            line = ""
+            num = num + 1
+        } else {
+            line = line ++ ch
+        }
+        i = i + 1
+    }
+    return out
+}
+
+static try_record(line: str, num: int, out: Map<int, str>): unit {
+    mut t = DocGen.ltrim(line)
+    mut n = Str.len(t).unwrap_or(0)
+    if n >= 2 and Str.sub(t, 1, 2).unwrap_or("") == "//" {
+        out[num] = DocGen.ltrim(Str.sub(t, 3, n).unwrap_or(""))
+    }
+}
+
+static ltrim(s: str): str {
+    mut n = Str.len(s).unwrap_or(0)
+    mut i = 1
+    loop {
+        if i > n {
+            break
+        }
+        if Str.sub(s, i, i).unwrap_or("") != " " {
+            break
+        }
+        i = i + 1
+    }
+    return Str.sub(s, i, n).unwrap_or("")
+}
+
+// Contiguous `//` block immediately before `decl_line`, returned top-to-bottom.
+static doc_for(decl_line: int, comments: Map<int, str>): str {
+    mut rev = []
+    mut ln = decl_line - 1
+    loop {
+        if ln <= 0 {
+            break
+        }
+        if not comments.has(ln) {
+            break
+        }
+        rev.push(comments.get(ln).unwrap())
+        ln = ln - 1
+    }
+    mut parts = []
+    mut j = rev.len()
+    loop {
+        if j <= 0 {
+            break
+        }
+        parts.push(rev.get(j).unwrap())
+        j = j - 1
+    }
+    return Text.join(parts, Text.nl())
+}
+
+// The contiguous `//` block from line 1 (the module-level doc comment).
+static module_doc(comments: Map<int, str>): str {
+    mut parts = []
+    mut i = 1
+    loop {
+        if not comments.has(i) {
+            break
+        }
+        parts.push(comments.get(i).unwrap())
+        i = i + 1
+    }
+    return Text.join(parts, Text.nl())
+}
+
+// -- type rendering --
+
+static type_str(node: Node): str {
+    if node.kind == "TypeFn" {
+        mut pstrs = [DocGen.type_str(p) for p in node.child("params")]
+        return "(" ++ Text.join(pstrs, ", ") ++ ") -> " ++ DocGen.type_str(node.child("result"))
+    }
+    if node.kind == "TypeName" {
+        mut name = node.child("name")
+        mut args = node.child("args")
+        if args.len() == 0 {
+            return name
+        }
+        return name ++ "<" ++ Text.join([DocGen.type_str(a) for a in args], ", ") ++ ">"
+    }
+    return "dynamic"
+}
+
+// `name` alone when type is dynamic; `name: Type` otherwise.
+static param_sig(name: str, ty: Node): str {
+    if ty.kind == "TypeName" and ty.child("name") == "dynamic" {
+        return name
+    }
+    return name ++ ": " ++ DocGen.type_str(ty)
+}
+
+// -- signature rendering --
+
+static func_sig(node: Node): str {
+    mut name = node.child("name")
+    mut type_params = node.child("type_params")
+    mut params = node.child("params")
+    mut param_types = node.child("param_types")
+    mut ret = node.child("return_type")
+    mut out = name
+    if type_params.len() > 0 {
+        out = out ++ "<" ++ Text.join(type_params, ", ") ++ ">"
+    }
+    mut parts = []
+    mut i = 1
+    for p in params {
+        parts.push(DocGen.param_sig(p, param_types.get(i).unwrap()))
+        i = i + 1
+    }
+    return out ++ "(" ++ Text.join(parts, ", ") ++ "): " ++ DocGen.type_str(ret)
+}
+
+static extern_sig(node: Node): str {
+    mut name = node.child("name")
+    mut params = node.child("params")
+    mut param_types = node.child("param_types")
+    mut ret = node.child("return_type")
+    mut parts = []
+    mut i = 1
+    for p in params {
+        parts.push(DocGen.param_sig(p, param_types.get(i).unwrap()))
+        i = i + 1
+    }
+    return name ++ "(" ++ Text.join(parts, ", ") ++ "): " ++ DocGen.type_str(ret)
+}
+
+static ctor_sig(node: Node): str {
+    mut params = node.child("params")
+    mut param_types = node.child("param_types")
+    mut parts = []
+    mut i = 1
+    for p in params {
+        parts.push(DocGen.param_sig(p, param_types.get(i).unwrap()))
+        i = i + 1
+    }
+    return "constructor(" ++ Text.join(parts, ", ") ++ ")"
+}
+
+// -- output blocks --
+
+// A `### \`sig\`` heading followed by the doc comment (if any).
+static decl_block(sig: str, decl_line: int, comments: Map<int, str>): str {
+    mut nl = Text.nl()
+    mut doc = DocGen.doc_for(decl_line, comments)
+    mut out = "### `" ++ sig ++ "`" ++ nl
+    if doc != "" {
+        out = out ++ nl ++ doc ++ nl
+    }
+    return out
+}
+
+static emit_section(title: str, blocks: List<str>): str {
+    if blocks.len() == 0 {
+        return ""
+    }
+    mut nl = Text.nl()
+    mut out = "## " ++ title ++ nl ++ nl
+    for block in blocks {
+        out = out ++ block ++ nl
+    }
+    return out
+}
+
+// -- main renderer --
+
+static render(ast: Node, module_name: str, comments: Map<int, str>): str {
+    mut nl = Text.nl()
+    mut out = "# " ++ module_name ++ nl ++ nl
+    mut mod_doc = DocGen.module_doc(comments)
+    if mod_doc != "" {
+        out = out ++ mod_doc ++ nl ++ nl
+    }
+
+    mut ctor_blocks = []
+    mut prop_blocks = []
+    mut method_blocks = []
+    mut func_blocks = []
+    mut extern_blocks = []
+    mut variant_blocks = []
+    mut iface_blocks = []
+
+    for node in ast.child("body") {
+        if node.kind == "ConstructorDecl" {
+            ctor_blocks.push(DocGen.decl_block(DocGen.ctor_sig(node), node.line(), comments))
+        } else if node.kind == "FunctionDecl" {
+            mut vis = node.attr("visibility").unwrap_or("")
+            mut is_static = node.attr("is_static").unwrap_or(false)
+            mut is_public_instance = vis == "public" and not is_static
+            mut is_public_static = is_static and vis != "private"
+            if is_public_instance or is_public_static {
+                mut block = DocGen.decl_block(DocGen.func_sig(node), node.line(), comments)
+                if is_static {
+                    func_blocks.push(block)
+                } else {
+                    method_blocks.push(block)
+                }
+            }
+        } else if node.kind == "VariableDecl" {
+            if node.attr("visibility").unwrap_or("") == "public" {
+                mut name = node.child("name")
+                mut sig = name
+                mut ty_opt = node.attr("type")
+                if ty_opt.is_some() {
+                    sig = name ++ ": " ++ DocGen.type_str(ty_opt.unwrap())
+                }
+                prop_blocks.push(DocGen.decl_block(sig, node.line(), comments))
+            }
+        } else if node.kind == "ExternDecl" {
+            extern_blocks.push(DocGen.decl_block(DocGen.extern_sig(node), node.line(), comments))
+        } else if node.kind == "EnumDecl" {
+            mut ename = node.child("name")
+            mut tp = node.child("type_params")
+            mut header = ename
+            if tp.len() > 0 {
+                header = header ++ "<" ++ Text.join(tp, ", ") ++ ">"
+            }
+            mut doc = DocGen.doc_for(node.line(), comments)
+            mut vblock = "**`" ++ header ++ "`**" ++ nl ++ nl
+            if doc != "" {
+                vblock = vblock ++ doc ++ nl ++ nl
+            }
+            for v in node.child("variants") {
+                mut vname = v.child("name")
+                mut fields = v.child("fields")
+                if fields.len() == 0 {
+                    vblock = vblock ++ "- `" ++ vname ++ "`" ++ nl
+                } else {
+                    mut fstrs = [DocGen.type_str(f) for f in fields]
+                    vblock = vblock ++ "- `" ++ vname ++ "(" ++ Text.join(fstrs, ", ") ++ ")`" ++ nl
+                }
+            }
+            variant_blocks.push(vblock)
+        } else if node.kind == "InterfaceDecl" {
+            mut iname = node.child("name")
+            if iname == "" {
+                iname = module_name
+            }
+            mut tp = node.child("type_params")
+            mut header = iname
+            if tp.len() > 0 {
+                header = header ++ "<" ++ Text.join(tp, ", ") ++ ">"
+            }
+            mut iblock = "**`interface " ++ header ++ "`**" ++ nl ++ nl
+            for m in node.child("methods") {
+                mut mname = m.child("name")
+                mut mtp = m.child("type_params")
+                mut mpt = m.child("param_types")
+                mut mret = m.child("return_type")
+                mut msig = mname
+                if mtp.len() > 0 {
+                    msig = msig ++ "<" ++ Text.join(mtp, ", ") ++ ">"
+                }
+                msig = msig ++ "(" ++ Text.join([DocGen.type_str(pt) for pt in mpt], ", ") ++ ")"
+                if not (mret.kind == "TypeName" and mret.child("name") == "dynamic") {
+                    msig = msig ++ ": " ++ DocGen.type_str(mret)
+                }
+                iblock = iblock ++ "- `" ++ msig ++ "`" ++ nl
+            }
+            for p in node.child("properties") {
+                iblock = iblock ++ "- `" ++ p.child("name") ++ ": " ++ DocGen.type_str(p.child("type")) ++ "`" ++ nl
+            }
+            iface_blocks.push(iblock)
+        }
+    }
+
+    out = out ++ DocGen.emit_section("Constructor", ctor_blocks)
+    out = out ++ DocGen.emit_section("Properties", prop_blocks)
+    out = out ++ DocGen.emit_section("Methods", method_blocks)
+    out = out ++ DocGen.emit_section("Functions", func_blocks)
+    out = out ++ DocGen.emit_section("Externs", extern_blocks)
+    out = out ++ DocGen.emit_section("Variants", variant_blocks)
+    out = out ++ DocGen.emit_section("Interface", iface_blocks)
+    return out
+}
