@@ -106,6 +106,13 @@ local function __lz_str_split(s, sep)
     end
     return { kind = 'list', items = items }
 end
+local function __lz_fread(h, fmt)
+    return h:read(fmt)
+end
+local function __lz_fwrite(h, s)
+    local ok = h:write(s)
+    return ok ~= nil
+end
 local function __lz_str_to_int(s)
     local n = tonumber(s)
     if n == nil or n % 1 ~= 0 then return nil end
@@ -5665,7 +5672,7 @@ end
 local Runtime = {}
 
 function Runtime.prelude()
-    return Text.lines(__lz_list("local function __lz_list(...)", "    return { kind = 'list', items = { ... } }", "end", "local function __lz_map(items)", "    return { kind = 'map', items = items }", "end", "local function __lz_some(v)", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_none()", "    return 'None'", "end", "local function __lz_ok(v)", "    return { kind = 'Ok', _1 = v }", "end", "local function __lz_err(m)", "    return { kind = 'Err', _1 = m }", "end", "local function __lz_wrap(v)", "    if v == nil then return 'None' end", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_is_some(o)", "    return type(o) == 'table' and o.kind == 'Some'", "end", "local function __lz_is_none(o)", "    return o == 'None'", "end", "local function __lz_is_ok(o)", "    return type(o) == 'table' and o.kind == 'Ok'", "end", "local function __lz_is_err(o)", "    return type(o) == 'table' and o.kind == 'Err'", "end", "local function __lz_unwrap(o)", "    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end", "    if type(o) == 'table' and o.kind == 'Err' then error(o._1) end", "    error('unwrap of a None value')", "end", "local function __lz_unwrap_or(o, d)", "    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end", "    return d", "end", "local function __lz_error(o)", "    return o._1", "end", "local function __lz_len(c)", "    if c.kind == 'list' then return #c.items end", "    local n = 0", "    for _ in pairs(c.items) do n = n + 1 end", "    return n", "end", "local function __lz_push(c, v)", "    c.items[#c.items + 1] = v", "end", "local function __lz_pop(c)", "    local n = #c.items", "    if n == 0 then return 'None' end", "    local v = c.items[n]", "    c.items[n] = nil", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_get(c, k)", "    local v = c.items[k]", "    if v == nil then return 'None' end", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_has(c, k)", "    return c.items[k] ~= nil", "end", "local function __lz_idx_get(c, i)", "    if c.kind == 'list' then return c.items[i + 1] end", "    return c.items[i]", "end", "local function __lz_idx_set(c, i, v)", "    if c.kind == 'list' then", "        c.items[i + 1] = v", "    else", "        c.items[i] = v", "    end", "end", "local function __lz_str_find(s, sub)", "    return (string.find(s, sub, 1, true))", "end", "local function __lz_str_split(s, sep)", "    local items = {}", "    if sep == '' then", "        items[1] = s", "        return { kind = 'list', items = items }", "    end", "    local start = 1", "    while true do", "        local pos = string.find(s, sep, start, true)", "        if pos == nil then", "            items[#items + 1] = string.sub(s, start)", "            break", "        end", "        items[#items + 1] = string.sub(s, start, pos - 1)", "        start = pos + #sep", "    end", "    return { kind = 'list', items = items }", "end", "local function __lz_str_to_int(s)", "    local n = tonumber(s)", "    if n == nil or n % 1 ~= 0 then return nil end", "    return math.floor(n)", "end", "local function __lz_argv(i)", "    if arg == nil then return nil end", "    return arg[i]", "end", "local function __lz_readfile(path)", "    local f = io.open(path, 'r')", "    if f == nil then return nil end", "    local data = f:read('*a')", "    f:close()", "    return data", "end", "local function __lz_each(c)", "    if c.kind == 'list' then", "        local i = 0", "        return function()", "            i = i + 1", "            if i > #c.items then return nil end", "            return i - 1, c.items[i]", "        end", "    end", "    return pairs(c.items)", "end", "local function __lz_exec(cmd)", "    local ok = os.execute(cmd)", "    if ok == true or ok == 0 then return 0 end", "    return 1", "end", "local function __lz_popen(cmd)", "    local h = io.popen(cmd .. ' 2>&1')", "    if h == nil then return nil end", "    local s = h:read('*a')", "    h:close()", "    return s", "end", "local function __lz_write_file(path, content)", "    local f = io.open(path, 'w')", "    if f == nil then return false end", "    local ok = f:write(content)", "    f:close()", "    return ok ~= nil", "end", "local function __lz_exists(path)", "    local f = io.open(path, 'r')", "    if f then f:close(); return true end", "    local ok = os.rename(path, path)", "    return ok == true", "end", "local function __lz_mkdir(path)", "    local ok = os.execute('mkdir -p ' .. path)", "    return ok == true or ok == 0", "end"))
+    return Text.lines(__lz_list("local function __lz_list(...)", "    return { kind = 'list', items = { ... } }", "end", "local function __lz_map(items)", "    return { kind = 'map', items = items }", "end", "local function __lz_some(v)", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_none()", "    return 'None'", "end", "local function __lz_ok(v)", "    return { kind = 'Ok', _1 = v }", "end", "local function __lz_err(m)", "    return { kind = 'Err', _1 = m }", "end", "local function __lz_wrap(v)", "    if v == nil then return 'None' end", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_is_some(o)", "    return type(o) == 'table' and o.kind == 'Some'", "end", "local function __lz_is_none(o)", "    return o == 'None'", "end", "local function __lz_is_ok(o)", "    return type(o) == 'table' and o.kind == 'Ok'", "end", "local function __lz_is_err(o)", "    return type(o) == 'table' and o.kind == 'Err'", "end", "local function __lz_unwrap(o)", "    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end", "    if type(o) == 'table' and o.kind == 'Err' then error(o._1) end", "    error('unwrap of a None value')", "end", "local function __lz_unwrap_or(o, d)", "    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end", "    return d", "end", "local function __lz_error(o)", "    return o._1", "end", "local function __lz_len(c)", "    if c.kind == 'list' then return #c.items end", "    local n = 0", "    for _ in pairs(c.items) do n = n + 1 end", "    return n", "end", "local function __lz_push(c, v)", "    c.items[#c.items + 1] = v", "end", "local function __lz_pop(c)", "    local n = #c.items", "    if n == 0 then return 'None' end", "    local v = c.items[n]", "    c.items[n] = nil", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_get(c, k)", "    local v = c.items[k]", "    if v == nil then return 'None' end", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_has(c, k)", "    return c.items[k] ~= nil", "end", "local function __lz_idx_get(c, i)", "    if c.kind == 'list' then return c.items[i + 1] end", "    return c.items[i]", "end", "local function __lz_idx_set(c, i, v)", "    if c.kind == 'list' then", "        c.items[i + 1] = v", "    else", "        c.items[i] = v", "    end", "end", "local function __lz_str_find(s, sub)", "    return (string.find(s, sub, 1, true))", "end", "local function __lz_str_split(s, sep)", "    local items = {}", "    if sep == '' then", "        items[1] = s", "        return { kind = 'list', items = items }", "    end", "    local start = 1", "    while true do", "        local pos = string.find(s, sep, start, true)", "        if pos == nil then", "            items[#items + 1] = string.sub(s, start)", "            break", "        end", "        items[#items + 1] = string.sub(s, start, pos - 1)", "        start = pos + #sep", "    end", "    return { kind = 'list', items = items }", "end", "local function __lz_fread(h, fmt)", "    return h:read(fmt)", "end", "local function __lz_fwrite(h, s)", "    local ok = h:write(s)", "    return ok ~= nil", "end", "local function __lz_str_to_int(s)", "    local n = tonumber(s)", "    if n == nil or n % 1 ~= 0 then return nil end", "    return math.floor(n)", "end", "local function __lz_argv(i)", "    if arg == nil then return nil end", "    return arg[i]", "end", "local function __lz_readfile(path)", "    local f = io.open(path, 'r')", "    if f == nil then return nil end", "    local data = f:read('*a')", "    f:close()", "    return data", "end", "local function __lz_each(c)", "    if c.kind == 'list' then", "        local i = 0", "        return function()", "            i = i + 1", "            if i > #c.items then return nil end", "            return i - 1, c.items[i]", "        end", "    end", "    return pairs(c.items)", "end", "local function __lz_exec(cmd)", "    local ok = os.execute(cmd)", "    if ok == true or ok == 0 then return 0 end", "    return 1", "end", "local function __lz_popen(cmd)", "    local h = io.popen(cmd .. ' 2>&1')", "    if h == nil then return nil end", "    local s = h:read('*a')", "    h:close()", "    return s", "end", "local function __lz_write_file(path, content)", "    local f = io.open(path, 'w')", "    if f == nil then return false end", "    local ok = f:write(content)", "    f:close()", "    return ok ~= nil", "end", "local function __lz_exists(path)", "    local f = io.open(path, 'r')", "    if f then f:close(); return true end", "    local ok = os.rename(path, path)", "    return ok == true", "end", "local function __lz_mkdir(path)", "    local ok = os.execute('mkdir -p ' .. path)", "    return ok == true or ok == 0", "end"))
 end
 
 local Meta = {}
@@ -5884,61 +5891,111 @@ end
 
 local Path = {}
 
-function Path.dirname(path)
-    local n = Option.unwrap_or(__lz_wrap(string.len(path)), 0)
+function Path.join(a, b)
+    if a == "" then
+        return b
+    end
+    if Str.is_suffix(a, "/") then
+        return a .. b
+    end
+    return (a .. "/") .. b
+end
+function Path.last_slash(s)
+    local n = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
     local cut = 0
     local i = 1
-    while true do
-        if i > n then
-            break
-        end
-        local ch = Option.unwrap_or(__lz_wrap(string.sub(path, i, i)), "")
-        if ch == "/" then
+    while i <= n do
+        if Option.unwrap_or(__lz_wrap(string.byte(s, i)), 0) == 47 then
             cut = i
         end
         i = i + 1
     end
+    return cut
+end
+function Path.dirname(s)
+    local cut = Path.last_slash(s)
     if cut == 0 then
         return ""
     end
-    return Option.unwrap_or(__lz_wrap(string.sub(path, 1, cut - 1)), "")
+    if cut == 1 then
+        return "/"
+    end
+    return Option.unwrap_or(__lz_wrap(string.sub(s, 1, cut - 1)), "")
 end
-function Path.stem(path)
-    local n = Option.unwrap_or(__lz_wrap(string.len(path)), 0)
-    local start = 1
-    local dot = n + 1
-    local i = 1
-    while true do
-        if i > n then
-            break
-        end
-        local ch = Option.unwrap_or(__lz_wrap(string.sub(path, i, i)), "")
-        if ch == "/" then
-            start = i + 1
-        end
-        if ch == "." then
+function Path.basename(s)
+    local cut = Path.last_slash(s)
+    if cut == 0 then
+        return s
+    end
+    local n = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
+    return Option.unwrap_or(__lz_wrap(string.sub(s, cut + 1, n)), "")
+end
+function Path.ext_dot(base)
+    local n = Option.unwrap_or(__lz_wrap(string.len(base)), 0)
+    local dot = 0
+    local i = 2
+    while i <= n do
+        if Option.unwrap_or(__lz_wrap(string.byte(base, i)), 0) == 46 then
             dot = i
         end
         i = i + 1
     end
-    return Option.unwrap_or(__lz_wrap(string.sub(path, start, dot - 1)), path)
+    return dot
 end
-function Path.resolve(root, pkg_root, node)
-    local rel = Text.join(node:child("segments"), "/") .. ".laz"
-    local local_path = Path.join(root, rel)
-    if __lz_exists(local_path) then
-        return local_path
+function Path.stem(s)
+    local base = Path.basename(s)
+    local dot = Path.ext_dot(base)
+    if dot == 0 then
+        return base
     end
-    if pkg_root ~= "" then
-        return Path.join(pkg_root, rel)
-    end
-    return local_path
+    return Option.unwrap_or(__lz_wrap(string.sub(base, 1, dot - 1)), base)
 end
-function Path.join(dir, rel)
-    if dir == "" then
-        return rel
+function Path.ext(s)
+    local base = Path.basename(s)
+    local dot = Path.ext_dot(base)
+    if dot == 0 then
+        return ""
     end
-    return (dir .. "/") .. rel
+    local n = Option.unwrap_or(__lz_wrap(string.len(base)), 0)
+    return Option.unwrap_or(__lz_wrap(string.sub(base, dot, n)), "")
+end
+function Path.is_absolute(s)
+    return Str.is_prefix(s, "/")
+end
+function Path.normalize(s)
+    local absolute = Path.is_absolute(s)
+    local stack = __lz_list()
+    for _, part in __lz_each(__lz_str_split(s, "/")) do
+        if (part ~= "") and (part ~= ".") then
+            if part == ".." then
+                local top = Option.unwrap_or(__lz_get(stack, __lz_len(stack)), "")
+                if (__lz_len(stack) > 0) and (top ~= "..") then
+                    __lz_pop(stack)
+                elseif not absolute then
+                    __lz_push(stack, "..")
+                end
+            else
+                __lz_push(stack, part)
+            end
+        end
+    end
+    local out = ""
+    local first = true
+    for _, part in __lz_each(stack) do
+        if first then
+            out = part
+            first = false
+        else
+            out = (out .. "/") .. part
+        end
+    end
+    if absolute then
+        return "/" .. out
+    end
+    if out == "" then
+        return "."
+    end
+    return out
 end
 
 local Linker = {}
@@ -5948,6 +6005,7 @@ function Linker.new(entry, pkg_root)
     self.link = Linker.link
     self.entry_class = Linker.entry_class
     self.load = Linker.load
+    self.resolve = Linker.resolve
     self.body_is_interface = Linker.body_is_interface
     self.entry = entry
     self.root = Path.dirname(entry)
@@ -5985,7 +6043,7 @@ function Linker.load(self, path, origin_source, origin_line, origin_col, origin_
     for _, node in __lz_each(program:child("body")) do
         if node.kind == "ImportDecl" then
             local span = Option.unwrap_or(__lz_wrap(string.len(node:child("name"))), 1)
-            Linker.load(self, Path.resolve(self.root, self.pkg_root, node), source, node:line(), node:col(), span)
+            Linker.load(self, Linker.resolve(self, node), source, node:line(), node:col(), span)
             __lz_push(imports, node:child("name"))
         else
             __lz_push(body, node)
@@ -5994,6 +6052,17 @@ function Linker.load(self, path, origin_source, origin_line, origin_col, origin_
     program:set("body", body)
     __lz_push(self.ordered, Module.new(path, class_name, source, program, imports, Linker.body_is_interface(self, body)))
     __lz_idx_set(self.loaded, path, true)
+end
+function Linker.resolve(self, node)
+    local rel = Text.join(node:child("segments"), "/") .. ".laz"
+    local local_path = Path.join(self.root, rel)
+    if __lz_exists(local_path) then
+        return local_path
+    end
+    if self.pkg_root ~= "" then
+        return Path.join(self.pkg_root, rel)
+    end
+    return local_path
 end
 function Linker.body_is_interface(self, body)
     if __lz_len(body) == 0 then
