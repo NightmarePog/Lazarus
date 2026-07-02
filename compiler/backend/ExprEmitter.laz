@@ -235,7 +235,12 @@ private emit_call(node: Node): str {
             mut target = .ctx.extern_target(object.child("name"), field)
             if target.is_some() {
                 .ctx.mark_collections()
-                return "__lz_wrap(" ++ target.unwrap() ++ "(" ++ Text.join(args, ", ") ++ "))"
+                mut ext = target.unwrap()
+                mut call = ext["target"] ++ "(" ++ Text.join(args, ", ") ++ ")"
+                if ext["wrap"] {
+                    return "__lz_wrap(" ++ call ++ ")"
+                }
+                return call
             }
             mut ctor = ExprEmitter.constructors.get(object.child("name") ++ "." ++ field)
             if ctor.is_some() {

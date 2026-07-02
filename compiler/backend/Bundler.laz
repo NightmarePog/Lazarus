@@ -10,6 +10,7 @@ import backend.Codegen
 import backend.Runtime
 import backend.Text
 import backend.linker.Module
+import frontend.parser.Node
 import Error
 
 private modules: List<Module>
@@ -62,19 +63,34 @@ public bundle(): str {
     return Text.join(sections, Text.nl() ++ Text.nl())
 }
 
-// Gather the extern-only modules into `externs[class_name][member] = target`.
-private collect_externs(): Map<str, Map<str, str>> {
+// Gather every module's extern bindings into
+// `externs[class_name][member] = ["target": t, "wrap": b]` — mixed modules
+// contribute their externs alongside their class table. A binding wraps at the
+// Option boundary unless its declared return type names a concrete type
+// (bool/int/str/…), which lowers to the bare call.
+private collect_externs(): Map<str, Map<str, dynamic>> {
     mut externs = [:]
     for m in .modules {
-        if .is_extern_module(m) {
-            mut binds = [:]
-            for node in m.ast.child("body") {
-                binds[node.child("name")] = node.child("target")
+        mut binds = [:]
+        for node in m.ast.child("body") {
+            if node.kind == "ExternDecl" {
+                binds[node.child("name")] = ["target": node.child("target"), "wrap": .extern_wraps(node)]
             }
+        }
+        if binds.len() > 0 {
             externs[m.class_name] = binds
         }
     }
     return externs
+}
+
+private extern_wraps(node: Node): bool {
+    mut rt = node.attr("return_type")
+    if rt.is_none() {
+        return true
+    }
+    mut name = rt.unwrap().child("name")
+    return name == "Option" or name == "dynamic"
 }
 
 // A module is an extern namespace when its body holds extern declarations and

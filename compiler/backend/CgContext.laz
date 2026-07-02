@@ -12,10 +12,10 @@ private instance_methods: Map<str, bool>
 private instance_order: List<str>
 private properties: List<Node>
 private known_classes: Map<str, bool>
-private externs: Map<str, Map<str, str>>
+private externs: Map<str, Map<str, dynamic>>
 private variant_owner: Map<str, str>
 @auto
-constructor(cls: str, members: Map<str, bool>, instance_methods: Map<str, bool>, instance_order: List<str>, properties: List<Node>, known_classes: Map<str, bool>, externs: Map<str, Map<str, str>>, variant_owner: Map<str, str>)
+constructor(cls: str, members: Map<str, bool>, instance_methods: Map<str, bool>, instance_order: List<str>, properties: List<Node>, known_classes: Map<str, bool>, externs: Map<str, Map<str, dynamic>>, variant_owner: Map<str, str>)
 private scopes: List<Map<str, bool>> = [[:]]
 private collections: bool = false
 private temp_seq: int = 0
@@ -58,8 +58,8 @@ public is_construction(name: str): bool {
     return .known_classes.has(name)
 }
 
-// The raw Lua target an extern member lowers to, or None when `ns`.`member` is
-// not an extern binding in scope.
+// The extern binding entry (`["target": t, "wrap": b]`) a member lowers to, or
+// None when `ns`.`member` is not an extern binding in scope.
 public extern_target(ns: str, member: str): Option<dynamic> {
     mut table = .externs.get(ns)
     if table.is_none() {

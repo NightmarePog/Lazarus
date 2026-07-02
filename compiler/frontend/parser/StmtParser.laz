@@ -148,6 +148,11 @@ private parse_object_body(): Node {
 }
 
 private parse_object_member(): Node {
+    if .cursor.check("EXTERN") {
+        mut etok = .cursor.current()
+        .cursor.advance()
+        return .parse_extern(etok)
+    }
     mut visibility = ""
     if .cursor.match("PRIVATE") {
         visibility = "private"
