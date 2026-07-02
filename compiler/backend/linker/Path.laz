@@ -51,11 +51,11 @@ stem(path: str): str {
 }
 
 // Resolve one import node to a source path: `import a.b.Name` -> `<root>/a/b/Name.laz`.
-// When a pkg_root is provided, the local root is tried first; if absent, pkg_root is used.
+// When pkg_root is non-empty, the local root is tried first; if the file is absent there, pkg_root is used.
 resolve(root: str, pkg_root: str, node: Node): str {
     mut rel = Text.join(node.child("segments"), "/") ++ ".laz"
     mut local_path = Path.join(root, rel)
-    if Sys.read_file(local_path).is_some() {
+    if Sys.file_exists(local_path) {
         return local_path
     }
     if pkg_root != "" {

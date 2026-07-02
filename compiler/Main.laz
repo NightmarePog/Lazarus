@@ -41,6 +41,8 @@ constructor() {
                 mut val = Sys.argv(i)
                 if val.is_some() {
                     pkg_path = val.unwrap()
+                } else {
+                    Error("MissingFlagValue", "--pkg-path requires a directory argument", 0, 0, "", 1).raise()
                 }
             }
             i = i + 1
