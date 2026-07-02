@@ -1,0 +1,134 @@
+// Path — pure path-string manipulation for '/'-separated paths. No filesystem
+// access (that is Sys / File); everything here is string work on top of Str.
+// dirname/basename follow POSIX-ish conventions: dirname("/a") is "/",
+// dirname("a") is "", a name starting with '.' has no extension.
+
+#object
+import std.Str
+
+// Join two segments with a single '/'. An empty `a` yields `b` unchanged; a
+// trailing '/' on `a` is not doubled.
+join(a: str, b: str): str {
+    if a == "" {
+        return b
+    }
+    if Str.is_suffix(a, "/") {
+        return a ++ b
+    }
+    return a ++ "/" ++ b
+}
+
+// 1-based index of the last '/' in `s`, or 0 when there is none.
+private last_slash(s: str): int {
+    mut n = Str.len(s).unwrap_or(0)
+    mut cut = 0
+    mut i = 1
+    while i <= n {
+        if Str.byte(s, i).unwrap_or(0) == 47 {
+            cut = i
+        }
+        i = i + 1
+    }
+    return cut
+}
+
+// Everything before the last '/': "a/b/c.laz" -> "a/b", "/a" -> "/", "a" -> "".
+dirname(s: str): str {
+    mut cut = Path.last_slash(s)
+    if cut == 0 {
+        return ""
+    }
+    if cut == 1 {
+        return "/"
+    }
+    return Str.sub(s, 1, cut - 1).unwrap_or("")
+}
+
+// Everything after the last '/': "a/b/c.laz" -> "c.laz", "a" -> "a".
+basename(s: str): str {
+    mut cut = Path.last_slash(s)
+    if cut == 0 {
+        return s
+    }
+    mut n = Str.len(s).unwrap_or(0)
+    return Str.sub(s, cut + 1, n).unwrap_or("")
+}
+
+// 1-based index of the dot starting `base`'s extension, or 0 when it has none.
+// A leading dot (".bashrc") marks a hidden file, not an extension.
+private ext_dot(base: str): int {
+    mut n = Str.len(base).unwrap_or(0)
+    mut dot = 0
+    mut i = 2
+    while i <= n {
+        if Str.byte(base, i).unwrap_or(0) == 46 {
+            dot = i
+        }
+        i = i + 1
+    }
+    return dot
+}
+
+// The basename without its extension: "a/b/Vec.laz" -> "Vec", ".bashrc" -> ".bashrc".
+stem(s: str): str {
+    mut base = Path.basename(s)
+    mut dot = Path.ext_dot(base)
+    if dot == 0 {
+        return base
+    }
+    return Str.sub(base, 1, dot - 1).unwrap_or(base)
+}
+
+// The extension including its dot: "Vec.laz" -> ".laz", "Makefile" -> "".
+ext(s: str): str {
+    mut base = Path.basename(s)
+    mut dot = Path.ext_dot(base)
+    if dot == 0 {
+        return ""
+    }
+    mut n = Str.len(base).unwrap_or(0)
+    return Str.sub(base, dot, n).unwrap_or("")
+}
+
+is_absolute(s: str): bool {
+    return Str.is_prefix(s, "/")
+}
+
+// Collapse "//" and resolve "." / ".." segments lexically. ".." never climbs
+// above the root of an absolute path; on a relative path unmatched ".."s are
+// kept. An emptied path yields "/" (absolute) or "." (relative).
+normalize(s: str): str {
+    mut absolute = Path.is_absolute(s)
+    mut stack = []
+    for part in Str.split(s, "/") {
+        if part != "" and part != "." {
+            if part == ".." {
+                mut top = stack.get(stack.len()).unwrap_or("")
+                if stack.len() > 0 and top != ".." {
+                    stack.pop()
+                } else if not absolute {
+                    stack.push("..")
+                }
+            } else {
+                stack.push(part)
+            }
+        }
+    }
+    mut out = ""
+    mut first = true
+    for part in stack {
+        if first {
+            out = part
+            first = false
+        } else {
+            out = out ++ "/" ++ part
+        }
+    }
+    if absolute {
+        return "/" ++ out
+    }
+    if out == "" {
+        return "."
+    }
+    return out
+}
