@@ -32,3 +32,9 @@ find<K, V>(m: Map<K, V>, f: (K, V) -> bool): Option<V> {
     for k, v in m { if f(k, v) { return Option.some(v) } }
     return Option.none()
 }
+
+copy<K, V>(m: Map<K, V>): Map<K, V> {
+    mut result = [:]
+    for k, v in m { result[k] = v }
+    return result
+}

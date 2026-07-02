@@ -32,3 +32,9 @@ find<T>(xs: List<T>, f: (T) -> bool): Option<T> {
     for x in xs { if f(x) { return Option.some(x) } }
     return Option.none()
 }
+
+copy<T>(xs: List<T>): List<T> {
+    mut result = []
+    for x in xs { result.push(x) }
+    return result
+}
