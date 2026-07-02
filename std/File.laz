@@ -1,0 +1,41 @@
+// File — an open file handle. `open` wraps Lua's io.open and yields None on
+// failure; reads and writes cross the nil boundary through the `__lz_f*` shims
+// (the language has no nil, so Option-wrapping happens at the extern edge).
+// For one-shot whole-file reads and writes use Sys.read_file / Sys.write_file.
+
+import std.Option
+import std.Sys
+
+extern fread(h, fmt: str): Option<str> = "__lz_fread"
+extern fwrite(h, content: str): bool = "__lz_fwrite"
+
+private handle: dynamic
+
+@auto
+constructor(handle: dynamic)
+
+static open(path: str, mode: str): Option<File> {
+    mut h = Sys.open(path, mode)
+    if h.is_none() {
+        return Option.none()
+    }
+    return Option.some(File(h.unwrap()))
+}
+
+write(content: str): bool {
+    return File.fwrite(.handle, content)
+}
+
+// The next line without its trailing newline, or None at end of file.
+read_line(): Option<str> {
+    return File.fread(.handle, "*l")
+}
+
+// The remaining contents from the current position, or None on a read error.
+read_all(): Option<str> {
+    return File.fread(.handle, "*a")
+}
+
+close(): unit {
+    .handle.close()
+}
