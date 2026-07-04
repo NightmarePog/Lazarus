@@ -7,13 +7,16 @@ import std.annotation.Macro
 //
 // Example output for class Point with fields x, y:
 //   Point { x=3 y=7 }
-static debug(ctx: Macro): List<dynamic> {
-    mut flds = Macro.fields(ctx)
-    mut body = "return \"" ++ ctx.class_name ++ " {\""
-    for f in flds {
-        mut nm = f.get("name").unwrap_or("?")
-        body = body ++ " .. \" " ++ nm ++ "=\" .. tostring(self." ++ nm ++ ")"
-    }
-    body = body ++ " .. \" }\""
-    return [Macro.make_method("to_str", [], body, "public")]
+// Written as raw Lua so that mutable accumulation of `body` works correctly
+// when this module is compiled for the handler bundle (before the Schematic pass
+// has set the reassign flag on VariableDecl nodes).
+static lua debug(ctx: dynamic): dynamic {
+    local flds = Macro.fields(ctx)
+    local body = "return \"" .. ctx.class_name .. " {\""
+    for _, f in List.__lz_each(flds) do
+        local nm = Option.__lz_unwrap_or(List.__lz_get(f, "name"), "?")
+        body = body .. " .. \" " .. nm .. "=\" .. tostring(self." .. nm .. ")"
+    end
+    body = body .. " .. \" }\""
+    return List.__lz_list({Macro.make_method("to_str", List.__lz_list({}), body, "public")})
 }

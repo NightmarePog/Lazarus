@@ -73,7 +73,14 @@ static compile_handler(handler_class: str, modules: List<Module>): dynamic {
 }
 
 static lua load_lua(src: str, class_name: str): dynamic {
-    local chunk, err = load(src)
+    local env = setmetatable({
+        Node = Node,
+        List = List,
+        Map = Map,
+        Option = Option,
+        Result = Result,
+    }, {__index = _ENV})
+    local chunk, err = load(src, "@" .. class_name, "t", env)
     if not chunk then
         error("failed to load annotation handler '" .. class_name .. "': " .. tostring(err))
     end
