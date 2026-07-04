@@ -92,7 +92,7 @@ static lua call_handler(handler: dynamic, method: str, ctx: dynamic): dynamic {
     if not fn then
         error("annotation handler has no method '" .. method .. "'")
     end
-    local ok, result = pcall(fn, handler, ctx)
+    local ok, result = pcall(fn, ctx)
     if not ok then
         error(tostring(result))
     end
