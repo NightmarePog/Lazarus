@@ -25,17 +25,23 @@ public expand(program: Node, modules: List<Module>): unit {
             new_body.push(node)
             mut ann_class = ann_opt.unwrap()
             mut args = node.attr("annotation_args").unwrap_or([])
-            mut handler = .get_handler(ann_class, modules)
-            mut ctx = Macro(node, body, .class_name)
-            for arg in args {
-                mut method_name = Str.lower(arg).unwrap_or(arg)
-                mut injected = Expander.call_handler(handler, method_name, ctx)
-                for n in injected {
-                    new_body.push(n)
+            if args.len() == 0 {
+                node.set("annotation_class", "")
+                node.set("annotation_args", [])
+            } else {
+                mut handler = .get_handler(ann_class, modules)
+                // body is the original list — nodes injected by earlier handlers in this class are not visible
+                mut ctx = Macro(node, body, .class_name)
+                for arg in args {
+                    mut method_name = Str.lower(arg).unwrap_or(arg)
+                    mut injected = Expander.call_handler(handler, method_name, ctx)
+                    for n in injected {
+                        new_body.push(n)
+                    }
                 }
+                node.set("annotation_class", "")
+                node.set("annotation_args", [])
             }
-            node.set("annotation_class", "")
-            node.set("annotation_args", [])
         }
     }
     program.set("body", new_body)
@@ -57,22 +63,26 @@ static compile_handler(handler_class: str, modules: List<Module>): dynamic {
     mut blocks = []
     for m in modules {
         if not m.is_interface {
+            // externs and variant_owner left empty — handler modules must not use match on enums or extern bindings
             mut cg = Codegen(m.class_name, m.imports, [:], [:], "")
             blocks.push(cg.class_block(m.ast))
         }
     }
     blocks.push("return " ++ handler_class)
-    return Expander.load_lua(Text.join(blocks, "\n\n"))
+    return Expander.load_lua(Text.join(blocks, "\n\n"), handler_class)
 }
 
-static lua load_lua(src: str): dynamic {
+static lua load_lua(src: str, class_name: str): dynamic {
     local chunk, err = load(src)
     if not chunk then
-        error("failed to load annotation handler: " .. tostring(err))
+        error("failed to load annotation handler '" .. class_name .. "': " .. tostring(err))
     end
     local ok, result = pcall(chunk)
     if not ok then
-        error("failed to initialize annotation handler: " .. tostring(result))
+        error("failed to initialize annotation handler '" .. class_name .. "': " .. tostring(result))
+    end
+    if result == nil then
+        error("failed to load annotation handler '" .. class_name .. "': class not found in compiled modules")
     end
     return result
 }
@@ -87,5 +97,8 @@ static lua call_handler(handler: dynamic, method: str, ctx: dynamic): dynamic {
         error(tostring(result))
     end
     if result == nil then return List.__lz_list({}) end
+    if result ~= nil and not (type(result) == "table" and result.items ~= nil) then
+        error("annotation handler method '" .. method .. "' must return List<dynamic>, got " .. type(result))
+    end
     return result
 }
