@@ -485,8 +485,20 @@ private parse_annotation(): Node {
         next_node.set("platform", plat_tok.value)
         return next_node
     }
-    .cursor.fail("unknown annotation '@" ++ name.value ++ "'")
-    return Ast.error_node()
+    mut args = []
+    if .cursor.match("LEFT_BRACKET") {
+        loop {
+            if .cursor.check("RIGHT_BRACKET") { break }
+            mut arg = .cursor.consume("IDENTIFIER", "Expected annotation argument (identifier)")
+            args.push(arg.value)
+            if not .cursor.match("COMMA") { break }
+        }
+        .cursor.consume("RIGHT_BRACKET", "Expected ')' after annotation arguments")
+    }
+    mut next_node = .parse_statement()
+    next_node.set("annotation_class", name.value)
+    next_node.set("annotation_args", args)
+    return next_node
 }
 
 private parse_constructor(tok: Token, auto: bool): Node {
