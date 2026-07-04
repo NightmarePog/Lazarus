@@ -1,0 +1,91 @@
+import std.Str
+import backend.linker.Module
+import backend.Codegen
+import backend.Text
+import frontend.parser.Node
+import std.annotation.Macro
+
+// Annotation expansion pass. Construct with the current module's class_name and
+// a shared handler_cache (a Map from Main.laz — shared across modules by reference).
+
+private class_name: str
+private handler_cache: Map<str, dynamic>
+
+@auto
+constructor(class_name: str, handler_cache: Map<str, dynamic>)
+
+public expand(program: Node, modules: List<Module>): unit {
+    mut body = program.child("body")
+    mut new_body = []
+    for node in body {
+        mut ann_opt = node.attr("annotation_class")
+        if ann_opt.is_none() or ann_opt.unwrap() == "" {
+            new_body.push(node)
+        } else {
+            new_body.push(node)
+            mut ann_class = ann_opt.unwrap()
+            mut args = node.attr("annotation_args").unwrap_or([])
+            mut handler = .get_handler(ann_class, modules)
+            mut ctx = Macro(node, body, .class_name)
+            for arg in args {
+                mut method_name = Str.lower(arg).unwrap_or(arg)
+                mut injected = Expander.call_handler(handler, method_name, ctx)
+                for n in injected {
+                    new_body.push(n)
+                }
+            }
+            node.set("annotation_class", "")
+            node.set("annotation_args", [])
+        }
+    }
+    program.set("body", new_body)
+}
+
+private get_handler(handler_class: str, modules: List<Module>): dynamic {
+    if .handler_cache.has(handler_class) {
+        return .handler_cache.get(handler_class).unwrap()
+    }
+    mut handler = Expander.compile_handler(handler_class, modules)
+    .handler_cache[handler_class] = handler
+    return handler
+}
+
+// Codegen all non-interface modules (no typecheck) into one Lua chunk, then load it.
+// All modules are included so core stdlib (List, Map, Option, Result) are in scope as
+// locals — they are NOT globals, so they must appear in the same Lua chunk as the handler.
+static compile_handler(handler_class: str, modules: List<Module>): dynamic {
+    mut blocks = []
+    for m in modules {
+        if not m.is_interface {
+            mut cg = Codegen(m.class_name, m.imports, [:], [:], "")
+            blocks.push(cg.class_block(m.ast))
+        }
+    }
+    blocks.push("return " ++ handler_class)
+    return Expander.load_lua(Text.join(blocks, "\n\n"))
+}
+
+static lua load_lua(src: str): dynamic {
+    local chunk, err = load(src)
+    if not chunk then
+        error("failed to load annotation handler: " .. tostring(err))
+    end
+    local ok, result = pcall(chunk)
+    if not ok then
+        error("failed to initialize annotation handler: " .. tostring(result))
+    end
+    return result
+}
+
+static lua call_handler(handler: dynamic, method: str, ctx: dynamic): dynamic {
+    local fn = handler[method]
+    if not fn then
+        error("annotation handler has no method '" .. method .. "'")
+    end
+    local ok, result = pcall(fn, handler, ctx)
+    if not ok then
+        error(tostring(result))
+    end
+    if result == nil then return List.__lz_list({}) end
+    return result
+}
