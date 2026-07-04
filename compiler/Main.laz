@@ -13,6 +13,7 @@ import frontend.parser.Parser
 import frontend.schematic.Schematic
 import frontend.typecheck.Typecheck
 import frontend.optimizer.Optimizer
+import Expander
 import backend.Codegen
 import backend.Bundler
 import backend.linker.Linker
@@ -67,9 +68,20 @@ static build_file(path: str, platform: str, pkg_path: str): unit {
     mut classes = [:]
     mut interfaces = [:]
     mut gated_externs = [:]
+
     for m in modules {
         Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
         Main.collect_interfaces(m.ast, interfaces, m.class_name)
+    }
+
+    mut handler_cache = [:]
+    for m in modules {
+        if not m.is_interface {
+            Expander(m.class_name, handler_cache).expand(m.ast, modules)
+        }
+    }
+
+    for m in modules {
         if not m.is_interface {
             Main.collect_signatures(m.ast, m.class_name, classes, platform, gated_externs)
         }
