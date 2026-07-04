@@ -33,18 +33,24 @@ static fields(ctx: Macro): List<Map<str, str>> {
 // and in the compiler bundle at annotation-expansion time.
 static lua make_method(name: str, params: dynamic, body_lua: str, visibility: str): dynamic {
     local empty_list = List.__lz_list({})
-    local dyn_type = Node.new("TypeName", Map.__lz_map({
-        name = "dynamic",
-        args = empty_list,
-        line = 0,
-        col = 0
-    }))
     local pt = List.__lz_list({})
     if params ~= nil and params.items then
         for i = 1, #params.items do
+            local dyn_type = Node.new("TypeName", Map.__lz_map({
+                name = "dynamic",
+                args = List.__lz_list({}),
+                line = 0,
+                col = 0
+            }))
             List.__lz_push(pt, dyn_type)
         end
     end
+    local dyn_type = Node.new("TypeName", Map.__lz_map({
+        name = "dynamic",
+        args = List.__lz_list({}),
+        line = 0,
+        col = 0
+    }))
     return Node.new("FunctionDecl", Map.__lz_map({
         name = name,
         params = params or empty_list,
