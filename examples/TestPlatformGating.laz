@@ -1,0 +1,12 @@
+import std.Sys
+
+constructor() {
+    .run()
+}
+
+@platform(lua54)
+lua only_lua54(x: int): int { return x + 1 }
+
+public run(): unit {
+    Sys.print("platform gating works")
+}

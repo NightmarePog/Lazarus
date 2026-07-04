@@ -8,7 +8,6 @@
 import backend.CgContext
 import backend.ExprEmitter
 import backend.StmtEmitter
-import backend.Runtime
 import backend.Text
 import frontend.parser.Node
 import Meta
@@ -17,9 +16,9 @@ private class_name: str
 private known_classes: Map<str, bool>
 private externs: Map<str, Map<str, str>>
 private variant_owner: Map<str, str>
-private collections_used: bool
+private platform: str
 
-constructor(class_name: str, imports: List<str>, externs: Map<str, Map<str, str>>, variant_owner: Map<str, str>) {
+constructor(class_name: str, imports: List<str>, externs: Map<str, Map<str, str>>, variant_owner: Map<str, str>, platform: str) {
     .class_name = class_name
     .known_classes = [:]
     for name in imports {
@@ -27,19 +26,16 @@ constructor(class_name: str, imports: List<str>, externs: Map<str, Map<str, str>
     }
     .externs = externs
     .variant_owner = variant_owner
-    .collections_used = false
+    .platform = platform
 }
 
-// A whole single-file program as a self-contained Lua chunk: header, prelude (only
-// when needed), the class table, and — with a constructor — an entry footer.
+// A whole single-file program as a self-contained Lua chunk: header, the class
+// table, and — with a constructor — an entry footer. The stdlib helpers (List,
+// Map, Option, Result) are pre-loaded by the Linker; no separate preamble needed.
 public generate(program: Node): str {
     mut block = .class_block(program)
 
-    mut sections = [Codegen.header()]
-    if .uses_collections() {
-        sections.push(Runtime.prelude())
-    }
-    sections.push(block)
+    mut sections = [Codegen.header(), block]
     if .has_constructor(program.child("body")) {
         sections.push("return " ++ .class_name ++ ".new(...)")
     }
@@ -47,8 +43,8 @@ public generate(program: Node): str {
 }
 
 // Just the class table `local C = {}` plus its member lines. The bundler emits the
-// header/prelude/footer once for the whole program, so it composes class blocks
-// instead of calling `generate`. Records whether a member used a collection.
+// header/footer once for the whole program, so it composes class blocks instead of
+// calling `generate`.
 public class_block(program: Node): str {
     mut body = program.child("body")
     mut ctx = .build_context(body)
@@ -57,20 +53,12 @@ public class_block(program: Node): str {
     exprs.inject_stmts(stmts)
 
     mut member_lines = [stmts.emit_member(stmt) for stmt in body if .is_emittable(stmt)]
-    .collections_used = ctx.used_collections()
 
     mut block = "local " ++ .class_name ++ " = {}"
     if member_lines.len() > 0 {
         block = block ++ Text.nl() ++ Text.nl() ++ Text.join(member_lines, Text.nl())
     }
     return block
-}
-
-// Whether the last class block needed the prelude. Named `uses_collections`,
-// distinct from CgContext's `used_collections`, so `ctx.used_collections()` inside
-// this class does not mis-dispatch to here.
-public uses_collections(): bool {
-    return .collections_used
 }
 
 // Classify the top-level declarations into the member set, the instance-method set
@@ -81,18 +69,24 @@ private build_context(body: List<Node>): CgContext {
     mut instance_order = []
     mut properties = []
     for stmt in body {
-        mut k = stmt.kind
-        if k == "FunctionDecl" {
-            members[stmt.child("name")] = true
-            if not stmt.attr("is_static").unwrap_or(false) {
-                instance_methods[stmt.child("name")] = true
-                instance_order.push(stmt.child("name"))
-            }
-        } else if k == "VariableDecl" {
-            if .is_property(stmt) {
-                properties.push(stmt)
-            } else {
+        mut stmt_platform = stmt.attr("platform").unwrap_or("")
+        if stmt_platform != "" and stmt_platform != .platform {
+            // Skip platform-gated declarations that don't match the target platform.
+            // Without this, the constructor would still emit `self.m = C.m` for absent methods.
+        } else {
+            mut k = stmt.kind
+            if k == "FunctionDecl" {
                 members[stmt.child("name")] = true
+                if not stmt.attr("is_static").unwrap_or(false) {
+                    instance_methods[stmt.child("name")] = true
+                    instance_order.push(stmt.child("name"))
+                }
+            } else if k == "VariableDecl" {
+                if .is_property(stmt) {
+                    properties.push(stmt)
+                } else {
+                    members[stmt.child("name")] = true
+                }
             }
         }
     }
@@ -119,6 +113,10 @@ private is_emittable(stmt: Node): bool {
         return false
     }
     if k == "VariableDecl" and .is_property(stmt) {
+        return false
+    }
+    mut stmt_platform = stmt.attr("platform").unwrap_or("")
+    if stmt_platform != "" and stmt_platform != .platform {
         return false
     }
     return true

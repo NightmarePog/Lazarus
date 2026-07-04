@@ -83,7 +83,7 @@ static build_file(path: str, platform: str, pkg_path: str): unit {
         }
     }
     file = Sys.open("Main.lua", "w").unwrap()
-    file.write(Bundler(modules, linker.entry_class(), variant_owner).bundle())
+    file.write(Bundler(modules, linker.entry_class(), variant_owner, platform).bundle())
     file.close()
 }
 

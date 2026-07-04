@@ -7,7 +7,6 @@
 // class block with that map and the module's imports as its known classes.
 
 import backend.Codegen
-import backend.Runtime
 import backend.Text
 import backend.linker.Module
 import frontend.parser.Node
@@ -16,14 +15,14 @@ import Error
 private modules: List<Module>
 private entry_class: str
 private variant_owner: Map<str, str>
+private platform: str
 @auto
-constructor(modules: List<Module>, entry_class: str, variant_owner: Map<str, str>)
+constructor(modules: List<Module>, entry_class: str, variant_owner: Map<str, str>, platform: str)
 
 public bundle(): str {
     mut externs = .collect_externs()
 
     mut blocks = []
-    mut any_collections = false
     mut entry_has_ctor = false
     mut entry_source = ""
     mut entry_is_interface = false
@@ -33,11 +32,8 @@ public bundle(): str {
             entry_source = m.source
         }
         if not .is_extern_module(m) and not m.is_interface {
-            mut cg = Codegen(m.class_name, m.imports, externs, .variant_owner)
+            mut cg = Codegen(m.class_name, m.imports, externs, .variant_owner, .platform)
             blocks.push(cg.class_block(m.ast))
-            if cg.uses_collections() {
-                any_collections = true
-            }
             if m.class_name == .entry_class {
                 entry_has_ctor = cg.has_constructor(m.ast.child("body"))
             }
@@ -49,9 +45,6 @@ public bundle(): str {
     }
 
     mut sections = [Codegen.header()]
-    if any_collections {
-        sections.push(Runtime.prelude())
-    }
     for block in blocks {
         sections.push(block)
     }

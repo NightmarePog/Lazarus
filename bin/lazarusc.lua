@@ -4,475 +4,1111 @@
 -- This file is auto-generated. Do not edit by hand.
 --------------------------------------------------------------------
 
-local function __lz_list(...)
-    return { kind = 'list', items = { ... } }
+local Sys = {}
+
+-- Sys:5
+function Sys.__lz_argv(i)
+
+        if arg == nil then return nil end
+        return arg[i]
+
 end
-local function __lz_map(items)
-    return { kind = 'map', items = items }
+-- Sys:9
+function Sys.__lz_readfile(path)
+
+        local f = io.open(path, 'r')
+        if f == nil then return nil end
+        local data = f:read('*a')
+        f:close()
+        return data
+
 end
-local function __lz_some(v)
-    return { kind = 'Some', _1 = v }
+-- Sys:16
+function Sys.__lz_exec(cmd)
+
+        local ok = os.execute(cmd)
+        if ok == true or ok == 0 then return 0 end
+        return 1
+
 end
-local function __lz_none()
-    return 'None'
+-- Sys:21
+function Sys.__lz_popen(cmd)
+
+        local h = io.popen(cmd .. ' 2>&1')
+        if h == nil then return nil end
+        local s = h:read('*a')
+        h:close()
+        return s
+
 end
-local function __lz_ok(v)
-    return { kind = 'Ok', _1 = v }
+-- Sys:28
+function Sys.__lz_write_file(path, content)
+
+        local f = io.open(path, 'w')
+        if f == nil then return false end
+        local ok = f:write(content)
+        f:close()
+        return ok ~= nil
+
 end
-local function __lz_err(m)
-    return { kind = 'Err', _1 = m }
+-- Sys:35
+function Sys.__lz_exists(path)
+
+        local f = io.open(path, 'r')
+        if f then f:close(); return true end
+        local ok = os.rename(path, path)
+        return ok == true
+
 end
-local function __lz_wrap(v)
-    if v == nil then return 'None' end
-    return { kind = 'Some', _1 = v }
-end
-local function __lz_is_some(o)
-    return type(o) == 'table' and o.kind == 'Some'
-end
-local function __lz_is_none(o)
-    return o == 'None'
-end
-local function __lz_is_ok(o)
-    return type(o) == 'table' and o.kind == 'Ok'
-end
-local function __lz_is_err(o)
-    return type(o) == 'table' and o.kind == 'Err'
-end
-local function __lz_unwrap(o)
-    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end
-    if type(o) == 'table' and o.kind == 'Err' then error(o._1) end
-    error('unwrap of a None value')
-end
-local function __lz_unwrap_or(o, d)
-    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end
-    return d
-end
-local function __lz_error(o)
-    return o._1
-end
-local function __lz_len(c)
-    if c.kind == 'list' then return #c.items end
-    local n = 0
-    for _ in pairs(c.items) do n = n + 1 end
-    return n
-end
-local function __lz_push(c, v)
-    c.items[#c.items + 1] = v
-end
-local function __lz_pop(c)
-    local n = #c.items
-    if n == 0 then return 'None' end
-    local v = c.items[n]
-    c.items[n] = nil
-    return { kind = 'Some', _1 = v }
-end
-local function __lz_get(c, k)
-    local v = c.items[k]
-    if v == nil then return 'None' end
-    return { kind = 'Some', _1 = v }
-end
-local function __lz_has(c, k)
-    return c.items[k] ~= nil
-end
-local function __lz_idx_get(c, i)
-    if c.kind == 'list' then return c.items[i + 1] end
-    return c.items[i]
-end
-local function __lz_idx_set(c, i, v)
-    if c.kind == 'list' then
-        c.items[i + 1] = v
-    else
-        c.items[i] = v
-    end
-end
-local function __lz_str_find(s, sub)
-    return (string.find(s, sub, 1, true))
-end
-local function __lz_str_split(s, sep)
-    local items = {}
-    if sep == '' then
-        items[1] = s
-        return { kind = 'list', items = items }
-    end
-    local start = 1
-    while true do
-        local pos = string.find(s, sep, start, true)
-        if pos == nil then
-            items[#items + 1] = string.sub(s, start)
-            break
-        end
-        items[#items + 1] = string.sub(s, start, pos - 1)
-        start = pos + #sep
-    end
-    return { kind = 'list', items = items }
-end
-local function __lz_fread(h, fmt)
-    return h:read(fmt)
-end
-local function __lz_fwrite(h, s)
-    local ok = h:write(s)
-    return ok ~= nil
-end
-local function __lz_str_to_int(s)
-    local n = tonumber(s)
-    if n == nil or n % 1 ~= 0 then return nil end
-    return math.floor(n)
-end
-local function __lz_argv(i)
-    if arg == nil then return nil end
-    return arg[i]
-end
-local function __lz_readfile(path)
-    local f = io.open(path, 'r')
-    if f == nil then return nil end
-    local data = f:read('*a')
-    f:close()
-    return data
-end
-local function __lz_each(c)
-    if c.kind == 'list' then
-        local i = 0
-        return function()
-            i = i + 1
-            if i > #c.items then return nil end
-            return i - 1, c.items[i]
-        end
-    end
-    return pairs(c.items)
-end
-local function __lz_exec(cmd)
-    local ok = os.execute(cmd)
-    if ok == true or ok == 0 then return 0 end
-    return 1
-end
-local function __lz_popen(cmd)
-    local h = io.popen(cmd .. ' 2>&1')
-    if h == nil then return nil end
-    local s = h:read('*a')
-    h:close()
-    return s
-end
-local function __lz_write_file(path, content)
-    local f = io.open(path, 'w')
-    if f == nil then return false end
-    local ok = f:write(content)
-    f:close()
-    return ok ~= nil
-end
-local function __lz_exists(path)
-    local f = io.open(path, 'r')
-    if f then f:close(); return true end
-    local ok = os.rename(path, path)
-    return ok == true
-end
-local function __lz_mkdir(path)
-    local ok = os.execute('mkdir -p ' .. path)
-    return ok == true or ok == 0
+-- Sys:41
+function Sys.__lz_mkdir(path)
+
+        local ok = os.execute('mkdir -p ' .. path)
+        return ok == true or ok == 0
+
 end
 
 local Option = {}
 
+-- Option:3
+function Option.__lz_wrap(v)
+
+        if v == nil then return 'None' end
+        return { kind = 'Some', _1 = v }
+
+end
+-- Option:7
+function Option.__lz_unwrap(o)
+
+        if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end
+        if type(o) == 'table' and o.kind == 'Err' then error(o._1) end
+        error('unwrap of a None value')
+
+end
+-- Option:12
+function Option.__lz_unwrap_or(o, d)
+
+        if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end
+        return d
+
+end
+-- Option:16
+function Option.__lz_is_some(o)
+
+        return type(o) == 'table' and o.kind == 'Some'
+
+end
+-- Option:19
+function Option.__lz_is_none(o)
+
+        return o == 'None' or type(o) ~= 'table'
+
+end
+-- Option:23
 function Option.Some(_1)
     return { kind = 'Some', _1 = _1 }
 end
 Option.None = 'None'
+-- Option:28
 function Option.some(value)
+    -- Option:29
     return Option.Some(value)
 end
+-- Option:32
 function Option.none()
+    -- Option:33
     return Option.None
 end
+-- Option:36
 function Option.is_some(opt)
+    -- Option:37
     local __lz_m1 = opt
     if __lz_m1.kind == 'Some' then
+        -- Option:38
         return true
     elseif __lz_m1 == 'None' then
+        -- Option:39
         return false
     end
 end
+-- Option:43
 function Option.is_none(opt)
+    -- Option:44
     local __lz_m2 = opt
     if __lz_m2 == 'None' then
+        -- Option:45
         return true
     elseif __lz_m2.kind == 'Some' then
+        -- Option:46
         return false
     end
 end
+-- Option:50
 function Option.unwrap(opt)
+    -- Option:51
     local __lz_m3 = opt
     if __lz_m3.kind == 'Some' then
         local v = __lz_m3._1
+        -- Option:52
         return v
     elseif __lz_m3 == 'None' then
+        -- Option:53
         error("unwrap of None")
     end
 end
+-- Option:57
 function Option.unwrap_or(opt, default)
+    -- Option:58
     local __lz_m4 = opt
     if __lz_m4.kind == 'Some' then
         local v = __lz_m4._1
+        -- Option:59
         return v
     elseif __lz_m4 == 'None' then
+        -- Option:60
         return default
     end
 end
 
-local Str = {}
+local Result = {}
 
-function Str.is_space(s, i)
-    local b = Option.unwrap_or(__lz_wrap(string.byte(s, i)), 0)
-    return (((b == 32) or (b == 9)) or (b == 10)) or (b == 13)
+-- Result:3
+function Result.Ok(_1)
+    return { kind = 'Ok', _1 = _1 }
 end
-function Str.trim_start(s)
-    local n = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
-    local i = 1
-    while (i <= n) and Str.is_space(s, i) do
-        i = i + 1
-    end
-    if i > n then
-        return ""
-    end
-    return Option.unwrap_or(__lz_wrap(string.sub(s, i, n)), s)
+function Result.Err(_1)
+    return { kind = 'Err', _1 = _1 }
 end
-function Str.trim_end(s)
-    local j = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
-    while (j >= 1) and Str.is_space(s, j) do
-        j = j - 1
-    end
-    if j < 1 then
-        return ""
-    end
-    return Option.unwrap_or(__lz_wrap(string.sub(s, 1, j)), s)
+-- Result:8
+function Result.__lz_is_ok(o)
+
+        return type(o) == 'table' and o.kind == 'Ok'
+
 end
-function Str.trim(s)
-    return Str.trim_start(Str.trim_end(s))
+-- Result:11
+function Result.__lz_is_err(o)
+
+        return type(o) == 'table' and o.kind == 'Err'
+
 end
-function Str.pad_left(s, width, fill)
-    local n = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
-    if n >= width then
-        return s
-    end
-    return Option.unwrap_or(__lz_wrap(string.rep(fill, width - n)), "") .. s
+-- Result:15
+function Result.ok(value)
+    -- Result:16
+    return Result.Ok(value)
 end
-function Str.pad_right(s, width, fill)
-    local n = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
-    if n >= width then
-        return s
-    end
-    return s .. Option.unwrap_or(__lz_wrap(string.rep(fill, width - n)), "")
+-- Result:19
+function Result.err(message)
+    -- Result:20
+    return Result.Err(message)
 end
-function Str.is_prefix(s, prefix)
-    local pn = Option.unwrap_or(__lz_wrap(string.len(prefix)), 0)
-    return Option.unwrap_or(__lz_wrap(string.sub(s, 1, pn)), "") == prefix
-end
-function Str.is_suffix(s, suffix)
-    local n = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
-    local sn = Option.unwrap_or(__lz_wrap(string.len(suffix)), 0)
-    if sn > n then
+-- Result:23
+function Result.is_ok(res)
+    -- Result:24
+    local __lz_m1 = res
+    if __lz_m1.kind == 'Ok' then
+        -- Result:25
+        return true
+    elseif __lz_m1.kind == 'Err' then
+        -- Result:26
         return false
     end
-    return Option.unwrap_or(__lz_wrap(string.sub(s, (n - sn) + 1, n)), "") == suffix
 end
-function Str.replace(s, from, to)
-    if from == "" then
+-- Result:30
+function Result.is_err(res)
+    -- Result:31
+    local __lz_m2 = res
+    if __lz_m2.kind == 'Err' then
+        -- Result:32
+        return true
+    elseif __lz_m2.kind == 'Ok' then
+        -- Result:33
+        return false
+    end
+end
+-- Result:37
+function Result.unwrap(res)
+    -- Result:38
+    local __lz_m3 = res
+    if __lz_m3.kind == 'Ok' then
+        local v = __lz_m3._1
+        -- Result:39
+        return v
+    elseif __lz_m3.kind == 'Err' then
+        local m = __lz_m3._1
+        -- Result:40
+        error(m)
+    end
+end
+-- Result:44
+function Result.unwrap_or(res, default)
+    -- Result:45
+    local __lz_m4 = res
+    if __lz_m4.kind == 'Ok' then
+        local v = __lz_m4._1
+        -- Result:46
+        return v
+    elseif __lz_m4.kind == 'Err' then
+        -- Result:47
+        return default
+    end
+end
+-- Result:51
+function Result.error(res)
+    -- Result:52
+    local __lz_m5 = res
+    if __lz_m5.kind == 'Err' then
+        local m = __lz_m5._1
+        -- Result:53
+        return m
+    elseif __lz_m5.kind == 'Ok' then
+        -- Result:54
+        return ""
+    end
+end
+
+local List = {}
+
+-- List:3
+function List.__lz_list(items)
+
+        return { kind = 'list', items = items }
+
+end
+-- List:6
+function List.__lz_push(c, v)
+
+        c.items[#c.items + 1] = v
+
+end
+-- List:9
+function List.__lz_pop(c)
+
+        local n = #c.items
+        if n == 0 then return 'None' end
+        local v = c.items[n]
+        c.items[n] = nil
+        return { kind = 'Some', _1 = v }
+
+end
+-- List:16
+function List.__lz_get(c, k)
+
+        local v = c.items[k]
+        if v == nil then return 'None' end
+        return { kind = 'Some', _1 = v }
+
+end
+-- List:21
+function List.__lz_has(c, k)
+
+        return c.items[k] ~= nil
+
+end
+-- List:24
+function List.__lz_len(c)
+
+        if c.kind == 'list' then return #c.items end
+        local n = 0
+        for _ in pairs(c.items) do n = n + 1 end
+        return n
+
+end
+-- List:30
+function List.__lz_delete(c, k)
+
+        c.items[k] = nil
+
+end
+-- List:33
+function List.__lz_idx_get(c, i)
+
+        if c.kind == 'list' then return c.items[i + 1] end
+        return c.items[i]
+
+end
+-- List:37
+function List.__lz_idx_set(c, i, v)
+
+        if c.kind == 'list' then
+            c.items[i + 1] = v
+        else
+            c.items[i] = v
+        end
+
+end
+-- List:44
+function List.__lz_each(c)
+
+        if c.kind == 'list' then
+            local i = 0
+            return function()
+                i = i + 1
+                if i > #c.items then return nil end
+                return i - 1, c.items[i]
+            end
+        end
+        return pairs(c.items)
+
+end
+-- List:56
+function List.map(xs, f)
+    -- List:57
+    local result = List.__lz_list({})
+    -- List:58
+    for _, x in List.__lz_each(xs) do
+        -- List:58
+        List.__lz_push(result, f(x))
+    end
+    -- List:59
+    return result
+end
+-- List:62
+function List.filter(xs, f)
+    -- List:63
+    local result = List.__lz_list({})
+    -- List:64
+    for _, x in List.__lz_each(xs) do
+        -- List:64
+        if f(x) then
+            -- List:64
+            List.__lz_push(result, x)
+        end
+    end
+    -- List:65
+    return result
+end
+-- List:68
+function List.fold(xs, init, f)
+    -- List:69
+    local acc = init
+    -- List:70
+    for _, x in List.__lz_each(xs) do
+        -- List:70
+        acc = f(acc, x)
+    end
+    -- List:71
+    return acc
+end
+-- List:74
+function List.any(xs, f)
+    -- List:75
+    for _, x in List.__lz_each(xs) do
+        -- List:75
+        if f(x) then
+            -- List:75
+            return true
+        end
+    end
+    -- List:76
+    return false
+end
+-- List:79
+function List.all(xs, f)
+    -- List:80
+    for _, x in List.__lz_each(xs) do
+        -- List:80
+        if not f(x) then
+            -- List:80
+            return false
+        end
+    end
+    -- List:81
+    return true
+end
+-- List:84
+function List.find(xs, f)
+    -- List:85
+    for _, x in List.__lz_each(xs) do
+        -- List:85
+        if f(x) then
+            -- List:85
+            return Option.some(x)
+        end
+    end
+    -- List:86
+    return Option.none()
+end
+-- List:89
+function List.copy(xs)
+    -- List:90
+    local result = List.__lz_list({})
+    -- List:91
+    for _, x in List.__lz_each(xs) do
+        -- List:91
+        List.__lz_push(result, x)
+    end
+    -- List:92
+    return result
+end
+-- List:95
+function List.is_empty(xs)
+    -- List:96
+    return List.__lz_len(xs) == 0
+end
+-- List:99
+function List.contains(xs, v)
+    -- List:100
+    for _, x in List.__lz_each(xs) do
+        -- List:101
+        if x == v then
+            -- List:102
+            return true
+        end
+    end
+    -- List:105
+    return false
+end
+-- List:108
+function List.first(xs)
+    -- List:109
+    return List.__lz_get(xs, 1)
+end
+-- List:112
+function List.last(xs)
+    -- List:113
+    return List.__lz_get(xs, List.__lz_len(xs))
+end
+-- List:116
+function List.slice(xs, lo, hi)
+    -- List:117
+    local result = List.__lz_list({})
+    -- List:118
+    for i, x in List.__lz_each(xs) do
+        -- List:119
+        local j = i + 1
+        -- List:120
+        if (j >= lo) and (j <= hi) then
+            -- List:121
+            List.__lz_push(result, x)
+        end
+    end
+    -- List:124
+    return result
+end
+-- List:127
+function List.join(xs, sep)
+    -- List:128
+    local result = ""
+    -- List:129
+    local head = true
+    -- List:130
+    for _, x in List.__lz_each(xs) do
+        -- List:131
+        if head then
+            -- List:132
+            result = x
+            -- List:133
+            head = false
+        else
+            -- List:135
+            result = (result .. sep) .. x
+        end
+    end
+    -- List:138
+    return result
+end
+
+local Map = {}
+
+-- Map:3
+function Map.__lz_map(items)
+
+        return { kind = 'map', items = items }
+
+end
+-- Map:7
+function Map.map(m, f)
+    -- Map:8
+    local result = Map.__lz_map({})
+    -- Map:9
+    for k, v in List.__lz_each(m) do
+        -- Map:9
+        List.__lz_idx_set(result, k, f(k, v))
+    end
+    -- Map:10
+    return result
+end
+-- Map:13
+function Map.filter(m, f)
+    -- Map:14
+    local result = Map.__lz_map({})
+    -- Map:15
+    for k, v in List.__lz_each(m) do
+        -- Map:15
+        if f(k, v) then
+            -- Map:15
+            List.__lz_idx_set(result, k, v)
+        end
+    end
+    -- Map:16
+    return result
+end
+-- Map:19
+function Map.fold(m, init, f)
+    -- Map:20
+    local acc = init
+    -- Map:21
+    for k, v in List.__lz_each(m) do
+        -- Map:21
+        acc = f(acc, k, v)
+    end
+    -- Map:22
+    return acc
+end
+-- Map:25
+function Map.any(m, f)
+    -- Map:26
+    for k, v in List.__lz_each(m) do
+        -- Map:26
+        if f(k, v) then
+            -- Map:26
+            return true
+        end
+    end
+    -- Map:27
+    return false
+end
+-- Map:30
+function Map.all(m, f)
+    -- Map:31
+    for k, v in List.__lz_each(m) do
+        -- Map:31
+        if not f(k, v) then
+            -- Map:31
+            return false
+        end
+    end
+    -- Map:32
+    return true
+end
+-- Map:35
+function Map.find(m, f)
+    -- Map:36
+    for k, v in List.__lz_each(m) do
+        -- Map:36
+        if f(k, v) then
+            -- Map:36
+            return Option.some(v)
+        end
+    end
+    -- Map:37
+    return Option.none()
+end
+-- Map:40
+function Map.copy(m)
+    -- Map:41
+    local result = Map.__lz_map({})
+    -- Map:42
+    for k, v in List.__lz_each(m) do
+        -- Map:42
+        List.__lz_idx_set(result, k, v)
+    end
+    -- Map:43
+    return result
+end
+-- Map:46
+function Map.set(m, k, v)
+    -- Map:47
+    List.__lz_idx_set(m, k, v)
+end
+-- Map:50
+function Map.keys(m)
+    -- Map:51
+    local result = List.__lz_list({})
+    -- Map:52
+    for k, val in List.__lz_each(m) do
+        -- Map:53
+        List.__lz_push(result, k)
+    end
+    -- Map:55
+    return result
+end
+-- Map:58
+function Map.values(m)
+    -- Map:59
+    local result = List.__lz_list({})
+    -- Map:60
+    for k, val in List.__lz_each(m) do
+        -- Map:61
+        List.__lz_push(result, val)
+    end
+    -- Map:63
+    return result
+end
+
+local Str = {}
+
+-- Str:11
+function Str.__lz_str_find(s, sub)
+
+        return (string.find(s, sub, 1, true))
+
+end
+-- Str:14
+function Str.__lz_str_split(s, sep)
+
+        local items = {}
+        if sep == '' then
+            items[1] = s
+            return { kind = 'list', items = items }
+        end
+        local start = 1
+        while true do
+            local pos = string.find(s, sep, start, true)
+            if pos == nil then
+                items[#items + 1] = string.sub(s, start)
+                break
+            end
+            items[#items + 1] = string.sub(s, start, pos - 1)
+            start = pos + #sep
+        end
+        return { kind = 'list', items = items }
+
+end
+-- Str:32
+function Str.__lz_str_to_int(s)
+
+        local n = tonumber(s)
+        if n == nil or n % 1 ~= 0 then return nil end
+        return math.floor(n)
+
+end
+-- Str:53
+function Str.is_space(s, i)
+    -- Str:54
+    local b = Option.unwrap_or(Option.__lz_wrap(string.byte(s, i)), 0)
+    -- Str:55
+    return (((b == 32) or (b == 9)) or (b == 10)) or (b == 13)
+end
+-- Str:58
+function Str.trim_start(s)
+    -- Str:59
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(s)), 0)
+    -- Str:60
+    local i = 1
+    -- Str:61
+    while (i <= n) and Str.is_space(s, i) do
+        -- Str:62
+        i = i + 1
+    end
+    -- Str:64
+    if i > n then
+        -- Str:65
+        return ""
+    end
+    -- Str:67
+    return Option.unwrap_or(Option.__lz_wrap(string.sub(s, i, n)), s)
+end
+-- Str:70
+function Str.trim_end(s)
+    -- Str:71
+    local j = Option.unwrap_or(Option.__lz_wrap(string.len(s)), 0)
+    -- Str:72
+    while (j >= 1) and Str.is_space(s, j) do
+        -- Str:73
+        j = j - 1
+    end
+    -- Str:75
+    if j < 1 then
+        -- Str:76
+        return ""
+    end
+    -- Str:78
+    return Option.unwrap_or(Option.__lz_wrap(string.sub(s, 1, j)), s)
+end
+-- Str:81
+function Str.trim(s)
+    -- Str:82
+    return Str.trim_start(Str.trim_end(s))
+end
+-- Str:86
+function Str.pad_left(s, width, fill)
+    -- Str:87
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(s)), 0)
+    -- Str:88
+    if n >= width then
+        -- Str:89
         return s
     end
-    local __lz_m1 = __lz_wrap(__lz_str_find(s, from))
+    -- Str:91
+    return Option.unwrap_or(Option.__lz_wrap(string.rep(fill, width - n)), "") .. s
+end
+-- Str:94
+function Str.pad_right(s, width, fill)
+    -- Str:95
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(s)), 0)
+    -- Str:96
+    if n >= width then
+        -- Str:97
+        return s
+    end
+    -- Str:99
+    return s .. Option.unwrap_or(Option.__lz_wrap(string.rep(fill, width - n)), "")
+end
+-- Str:102
+function Str.is_prefix(s, prefix)
+    -- Str:103
+    local pn = Option.unwrap_or(Option.__lz_wrap(string.len(prefix)), 0)
+    -- Str:104
+    return Option.unwrap_or(Option.__lz_wrap(string.sub(s, 1, pn)), "") == prefix
+end
+-- Str:107
+function Str.is_suffix(s, suffix)
+    -- Str:108
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(s)), 0)
+    -- Str:109
+    local sn = Option.unwrap_or(Option.__lz_wrap(string.len(suffix)), 0)
+    -- Str:110
+    if sn > n then
+        -- Str:111
+        return false
+    end
+    -- Str:113
+    return Option.unwrap_or(Option.__lz_wrap(string.sub(s, (n - sn) + 1, n)), "") == suffix
+end
+-- Str:117
+function Str.replace(s, from, to)
+    -- Str:118
+    if from == "" then
+        -- Str:119
+        return s
+    end
+    -- Str:121
+    local __lz_m1 = Option.__lz_wrap(Str.__lz_str_find(s, from))
     if __lz_m1.kind == 'Some' then
         local pos = __lz_m1._1
-        local n = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
-        local flen = Option.unwrap_or(__lz_wrap(string.len(from)), 0)
-        return (Option.unwrap_or(__lz_wrap(string.sub(s, 1, pos - 1)), "") .. to) .. Option.unwrap_or(__lz_wrap(string.sub(s, pos + flen, n)), "")
+        -- Str:123
+        local n = Option.unwrap_or(Option.__lz_wrap(string.len(s)), 0)
+        -- Str:124
+        local flen = Option.unwrap_or(Option.__lz_wrap(string.len(from)), 0)
+        -- Str:125
+        return (Option.unwrap_or(Option.__lz_wrap(string.sub(s, 1, pos - 1)), "") .. to) .. Option.unwrap_or(Option.__lz_wrap(string.sub(s, pos + flen, n)), "")
     elseif __lz_m1 == 'None' then
+        -- Str:127
         return s
     end
 end
+-- Str:133
 function Str.replace_all(s, from, to)
+    -- Str:134
     if from == "" then
+        -- Str:135
         return s
     end
-    local flen = Option.unwrap_or(__lz_wrap(string.len(from)), 0)
+    -- Str:137
+    local flen = Option.unwrap_or(Option.__lz_wrap(string.len(from)), 0)
+    -- Str:138
     local out = ""
+    -- Str:139
     local rest = s
+    -- Str:140
     while true do
-        local __lz_m2 = __lz_wrap(__lz_str_find(rest, from))
+        -- Str:141
+        local __lz_m2 = Option.__lz_wrap(Str.__lz_str_find(rest, from))
         if __lz_m2.kind == 'Some' then
             local pos = __lz_m2._1
-            local rlen = Option.unwrap_or(__lz_wrap(string.len(rest)), 0)
-            out = (out .. Option.unwrap_or(__lz_wrap(string.sub(rest, 1, pos - 1)), "")) .. to
-            rest = Option.unwrap_or(__lz_wrap(string.sub(rest, pos + flen, rlen)), "")
+            -- Str:143
+            local rlen = Option.unwrap_or(Option.__lz_wrap(string.len(rest)), 0)
+            -- Str:144
+            out = (out .. Option.unwrap_or(Option.__lz_wrap(string.sub(rest, 1, pos - 1)), "")) .. to
+            -- Str:145
+            rest = Option.unwrap_or(Option.__lz_wrap(string.sub(rest, pos + flen, rlen)), "")
         elseif __lz_m2 == 'None' then
+            -- Str:147
             return out .. rest
         end
     end
 end
+-- Str:153
 function Str.chars(s)
-    local out = __lz_list()
-    local n = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
+    -- Str:154
+    local out = List.__lz_list({})
+    -- Str:155
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(s)), 0)
+    -- Str:156
     local i = 1
+    -- Str:157
     while i <= n do
-        __lz_push(out, Option.unwrap_or(__lz_wrap(string.sub(s, i, i)), ""))
+        -- Str:158
+        List.__lz_push(out, Option.unwrap_or(Option.__lz_wrap(string.sub(s, i, i)), ""))
+        -- Str:159
         i = i + 1
     end
+    -- Str:161
     return out
 end
 
 local Error = {}
 
+-- Error:15
 function Error.new(kind, message, line, column, source, span)
     local self = {}
     self.to_string = Error.to_string
     self.raise = Error.raise
+    self.print = Error.print
     self.format = Error.format
+    -- Error:15
     self.kind = kind
+    -- Error:15
     self.message = message
+    -- Error:15
     self.line = line
+    -- Error:15
     self.column = column
+    -- Error:15
     self.source = source
+    -- Error:15
     self.span = span
     return self
 end
+-- Error:17
 function Error.to_string(self)
+    -- Error:18
     return Error.format(self)
 end
+-- Error:21
 function Error.raise(self)
+    -- Error:22
     print(Error.format(self))
+    -- Error:23
     os.exit(1)
 end
+-- Error:26
+function Error.print(self)
+    -- Error:27
+    print(Error.format(self))
+end
+-- Error:30
 function Error.format(self)
-    local esc = Option.unwrap_or(__lz_wrap(string.char(27)), "")
+    -- Error:31
+    local esc = Option.unwrap_or(Option.__lz_wrap(string.char(27)), "")
+    -- Error:32
     local red = esc .. "[31m"
+    -- Error:33
     local bold = esc .. "[1m"
+    -- Error:34
     local reset = esc .. "[0m"
-    local nl = Option.unwrap_or(__lz_wrap(string.char(10)), "")
-    local prefix = __lz_unwrap_or(__lz_wrap(string.format("   %d │ ", self.line)), "")
-    local pad = Option.unwrap_or(__lz_wrap(string.rep(" ", (Error.display_width(prefix) + self.column) - 1)), "")
-    local carets = (red .. Option.unwrap_or(__lz_wrap(string.rep("^", self.span)), "^")) .. reset
+    -- Error:35
+    local nl = Option.unwrap_or(Option.__lz_wrap(string.char(10)), "")
+    -- Error:37
+    local prefix = Option.__lz_unwrap_or(Option.__lz_wrap(string.format("   %d │ ", self.line)), "")
+    -- Error:38
+    local pad = Option.unwrap_or(Option.__lz_wrap(string.rep(" ", (Error.display_width(prefix) + self.column) - 1)), "")
+    -- Error:39
+    local carets = (red .. Option.unwrap_or(Option.__lz_wrap(string.rep("^", self.span)), "^")) .. reset
+    -- Error:41
     local out = ""
+    -- Error:42
     out = out .. nl
+    -- Error:43
     out = (((out .. red) .. "╭─ Error ──────────────────────────────") .. reset) .. nl
+    -- Error:44
     out = ((((out .. "│ Type: ") .. bold) .. self.kind) .. reset) .. nl
-    out = (out .. __lz_unwrap_or(__lz_wrap(string.format("│ Location: unknown:%d:%d", self.line, self.column)), "│ Location: unknown")) .. nl
+    -- Error:45
+    out = (out .. Option.__lz_unwrap_or(Option.__lz_wrap(string.format("│ Location: unknown:%d:%d", self.line, self.column)), "│ Location: unknown")) .. nl
+    -- Error:46
     out = (out .. "│") .. nl
+    -- Error:47
     out = ((out .. "│ ") .. self.message) .. nl
+    -- Error:48
     out = (out .. "│") .. nl
+    -- Error:49
     out = (((out .. "│ ") .. prefix) .. Error.source_line(self.source, self.line)) .. nl
+    -- Error:50
     out = (((out .. "│ ") .. pad) .. carets) .. nl
+    -- Error:51
     out = ((out .. red) .. "╰──────────────────────────────────────") .. reset
+    -- Error:52
     return out
 end
+-- Error:56
 function Error.source_line(source, target)
-    local nl = Option.unwrap_or(__lz_wrap(string.char(10)), "")
-    local len = Option.unwrap_or(__lz_wrap(string.len(source)), 0)
+    -- Error:57
+    local nl = Option.unwrap_or(Option.__lz_wrap(string.char(10)), "")
+    -- Error:58
+    local len = Option.unwrap_or(Option.__lz_wrap(string.len(source)), 0)
+    -- Error:59
     local cur = 1
+    -- Error:60
     local out = ""
+    -- Error:61
     local i = 1
+    -- Error:62
     while true do
+        -- Error:63
         if i > len then
+            -- Error:64
             break
         end
-        local c = Option.unwrap_or(__lz_wrap(string.sub(source, i, i)), "")
+        -- Error:66
+        local c = Option.unwrap_or(Option.__lz_wrap(string.sub(source, i, i)), "")
+        -- Error:67
         if c == nl then
+            -- Error:68
             if cur == target then
+                -- Error:69
                 break
             end
+            -- Error:71
             cur = cur + 1
+            -- Error:72
             out = ""
         else
+            -- Error:74
             if cur == target then
+                -- Error:75
                 out = out .. c
             end
         end
+        -- Error:78
         i = i + 1
     end
+    -- Error:80
     return out
 end
+-- Error:85
 function Error.display_width(s)
-    local len = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
+    -- Error:86
+    local len = Option.unwrap_or(Option.__lz_wrap(string.len(s)), 0)
+    -- Error:87
     local w = 0
+    -- Error:88
     local i = 1
+    -- Error:89
     while true do
+        -- Error:90
         if i > len then
+            -- Error:91
             break
         end
-        local b = Option.unwrap_or(__lz_wrap(string.byte(s, i)), 0)
+        -- Error:93
+        local b = Option.unwrap_or(Option.__lz_wrap(string.byte(s, i)), 0)
+        -- Error:94
         if b < 128 then
+            -- Error:95
             w = w + 1
         else
+            -- Error:97
             if b >= 192 then
+                -- Error:98
                 w = w + 1
             end
         end
+        -- Error:101
         i = i + 1
     end
+    -- Error:103
     return w
 end
 
 local Char = {}
 
+-- Char:8
 function Char.code_of(c)
-    return __lz_wrap(string.byte(c, 1))
+    -- Char:9
+    return Option.__lz_wrap(string.byte(c, 1))
 end
+-- Char:12
 function Char.is_digit(c)
+    -- Char:13
     local code = Option.unwrap_or(Char.code_of(c), 0)
+    -- Char:14
     return (code >= 48) and (code <= 57)
 end
+-- Char:17
 function Char.is_alpha(c)
+    -- Char:18
     local code = Option.unwrap_or(Char.code_of(c), 0)
+    -- Char:19
     return ((code >= 97) and (code <= 122)) or ((code >= 65) and (code <= 90))
 end
+-- Char:22
 function Char.is_underscore(c)
+    -- Char:23
     return Option.unwrap_or(Char.code_of(c), 0) == 95
 end
+-- Char:26
 function Char.is_ident_start(c)
+    -- Char:27
     return Char.is_alpha(c) or Char.is_underscore(c)
 end
+-- Char:30
 function Char.is_ident_char(c)
+    -- Char:31
     return Char.is_ident_start(c) or Char.is_digit(c)
 end
+-- Char:34
 function Char.is_space(c)
+    -- Char:35
     local code = Option.unwrap_or(Char.code_of(c), 0)
+    -- Char:36
     return (code == 32) or ((code >= 9) and (code <= 13))
 end
+-- Char:39
 function Char.is_newline(c)
+    -- Char:40
     return Option.unwrap_or(Char.code_of(c), 0) == 10
 end
+-- Char:43
 function Char.is_quote(c)
+    -- Char:44
     return Option.unwrap_or(Char.code_of(c), 0) == 34
+end
+-- Char:47
+function Char.is_backslash(c)
+    -- Char:48
+    return Option.unwrap_or(Char.code_of(c), 0) == 92
 end
 
 local Keywords = {}
 
-Keywords.words = __lz_map({["import"] = "IMPORT", ["extern"] = "EXTERN", ["enum"] = "ENUM", ["interface"] = "INTERFACE", ["fn"] = "FN", ["private"] = "PRIVATE", ["public"] = "PUBLIC", ["mut"] = "MUTABLE", ["static"] = "STATIC", ["self"] = "SELF", ["constructor"] = "CONSTRUCTOR", ["return"] = "RETURN", ["if"] = "IF", ["else"] = "ELSE", ["while"] = "WHILE", ["loop"] = "LOOP", ["for"] = "FOR", ["in"] = "IN", ["break"] = "BREAK", ["true"] = "TRUE", ["false"] = "FALSE", ["and"] = "AND", ["or"] = "OR", ["not"] = "NOT"})
-Keywords.ops2 = __lz_map({["++"] = "CONCAT", ["=>"] = "FAT_ARROW", ["->"] = "ARROW", ["=="] = "EQ", ["!="] = "NEQ", ["<="] = "LESS_EQUAL", [">="] = "GREATER_EQUAL", ["+="] = "PLUS_ASSIGN", ["-="] = "MINUS_ASSIGN", ["*="] = "STAR_ASSIGN", ["/="] = "SLASH_ASSIGN"})
-Keywords.ops1 = __lz_map({["="] = "ASSIGN", ["+"] = "PLUS", ["-"] = "MINUS", ["*"] = "MULTIPLY", ["/"] = "DIVIDE", ["%"] = "MODULO", ["^"] = "POWER", ["<"] = "LESS", [">"] = "GREATER", ["("] = "LEFT_BRACKET", [")"] = "RIGHT_BRACKET", ["{"] = "BODY_START", ["}"] = "BODY_END", [","] = "COMMA", [":"] = "COLON", ["."] = "DOT", [";"] = "SEMICOLON", ["["] = "LSQUARE", ["]"] = "RSQUARE", ["@"] = "AT", ["#"] = "HASH", ["|"] = "PIPE", ["?"] = "QUESTION"})
+-- Keywords:6
+Keywords.words = Map.__lz_map({["import"] = "IMPORT", ["extern"] = "EXTERN", ["lua"] = "LUA", ["enum"] = "ENUM", ["interface"] = "INTERFACE", ["fn"] = "FN", ["private"] = "PRIVATE", ["public"] = "PUBLIC", ["mut"] = "MUTABLE", ["static"] = "STATIC", ["self"] = "SELF", ["constructor"] = "CONSTRUCTOR", ["return"] = "RETURN", ["if"] = "IF", ["else"] = "ELSE", ["while"] = "WHILE", ["loop"] = "LOOP", ["for"] = "FOR", ["in"] = "IN", ["break"] = "BREAK", ["true"] = "TRUE", ["false"] = "FALSE", ["and"] = "AND", ["or"] = "OR", ["not"] = "NOT"})
+-- Keywords:34
+Keywords.ops2 = Map.__lz_map({["++"] = "CONCAT", ["=>"] = "FAT_ARROW", ["->"] = "ARROW", ["=="] = "EQ", ["!="] = "NEQ", ["<="] = "LESS_EQUAL", [">="] = "GREATER_EQUAL", ["+="] = "PLUS_ASSIGN", ["-="] = "MINUS_ASSIGN", ["*="] = "STAR_ASSIGN", ["/="] = "SLASH_ASSIGN"})
+-- Keywords:48
+Keywords.ops1 = Map.__lz_map({["="] = "ASSIGN", ["+"] = "PLUS", ["-"] = "MINUS", ["*"] = "MULTIPLY", ["/"] = "DIVIDE", ["%"] = "MODULO", ["^"] = "POWER", ["<"] = "LESS", [">"] = "GREATER", ["("] = "LEFT_BRACKET", [")"] = "RIGHT_BRACKET", ["{"] = "BODY_START", ["}"] = "BODY_END", [","] = "COMMA", [":"] = "COLON", ["."] = "DOT", [";"] = "SEMICOLON", ["["] = "LSQUARE", ["]"] = "RSQUARE", ["@"] = "AT", ["#"] = "HASH", ["|"] = "PIPE", ["?"] = "QUESTION"})
+-- Keywords:74
 function Keywords.word_kind(word)
-    return __lz_unwrap_or(__lz_get(Keywords.words, word), "IDENTIFIER")
+    -- Keywords:75
+    return Option.__lz_unwrap_or(List.__lz_get(Keywords.words, word), "IDENTIFIER")
 end
+-- Keywords:78
 function Keywords.two(pair)
-    return __lz_get(Keywords.ops2, pair)
+    -- Keywords:79
+    return List.__lz_get(Keywords.ops2, pair)
 end
+-- Keywords:82
 function Keywords.one(ch)
-    return __lz_get(Keywords.ops1, ch)
+    -- Keywords:83
+    return List.__lz_get(Keywords.ops1, ch)
 end
 
 local Token = {}
 
+-- Token:10
 function Token.new(kind, value, line, column)
     local self = {}
     self.to_string = Token.to_string
+    -- Token:10
     self.kind = kind
+    -- Token:10
     self.value = value
+    -- Token:10
     self.line = line
+    -- Token:10
     self.column = column
     return self
 end
+-- Token:12
 function Token.to_string(self)
-    return __lz_unwrap_or(__lz_wrap(string.format("%s('%s', %d:%d)", self.kind, self.value, self.line, self.column)), "<token>")
+    -- Token:13
+    return Option.__lz_unwrap_or(Option.__lz_wrap(string.format("%s('%s', %d:%d)", self.kind, self.value, self.line, self.column)), "<token>")
 end
 
 local Lexer = {}
 
+-- Lexer:19
 function Lexer.new(source)
     local self = {}
     self.scan = Lexer.scan
@@ -482,11 +1118,16 @@ function Lexer.new(source)
     self.advance = Lexer.advance
     self.skip_trivia = Lexer.skip_trivia
     self.skip_comment = Lexer.skip_comment
+    self.scan_lua_body = Lexer.scan_lua_body
+    self.skip_lua_string = Lexer.skip_lua_string
+    self.skip_lua_comment = Lexer.skip_lua_comment
+    self.skip_lua_long_string = Lexer.skip_lua_long_string
     self.next_tokens = Lexer.next_tokens
     self.next_token = Lexer.next_token
     self.read_identifier = Lexer.read_identifier
     self.read_number = Lexer.read_number
     self.read_string = Lexer.read_string
+    self.read_escape = Lexer.read_escape
     self.read_symbol = Lexer.read_symbol
     self.read_interp = Lexer.read_interp
     self.scan_interp_expr = Lexer.scan_interp_expr
@@ -499,446 +1140,1049 @@ function Lexer.new(source)
     self.split_lines = Lexer.split_lines
     self.is_blank = Lexer.is_blank
     self.leading_spaces = Lexer.leading_spaces
+    -- Lexer:20
     self.source = source
+    -- Lexer:21
     self.pos = 1
+    -- Lexer:22
     self.line = 1
+    -- Lexer:23
     self.col = 1
+    -- Lexer:24
     self.current = Lexer.char_at(self, 1)
+    -- Lexer:25
+    self.next_body_is_raw = false
+    -- Lexer:26
+    self.lua_paren_depth = 0
     return self
 end
+-- Lexer:29
 function Lexer.scan(self)
-    local tokens = __lz_list()
+    -- Lexer:30
+    local tokens = List.__lz_list({})
+    -- Lexer:31
     while true do
+        -- Lexer:32
         Lexer.skip_trivia(self)
+        -- Lexer:33
         if Lexer.at_end(self) then
+            -- Lexer:34
             break
         end
-        for _, tok in __lz_each(Lexer.next_tokens(self)) do
-            __lz_push(tokens, tok)
+        -- Lexer:36
+        for _, tok in List.__lz_each(Lexer.next_tokens(self)) do
+            -- Lexer:37
+            List.__lz_push(tokens, tok)
         end
     end
+    -- Lexer:40
     return tokens
 end
+-- Lexer:44
 function Lexer.char_at(self, i)
-    return Option.unwrap_or(__lz_wrap(string.sub(self.source, i, i)), "")
+    -- Lexer:45
+    return Option.unwrap_or(Option.__lz_wrap(string.sub(self.source, i, i)), "")
 end
+-- Lexer:48
 function Lexer.peek(self)
+    -- Lexer:49
     return Lexer.char_at(self, self.pos + 1)
 end
+-- Lexer:52
 function Lexer.at_end(self)
+    -- Lexer:53
     return self.current == ""
 end
+-- Lexer:56
 function Lexer.advance(self)
+    -- Lexer:57
     if Char.is_newline(self.current) then
+        -- Lexer:58
         self.line = self.line + 1
+        -- Lexer:59
         self.col = 1
     else
+        -- Lexer:61
         self.col = self.col + 1
     end
+    -- Lexer:63
     self.pos = self.pos + 1
+    -- Lexer:64
     self.current = Lexer.char_at(self, self.pos)
 end
+-- Lexer:68
 function Lexer.skip_trivia(self)
+    -- Lexer:69
     while true do
+        -- Lexer:70
         while Char.is_space(self.current) do
+            -- Lexer:71
             Lexer.advance(self)
         end
+        -- Lexer:73
         if not Lexer.skip_comment(self) then
+            -- Lexer:74
             break
         end
     end
 end
+-- Lexer:80
 function Lexer.skip_comment(self)
+    -- Lexer:81
     if self.current ~= "/" then
+        -- Lexer:82
         return false
     end
+    -- Lexer:84
     local nxt = Lexer.peek(self)
+    -- Lexer:85
     if nxt == "/" then
+        -- Lexer:86
         Lexer.advance(self)
+        -- Lexer:87
         Lexer.advance(self)
+        -- Lexer:88
         while true do
+            -- Lexer:89
             if Lexer.at_end(self) then
+                -- Lexer:90
                 break
             end
+            -- Lexer:92
             if Char.is_newline(self.current) then
+                -- Lexer:93
                 break
             end
+            -- Lexer:95
             Lexer.advance(self)
         end
+        -- Lexer:97
         return true
     end
+    -- Lexer:99
     if nxt == "*" then
+        -- Lexer:100
         local line = self.line
+        -- Lexer:101
         local col = self.col
+        -- Lexer:102
         Lexer.advance(self)
+        -- Lexer:103
         Lexer.advance(self)
+        -- Lexer:104
         while true do
+            -- Lexer:105
             if Lexer.at_end(self) then
+                -- Lexer:106
                 Error.new("UnterminatedComment", "unterminated block comment", line, col, self.source, 2):raise()
             end
+            -- Lexer:108
             if self.current == "*" then
+                -- Lexer:109
                 if Lexer.peek(self) == "/" then
+                    -- Lexer:110
                     Lexer.advance(self)
+                    -- Lexer:111
                     Lexer.advance(self)
+                    -- Lexer:112
                     return true
                 end
             end
+            -- Lexer:115
             Lexer.advance(self)
         end
     end
+    -- Lexer:118
     return false
 end
-function Lexer.next_tokens(self)
-    local is_f = (self.current == "f") and Char.is_quote(Lexer.peek(self))
-    if is_f then
+-- Lexer:126
+function Lexer.scan_lua_body(self)
+    -- Lexer:127
+    local start = self.pos
+    -- Lexer:128
+    local depth = 1
+    -- Lexer:129
+    while true do
+        -- Lexer:130
+        if Lexer.at_end(self) then
+            -- Lexer:131
+            Error.new("UnterminatedLuaBody", "unterminated lua function body", self.line, self.col, self.source, 1):raise()
+        end
+        -- Lexer:133
+        if self.current == "{" then
+            -- Lexer:134
+            depth = depth + 1
+            -- Lexer:135
+            Lexer.advance(self)
+        elseif self.current == "}" then
+            -- Lexer:137
+            depth = depth - 1
+            -- Lexer:138
+            if depth == 0 then
+                -- Lexer:139
+                local result = Option.unwrap_or(Option.__lz_wrap(string.sub(self.source, start, self.pos - 1)), "")
+                -- Lexer:140
+                Lexer.advance(self)
+                -- Lexer:141
+                return result
+            end
+            -- Lexer:143
+            Lexer.advance(self)
+        elseif Char.is_quote(self.current) or (self.current == "'") then
+            -- Lexer:145
+            Lexer.skip_lua_string(self, self.current)
+        elseif (self.current == "-") and (Lexer.peek(self) == "-") then
+            -- Lexer:147
+            Lexer.skip_lua_comment(self)
+        elseif (self.current == "[") and (Lexer.peek(self) == "[") then
+            -- Lexer:149
+            Lexer.skip_lua_long_string(self)
+        else
+            -- Lexer:151
+            Lexer.advance(self)
+        end
+    end
+    -- Lexer:154
+    return ""
+end
+-- Lexer:158
+function Lexer.skip_lua_string(self, quote)
+    -- Lexer:159
+    Lexer.advance(self)
+    -- Lexer:160
+    while true do
+        -- Lexer:161
+        if Lexer.at_end(self) then
+            -- Lexer:161
+            break
+        end
+        -- Lexer:162
+        if Char.is_backslash(self.current) then
+            -- Lexer:163
+            Lexer.advance(self)
+            -- Lexer:164
+            if not Lexer.at_end(self) then
+                -- Lexer:164
+                Lexer.advance(self)
+            end
+        elseif self.current == quote then
+            -- Lexer:166
+            Lexer.advance(self)
+            -- Lexer:167
+            break
+        else
+            -- Lexer:169
+            Lexer.advance(self)
+        end
+    end
+end
+-- Lexer:175
+function Lexer.skip_lua_comment(self)
+    -- Lexer:176
+    Lexer.advance(self)
+    -- Lexer:177
+    Lexer.advance(self)
+    -- Lexer:178
+    if (self.current == "[") and (Lexer.peek(self) == "[") then
+        -- Lexer:179
+        Lexer.advance(self)
+        -- Lexer:180
+        Lexer.advance(self)
+        -- Lexer:181
+        while true do
+            -- Lexer:182
+            if Lexer.at_end(self) then
+                -- Lexer:182
+                break
+            end
+            -- Lexer:183
+            if (self.current == "]") and (Lexer.peek(self) == "]") then
+                -- Lexer:184
+                Lexer.advance(self)
+                -- Lexer:185
+                Lexer.advance(self)
+                -- Lexer:186
+                break
+            end
+            -- Lexer:188
+            Lexer.advance(self)
+        end
+    else
+        -- Lexer:191
+        while true do
+            -- Lexer:192
+            if Lexer.at_end(self) then
+                -- Lexer:192
+                break
+            end
+            -- Lexer:193
+            if Char.is_newline(self.current) then
+                -- Lexer:193
+                break
+            end
+            -- Lexer:194
+            Lexer.advance(self)
+        end
+    end
+end
+-- Lexer:200
+function Lexer.skip_lua_long_string(self)
+    -- Lexer:201
+    Lexer.advance(self)
+    -- Lexer:202
+    Lexer.advance(self)
+    -- Lexer:203
+    while true do
+        -- Lexer:204
+        if Lexer.at_end(self) then
+            -- Lexer:204
+            break
+        end
+        -- Lexer:205
+        if (self.current == "]") and (Lexer.peek(self) == "]") then
+            -- Lexer:206
+            Lexer.advance(self)
+            -- Lexer:207
+            Lexer.advance(self)
+            -- Lexer:208
+            break
+        end
+        -- Lexer:210
         Lexer.advance(self)
     end
+end
+-- Lexer:216
+function Lexer.next_tokens(self)
+    -- Lexer:217
+    local is_f = (self.current == "f") and Char.is_quote(Lexer.peek(self))
+    -- Lexer:218
+    if is_f then
+        -- Lexer:219
+        Lexer.advance(self)
+    end
+    -- Lexer:221
     if Char.is_quote(self.current) then
+        -- Lexer:222
         local line = self.line
+        -- Lexer:223
         local col = self.col
+        -- Lexer:224
         if Char.is_quote(Lexer.peek(self)) and Char.is_quote(Lexer.char_at(self, self.pos + 2)) then
+            -- Lexer:225
             Lexer.advance(self)
+            -- Lexer:226
             Lexer.advance(self)
+            -- Lexer:227
             Lexer.advance(self)
+            -- Lexer:228
             return Lexer.read_triple(self, is_f, line, col)
         end
+        -- Lexer:230
         if is_f then
+            -- Lexer:231
             Lexer.advance(self)
+            -- Lexer:232
             return Lexer.read_interp(self, line, col)
         end
     end
-    return __lz_list(Lexer.next_token(self))
+    -- Lexer:235
+    return List.__lz_list({Lexer.next_token(self)})
 end
+-- Lexer:238
 function Lexer.next_token(self)
+    -- Lexer:239
     if Char.is_ident_start(self.current) then
-        return Lexer.read_identifier(self)
+        -- Lexer:240
+        local tok = Lexer.read_identifier(self)
+        -- Lexer:241
+        if tok.kind == "LUA" then
+            -- Lexer:242
+            self.next_body_is_raw = true
+            -- Lexer:243
+            self.lua_paren_depth = 0
+        end
+        -- Lexer:245
+        return tok
     end
+    -- Lexer:247
     if Char.is_digit(self.current) then
+        -- Lexer:248
         return Lexer.read_number(self)
     end
+    -- Lexer:250
     if Char.is_quote(self.current) then
+        -- Lexer:251
         return Lexer.read_string(self)
     end
+    -- Lexer:253
     return Lexer.read_symbol(self)
 end
+-- Lexer:256
 function Lexer.read_identifier(self)
+    -- Lexer:257
     local start = self.pos
+    -- Lexer:258
     local line = self.line
+    -- Lexer:259
     local col = self.col
+    -- Lexer:260
     while Char.is_ident_char(self.current) do
+        -- Lexer:261
         Lexer.advance(self)
     end
-    local text = Option.unwrap_or(__lz_wrap(string.sub(self.source, start, self.pos - 1)), "")
+    -- Lexer:263
+    local text = Option.unwrap_or(Option.__lz_wrap(string.sub(self.source, start, self.pos - 1)), "")
+    -- Lexer:264
     return Token.new(Keywords.word_kind(text), text, line, col)
 end
+-- Lexer:269
 function Lexer.read_number(self)
+    -- Lexer:270
     local start = self.pos
+    -- Lexer:271
     local line = self.line
+    -- Lexer:272
     local col = self.col
+    -- Lexer:273
     while Char.is_digit(self.current) do
+        -- Lexer:274
         Lexer.advance(self)
     end
+    -- Lexer:276
     local kind = "NUMBER"
+    -- Lexer:277
     if (self.current == ".") and Char.is_digit(Lexer.peek(self)) then
+        -- Lexer:278
         kind = "FLOAT"
+        -- Lexer:279
         Lexer.advance(self)
+        -- Lexer:280
         while Char.is_digit(self.current) do
+            -- Lexer:281
             Lexer.advance(self)
         end
     end
+    -- Lexer:284
     if Char.is_ident_start(self.current) then
+        -- Lexer:285
         Error.new("InvalidNumber", "unexpected character after number literal", self.line, self.col, self.source, 1):raise()
     end
-    local text = Option.unwrap_or(__lz_wrap(string.sub(self.source, start, self.pos - 1)), "")
+    -- Lexer:287
+    local text = Option.unwrap_or(Option.__lz_wrap(string.sub(self.source, start, self.pos - 1)), "")
+    -- Lexer:288
     return Token.new(kind, text, line, col)
 end
+-- Lexer:291
 function Lexer.read_string(self)
+    -- Lexer:292
     local line = self.line
+    -- Lexer:293
     local col = self.col
+    -- Lexer:294
     Lexer.advance(self)
-    local start = self.pos
+    -- Lexer:295
+    local text = ""
+    -- Lexer:296
+    local seg_start = self.pos
+    -- Lexer:297
     while true do
+        -- Lexer:298
         if Lexer.at_end(self) then
+            -- Lexer:299
             Error.new("UnterminatedString", "unterminated string literal", line, col, self.source, 1):raise()
         end
+        -- Lexer:301
         if Char.is_newline(self.current) then
+            -- Lexer:302
             Error.new("UnterminatedString", "unterminated string literal", line, col, self.source, 1):raise()
         end
-        if Char.is_quote(self.current) then
+        -- Lexer:304
+        if Char.is_backslash(self.current) then
+            -- Lexer:305
+            text = text .. Option.unwrap_or(Option.__lz_wrap(string.sub(self.source, seg_start, self.pos - 1)), "")
+            -- Lexer:306
+            text = text .. Lexer.read_escape(self, line, col)
+            -- Lexer:307
+            seg_start = self.pos
+        elseif Char.is_quote(self.current) then
+            -- Lexer:309
+            text = text .. Option.unwrap_or(Option.__lz_wrap(string.sub(self.source, seg_start, self.pos - 1)), "")
+            -- Lexer:310
             break
+        else
+            -- Lexer:312
+            Lexer.advance(self)
         end
-        Lexer.advance(self)
     end
-    local text = Option.unwrap_or(__lz_wrap(string.sub(self.source, start, self.pos - 1)), "")
+    -- Lexer:315
     Lexer.advance(self)
+    -- Lexer:316
     return Token.new("STRING", text, line, col)
 end
-function Lexer.read_symbol(self)
-    local line = self.line
-    local col = self.col
+-- Lexer:322
+function Lexer.read_escape(self, str_line, str_col)
+    -- Lexer:323
+    Lexer.advance(self)
+    -- Lexer:324
+    if Lexer.at_end(self) then
+        -- Lexer:325
+        Error.new("UnterminatedString", "unterminated escape sequence in string", str_line, str_col, self.source, 1):raise()
+    end
+    -- Lexer:327
     local ch = self.current
+    -- Lexer:328
+    Lexer.advance(self)
+    -- Lexer:329
+    if ch == "n" then
+        -- Lexer:329
+        return Option.unwrap_or(Option.__lz_wrap(string.char(10)), "")
+    end
+    -- Lexer:330
+    if ch == "t" then
+        -- Lexer:330
+        return Option.unwrap_or(Option.__lz_wrap(string.char(9)), "")
+    end
+    -- Lexer:331
+    if ch == "r" then
+        -- Lexer:331
+        return Option.unwrap_or(Option.__lz_wrap(string.char(13)), "")
+    end
+    -- Lexer:332
+    if Char.is_backslash(ch) then
+        -- Lexer:332
+        return Option.unwrap_or(Option.__lz_wrap(string.char(92)), "")
+    end
+    -- Lexer:333
+    if Char.is_quote(ch) then
+        -- Lexer:333
+        return Option.unwrap_or(Option.__lz_wrap(string.char(34)), "")
+    end
+    -- Lexer:334
+    Error.new("InvalidEscape", "unknown escape sequence in string literal", str_line, str_col, self.source, 1):raise()
+    -- Lexer:335
+    return ""
+end
+-- Lexer:339
+function Lexer.read_symbol(self)
+    -- Lexer:340
+    local line = self.line
+    -- Lexer:341
+    local col = self.col
+    -- Lexer:342
+    local ch = self.current
+    -- Lexer:343
     local pair = ch .. Lexer.peek(self)
+    -- Lexer:344
     local two = Keywords.two(pair)
+    -- Lexer:345
     if Option.is_some(two) then
+        -- Lexer:346
         Lexer.advance(self)
+        -- Lexer:347
         Lexer.advance(self)
+        -- Lexer:348
         return Token.new(Option.unwrap(two), pair, line, col)
     end
+    -- Lexer:350
     local one = Keywords.one(ch)
+    -- Lexer:351
     if Option.is_some(one) then
+        -- Lexer:352
+        local kind = Option.unwrap(one)
+        -- Lexer:353
+        if (kind == "BODY_START") and self.next_body_is_raw then
+            -- Lexer:354
+            if self.lua_paren_depth == 0 then
+                -- Lexer:355
+                self.next_body_is_raw = false
+                -- Lexer:356
+                Lexer.advance(self)
+                -- Lexer:357
+                return Token.new("LUA_BODY", Lexer.scan_lua_body(self), line, col)
+            else
+                -- Lexer:360
+                self.next_body_is_raw = false
+                -- Lexer:361
+                self.lua_paren_depth = 0
+            end
+        end
+        -- Lexer:364
+        if (kind == "BODY_END") and self.next_body_is_raw then
+            -- Lexer:366
+            self.next_body_is_raw = false
+            -- Lexer:367
+            self.lua_paren_depth = 0
+        end
+        -- Lexer:369
+        if self.next_body_is_raw then
+            -- Lexer:370
+            if kind == "LPAREN" then
+                -- Lexer:371
+                self.lua_paren_depth = self.lua_paren_depth + 1
+            elseif kind == "RPAREN" then
+                -- Lexer:373
+                if self.lua_paren_depth > 0 then
+                    -- Lexer:374
+                    self.lua_paren_depth = self.lua_paren_depth - 1
+                else
+                    -- Lexer:376
+                    self.next_body_is_raw = false
+                end
+            end
+        end
+        -- Lexer:380
         Lexer.advance(self)
-        return Token.new(Option.unwrap(one), ch, line, col)
+        -- Lexer:381
+        return Token.new(kind, ch, line, col)
     end
+    -- Lexer:383
     Error.new("UnexpectedChar", ("unexpected character '" .. ch) .. "'", line, col, self.source, 1):raise()
+    -- Lexer:384
     return Token.new("ERROR", ch, line, col)
 end
+-- Lexer:392
 function Lexer.read_interp(self, line, col)
-    local result = __lz_list()
+    -- Lexer:393
+    local result = List.__lz_list({})
+    -- Lexer:394
     local seg = Lexer.scan_str_segment(self, false)
+    -- Lexer:395
     if Char.is_quote(self.current) then
+        -- Lexer:396
         Lexer.advance(self)
-        __lz_push(result, Token.new("STRING", seg, line, col))
+        -- Lexer:397
+        List.__lz_push(result, Token.new("STRING", seg, line, col))
+        -- Lexer:398
         return result
     end
-    __lz_push(result, Token.new("ISTR_HEAD", seg, line, col))
+    -- Lexer:400
+    List.__lz_push(result, Token.new("ISTR_HEAD", seg, line, col))
+    -- Lexer:401
     while true do
-        for _, tok in __lz_each(Lexer.scan_interp_expr(self, line, col)) do
-            __lz_push(result, tok)
+        -- Lexer:402
+        for _, tok in List.__lz_each(Lexer.scan_interp_expr(self, line, col)) do
+            -- Lexer:403
+            List.__lz_push(result, tok)
         end
+        -- Lexer:405
         seg = Lexer.scan_str_segment(self, false)
+        -- Lexer:406
         if Char.is_quote(self.current) then
+            -- Lexer:407
             Lexer.advance(self)
-            __lz_push(result, Token.new("ISTR_TAIL", seg, line, col))
+            -- Lexer:408
+            List.__lz_push(result, Token.new("ISTR_TAIL", seg, line, col))
+            -- Lexer:409
             break
         end
-        __lz_push(result, Token.new("ISTR_MID", seg, line, col))
+        -- Lexer:411
+        List.__lz_push(result, Token.new("ISTR_MID", seg, line, col))
     end
+    -- Lexer:413
     return result
 end
+-- Lexer:418
 function Lexer.scan_interp_expr(self, err_line, err_col)
+    -- Lexer:419
     Lexer.advance(self)
-    local result = __lz_list()
+    -- Lexer:420
+    local result = List.__lz_list({})
+    -- Lexer:421
     local depth = 1
+    -- Lexer:422
     while depth > 0 do
+        -- Lexer:423
         Lexer.skip_trivia(self)
+        -- Lexer:424
         if Lexer.at_end(self) then
+            -- Lexer:425
             Error.new("UnterminatedInterpolation", "unclosed '{' in string interpolation", err_line, err_col, self.source, 1):raise()
         end
+        -- Lexer:427
         local tok = Lexer.next_token(self)
+        -- Lexer:428
         if tok.kind == "BODY_START" then
+            -- Lexer:429
             depth = depth + 1
-            __lz_push(result, tok)
+            -- Lexer:430
+            List.__lz_push(result, tok)
         elseif tok.kind == "BODY_END" then
+            -- Lexer:432
             depth = depth - 1
+            -- Lexer:433
             if depth > 0 then
-                __lz_push(result, tok)
+                -- Lexer:434
+                List.__lz_push(result, tok)
             end
         else
-            __lz_push(result, tok)
+            -- Lexer:437
+            List.__lz_push(result, tok)
         end
     end
+    -- Lexer:440
     return result
 end
+-- Lexer:446
 function Lexer.scan_str_segment(self, multiline)
+    -- Lexer:447
     local result = ""
+    -- Lexer:448
+    local seg_start = self.pos
+    -- Lexer:449
     while true do
+        -- Lexer:450
         if Lexer.at_end(self) then
+            -- Lexer:451
             Error.new("UnterminatedString", "unterminated string literal", self.line, self.col, self.source, 1):raise()
         end
+        -- Lexer:453
         if (not multiline) and Char.is_newline(self.current) then
+            -- Lexer:454
             Error.new("UnterminatedString", "unterminated string literal", self.line, self.col, self.source, 1):raise()
         end
+        -- Lexer:456
         if self.current == "{" then
+            -- Lexer:457
             if Lexer.peek(self) == "{" then
-                result = result .. "{"
+                -- Lexer:458
+                result = (result .. Option.unwrap_or(Option.__lz_wrap(string.sub(self.source, seg_start, self.pos - 1)), "")) .. "{"
+                -- Lexer:459
                 Lexer.advance(self)
+                -- Lexer:460
                 Lexer.advance(self)
+                -- Lexer:461
+                seg_start = self.pos
             else
+                -- Lexer:463
+                result = result .. Option.unwrap_or(Option.__lz_wrap(string.sub(self.source, seg_start, self.pos - 1)), "")
+                -- Lexer:464
                 break
             end
+        elseif Char.is_backslash(self.current) then
+            -- Lexer:467
+            result = result .. Option.unwrap_or(Option.__lz_wrap(string.sub(self.source, seg_start, self.pos - 1)), "")
+            -- Lexer:468
+            result = result .. Lexer.read_escape(self, self.line, self.col)
+            -- Lexer:469
+            seg_start = self.pos
         elseif Char.is_quote(self.current) then
+            -- Lexer:471
+            result = result .. Option.unwrap_or(Option.__lz_wrap(string.sub(self.source, seg_start, self.pos - 1)), "")
+            -- Lexer:472
             break
         else
-            result = result .. self.current
+            -- Lexer:474
             Lexer.advance(self)
         end
     end
+    -- Lexer:477
     return result
 end
+-- Lexer:483
 function Lexer.read_triple(self, is_f, line, col)
+    -- Lexer:484
     if is_f then
+        -- Lexer:485
         return Lexer.read_triple_interp(self, line, col)
     end
+    -- Lexer:487
     local content = Lexer.strip_indent(self, Lexer.scan_triple_raw(self))
-    return __lz_list(Token.new("STRING", content, line, col))
+    -- Lexer:488
+    return List.__lz_list({Token.new("STRING", content, line, col)})
 end
+-- Lexer:492
 function Lexer.scan_triple_raw(self)
-    local result = ""
+    -- Lexer:493
+    local start = self.pos
+    -- Lexer:494
     while true do
+        -- Lexer:495
         if Lexer.at_end(self) then
+            -- Lexer:496
             Error.new("UnterminatedString", "unterminated triple-quoted string", self.line, self.col, self.source, 3):raise()
         end
+        -- Lexer:498
         if (Char.is_quote(self.current) and Char.is_quote(Lexer.peek(self))) and Char.is_quote(Lexer.char_at(self, self.pos + 2)) then
+            -- Lexer:499
+            local result = Option.unwrap_or(Option.__lz_wrap(string.sub(self.source, start, self.pos - 1)), "")
+            -- Lexer:500
             Lexer.advance(self)
+            -- Lexer:501
             Lexer.advance(self)
+            -- Lexer:502
             Lexer.advance(self)
-            break
+            -- Lexer:503
+            return result
         end
-        result = result .. self.current
+        -- Lexer:505
         Lexer.advance(self)
     end
-    return result
+    -- Lexer:507
+    return ""
 end
+-- Lexer:513
 function Lexer.read_triple_interp(self, line, col)
+    -- Lexer:514
     local raw = ""
-    local hole_tokens = __lz_list()
-    local sentinel = Option.unwrap_or(__lz_wrap(string.char(1)), "")
+    -- Lexer:515
+    local hole_tokens = List.__lz_list({})
+    -- Lexer:516
+    local sentinel = Option.unwrap_or(Option.__lz_wrap(string.char(1)), "")
+    -- Lexer:517
     while true do
+        -- Lexer:518
         if Lexer.at_end(self) then
+            -- Lexer:519
             Error.new("UnterminatedString", "unterminated triple-quoted string", self.line, self.col, self.source, 3):raise()
         end
+        -- Lexer:521
         if (Char.is_quote(self.current) and Char.is_quote(Lexer.peek(self))) and Char.is_quote(Lexer.char_at(self, self.pos + 2)) then
+            -- Lexer:522
             Lexer.advance(self)
+            -- Lexer:523
             Lexer.advance(self)
+            -- Lexer:524
             Lexer.advance(self)
+            -- Lexer:525
             break
         end
+        -- Lexer:527
         if self.current == "{" then
+            -- Lexer:528
             if Lexer.peek(self) == "{" then
+                -- Lexer:529
                 raw = raw .. "{"
+                -- Lexer:530
                 Lexer.advance(self)
+                -- Lexer:531
                 Lexer.advance(self)
             else
-                local idx = __lz_unwrap_or(__lz_wrap(string.format("%d", __lz_len(hole_tokens))), "0")
+                -- Lexer:533
+                local idx = Option.__lz_unwrap_or(Option.__lz_wrap(string.format("%d", List.__lz_len(hole_tokens))), "0")
+                -- Lexer:534
                 raw = (raw .. sentinel) .. idx
-                __lz_push(hole_tokens, Lexer.scan_interp_expr(self, line, col))
+                -- Lexer:535
+                List.__lz_push(hole_tokens, Lexer.scan_interp_expr(self, line, col))
             end
         else
+            -- Lexer:538
             raw = raw .. self.current
+            -- Lexer:539
             Lexer.advance(self)
         end
     end
+    -- Lexer:542
     local stripped = Lexer.strip_indent(self, raw)
+    -- Lexer:543
     local segs = Lexer.split_on_sentinel(self, stripped, sentinel)
-    local result = __lz_list()
-    local n = __lz_len(segs)
+    -- Lexer:544
+    local result = List.__lz_list({})
+    -- Lexer:545
+    local n = List.__lz_len(segs)
+    -- Lexer:546
     if n == 1 then
-        __lz_push(result, Token.new("STRING", Option.unwrap(__lz_get(segs, 1)), line, col))
+        -- Lexer:547
+        List.__lz_push(result, Token.new("STRING", Option.unwrap(List.__lz_get(segs, 1)), line, col))
+        -- Lexer:548
         return result
     end
-    __lz_push(result, Token.new("ISTR_HEAD", Option.unwrap(__lz_get(segs, 1)), line, col))
+    -- Lexer:550
+    List.__lz_push(result, Token.new("ISTR_HEAD", Option.unwrap(List.__lz_get(segs, 1)), line, col))
+    -- Lexer:551
     local i = 2
+    -- Lexer:552
     while i <= n do
-        for _, tok in __lz_each(Option.unwrap(__lz_get(hole_tokens, i - 1))) do
-            __lz_push(result, tok)
+        -- Lexer:553
+        for _, tok in List.__lz_each(Option.unwrap(List.__lz_get(hole_tokens, i - 1))) do
+            -- Lexer:554
+            List.__lz_push(result, tok)
         end
+        -- Lexer:556
         if i == n then
-            __lz_push(result, Token.new("ISTR_TAIL", Option.unwrap(__lz_get(segs, i)), line, col))
+            -- Lexer:557
+            List.__lz_push(result, Token.new("ISTR_TAIL", Option.unwrap(List.__lz_get(segs, i)), line, col))
         else
-            __lz_push(result, Token.new("ISTR_MID", Option.unwrap(__lz_get(segs, i)), line, col))
+            -- Lexer:559
+            List.__lz_push(result, Token.new("ISTR_MID", Option.unwrap(List.__lz_get(segs, i)), line, col))
         end
+        -- Lexer:561
         i = i + 1
     end
+    -- Lexer:563
     return result
 end
+-- Lexer:568
 function Lexer.split_on_sentinel(self, content, sentinel)
-    local result = __lz_list()
-    local n = Option.unwrap_or(__lz_wrap(string.len(content)), 0)
+    -- Lexer:569
+    local result = List.__lz_list({})
+    -- Lexer:570
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(content)), 0)
+    -- Lexer:571
     local i = 1
+    -- Lexer:572
     local seg_start = 1
+    -- Lexer:573
     while i <= n do
-        if Option.unwrap_or(__lz_wrap(string.sub(content, i, i)), "") == sentinel then
-            __lz_push(result, Option.unwrap_or(__lz_wrap(string.sub(content, seg_start, i - 1)), ""))
+        -- Lexer:574
+        if Option.unwrap_or(Option.__lz_wrap(string.sub(content, i, i)), "") == sentinel then
+            -- Lexer:575
+            List.__lz_push(result, Option.unwrap_or(Option.__lz_wrap(string.sub(content, seg_start, i - 1)), ""))
+            -- Lexer:576
             i = i + 1
-            while (i <= n) and Char.is_digit(Option.unwrap_or(__lz_wrap(string.sub(content, i, i)), "")) do
+            -- Lexer:577
+            while (i <= n) and Char.is_digit(Option.unwrap_or(Option.__lz_wrap(string.sub(content, i, i)), "")) do
+                -- Lexer:578
                 i = i + 1
             end
+            -- Lexer:580
             seg_start = i
         else
+            -- Lexer:582
             i = i + 1
         end
     end
-    __lz_push(result, Option.unwrap_or(__lz_wrap(string.sub(content, seg_start, n)), ""))
+    -- Lexer:585
+    List.__lz_push(result, Option.unwrap_or(Option.__lz_wrap(string.sub(content, seg_start, n)), ""))
+    -- Lexer:586
     return result
 end
+-- Lexer:595
 function Lexer.strip_indent(self, content)
+    -- Lexer:596
     local lines = Lexer.split_lines(self, content)
-    local nlines = __lz_len(lines)
+    -- Lexer:597
+    local nlines = List.__lz_len(lines)
+    -- Lexer:598
     if nlines == 0 then
+        -- Lexer:599
         return ""
     end
+    -- Lexer:601
     local start = 1
-    if Lexer.is_blank(self, Option.unwrap(__lz_get(lines, 1))) then
+    -- Lexer:602
+    if Lexer.is_blank(self, Option.unwrap(List.__lz_get(lines, 1))) then
+        -- Lexer:603
         start = 2
     end
-    local last = Option.unwrap(__lz_get(lines, nlines))
+    -- Lexer:605
+    local last = Option.unwrap(List.__lz_get(lines, nlines))
+    -- Lexer:606
     local strip = Lexer.leading_spaces(self, last)
+    -- Lexer:607
     local last_idx = nlines
+    -- Lexer:608
     if Lexer.is_blank(self, last) then
+        -- Lexer:609
         last_idx = nlines - 1
     end
-    local nl = Option.unwrap_or(__lz_wrap(string.char(10)), "")
+    -- Lexer:611
+    local nl = Option.unwrap_or(Option.__lz_wrap(string.char(10)), "")
+    -- Lexer:612
     local result = ""
+    -- Lexer:613
     local i = start
+    -- Lexer:614
     while i <= last_idx do
-        local ln = Option.unwrap(__lz_get(lines, i))
+        -- Lexer:615
+        local ln = Option.unwrap(List.__lz_get(lines, i))
+        -- Lexer:616
         local stripped_line = ""
+        -- Lexer:617
         if not Lexer.is_blank(self, ln) then
-            local ln_len = Option.unwrap_or(__lz_wrap(string.len(ln)), 0)
+            -- Lexer:618
+            local ln_len = Option.unwrap_or(Option.__lz_wrap(string.len(ln)), 0)
+            -- Lexer:619
             local s = strip + 1
+            -- Lexer:620
             if s > ln_len then
+                -- Lexer:621
                 s = ln_len + 1
             end
-            stripped_line = Option.unwrap_or(__lz_wrap(string.sub(ln, s, ln_len)), "")
+            -- Lexer:623
+            stripped_line = Option.unwrap_or(Option.__lz_wrap(string.sub(ln, s, ln_len)), "")
         end
+        -- Lexer:625
         if i > start then
+            -- Lexer:626
             result = result .. nl
         end
+        -- Lexer:628
         result = result .. stripped_line
+        -- Lexer:629
         i = i + 1
     end
+    -- Lexer:631
     return result
 end
+-- Lexer:634
 function Lexer.split_lines(self, s)
-    local result = __lz_list()
-    local n = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
+    -- Lexer:635
+    local result = List.__lz_list({})
+    -- Lexer:636
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(s)), 0)
+    -- Lexer:637
     local i = 1
+    -- Lexer:638
     local seg_start = 1
+    -- Lexer:639
     while i <= n do
-        if Char.is_newline(Option.unwrap_or(__lz_wrap(string.sub(s, i, i)), "")) then
-            __lz_push(result, Option.unwrap_or(__lz_wrap(string.sub(s, seg_start, i - 1)), ""))
+        -- Lexer:640
+        if Char.is_newline(Option.unwrap_or(Option.__lz_wrap(string.sub(s, i, i)), "")) then
+            -- Lexer:641
+            List.__lz_push(result, Option.unwrap_or(Option.__lz_wrap(string.sub(s, seg_start, i - 1)), ""))
+            -- Lexer:642
             seg_start = i + 1
         end
+        -- Lexer:644
         i = i + 1
     end
-    __lz_push(result, Option.unwrap_or(__lz_wrap(string.sub(s, seg_start, n)), ""))
+    -- Lexer:646
+    List.__lz_push(result, Option.unwrap_or(Option.__lz_wrap(string.sub(s, seg_start, n)), ""))
+    -- Lexer:647
     return result
 end
+-- Lexer:650
 function Lexer.is_blank(self, s)
-    local n = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
+    -- Lexer:651
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(s)), 0)
+    -- Lexer:652
     local i = 1
+    -- Lexer:653
     while i <= n do
-        if Option.unwrap_or(__lz_wrap(string.sub(s, i, i)), "") ~= " " then
+        -- Lexer:654
+        if Option.unwrap_or(Option.__lz_wrap(string.sub(s, i, i)), "") ~= " " then
+            -- Lexer:655
             return false
         end
+        -- Lexer:657
         i = i + 1
     end
+    -- Lexer:659
     return true
 end
+-- Lexer:662
 function Lexer.leading_spaces(self, s)
-    local n = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
+    -- Lexer:663
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(s)), 0)
+    -- Lexer:664
     local i = 1
+    -- Lexer:665
     while i <= n do
-        if Option.unwrap_or(__lz_wrap(string.sub(s, i, i)), "") ~= " " then
+        -- Lexer:666
+        if Option.unwrap_or(Option.__lz_wrap(string.sub(s, i, i)), "") ~= " " then
+            -- Lexer:667
             return i - 1
         end
+        -- Lexer:669
         i = i + 1
     end
+    -- Lexer:671
     return n
 end
 
 local Node = {}
 
+-- Node:8
 function Node.new(kind, attrs)
     local self = {}
     self.attr = Node.attr
@@ -947,35 +2191,55 @@ function Node.new(kind, attrs)
     self.col = Node.col
     self.set = Node.set
     self.summary = Node.summary
+    -- Node:8
     self.kind = kind
+    -- Node:8
     self.attrs = attrs
     return self
 end
+-- Node:11
 function Node.attr(self, name)
-    return __lz_get(self.attrs, name)
+    -- Node:12
+    return List.__lz_get(self.attrs, name)
 end
+-- Node:17
 function Node.child(self, name)
-    return Option.unwrap(__lz_get(self.attrs, name))
+    -- Node:18
+    return Option.unwrap(List.__lz_get(self.attrs, name))
 end
+-- Node:21
 function Node.line(self)
-    return Option.unwrap_or(__lz_get(self.attrs, "line"), 0)
+    -- Node:22
+    return Option.unwrap_or(List.__lz_get(self.attrs, "line"), 0)
 end
+-- Node:25
 function Node.col(self)
-    return Option.unwrap_or(__lz_get(self.attrs, "col"), 0)
+    -- Node:26
+    return Option.unwrap_or(List.__lz_get(self.attrs, "col"), 0)
 end
+-- Node:29
 function Node.set(self, name, value)
-    __lz_idx_set(self.attrs, name, value)
+    -- Node:30
+    List.__lz_idx_set(self.attrs, name, value)
 end
+-- Node:33
 function Node.summary(self)
-    local named = __lz_get(self.attrs, "name")
+    -- Node:34
+    local named = List.__lz_get(self.attrs, "name")
+    -- Node:35
     if Option.is_some(named) then
+        -- Node:36
         return (self.kind .. " ") .. Option.unwrap(named)
     end
+    -- Node:38
     return self.kind
 end
 
 local TokenCursor = {}
 
+-- TokenCursor:12
+TokenCursor.recovery_tokens = Map.__lz_map({["PRIVATE"] = true, ["PUBLIC"] = true, ["STATIC"] = true, ["CONSTRUCTOR"] = true, ["EXTERN"] = true, ["LUA"] = true, ["RETURN"] = true, ["IF"] = true, ["WHILE"] = true, ["LOOP"] = true, ["FOR"] = true, ["BREAK"] = true, ["BODY_END"] = true, ["MUTABLE"] = true, ["AT"] = true, ["IMPORT"] = true, ["ENUM"] = true, ["INTERFACE"] = true})
+-- TokenCursor:22
 function TokenCursor.new(tokens, source)
     local self = {}
     self.position = TokenCursor.position
@@ -991,209 +2255,408 @@ function TokenCursor.new(tokens, source)
     self.consume = TokenCursor.consume
     self.fail = TokenCursor.fail
     self.fail_at = TokenCursor.fail_at
+    self.synchronize = TokenCursor.synchronize
+    self.has_errors = TokenCursor.has_errors
+    self.flush = TokenCursor.flush
     self.error_pos = TokenCursor.error_pos
     self.eof = TokenCursor.eof
     self.pos = 1
+    self.errors = List.__lz_list({})
+    -- TokenCursor:22
     self.tokens = tokens
+    -- TokenCursor:22
     self.source = source
     return self
 end
+-- TokenCursor:26
 function TokenCursor.position(self)
+    -- TokenCursor:27
     return self.pos
 end
+-- TokenCursor:31
 function TokenCursor.token_at(self, i)
-    local t = __lz_get(self.tokens, i)
+    -- TokenCursor:32
+    local t = List.__lz_get(self.tokens, i)
+    -- TokenCursor:33
     if Option.is_none(t) then
+        -- TokenCursor:34
         return TokenCursor.eof(self)
     end
+    -- TokenCursor:36
     return Option.unwrap(t)
 end
+-- TokenCursor:39
 function TokenCursor.current(self)
+    -- TokenCursor:40
     return TokenCursor.token_at(self, self.pos)
 end
+-- TokenCursor:43
 function TokenCursor.current_kind(self)
+    -- TokenCursor:44
     return TokenCursor.current(self).kind
 end
+-- TokenCursor:47
 function TokenCursor.peek_next(self)
+    -- TokenCursor:48
     return TokenCursor.token_at(self, self.pos + 1)
 end
+-- TokenCursor:51
 function TokenCursor.previous(self)
+    -- TokenCursor:52
     return TokenCursor.token_at(self, self.pos - 1)
 end
+-- TokenCursor:55
 function TokenCursor.at_end(self)
+    -- TokenCursor:56
     return TokenCursor.current(self).kind == "EOF"
 end
+-- TokenCursor:59
 function TokenCursor.check(self, kind)
+    -- TokenCursor:60
     return TokenCursor.current(self).kind == kind
 end
+-- TokenCursor:64
 function TokenCursor.advance(self)
+    -- TokenCursor:65
     if TokenCursor.at_end(self) then
+        -- TokenCursor:66
         TokenCursor.fail(self, "Unexpected end of input")
     end
+    -- TokenCursor:68
     local tok = TokenCursor.current(self)
+    -- TokenCursor:69
     self.pos = self.pos + 1
+    -- TokenCursor:70
     return tok
 end
+-- TokenCursor:74
 function TokenCursor.match(self, kind)
+    -- TokenCursor:75
     if TokenCursor.check(self, kind) then
+        -- TokenCursor:76
         TokenCursor.advance(self)
+        -- TokenCursor:77
         return true
     end
+    -- TokenCursor:79
     return false
 end
+-- TokenCursor:83
 function TokenCursor.consume(self, kind, message)
+    -- TokenCursor:84
     if TokenCursor.check(self, kind) then
+        -- TokenCursor:85
         return TokenCursor.advance(self)
     end
+    -- TokenCursor:87
     TokenCursor.fail(self, message)
+    -- TokenCursor:88
     return TokenCursor.eof(self)
 end
+-- TokenCursor:93
 function TokenCursor.fail(self, message)
+    -- TokenCursor:94
     local t = TokenCursor.error_pos(self)
-    local span = Option.unwrap_or(__lz_wrap(string.len(t.value)), 1)
+    -- TokenCursor:95
+    local span = Option.unwrap_or(Option.__lz_wrap(string.len(t.value)), 1)
+    -- TokenCursor:96
     if span < 1 then
+        -- TokenCursor:97
         span = 1
     end
+    -- TokenCursor:99
     TokenCursor.fail_at(self, message, t.line, t.column, span)
 end
+-- TokenCursor:102
 function TokenCursor.fail_at(self, message, line, col, span)
-    Error.new("SyntaxError", message, line, col, self.source, span):raise()
+    -- TokenCursor:103
+    List.__lz_push(self.errors, Map.__lz_map({["message"] = message, ["line"] = line, ["col"] = col, ["span"] = span}))
+    -- TokenCursor:104
+    TokenCursor.synchronize(self)
 end
+-- TokenCursor:109
+function TokenCursor.synchronize(self)
+    -- TokenCursor:110
+    local start = self.pos
+    -- TokenCursor:111
+    while true do
+        -- TokenCursor:112
+        if TokenCursor.at_end(self) then
+            -- TokenCursor:113
+            break
+        end
+        -- TokenCursor:115
+        local k = TokenCursor.current(self).kind
+        -- TokenCursor:116
+        if List.__lz_has(TokenCursor.recovery_tokens, k) then
+            -- TokenCursor:117
+            break
+        end
+        -- TokenCursor:119
+        self.pos = self.pos + 1
+    end
+    -- TokenCursor:121
+    if (self.pos == start) and (not TokenCursor.at_end(self)) then
+        -- TokenCursor:122
+        self.pos = self.pos + 1
+    end
+end
+-- TokenCursor:126
+function TokenCursor.has_errors(self)
+    -- TokenCursor:127
+    return List.__lz_len(self.errors) > 0
+end
+-- TokenCursor:131
+function TokenCursor.flush(self)
+    -- TokenCursor:132
+    for _, e in List.__lz_each(self.errors) do
+        -- TokenCursor:133
+        local msg = Option.__lz_unwrap_or(List.__lz_get(e, "message"), "syntax error")
+        -- TokenCursor:134
+        local ln = Option.__lz_unwrap_or(List.__lz_get(e, "line"), 0)
+        -- TokenCursor:135
+        local col = Option.__lz_unwrap_or(List.__lz_get(e, "col"), 1)
+        -- TokenCursor:136
+        local span = Option.__lz_unwrap_or(List.__lz_get(e, "span"), 1)
+        -- TokenCursor:137
+        Error.new("SyntaxError", msg, ln, col, self.source, span):print()
+    end
+    -- TokenCursor:139
+    os.exit(1)
+end
+-- TokenCursor:143
 function TokenCursor.error_pos(self)
+    -- TokenCursor:144
     local cur = TokenCursor.current(self)
+    -- TokenCursor:145
     if cur.kind ~= "EOF" then
+        -- TokenCursor:146
         return cur
     end
+    -- TokenCursor:148
     local prev = TokenCursor.previous(self)
+    -- TokenCursor:149
     if prev.kind ~= "EOF" then
+        -- TokenCursor:150
         return prev
     end
+    -- TokenCursor:152
     return cur
 end
+-- TokenCursor:155
 function TokenCursor.eof(self)
+    -- TokenCursor:156
     return Token.new("EOF", "", 0, 0)
 end
 
 local Ast = {}
 
+-- Ast:9
 function Ast.node(kind, attrs)
+    -- Ast:10
     return Node.new(kind, attrs)
 end
+-- Ast:13
 function Ast.program(body)
-    return Node.new("Program", __lz_map({["body"] = body}))
+    -- Ast:14
+    return Node.new("Program", Map.__lz_map({["body"] = body}))
 end
+-- Ast:18
+function Ast.error_node()
+    -- Ast:19
+    return Node.new("ErrorNode", Map.__lz_map({}))
+end
+-- Ast:22
 function Ast.import_decl(segments, name, line, col)
-    return Node.new("ImportDecl", __lz_map({["segments"] = segments, ["name"] = name, ["line"] = line, ["col"] = col}))
+    -- Ast:23
+    return Node.new("ImportDecl", Map.__lz_map({["segments"] = segments, ["name"] = name, ["line"] = line, ["col"] = col}))
 end
+-- Ast:26
 function Ast.extern_decl(name, params, param_types, return_type, target, line, col)
-    return Node.new("ExternDecl", __lz_map({["name"] = name, ["params"] = params, ["param_types"] = param_types, ["return_type"] = return_type, ["target"] = target, ["line"] = line, ["col"] = col}))
+    -- Ast:27
+    return Node.new("ExternDecl", Map.__lz_map({["name"] = name, ["params"] = params, ["param_types"] = param_types, ["return_type"] = return_type, ["target"] = target, ["line"] = line, ["col"] = col}))
 end
+-- Ast:32
 function Ast.function_decl(name, params, body, is_static, visibility, line, col, param_types, return_type, type_params)
-    return Node.new("FunctionDecl", __lz_map({["name"] = name, ["params"] = params, ["body"] = body, ["is_static"] = is_static, ["visibility"] = visibility, ["line"] = line, ["col"] = col, ["param_types"] = param_types, ["return_type"] = return_type, ["type_params"] = type_params}))
+    -- Ast:33
+    return Node.new("FunctionDecl", Map.__lz_map({["name"] = name, ["params"] = params, ["body"] = body, ["is_static"] = is_static, ["visibility"] = visibility, ["line"] = line, ["col"] = col, ["param_types"] = param_types, ["return_type"] = return_type, ["type_params"] = type_params}))
 end
+-- Ast:39
+function Ast.lua_decl(name, params, param_types, return_type, raw_body, is_static, visibility, line, col, type_params)
+    -- Ast:40
+    return Node.new("FunctionDecl", Map.__lz_map({["name"] = name, ["params"] = params, ["param_types"] = param_types, ["return_type"] = return_type, ["raw_body"] = raw_body, ["is_static"] = is_static, ["visibility"] = visibility, ["line"] = line, ["col"] = col, ["type_params"] = type_params}))
+end
+-- Ast:45
 function Ast.constructor_decl(params, body, line, col, param_types, type_params)
-    return Node.new("ConstructorDecl", __lz_map({["params"] = params, ["body"] = body, ["line"] = line, ["col"] = col, ["param_types"] = param_types, ["type_params"] = type_params}))
+    -- Ast:46
+    return Node.new("ConstructorDecl", Map.__lz_map({["params"] = params, ["body"] = body, ["line"] = line, ["col"] = col, ["param_types"] = param_types, ["type_params"] = type_params}))
 end
+-- Ast:49
 function Ast.expression_stmt(expression, line, col)
-    return Node.new("ExpressionStmt", __lz_map({["expression"] = expression, ["line"] = line, ["col"] = col}))
+    -- Ast:50
+    return Node.new("ExpressionStmt", Map.__lz_map({["expression"] = expression, ["line"] = line, ["col"] = col}))
 end
+-- Ast:53
 function Ast.field_assign(target, value, line, col)
-    return Node.new("FieldAssign", __lz_map({["target"] = target, ["value"] = value, ["line"] = line, ["col"] = col}))
+    -- Ast:54
+    return Node.new("FieldAssign", Map.__lz_map({["target"] = target, ["value"] = value, ["line"] = line, ["col"] = col}))
 end
+-- Ast:57
 function Ast.index_assign(target, value, line, col)
-    return Node.new("IndexAssign", __lz_map({["target"] = target, ["value"] = value, ["line"] = line, ["col"] = col}))
+    -- Ast:58
+    return Node.new("IndexAssign", Map.__lz_map({["target"] = target, ["value"] = value, ["line"] = line, ["col"] = col}))
 end
+-- Ast:61
 function Ast.while_stmt(condition, body, line, col)
-    return Node.new("WhileStmt", __lz_map({["condition"] = condition, ["body"] = body, ["line"] = line, ["col"] = col}))
+    -- Ast:62
+    return Node.new("WhileStmt", Map.__lz_map({["condition"] = condition, ["body"] = body, ["line"] = line, ["col"] = col}))
 end
+-- Ast:65
 function Ast.loop_stmt(body, line, col)
-    return Node.new("LoopStmt", __lz_map({["body"] = body, ["line"] = line, ["col"] = col}))
+    -- Ast:66
+    return Node.new("LoopStmt", Map.__lz_map({["body"] = body, ["line"] = line, ["col"] = col}))
 end
+-- Ast:69
 function Ast.break_stmt(line, col)
-    return Node.new("BreakStmt", __lz_map({["line"] = line, ["col"] = col}))
+    -- Ast:70
+    return Node.new("BreakStmt", Map.__lz_map({["line"] = line, ["col"] = col}))
 end
+-- Ast:73
 function Ast.for_in(vars, iter, body, line, col)
-    return Node.new("ForInStmt", __lz_map({["vars"] = vars, ["iter"] = iter, ["body"] = body, ["line"] = line, ["col"] = col}))
+    -- Ast:74
+    return Node.new("ForInStmt", Map.__lz_map({["vars"] = vars, ["iter"] = iter, ["body"] = body, ["line"] = line, ["col"] = col}))
 end
+-- Ast:77
 function Ast.if_clause(condition, body)
-    return Node.new("IfClause", __lz_map({["condition"] = condition, ["body"] = body}))
+    -- Ast:78
+    return Node.new("IfClause", Map.__lz_map({["condition"] = condition, ["body"] = body}))
 end
+-- Ast:83
 function Ast.enum_decl(name, variants, line, col, type_params)
-    return Node.new("EnumDecl", __lz_map({["name"] = name, ["variants"] = variants, ["line"] = line, ["col"] = col, ["type_params"] = type_params}))
+    -- Ast:84
+    return Node.new("EnumDecl", Map.__lz_map({["name"] = name, ["variants"] = variants, ["line"] = line, ["col"] = col, ["type_params"] = type_params}))
 end
+-- Ast:87
 function Ast.enum_variant(name, fields, line, col)
-    return Node.new("EnumVariant", __lz_map({["name"] = name, ["fields"] = fields, ["line"] = line, ["col"] = col}))
+    -- Ast:88
+    return Node.new("EnumVariant", Map.__lz_map({["name"] = name, ["fields"] = fields, ["line"] = line, ["col"] = col}))
 end
+-- Ast:95
 function Ast.interface_decl(name, methods, properties, type_params, line, col)
-    return Node.new("InterfaceDecl", __lz_map({["name"] = name, ["methods"] = methods, ["properties"] = properties, ["type_params"] = type_params, ["line"] = line, ["col"] = col}))
+    -- Ast:96
+    return Node.new("InterfaceDecl", Map.__lz_map({["name"] = name, ["methods"] = methods, ["properties"] = properties, ["type_params"] = type_params, ["line"] = line, ["col"] = col}))
 end
+-- Ast:99
 function Ast.interface_method(name, param_types, return_type, type_params)
-    return Node.new("InterfaceMethod", __lz_map({["name"] = name, ["param_types"] = param_types, ["return_type"] = return_type, ["type_params"] = type_params}))
+    -- Ast:100
+    return Node.new("InterfaceMethod", Map.__lz_map({["name"] = name, ["param_types"] = param_types, ["return_type"] = return_type, ["type_params"] = type_params}))
 end
+-- Ast:103
 function Ast.interface_property(name, type)
-    return Node.new("InterfaceProperty", __lz_map({["name"] = name, ["type"] = type}))
+    -- Ast:104
+    return Node.new("InterfaceProperty", Map.__lz_map({["name"] = name, ["type"] = type}))
 end
+-- Ast:109
 function Ast.type_name(name, args, line, col)
-    return Node.new("TypeName", __lz_map({["name"] = name, ["args"] = args, ["line"] = line, ["col"] = col}))
+    -- Ast:110
+    return Node.new("TypeName", Map.__lz_map({["name"] = name, ["args"] = args, ["line"] = line, ["col"] = col}))
 end
+-- Ast:114
 function Ast.type_fn(params, result, line, col)
-    return Node.new("TypeFn", __lz_map({["params"] = params, ["result"] = result, ["line"] = line, ["col"] = col}))
+    -- Ast:115
+    return Node.new("TypeFn", Map.__lz_map({["params"] = params, ["result"] = result, ["line"] = line, ["col"] = col}))
 end
+-- Ast:118
 function Ast.match_stmt(scrutinee, arms, line, col)
-    return Node.new("MatchStmt", __lz_map({["scrutinee"] = scrutinee, ["arms"] = arms, ["line"] = line, ["col"] = col}))
+    -- Ast:119
+    return Node.new("MatchStmt", Map.__lz_map({["scrutinee"] = scrutinee, ["arms"] = arms, ["line"] = line, ["col"] = col}))
 end
+-- Ast:122
 function Ast.match_arm(pattern, body)
-    return Node.new("MatchArm", __lz_map({["pattern"] = pattern, ["is_wildcard"] = false, ["is_variant"] = false, ["body"] = body}))
+    -- Ast:123
+    return Node.new("MatchArm", Map.__lz_map({["pattern"] = pattern, ["is_wildcard"] = false, ["is_variant"] = false, ["body"] = body}))
 end
+-- Ast:128
 function Ast.match_variant(variant, bindings, body)
-    return Node.new("MatchArm", __lz_map({["variant"] = variant, ["bindings"] = bindings, ["is_wildcard"] = false, ["is_variant"] = true, ["body"] = body}))
+    -- Ast:129
+    return Node.new("MatchArm", Map.__lz_map({["variant"] = variant, ["bindings"] = bindings, ["is_wildcard"] = false, ["is_variant"] = true, ["body"] = body}))
 end
+-- Ast:132
 function Ast.match_default(body)
-    return Node.new("MatchArm", __lz_map({["is_wildcard"] = true, ["is_variant"] = false, ["body"] = body}))
+    -- Ast:133
+    return Node.new("MatchArm", Map.__lz_map({["is_wildcard"] = true, ["is_variant"] = false, ["body"] = body}))
 end
+-- Ast:136
 function Ast.map_entry(key, value)
-    return Node.new("MapEntry", __lz_map({["key"] = key, ["value"] = value}))
+    -- Ast:137
+    return Node.new("MapEntry", Map.__lz_map({["key"] = key, ["value"] = value}))
 end
+-- Ast:140
 function Ast.binary(op, left, right, line, col)
-    return Node.new("BinaryExpr", __lz_map({["op"] = op, ["left"] = left, ["right"] = right, ["line"] = line, ["col"] = col}))
+    -- Ast:141
+    return Node.new("BinaryExpr", Map.__lz_map({["op"] = op, ["left"] = left, ["right"] = right, ["line"] = line, ["col"] = col}))
 end
+-- Ast:144
 function Ast.unary(op, operand, line, col)
-    return Node.new("UnaryExpr", __lz_map({["op"] = op, ["operand"] = operand, ["line"] = line, ["col"] = col}))
+    -- Ast:145
+    return Node.new("UnaryExpr", Map.__lz_map({["op"] = op, ["operand"] = operand, ["line"] = line, ["col"] = col}))
 end
+-- Ast:148
 function Ast.call(callee, args, line, col)
-    return Node.new("CallExpr", __lz_map({["callee"] = callee, ["args"] = args, ["line"] = line, ["col"] = col}))
+    -- Ast:149
+    return Node.new("CallExpr", Map.__lz_map({["callee"] = callee, ["args"] = args, ["line"] = line, ["col"] = col}))
 end
+-- Ast:152
 function Ast.member(object, field, line, col)
-    return Node.new("MemberExpr", __lz_map({["object"] = object, ["field"] = field, ["line"] = line, ["col"] = col}))
+    -- Ast:153
+    return Node.new("MemberExpr", Map.__lz_map({["object"] = object, ["field"] = field, ["line"] = line, ["col"] = col}))
 end
+-- Ast:156
 function Ast.index(object, index, line, col)
-    return Node.new("IndexExpr", __lz_map({["object"] = object, ["index"] = index, ["line"] = line, ["col"] = col}))
+    -- Ast:157
+    return Node.new("IndexExpr", Map.__lz_map({["object"] = object, ["index"] = index, ["line"] = line, ["col"] = col}))
 end
+-- Ast:160
 function Ast.self_expr(line, col)
-    return Node.new("SelfExpr", __lz_map({["line"] = line, ["col"] = col}))
+    -- Ast:161
+    return Node.new("SelfExpr", Map.__lz_map({["line"] = line, ["col"] = col}))
 end
+-- Ast:164
 function Ast.identifier(name, line, col)
-    return Node.new("IdentifierExpr", __lz_map({["name"] = name, ["line"] = line, ["col"] = col}))
+    -- Ast:165
+    return Node.new("IdentifierExpr", Map.__lz_map({["name"] = name, ["line"] = line, ["col"] = col}))
 end
+-- Ast:168
 function Ast.fn_expr(params, param_types, return_type, body, line, col)
-    return Node.new("FnExpr", __lz_map({["params"] = params, ["param_types"] = param_types, ["return_type"] = return_type, ["body"] = body, ["line"] = line, ["col"] = col}))
+    -- Ast:169
+    return Node.new("FnExpr", Map.__lz_map({["params"] = params, ["param_types"] = param_types, ["return_type"] = return_type, ["body"] = body, ["line"] = line, ["col"] = col}))
 end
+-- Ast:173
 function Ast.literal(lit_kind, value, line, col)
-    return Node.new("LiteralExpr", __lz_map({["lit_kind"] = lit_kind, ["value"] = value, ["line"] = line, ["col"] = col}))
+    -- Ast:174
+    return Node.new("LiteralExpr", Map.__lz_map({["lit_kind"] = lit_kind, ["value"] = value, ["line"] = line, ["col"] = col}))
 end
+-- Ast:177
 function Ast.list(elements, line, col)
-    return Node.new("ListExpr", __lz_map({["elements"] = elements, ["line"] = line, ["col"] = col}))
+    -- Ast:178
+    return Node.new("ListExpr", Map.__lz_map({["elements"] = elements, ["line"] = line, ["col"] = col}))
 end
+-- Ast:181
 function Ast.map(entries, line, col)
-    return Node.new("MapExpr", __lz_map({["entries"] = entries, ["line"] = line, ["col"] = col}))
+    -- Ast:182
+    return Node.new("MapExpr", Map.__lz_map({["entries"] = entries, ["line"] = line, ["col"] = col}))
 end
+-- Ast:186
 function Ast.interp_string(parts, line, col)
-    return Node.new("InterpolatedString", __lz_map({["parts"] = parts, ["line"] = line, ["col"] = col}))
+    -- Ast:187
+    return Node.new("InterpolatedString", Map.__lz_map({["parts"] = parts, ["line"] = line, ["col"] = col}))
 end
 
 local ExprParser = {}
 
-ExprParser.precedences = __lz_map({["OR"] = 1, ["AND"] = 2, ["EQ"] = 3, ["NEQ"] = 3, ["LESS"] = 3, ["LESS_EQUAL"] = 3, ["GREATER"] = 3, ["GREATER_EQUAL"] = 3, ["CONCAT"] = 4, ["PLUS"] = 4, ["MINUS"] = 4, ["MULTIPLY"] = 5, ["DIVIDE"] = 5, ["MODULO"] = 5, ["POWER"] = 6})
+-- ExprParser:14
+ExprParser.precedences = Map.__lz_map({["OR"] = 1, ["AND"] = 2, ["EQ"] = 3, ["NEQ"] = 3, ["LESS"] = 3, ["LESS_EQUAL"] = 3, ["GREATER"] = 3, ["GREATER_EQUAL"] = 3, ["CONCAT"] = 4, ["PLUS"] = 4, ["MINUS"] = 4, ["MULTIPLY"] = 5, ["DIVIDE"] = 5, ["MODULO"] = 5, ["POWER"] = 6})
+-- ExprParser:35
 function ExprParser.new(cursor)
     local self = {}
     self.inject_stmts = ExprParser.inject_stmts
@@ -1216,264 +2679,449 @@ function ExprParser.new(cursor)
     self.parse_interp_string = ExprParser.parse_interp_string
     self.parse_fn_expr = ExprParser.parse_fn_expr
     self.precedence = ExprParser.precedence
+    -- ExprParser:35
     self.cursor = cursor
     return self
 end
+-- ExprParser:37
 function ExprParser.inject_stmts(self, s)
+    -- ExprParser:38
     self.stmts = s
 end
+-- ExprParser:41
 function ExprParser.expression(self)
+    -- ExprParser:42
     return ExprParser.parse_binary(self, 1)
 end
+-- ExprParser:47
 function ExprParser.parse_binary(self, min_prec)
+    -- ExprParser:48
     local left = ExprParser.parse_unary(self)
+    -- ExprParser:49
     while true do
+        -- ExprParser:50
         local p = ExprParser.precedence(self, self.cursor:current_kind())
+        -- ExprParser:51
         if Option.is_none(p) then
+            -- ExprParser:52
             break
         end
+        -- ExprParser:54
         local prec = Option.unwrap(p)
+        -- ExprParser:55
         if prec < min_prec then
+            -- ExprParser:56
             break
         end
+        -- ExprParser:58
         local op = self.cursor:advance()
+        -- ExprParser:59
         local right = ExprParser.parse_binary(self, prec + 1)
+        -- ExprParser:60
         left = Ast.binary(op.kind, left, right, op.line, op.column)
     end
+    -- ExprParser:62
     return left
 end
+-- ExprParser:65
 function ExprParser.parse_unary(self)
+    -- ExprParser:66
     if self.cursor:check("NOT") then
+        -- ExprParser:67
         local op = self.cursor:advance()
+        -- ExprParser:68
         local operand = ExprParser.parse_unary(self)
+        -- ExprParser:69
         return Ast.unary(op.kind, operand, op.line, op.column)
     end
+    -- ExprParser:71
     return ExprParser.parse_call(self)
 end
+-- ExprParser:77
 function ExprParser.parse_call(self)
+    -- ExprParser:78
     local expr = ExprParser.parse_primary(self)
+    -- ExprParser:79
     while true do
+        -- ExprParser:80
         local k = self.cursor:current_kind()
+        -- ExprParser:81
         if k == "LEFT_BRACKET" then
+            -- ExprParser:82
             expr = ExprParser.finish_call(self, expr)
         elseif (k == "DOT") and ExprParser.continues_line(self) then
+            -- ExprParser:84
             expr = ExprParser.finish_member(self, expr)
         elseif (k == "LSQUARE") and ExprParser.continues_line(self) then
+            -- ExprParser:86
             expr = ExprParser.finish_index(self, expr)
         elseif (k == "QUESTION") and ExprParser.continues_line(self) then
+            -- ExprParser:88
             local q = self.cursor:advance()
+            -- ExprParser:89
             expr = Ast.propagate_expr(expr, q.line, q.column)
         else
+            -- ExprParser:91
             break
         end
     end
+    -- ExprParser:94
     return expr
 end
+-- ExprParser:97
 function ExprParser.finish_call(self, callee)
+    -- ExprParser:98
     local paren = self.cursor:advance()
+    -- ExprParser:99
     local args = ExprParser.parse_arguments(self)
+    -- ExprParser:100
     return Ast.call(callee, args, paren.line, paren.column)
 end
+-- ExprParser:103
 function ExprParser.finish_member(self, object)
+    -- ExprParser:104
     local dot = self.cursor:advance()
+    -- ExprParser:105
     local field = self.cursor:consume("IDENTIFIER", "Expected a field name after '.'")
+    -- ExprParser:106
     return Ast.member(object, field.value, dot.line, dot.column)
 end
+-- ExprParser:109
 function ExprParser.finish_index(self, object)
+    -- ExprParser:110
     local bracket = self.cursor:advance()
+    -- ExprParser:111
     local index = ExprParser.expression(self)
+    -- ExprParser:112
     self.cursor:consume("RSQUARE", "Expected ']' after an index expression")
+    -- ExprParser:113
     return Ast.index(object, index, bracket.line, bracket.column)
 end
+-- ExprParser:116
 function ExprParser.continues_line(self)
+    -- ExprParser:117
     return self.cursor:previous().line == self.cursor:current().line
 end
+-- ExprParser:122
 function ExprParser.parse_arguments(self)
-    local args = __lz_list()
+    -- ExprParser:123
+    local args = List.__lz_list({})
+    -- ExprParser:124
     if not self.cursor:check("RIGHT_BRACKET") then
+        -- ExprParser:125
         if self.cursor:check("IDENTIFIER") and (self.cursor:peek_next().kind == "COLON") then
+            -- ExprParser:126
             while true do
+                -- ExprParser:127
                 local name_tok = self.cursor:consume("IDENTIFIER", "Expected a label name")
+                -- ExprParser:128
                 self.cursor:consume("COLON", "Expected ':' after label name")
-                __lz_push(args, Ast.labeled_arg(name_tok.value, ExprParser.expression(self), name_tok.line, name_tok.column))
+                -- ExprParser:129
+                List.__lz_push(args, Ast.labeled_arg(name_tok.value, ExprParser.expression(self), name_tok.line, name_tok.column))
+                -- ExprParser:130
                 if not self.cursor:match("COMMA") then
+                    -- ExprParser:131
                     break
                 end
             end
         else
+            -- ExprParser:135
             while true do
-                __lz_push(args, ExprParser.expression(self))
+                -- ExprParser:136
+                List.__lz_push(args, ExprParser.expression(self))
+                -- ExprParser:137
                 if not self.cursor:match("COMMA") then
+                    -- ExprParser:138
                     break
                 end
             end
         end
     end
+    -- ExprParser:143
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after arguments")
+    -- ExprParser:144
     return args
 end
+-- ExprParser:149
 function ExprParser.parse_primary(self)
+    -- ExprParser:150
     local tok = self.cursor:current()
+    -- ExprParser:151
     local __lz_m1 = tok.kind
     if __lz_m1 == "LEFT_BRACKET" then
+        -- ExprParser:153
         self.cursor:advance()
+        -- ExprParser:154
         local inner = ExprParser.expression(self)
+        -- ExprParser:155
         self.cursor:consume("RIGHT_BRACKET", "Expected ')' after expression")
+        -- ExprParser:156
         return inner
     elseif __lz_m1 == "NUMBER" then
+        -- ExprParser:158
         self.cursor:advance()
+        -- ExprParser:158
         return Ast.literal("number", tok.value, tok.line, tok.column)
     elseif __lz_m1 == "FLOAT" then
+        -- ExprParser:159
         self.cursor:advance()
+        -- ExprParser:159
         return Ast.literal("float", tok.value, tok.line, tok.column)
     elseif __lz_m1 == "STRING" then
+        -- ExprParser:160
         self.cursor:advance()
+        -- ExprParser:160
         return Ast.literal("string", tok.value, tok.line, tok.column)
     elseif __lz_m1 == "ISTR_HEAD" then
+        -- ExprParser:161
         return ExprParser.parse_interp_string(self)
     elseif __lz_m1 == "TRUE" then
+        -- ExprParser:162
         self.cursor:advance()
+        -- ExprParser:162
         return Ast.literal("boolean", true, tok.line, tok.column)
     elseif __lz_m1 == "FALSE" then
+        -- ExprParser:163
         self.cursor:advance()
+        -- ExprParser:163
         return Ast.literal("boolean", false, tok.line, tok.column)
     elseif __lz_m1 == "FN" then
+        -- ExprParser:164
         self.cursor:advance()
+        -- ExprParser:164
         return ExprParser.parse_fn_expr(self, tok)
     elseif __lz_m1 == "IDENTIFIER" then
+        -- ExprParser:165
         self.cursor:advance()
+        -- ExprParser:165
         return Ast.identifier(tok.value, tok.line, tok.column)
     elseif __lz_m1 == "SELF" then
+        -- ExprParser:166
         self.cursor:advance()
+        -- ExprParser:166
         return Ast.self_expr(tok.line, tok.column)
     elseif __lz_m1 == "LSQUARE" then
+        -- ExprParser:167
         return ExprParser.parse_collection(self)
     elseif __lz_m1 == "DOT" then
+        -- ExprParser:169
         self.cursor:advance()
+        -- ExprParser:170
         local field = self.cursor:consume("IDENTIFIER", "Expected a field name after '.'")
+        -- ExprParser:171
         return Ast.member(Ast.self_expr(tok.line, tok.column), field.value, tok.line, tok.column)
     elseif __lz_m1 == "EOF" then
+        -- ExprParser:173
         self.cursor:fail("Unexpected end of input")
     else
+        -- ExprParser:174
         self.cursor:fail(("Unexpected token '" .. tok.value) .. "'")
     end
-    return Ast.literal("string", "", 0, 0)
+    -- ExprParser:176
+    return Ast.error_node()
 end
+-- ExprParser:181
 function ExprParser.parse_collection(self)
+    -- ExprParser:182
     local open = self.cursor:advance()
+    -- ExprParser:183
     if self.cursor:check("RSQUARE") then
+        -- ExprParser:184
         self.cursor:advance()
-        return Ast.list(__lz_list(), open.line, open.column)
+        -- ExprParser:185
+        return Ast.list(List.__lz_list({}), open.line, open.column)
     end
+    -- ExprParser:187
     if self.cursor:check("COLON") then
+        -- ExprParser:188
         self.cursor:advance()
+        -- ExprParser:189
         self.cursor:consume("RSQUARE", "Expected ']' to close empty map '[:]'")
-        return Ast.map(__lz_list(), open.line, open.column)
+        -- ExprParser:190
+        return Ast.map(List.__lz_list({}), open.line, open.column)
     end
+    -- ExprParser:193
     local first = ExprParser.expression(self)
+    -- ExprParser:194
     if self.cursor:match("COLON") then
+        -- ExprParser:195
         local value = ExprParser.expression(self)
+        -- ExprParser:196
         if self.cursor:check("FOR") then
+            -- ExprParser:197
             return ExprParser.parse_map_comp(self, first, value, open)
         end
+        -- ExprParser:199
         return ExprParser.parse_map_rest(self, first, value, open)
     end
+    -- ExprParser:201
     if self.cursor:check("FOR") then
+        -- ExprParser:202
         return ExprParser.parse_list_comp(self, first, open)
     end
+    -- ExprParser:204
     return ExprParser.parse_list_rest(self, first, open)
 end
+-- ExprParser:210
 function ExprParser.parse_list_comp(self, element, open)
-    local attrs = __lz_map({["element"] = element, ["line"] = open.line, ["col"] = open.column})
+    -- ExprParser:211
+    local attrs = Map.__lz_map({["element"] = element, ["line"] = open.line, ["col"] = open.column})
+    -- ExprParser:212
     ExprParser.parse_comp_clause(self, attrs)
+    -- ExprParser:213
     return Ast.node("ListComp", attrs)
 end
+-- ExprParser:216
 function ExprParser.parse_map_comp(self, key, value, open)
-    local attrs = __lz_map({["key"] = key, ["value"] = value, ["line"] = open.line, ["col"] = open.column})
+    -- ExprParser:217
+    local attrs = Map.__lz_map({["key"] = key, ["value"] = value, ["line"] = open.line, ["col"] = open.column})
+    -- ExprParser:218
     ExprParser.parse_comp_clause(self, attrs)
+    -- ExprParser:219
     return Ast.node("MapComp", attrs)
 end
+-- ExprParser:222
 function ExprParser.parse_comp_clause(self, attrs)
+    -- ExprParser:223
     self.cursor:consume("FOR", "Expected 'for' in a comprehension")
-    local vars = __lz_list(self.cursor:consume("IDENTIFIER", "Expected a loop variable after 'for'").value)
+    -- ExprParser:224
+    local vars = List.__lz_list({self.cursor:consume("IDENTIFIER", "Expected a loop variable after 'for'").value})
+    -- ExprParser:225
     if self.cursor:match("COMMA") then
-        __lz_push(vars, self.cursor:consume("IDENTIFIER", "Expected a second loop variable after ','").value)
+        -- ExprParser:226
+        List.__lz_push(vars, self.cursor:consume("IDENTIFIER", "Expected a second loop variable after ','").value)
     end
+    -- ExprParser:228
     self.cursor:consume("IN", "Expected 'in' after the comprehension loop variable(s)")
-    __lz_idx_set(attrs, "vars", vars)
-    __lz_idx_set(attrs, "iter", ExprParser.expression(self))
+    -- ExprParser:229
+    List.__lz_idx_set(attrs, "vars", vars)
+    -- ExprParser:230
+    List.__lz_idx_set(attrs, "iter", ExprParser.expression(self))
+    -- ExprParser:231
     if self.cursor:match("IF") then
-        __lz_idx_set(attrs, "cond", ExprParser.expression(self))
+        -- ExprParser:232
+        List.__lz_idx_set(attrs, "cond", ExprParser.expression(self))
     end
+    -- ExprParser:234
     self.cursor:consume("RSQUARE", "Expected ']' to close the comprehension")
 end
+-- ExprParser:237
 function ExprParser.parse_map_rest(self, first, value, open)
-    local entries = __lz_list(Ast.map_entry(first, value))
+    -- ExprParser:238
+    local entries = List.__lz_list({Ast.map_entry(first, value)})
+    -- ExprParser:239
     while true do
+        -- ExprParser:240
         if not self.cursor:match("COMMA") then
+            -- ExprParser:241
             break
         end
+        -- ExprParser:243
         local key = ExprParser.expression(self)
+        -- ExprParser:244
         self.cursor:consume("COLON", "Expected ':' between a map key and its value")
-        __lz_push(entries, Ast.map_entry(key, ExprParser.expression(self)))
+        -- ExprParser:245
+        List.__lz_push(entries, Ast.map_entry(key, ExprParser.expression(self)))
     end
+    -- ExprParser:247
     self.cursor:consume("RSQUARE", "Expected ']' to close the map literal")
+    -- ExprParser:248
     return Ast.map(entries, open.line, open.column)
 end
+-- ExprParser:251
 function ExprParser.parse_list_rest(self, first, open)
-    local elements = __lz_list(first)
+    -- ExprParser:252
+    local elements = List.__lz_list({first})
+    -- ExprParser:253
     while true do
+        -- ExprParser:254
         if not self.cursor:match("COMMA") then
+            -- ExprParser:255
             break
         end
-        __lz_push(elements, ExprParser.expression(self))
+        -- ExprParser:257
+        List.__lz_push(elements, ExprParser.expression(self))
     end
+    -- ExprParser:259
     self.cursor:consume("RSQUARE", "Expected ']' to close the list literal")
+    -- ExprParser:260
     return Ast.list(elements, open.line, open.column)
 end
+-- ExprParser:265
 function ExprParser.parse_interp_string(self)
+    -- ExprParser:266
     local head = self.cursor:advance()
-    local parts = __lz_list(Ast.literal("string", head.value, head.line, head.column))
+    -- ExprParser:267
+    local parts = List.__lz_list({Ast.literal("string", head.value, head.line, head.column)})
+    -- ExprParser:268
     while true do
-        __lz_push(parts, ExprParser.expression(self))
+        -- ExprParser:269
+        List.__lz_push(parts, ExprParser.expression(self))
+        -- ExprParser:270
         local next = self.cursor:current()
+        -- ExprParser:271
         if next.kind == "ISTR_TAIL" then
+            -- ExprParser:272
             self.cursor:advance()
-            __lz_push(parts, Ast.literal("string", next.value, next.line, next.column))
+            -- ExprParser:273
+            List.__lz_push(parts, Ast.literal("string", next.value, next.line, next.column))
+            -- ExprParser:274
             break
         end
+        -- ExprParser:276
         if next.kind == "ISTR_MID" then
+            -- ExprParser:277
             self.cursor:advance()
-            __lz_push(parts, Ast.literal("string", next.value, next.line, next.column))
+            -- ExprParser:278
+            List.__lz_push(parts, Ast.literal("string", next.value, next.line, next.column))
         else
+            -- ExprParser:280
             self.cursor:fail("Expected end of string interpolation")
+            -- ExprParser:281
             break
         end
     end
+    -- ExprParser:284
     return Ast.interp_string(parts, head.line, head.column)
 end
+-- ExprParser:287
 function ExprParser.parse_fn_expr(self, tok)
+    -- ExprParser:288
     self.cursor:consume("LEFT_BRACKET", "Expected '(' after 'fn'")
-    local param_types = __lz_list()
+    -- ExprParser:289
+    local param_types = List.__lz_list({})
+    -- ExprParser:290
     local params = self.stmts:parse_params(param_types)
+    -- ExprParser:291
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after fn parameters")
+    -- ExprParser:292
     local return_type = self.stmts:parse_return_type()
-    local body = __lz_list()
+    -- ExprParser:293
+    local body = List.__lz_list({})
+    -- ExprParser:294
     if self.cursor:match("ASSIGN") then
+        -- ExprParser:295
         local expr = ExprParser.expression(self)
-        body = __lz_list(Ast.node("ReturnStmt", __lz_map({["value"] = expr, ["line"] = expr:line(), ["col"] = expr:col()})))
+        -- ExprParser:296
+        body = List.__lz_list({Ast.node("ReturnStmt", Map.__lz_map({["value"] = expr, ["line"] = expr:line(), ["col"] = expr:col()}))})
     else
+        -- ExprParser:298
         body = self.stmts:parse_block("fn body")
     end
+    -- ExprParser:300
     return Ast.fn_expr(params, param_types, return_type, body, tok.line, tok.column)
 end
+-- ExprParser:303
 function ExprParser.precedence(self, kind)
-    return __lz_get(ExprParser.precedences, kind)
+    -- ExprParser:304
+    return List.__lz_get(ExprParser.precedences, kind)
 end
 
 local StmtParser = {}
 
-StmtParser.compounds = __lz_map({["PLUS_ASSIGN"] = "PLUS", ["MINUS_ASSIGN"] = "MINUS", ["STAR_ASSIGN"] = "MULTIPLY", ["SLASH_ASSIGN"] = "DIVIDE"})
+-- StmtParser:17
+StmtParser.compounds = Map.__lz_map({["PLUS_ASSIGN"] = "PLUS", ["MINUS_ASSIGN"] = "MINUS", ["STAR_ASSIGN"] = "MULTIPLY", ["SLASH_ASSIGN"] = "DIVIDE"})
+-- StmtParser:27
 function StmtParser.new(cursor, exprs)
     local self = {}
     self.parse_program = StmtParser.parse_program
@@ -1492,6 +3140,7 @@ function StmtParser.new(cursor, exprs)
     self.parse_enum_variant = StmtParser.parse_enum_variant
     self.parse_interface = StmtParser.parse_interface
     self.parse_interface_member = StmtParser.parse_interface_member
+    self.parse_lua_decl = StmtParser.parse_lua_decl
     self.parse_extern = StmtParser.parse_extern
     self.parse_member = StmtParser.parse_member
     self.parse_static = StmtParser.parse_static
@@ -1531,870 +3180,1565 @@ function StmtParser.new(cursor, exprs)
     self.parse_expr_statement = StmtParser.parse_expr_statement
     self.make_assign = StmtParser.make_assign
     self.compound = StmtParser.compound
+    -- StmtParser:27
     self.cursor = cursor
+    -- StmtParser:27
     self.exprs = exprs
     return self
 end
+-- StmtParser:29
 function StmtParser.parse_program(self)
+    -- StmtParser:33
     if self.cursor:check("HASH") and StmtParser.is_file_directive(self) then
-        return StmtParser.parse_file_directive(self)
+        -- StmtParser:34
+        local result = StmtParser.parse_file_directive(self)
+        -- StmtParser:35
+        if self.cursor:has_errors() then
+            -- StmtParser:36
+            self.cursor:flush()
+        end
+        -- StmtParser:38
+        return result
     end
-    local body = __lz_list()
+    -- StmtParser:40
+    local body = List.__lz_list({})
+    -- StmtParser:41
     while true do
+        -- StmtParser:42
         if self.cursor:at_end() then
+            -- StmtParser:43
             break
         end
-        __lz_push(body, StmtParser.parse_statement(self))
+        -- StmtParser:45
+        List.__lz_push(body, StmtParser.parse_statement(self))
     end
-    return Ast.program(StmtParser.expand_field_params(self, body))
+    -- StmtParser:48
+    local clean = (function() local __lz_m1 = List.__lz_list({}) for _, s in List.__lz_each(body) do if s.kind ~= "ErrorNode" then List.__lz_push(__lz_m1, s) end end return __lz_m1 end)()
+    -- StmtParser:49
+    if self.cursor:has_errors() then
+        -- StmtParser:50
+        self.cursor:flush()
+    end
+    -- StmtParser:52
+    return Ast.program(StmtParser.expand_field_params(self, clean))
 end
+-- StmtParser:57
 function StmtParser.is_file_directive(self)
+    -- StmtParser:58
     local after = self.cursor:peek_next()
+    -- StmtParser:59
     if after.kind == "INTERFACE" then
+        -- StmtParser:60
         return true
     end
+    -- StmtParser:62
     if (after.kind == "IDENTIFIER") and (after.value == "object") then
+        -- StmtParser:63
         return true
     end
+    -- StmtParser:65
     return false
 end
+-- StmtParser:72
 function StmtParser.expand_field_params(self, body)
+    -- StmtParser:73
     local prop_types = StmtParser.declared_property_types(self, body)
-    local props = __lz_list()
-    for _, stmt in __lz_each(body) do
+    -- StmtParser:74
+    local props = List.__lz_list({})
+    -- StmtParser:75
+    for _, stmt in List.__lz_each(body) do
+        -- StmtParser:76
         if stmt.kind == "ConstructorDecl" then
-            for _, fp in __lz_each(Option.unwrap_or(stmt:attr("field_params"), __lz_list())) do
-                __lz_push(props, StmtParser.field_property(self, fp))
+            -- StmtParser:77
+            for _, fp in List.__lz_each(Option.unwrap_or(stmt:attr("field_params"), List.__lz_list({}))) do
+                -- StmtParser:78
+                List.__lz_push(props, StmtParser.field_property(self, fp))
             end
+            -- StmtParser:80
             if Option.unwrap_or(stmt:attr("auto"), false) then
+                -- StmtParser:81
                 StmtParser.resolve_auto_params(self, stmt, prop_types)
             end
         end
     end
-    if __lz_len(props) == 0 then
+    -- StmtParser:85
+    if List.__lz_len(props) == 0 then
+        -- StmtParser:86
         return body
     end
-    local out = __lz_list()
-    for _, p in __lz_each(props) do
-        __lz_push(out, p)
+    -- StmtParser:88
+    local out = List.__lz_list({})
+    -- StmtParser:89
+    for _, p in List.__lz_each(props) do
+        -- StmtParser:90
+        List.__lz_push(out, p)
     end
-    for _, stmt in __lz_each(body) do
-        __lz_push(out, stmt)
+    -- StmtParser:92
+    for _, stmt in List.__lz_each(body) do
+        -- StmtParser:93
+        List.__lz_push(out, stmt)
     end
+    -- StmtParser:95
     return out
 end
+-- StmtParser:98
 function StmtParser.field_property(self, fp)
-    return Ast.node("VariableDecl", __lz_map({["name"] = __lz_unwrap(__lz_get(fp, "name")), ["visibility"] = "private", ["mutable"] = false, ["is_static"] = false, ["type"] = __lz_unwrap(__lz_get(fp, "type")), ["line"] = __lz_unwrap(__lz_get(fp, "line")), ["col"] = __lz_unwrap(__lz_get(fp, "col"))}))
+    -- StmtParser:99
+    return Ast.node("VariableDecl", Map.__lz_map({["name"] = Option.__lz_unwrap(List.__lz_get(fp, "name")), ["visibility"] = "private", ["mutable"] = false, ["is_static"] = false, ["type"] = Option.__lz_unwrap(List.__lz_get(fp, "type")), ["line"] = Option.__lz_unwrap(List.__lz_get(fp, "line")), ["col"] = Option.__lz_unwrap(List.__lz_get(fp, "col"))}))
 end
+-- StmtParser:105
 function StmtParser.parse_file_directive(self)
+    -- StmtParser:106
     local at = self.cursor:consume("HASH", "Expected a file directive")
+    -- StmtParser:107
     if self.cursor:match("INTERFACE") then
+        -- StmtParser:108
         return StmtParser.parse_interface_body(self, at)
     end
+    -- StmtParser:110
     if self.cursor:check("IDENTIFIER") and (self.cursor:current().value == "object") then
+        -- StmtParser:111
         self.cursor:advance()
+        -- StmtParser:112
         return StmtParser.parse_object_body(self)
     end
+    -- StmtParser:114
     self.cursor:fail(("unknown file directive '#" .. self.cursor:current().value) .. "'")
-    return Ast.program(__lz_list())
+    -- StmtParser:115
+    return Ast.program(List.__lz_list({}))
 end
+-- StmtParser:120
 function StmtParser.parse_interface_body(self, at)
-    local body = __lz_list()
-    local methods = __lz_list()
-    local properties = __lz_list()
+    -- StmtParser:121
+    local body = List.__lz_list({})
+    -- StmtParser:122
+    local methods = List.__lz_list({})
+    -- StmtParser:123
+    local properties = List.__lz_list({})
+    -- StmtParser:124
     while true do
+        -- StmtParser:125
         if self.cursor:at_end() then
+            -- StmtParser:126
             break
         end
+        -- StmtParser:128
         if self.cursor:check("IMPORT") then
+            -- StmtParser:129
             local itok = self.cursor:current()
+            -- StmtParser:130
             self.cursor:advance()
-            __lz_push(body, StmtParser.parse_import(self, itok))
+            -- StmtParser:131
+            List.__lz_push(body, StmtParser.parse_import(self, itok))
         else
+            -- StmtParser:133
             StmtParser.parse_interface_member(self, methods, properties)
         end
     end
-    __lz_push(body, Ast.interface_decl("", methods, properties, __lz_list(), at.line, at.column))
-    return Ast.program(body)
+    -- StmtParser:136
+    List.__lz_push(body, Ast.interface_decl("", methods, properties, List.__lz_list({}), at.line, at.column))
+    -- StmtParser:137
+    local clean = (function() local __lz_m2 = List.__lz_list({}) for _, s in List.__lz_each(body) do if s.kind ~= "ErrorNode" then List.__lz_push(__lz_m2, s) end end return __lz_m2 end)()
+    -- StmtParser:138
+    return Ast.program(clean)
 end
+-- StmtParser:143
 function StmtParser.parse_object_body(self)
-    local body = __lz_list()
+    -- StmtParser:144
+    local body = List.__lz_list({})
+    -- StmtParser:145
     while true do
+        -- StmtParser:146
         if self.cursor:at_end() then
+            -- StmtParser:147
             break
         end
+        -- StmtParser:149
         if self.cursor:check("IMPORT") then
+            -- StmtParser:150
             local itok = self.cursor:current()
+            -- StmtParser:151
             self.cursor:advance()
-            __lz_push(body, StmtParser.parse_import(self, itok))
+            -- StmtParser:152
+            List.__lz_push(body, StmtParser.parse_import(self, itok))
         else
-            __lz_push(body, StmtParser.parse_object_member(self))
+            -- StmtParser:154
+            List.__lz_push(body, StmtParser.parse_object_member(self))
         end
     end
-    return Ast.program(body)
+    -- StmtParser:157
+    local clean = (function() local __lz_m3 = List.__lz_list({}) for _, s in List.__lz_each(body) do if s.kind ~= "ErrorNode" then List.__lz_push(__lz_m3, s) end end return __lz_m3 end)()
+    -- StmtParser:158
+    return Ast.program(clean)
 end
+-- StmtParser:161
 function StmtParser.parse_object_member(self)
+    -- StmtParser:162
     if self.cursor:check("EXTERN") then
+        -- StmtParser:163
         local etok = self.cursor:current()
+        -- StmtParser:164
         self.cursor:advance()
+        -- StmtParser:165
         return StmtParser.parse_extern(self, etok)
     end
+    -- StmtParser:167
     local visibility = ""
+    -- StmtParser:168
     if self.cursor:match("PRIVATE") then
+        -- StmtParser:169
         visibility = "private"
     elseif self.cursor:match("PUBLIC") then
+        -- StmtParser:171
         visibility = "public"
     end
+    -- StmtParser:173
     if self.cursor:check("STATIC") then
+        -- StmtParser:174
+        self.cursor:advance()
+        -- StmtParser:175
         self.cursor:fail("'static' is implied in an #object file; remove it")
+        -- StmtParser:176
+        return Ast.error_node()
     end
+    -- StmtParser:178
     if self.cursor:check("CONSTRUCTOR") then
+        -- StmtParser:179
+        self.cursor:advance()
+        -- StmtParser:180
         self.cursor:fail("an #object file has no instances; remove the constructor")
+        -- StmtParser:181
+        return Ast.error_node()
     end
+    -- StmtParser:183
+    if self.cursor:match("LUA") then
+        -- StmtParser:184
+        return StmtParser.parse_lua_decl(self, visibility, true)
+    end
+    -- StmtParser:186
     if self.cursor:check("IDENTIFIER") and StmtParser.looks_like_decl(self) then
+        -- StmtParser:187
         return StmtParser.parse_method(self, visibility, true)
     end
+    -- StmtParser:189
     local mutable = self.cursor:match("MUTABLE")
+    -- StmtParser:190
     return StmtParser.parse_binding(self, visibility, mutable, "Expected a member name in the #object file", true)
 end
+-- StmtParser:193
 function StmtParser.parse_statement(self)
+    -- StmtParser:194
     local tok = self.cursor:current()
-    local __lz_m1 = tok.kind
-    if __lz_m1 == "IMPORT" then
+    -- StmtParser:195
+    local __lz_m4 = tok.kind
+    if __lz_m4 == "IMPORT" then
+        -- StmtParser:196
         self.cursor:advance()
+        -- StmtParser:196
         return StmtParser.parse_import(self, tok)
-    elseif __lz_m1 == "EXTERN" then
+    elseif __lz_m4 == "EXTERN" then
+        -- StmtParser:197
         self.cursor:advance()
+        -- StmtParser:197
         return StmtParser.parse_extern(self, tok)
-    elseif __lz_m1 == "ENUM" then
+    elseif __lz_m4 == "LUA" then
+        -- StmtParser:198
         self.cursor:advance()
+        -- StmtParser:198
+        return StmtParser.parse_lua_decl(self, "", false)
+    elseif __lz_m4 == "ENUM" then
+        -- StmtParser:199
+        self.cursor:advance()
+        -- StmtParser:199
         return StmtParser.parse_enum(self, tok)
-    elseif __lz_m1 == "INTERFACE" then
+    elseif __lz_m4 == "INTERFACE" then
+        -- StmtParser:200
         self.cursor:advance()
+        -- StmtParser:200
         return StmtParser.parse_interface(self, tok)
-    elseif __lz_m1 == "PRIVATE" then
+    elseif __lz_m4 == "PRIVATE" then
+        -- StmtParser:201
         self.cursor:advance()
+        -- StmtParser:201
         return StmtParser.parse_member(self, "private")
-    elseif __lz_m1 == "PUBLIC" then
+    elseif __lz_m4 == "PUBLIC" then
+        -- StmtParser:202
         self.cursor:advance()
+        -- StmtParser:202
         return StmtParser.parse_member(self, "public")
-    elseif __lz_m1 == "MUTABLE" then
+    elseif __lz_m4 == "MUTABLE" then
+        -- StmtParser:203
         self.cursor:advance()
+        -- StmtParser:203
         return StmtParser.parse_binding(self, "", true, "Expected variable name after 'mut'", false)
-    elseif __lz_m1 == "STATIC" then
+    elseif __lz_m4 == "STATIC" then
+        -- StmtParser:204
         self.cursor:advance()
+        -- StmtParser:204
         return StmtParser.parse_static(self)
-    elseif __lz_m1 == "AT" then
+    elseif __lz_m4 == "AT" then
+        -- StmtParser:205
         return StmtParser.parse_annotation(self)
-    elseif __lz_m1 == "CONSTRUCTOR" then
+    elseif __lz_m4 == "CONSTRUCTOR" then
+        -- StmtParser:206
         self.cursor:advance()
+        -- StmtParser:206
         return StmtParser.parse_constructor(self, tok, false)
-    elseif __lz_m1 == "RETURN" then
+    elseif __lz_m4 == "RETURN" then
+        -- StmtParser:207
         self.cursor:advance()
+        -- StmtParser:207
         return StmtParser.parse_return(self, tok)
-    elseif __lz_m1 == "IF" then
+    elseif __lz_m4 == "IF" then
+        -- StmtParser:208
         self.cursor:advance()
+        -- StmtParser:208
         return StmtParser.parse_if(self, tok)
-    elseif __lz_m1 == "WHILE" then
+    elseif __lz_m4 == "WHILE" then
+        -- StmtParser:209
         self.cursor:advance()
+        -- StmtParser:209
         return StmtParser.parse_while(self, tok)
-    elseif __lz_m1 == "LOOP" then
+    elseif __lz_m4 == "LOOP" then
+        -- StmtParser:210
         self.cursor:advance()
+        -- StmtParser:210
         return StmtParser.parse_loop(self, tok)
-    elseif __lz_m1 == "FOR" then
+    elseif __lz_m4 == "FOR" then
+        -- StmtParser:211
         self.cursor:advance()
+        -- StmtParser:211
         return StmtParser.parse_for(self, tok)
-    elseif __lz_m1 == "BREAK" then
+    elseif __lz_m4 == "BREAK" then
+        -- StmtParser:212
         self.cursor:advance()
+        -- StmtParser:212
         return StmtParser.parse_break(self, tok)
-    elseif __lz_m1 == "IDENTIFIER" then
+    elseif __lz_m4 == "IDENTIFIER" then
+        -- StmtParser:213
         return StmtParser.parse_identifier_statement(self, tok)
     else
     end
+    -- StmtParser:216
     return StmtParser.parse_expr_statement(self, tok)
 end
+-- StmtParser:222
 function StmtParser.parse_identifier_statement(self, tok)
+    -- StmtParser:223
     if (tok.value == "match") and StmtParser.starts_match(self) then
+        -- StmtParser:224
         self.cursor:advance()
+        -- StmtParser:225
         return StmtParser.parse_match(self, tok)
     end
+    -- StmtParser:227
     if self.cursor:peek_next().kind == "COLON" then
+        -- StmtParser:228
         return StmtParser.parse_typed_local(self, tok)
     end
+    -- StmtParser:230
     if StmtParser.looks_like_decl(self) then
+        -- StmtParser:231
         return StmtParser.parse_method(self, "", false)
     end
+    -- StmtParser:233
     local nk = self.cursor:peek_next().kind
+    -- StmtParser:234
     if (nk == "ASSIGN") or Option.is_some(StmtParser.compound(self, nk)) then
+        -- StmtParser:235
         return StmtParser.parse_assignment(self, "Expected variable name")
     end
+    -- StmtParser:237
     return StmtParser.parse_expr_statement(self, tok)
 end
+-- StmtParser:241
 function StmtParser.parse_block(self, context)
+    -- StmtParser:242
     local open = self.cursor:consume("BODY_START", "Expected '{' to open " .. context)
-    local body = __lz_list()
+    -- StmtParser:243
+    local body = List.__lz_list({})
+    -- StmtParser:244
     while true do
-        if self.cursor:check("BODY_END") then
+        -- StmtParser:245
+        if self.cursor:at_end() then
+            -- StmtParser:246
+            self.cursor:fail_at("Expected '}' to close " .. context, open.line, open.column, 1)
+            -- StmtParser:247
             break
         end
-        if self.cursor:at_end() then
-            self.cursor:fail_at("Expected '}' to close " .. context, open.line, open.column, 1)
+        -- StmtParser:249
+        if self.cursor:check("BODY_END") then
+            -- StmtParser:250
+            break
         end
-        __lz_push(body, StmtParser.parse_statement(self))
+        -- StmtParser:252
+        List.__lz_push(body, StmtParser.parse_statement(self))
     end
+    -- StmtParser:254
     self.cursor:consume("BODY_END", "Expected '}' to close " .. context)
+    -- StmtParser:255
     return body
 end
+-- StmtParser:258
 function StmtParser.parse_import(self, tok)
+    -- StmtParser:259
     local first = self.cursor:consume("IDENTIFIER", "Expected a name after 'import'")
-    local segments = __lz_list(first.value)
+    -- StmtParser:260
+    local segments = List.__lz_list({first.value})
+    -- StmtParser:261
     local last = first.value
+    -- StmtParser:262
     while true do
+        -- StmtParser:263
         if not self.cursor:match("DOT") then
+            -- StmtParser:264
             break
         end
+        -- StmtParser:266
         local seg = self.cursor:consume("IDENTIFIER", "Expected a name after '.' in an import path")
-        __lz_push(segments, seg.value)
+        -- StmtParser:267
+        List.__lz_push(segments, seg.value)
+        -- StmtParser:268
         last = seg.value
     end
+    -- StmtParser:270
     return Ast.import_decl(segments, last, tok.line, tok.column)
 end
+-- StmtParser:275
 function StmtParser.parse_enum(self, tok)
+    -- StmtParser:276
     local name = self.cursor:consume("IDENTIFIER", "Expected an enum name after 'enum'")
+    -- StmtParser:277
     local type_params = StmtParser.parse_type_params(self)
+    -- StmtParser:278
     local open = self.cursor:consume("BODY_START", "Expected '{' to open enum body")
-    local variants = __lz_list()
+    -- StmtParser:279
+    local variants = List.__lz_list({})
+    -- StmtParser:280
     while true do
-        if self.cursor:check("BODY_END") then
+        -- StmtParser:281
+        if self.cursor:at_end() then
+            -- StmtParser:282
+            self.cursor:fail_at("Expected '}' to close enum body", open.line, open.column, 1)
+            -- StmtParser:283
             break
         end
-        if self.cursor:at_end() then
-            self.cursor:fail_at("Expected '}' to close enum body", open.line, open.column, 1)
+        -- StmtParser:285
+        if self.cursor:check("BODY_END") then
+            -- StmtParser:286
+            break
         end
-        __lz_push(variants, StmtParser.parse_enum_variant(self))
+        -- StmtParser:288
+        List.__lz_push(variants, StmtParser.parse_enum_variant(self))
+        -- StmtParser:289
         self.cursor:match("COMMA")
     end
+    -- StmtParser:291
     self.cursor:consume("BODY_END", "Expected '}' to close enum body")
+    -- StmtParser:292
     return Ast.enum_decl(name.value, variants, tok.line, tok.column, type_params)
 end
+-- StmtParser:295
 function StmtParser.parse_enum_variant(self)
+    -- StmtParser:296
     local v = self.cursor:consume("IDENTIFIER", "Expected a variant name in the enum body")
-    local fields = __lz_list()
+    -- StmtParser:297
+    local fields = List.__lz_list({})
+    -- StmtParser:298
     if self.cursor:match("LEFT_BRACKET") then
+        -- StmtParser:299
         if not self.cursor:check("RIGHT_BRACKET") then
+            -- StmtParser:300
             while true do
-                __lz_push(fields, StmtParser.parse_type(self))
+                -- StmtParser:301
+                List.__lz_push(fields, StmtParser.parse_type(self))
+                -- StmtParser:302
                 if not self.cursor:match("COMMA") then
+                    -- StmtParser:303
                     break
                 end
             end
         end
+        -- StmtParser:307
         self.cursor:consume("RIGHT_BRACKET", "Expected ')' after the variant payload types")
     end
+    -- StmtParser:309
     return Ast.enum_variant(v.value, fields, v.line, v.column)
 end
+-- StmtParser:315
 function StmtParser.parse_interface(self, tok)
+    -- StmtParser:316
     local name = self.cursor:consume("IDENTIFIER", "Expected an interface name after 'interface'")
+    -- StmtParser:317
     local type_params = StmtParser.parse_type_params(self)
+    -- StmtParser:318
     local open = self.cursor:consume("BODY_START", "Expected '{' to open interface body")
-    local methods = __lz_list()
-    local properties = __lz_list()
+    -- StmtParser:319
+    local methods = List.__lz_list({})
+    -- StmtParser:320
+    local properties = List.__lz_list({})
+    -- StmtParser:321
     while true do
-        if self.cursor:check("BODY_END") then
+        -- StmtParser:322
+        if self.cursor:at_end() then
+            -- StmtParser:323
+            self.cursor:fail_at("Expected '}' to close interface body", open.line, open.column, 1)
+            -- StmtParser:324
             break
         end
-        if self.cursor:at_end() then
-            self.cursor:fail_at("Expected '}' to close interface body", open.line, open.column, 1)
+        -- StmtParser:326
+        if self.cursor:check("BODY_END") then
+            -- StmtParser:327
+            break
         end
+        -- StmtParser:329
         StmtParser.parse_interface_member(self, methods, properties)
     end
+    -- StmtParser:331
     self.cursor:consume("BODY_END", "Expected '}' to close interface body")
+    -- StmtParser:332
     return Ast.interface_decl(name.value, methods, properties, type_params, tok.line, tok.column)
 end
+-- StmtParser:337
 function StmtParser.parse_interface_member(self, methods, properties)
+    -- StmtParser:338
     local name = self.cursor:consume("IDENTIFIER", "Expected a member name in the interface body")
+    -- StmtParser:339
     if self.cursor:check("LESS") or self.cursor:check("LEFT_BRACKET") then
+        -- StmtParser:340
         local type_params = StmtParser.parse_type_params(self)
+        -- StmtParser:341
         self.cursor:consume("LEFT_BRACKET", "Expected '(' in an interface method signature")
-        local param_types = __lz_list()
+        -- StmtParser:342
+        local param_types = List.__lz_list({})
+        -- StmtParser:343
         StmtParser.parse_params(self, param_types)
+        -- StmtParser:344
         self.cursor:consume("RIGHT_BRACKET", "Expected ')' in an interface method signature")
+        -- StmtParser:345
         local return_type = StmtParser.parse_return_type(self)
-        __lz_push(methods, Ast.interface_method(name.value, param_types, return_type, type_params))
+        -- StmtParser:346
+        List.__lz_push(methods, Ast.interface_method(name.value, param_types, return_type, type_params))
     else
+        -- StmtParser:348
         self.cursor:consume("COLON", "Expected ':' for an interface property requirement")
-        __lz_push(properties, Ast.interface_property(name.value, StmtParser.parse_type(self)))
+        -- StmtParser:349
+        List.__lz_push(properties, Ast.interface_property(name.value, StmtParser.parse_type(self)))
     end
 end
-function StmtParser.parse_extern(self, tok)
-    local name = self.cursor:consume("IDENTIFIER", "Expected a name after 'extern'")
-    self.cursor:consume("LEFT_BRACKET", "Expected '(' after extern name")
-    local param_types = __lz_list()
+-- StmtParser:355
+function StmtParser.parse_lua_decl(self, visibility, is_static)
+    -- StmtParser:356
+    local name = self.cursor:consume("IDENTIFIER", "Expected function name after 'lua'")
+    -- StmtParser:357
+    local type_params = StmtParser.parse_type_params(self)
+    -- StmtParser:358
+    self.cursor:consume("LEFT_BRACKET", "Expected '(' after lua function name")
+    -- StmtParser:359
+    local param_types = List.__lz_list({})
+    -- StmtParser:360
     local params = StmtParser.parse_params(self, param_types)
-    self.cursor:consume("RIGHT_BRACKET", "Expected ')' after extern parameters")
+    -- StmtParser:361
+    self.cursor:consume("RIGHT_BRACKET", "Expected ')' after lua function parameters")
+    -- StmtParser:362
     local return_type = StmtParser.parse_return_type(self)
+    -- StmtParser:363
+    local body_tok = self.cursor:consume("LUA_BODY", "Expected '{' to open lua function body")
+    -- StmtParser:364
+    return Ast.lua_decl(name.value, params, param_types, return_type, body_tok.value, is_static, visibility, name.line, name.column, type_params)
+end
+-- StmtParser:367
+function StmtParser.parse_extern(self, tok)
+    -- StmtParser:368
+    local name = self.cursor:consume("IDENTIFIER", "Expected a name after 'extern'")
+    -- StmtParser:369
+    self.cursor:consume("LEFT_BRACKET", "Expected '(' after extern name")
+    -- StmtParser:370
+    local param_types = List.__lz_list({})
+    -- StmtParser:371
+    local params = StmtParser.parse_params(self, param_types)
+    -- StmtParser:372
+    self.cursor:consume("RIGHT_BRACKET", "Expected ')' after extern parameters")
+    -- StmtParser:373
+    local return_type = StmtParser.parse_return_type(self)
+    -- StmtParser:374
     self.cursor:consume("ASSIGN", "Expected '=' after extern parameters")
+    -- StmtParser:375
     local target = self.cursor:consume("STRING", "Expected a quoted Lua target after '='")
+    -- StmtParser:376
     return Ast.extern_decl(name.value, params, param_types, return_type, target.value, tok.line, tok.column)
 end
+-- StmtParser:380
 function StmtParser.parse_member(self, visibility)
+    -- StmtParser:381
     if self.cursor:match("STATIC") then
+        -- StmtParser:382
+        if self.cursor:match("LUA") then
+            -- StmtParser:383
+            return StmtParser.parse_lua_decl(self, visibility, true)
+        end
+        -- StmtParser:385
         if self.cursor:check("IDENTIFIER") and StmtParser.looks_like_decl(self) then
+            -- StmtParser:386
             return StmtParser.parse_method(self, visibility, true)
         end
+        -- StmtParser:388
         local static_mut = self.cursor:match("MUTABLE")
+        -- StmtParser:389
         return StmtParser.parse_binding(self, visibility, static_mut, "Expected member name", true)
     end
+    -- StmtParser:391
+    if self.cursor:match("LUA") then
+        -- StmtParser:392
+        return StmtParser.parse_lua_decl(self, visibility, false)
+    end
+    -- StmtParser:394
     if self.cursor:check("IDENTIFIER") and StmtParser.looks_like_decl(self) then
+        -- StmtParser:395
         return StmtParser.parse_method(self, visibility, false)
     end
+    -- StmtParser:397
     local mutable = self.cursor:match("MUTABLE")
+    -- StmtParser:398
     return StmtParser.parse_binding(self, visibility, mutable, "Expected property name", false)
 end
+-- StmtParser:401
 function StmtParser.parse_static(self)
+    -- StmtParser:402
+    if self.cursor:match("LUA") then
+        -- StmtParser:403
+        return StmtParser.parse_lua_decl(self, "", true)
+    end
+    -- StmtParser:405
     if self.cursor:check("IDENTIFIER") and StmtParser.looks_like_decl(self) then
+        -- StmtParser:406
         return StmtParser.parse_method(self, "", true)
     end
+    -- StmtParser:408
     local static_mut = self.cursor:match("MUTABLE")
+    -- StmtParser:409
     return StmtParser.parse_binding(self, "", static_mut, "Expected member name after 'static'", true)
 end
+-- StmtParser:414
 function StmtParser.parse_binding(self, visibility, mutable, name_err, is_static)
+    -- StmtParser:415
     local name = self.cursor:consume("IDENTIFIER", name_err)
+    -- StmtParser:416
     local is_property = (visibility ~= "") and (not is_static)
-    local attrs = __lz_map({["name"] = name.value, ["visibility"] = visibility, ["mutable"] = mutable, ["is_static"] = is_static, ["line"] = name.line, ["col"] = name.column})
+    -- StmtParser:417
+    local attrs = Map.__lz_map({["name"] = name.value, ["visibility"] = visibility, ["mutable"] = mutable, ["is_static"] = is_static, ["line"] = name.line, ["col"] = name.column})
+    -- StmtParser:418
     if self.cursor:match("COLON") then
-        __lz_idx_set(attrs, "type", StmtParser.parse_type(self))
+        -- StmtParser:419
+        List.__lz_idx_set(attrs, "type", StmtParser.parse_type(self))
     end
+    -- StmtParser:421
     if self.cursor:match("ASSIGN") then
-        __lz_idx_set(attrs, "value", self.exprs:expression())
+        -- StmtParser:422
+        List.__lz_idx_set(attrs, "value", self.exprs:expression())
     elseif (not mutable) and (not is_property) then
+        -- StmtParser:424
         self.cursor:fail(("Immutable binding '" .. name.value) .. "' must be initialised: expected '='")
     end
+    -- StmtParser:426
     return Ast.node("VariableDecl", attrs)
 end
+-- StmtParser:431
 function StmtParser.parse_assignment(self, name_err)
+    -- StmtParser:432
     local name = self.cursor:consume("IDENTIFIER", name_err)
+    -- StmtParser:433
     if self.cursor:match("ASSIGN") then
+        -- StmtParser:434
         return StmtParser.local_binding(self, name, self.exprs:expression())
     end
+    -- StmtParser:436
     local binop = StmtParser.compound(self, self.cursor:current_kind())
+    -- StmtParser:437
     if Option.is_some(binop) then
+        -- StmtParser:438
         self.cursor:advance()
+        -- StmtParser:439
         local target = Ast.identifier(name.value, name.line, name.column)
+        -- StmtParser:440
         local value = Ast.binary(Option.unwrap(binop), target, self.exprs:expression(), name.line, name.column)
+        -- StmtParser:441
         return StmtParser.local_binding(self, name, value)
     end
+    -- StmtParser:443
     self.cursor:fail(("Expected '=' or a compound assignment after '" .. name.value) .. "'")
-    return Ast.node("VariableDecl", __lz_map({["name"] = name.value, ["visibility"] = "", ["mutable"] = false, ["is_static"] = false}))
+    -- StmtParser:444
+    return Ast.error_node()
 end
+-- StmtParser:447
 function StmtParser.local_binding(self, name, value)
-    return Ast.node("VariableDecl", __lz_map({["name"] = name.value, ["value"] = value, ["visibility"] = "", ["mutable"] = false, ["is_static"] = false, ["line"] = name.line, ["col"] = name.column}))
+    -- StmtParser:448
+    return Ast.node("VariableDecl", Map.__lz_map({["name"] = name.value, ["value"] = value, ["visibility"] = "", ["mutable"] = false, ["is_static"] = false, ["line"] = name.line, ["col"] = name.column}))
 end
+-- StmtParser:451
 function StmtParser.parse_method(self, visibility, is_static)
+    -- StmtParser:452
     local name = self.cursor:consume("IDENTIFIER", "Expected method name")
+    -- StmtParser:453
     local type_params = StmtParser.parse_type_params(self)
+    -- StmtParser:454
     self.cursor:consume("LEFT_BRACKET", "Expected '(' after method name")
-    local param_types = __lz_list()
+    -- StmtParser:455
+    local param_types = List.__lz_list({})
+    -- StmtParser:456
     local params = StmtParser.parse_params(self, param_types)
+    -- StmtParser:457
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after parameters")
+    -- StmtParser:458
     local return_type = StmtParser.parse_return_type(self)
-    local body = __lz_list()
+    -- StmtParser:459
+    local body = List.__lz_list({})
+    -- StmtParser:460
     if self.cursor:match("ASSIGN") then
+        -- StmtParser:461
         local expr = self.exprs:expression()
-        body = __lz_list(Ast.node("ReturnStmt", __lz_map({["value"] = expr, ["line"] = expr:line(), ["col"] = expr:col()})))
+        -- StmtParser:462
+        body = List.__lz_list({Ast.node("ReturnStmt", Map.__lz_map({["value"] = expr, ["line"] = expr:line(), ["col"] = expr:col()}))})
     else
+        -- StmtParser:464
         body = StmtParser.parse_block(self, "method body")
     end
+    -- StmtParser:466
     return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column, param_types, return_type, type_params)
 end
+-- StmtParser:473
 function StmtParser.parse_annotation(self)
+    -- StmtParser:474
     self.cursor:consume("AT", "Expected '@'")
+    -- StmtParser:475
     local name = self.cursor:consume("IDENTIFIER", "Expected an annotation name after '@'")
+    -- StmtParser:476
     if name.value == "auto" then
+        -- StmtParser:477
         local tok = self.cursor:consume("CONSTRUCTOR", "@auto must annotate a constructor")
+        -- StmtParser:478
         return StmtParser.parse_constructor(self, tok, true)
     end
+    -- StmtParser:480
+    if name.value == "platform" then
+        -- StmtParser:481
+        self.cursor:consume("LEFT_BRACKET", "Expected '(' after '@platform'")
+        -- StmtParser:482
+        local plat_tok = self.cursor:consume("IDENTIFIER", "Expected platform name after '@platform('")
+        -- StmtParser:483
+        self.cursor:consume("RIGHT_BRACKET", "Expected ')' after platform name")
+        -- StmtParser:484
+        local next_node = StmtParser.parse_statement(self)
+        -- StmtParser:485
+        next_node:set("platform", plat_tok.value)
+        -- StmtParser:486
+        return next_node
+    end
+    -- StmtParser:488
     self.cursor:fail(("unknown annotation '@" .. name.value) .. "'")
-    return Ast.constructor_decl(__lz_list(), __lz_list(), 0, 0, __lz_list(), __lz_list())
+    -- StmtParser:489
+    return Ast.error_node()
 end
+-- StmtParser:492
 function StmtParser.parse_constructor(self, tok, auto)
+    -- StmtParser:493
     local type_params = StmtParser.parse_type_params(self)
+    -- StmtParser:494
     self.cursor:consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
-    local param_types = __lz_list()
-    local field_params = __lz_list()
+    -- StmtParser:495
+    local param_types = List.__lz_list({})
+    -- StmtParser:496
+    local field_params = List.__lz_list({})
+    -- StmtParser:497
     local params = StmtParser.parse_ctor_params(self, param_types, field_params)
+    -- StmtParser:498
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after parameters")
-    local body = __lz_list()
+    -- StmtParser:499
+    local body = List.__lz_list({})
+    -- StmtParser:500
     if auto then
-        for _, name in __lz_each(params) do
-            __lz_push(body, StmtParser.field_param_assign(self, __lz_map({["name"] = name, ["line"] = tok.line, ["col"] = tok.column})))
+        -- StmtParser:503
+        for _, name in List.__lz_each(params) do
+            -- StmtParser:504
+            List.__lz_push(body, StmtParser.field_param_assign(self, Map.__lz_map({["name"] = name, ["line"] = tok.line, ["col"] = tok.column})))
         end
     else
-        for _, fp in __lz_each(field_params) do
-            __lz_push(body, StmtParser.field_param_assign(self, fp))
+        -- StmtParser:507
+        for _, fp in List.__lz_each(field_params) do
+            -- StmtParser:508
+            List.__lz_push(body, StmtParser.field_param_assign(self, fp))
         end
     end
+    -- StmtParser:511
     if self.cursor:check("BODY_START") then
-        for _, stmt in __lz_each(StmtParser.parse_block(self, "constructor body")) do
-            __lz_push(body, stmt)
+        -- StmtParser:512
+        for _, stmt in List.__lz_each(StmtParser.parse_block(self, "constructor body")) do
+            -- StmtParser:513
+            List.__lz_push(body, stmt)
         end
     end
+    -- StmtParser:516
     local node = Ast.constructor_decl(params, body, tok.line, tok.column, param_types, type_params)
+    -- StmtParser:517
     node:set("field_params", field_params)
+    -- StmtParser:518
     node:set("auto", auto)
+    -- StmtParser:519
     return node
 end
+-- StmtParser:524
 function StmtParser.parse_ctor_params(self, out_types, field_params)
-    local params = __lz_list()
+    -- StmtParser:525
+    local params = List.__lz_list({})
+    -- StmtParser:526
     if not self.cursor:check("RIGHT_BRACKET") then
+        -- StmtParser:527
         while true do
+            -- StmtParser:528
             local is_field = self.cursor:match("DOT")
+            -- StmtParser:529
             local p = self.cursor:consume("IDENTIFIER", "Expected parameter name")
-            __lz_push(params, p.value)
+            -- StmtParser:530
+            List.__lz_push(params, p.value)
+            -- StmtParser:531
             local ty = StmtParser.param_type(self, p)
-            __lz_push(out_types, ty)
+            -- StmtParser:532
+            List.__lz_push(out_types, ty)
+            -- StmtParser:533
             if is_field then
-                __lz_push(field_params, __lz_map({["name"] = p.value, ["type"] = ty, ["line"] = p.line, ["col"] = p.column}))
+                -- StmtParser:534
+                List.__lz_push(field_params, Map.__lz_map({["name"] = p.value, ["type"] = ty, ["line"] = p.line, ["col"] = p.column}))
             end
+            -- StmtParser:536
             if not self.cursor:match("COMMA") then
+                -- StmtParser:537
                 break
             end
         end
     end
+    -- StmtParser:541
     return params
 end
+-- StmtParser:544
 function StmtParser.field_param_assign(self, fp)
-    local name = __lz_unwrap(__lz_get(fp, "name"))
-    local l = __lz_unwrap(__lz_get(fp, "line"))
-    local c = __lz_unwrap(__lz_get(fp, "col"))
+    -- StmtParser:545
+    local name = Option.__lz_unwrap(List.__lz_get(fp, "name"))
+    -- StmtParser:546
+    local l = Option.__lz_unwrap(List.__lz_get(fp, "line"))
+    -- StmtParser:547
+    local c = Option.__lz_unwrap(List.__lz_get(fp, "col"))
+    -- StmtParser:548
     return Ast.field_assign(Ast.member(Ast.self_expr(l, c), name, l, c), Ast.identifier(name, l, c), l, c)
 end
+-- StmtParser:554
 function StmtParser.declared_property_types(self, body)
-    local out = __lz_map({})
-    for _, stmt in __lz_each(body) do
+    -- StmtParser:555
+    local out = Map.__lz_map({})
+    -- StmtParser:556
+    for _, stmt in List.__lz_each(body) do
+        -- StmtParser:557
         if ((stmt.kind == "VariableDecl") and (Option.unwrap_or(stmt:attr("visibility"), "") ~= "")) and (not Option.unwrap_or(stmt:attr("is_static"), false)) then
-            __lz_idx_set(out, stmt:child("name"), Option.unwrap_or(stmt:attr("type"), Ast.type_name("dynamic", __lz_list(), stmt:line(), stmt:col())))
+            -- StmtParser:558
+            List.__lz_idx_set(out, stmt:child("name"), Option.unwrap_or(stmt:attr("type"), Ast.type_name("dynamic", List.__lz_list({}), stmt:line(), stmt:col())))
         end
     end
+    -- StmtParser:561
     return out
 end
+-- StmtParser:568
 function StmtParser.resolve_auto_params(self, ctor, prop_types)
-    local new_types = __lz_list()
+    -- StmtParser:569
+    local new_types = List.__lz_list({})
+    -- StmtParser:570
     local i = 1
-    for _, name in __lz_each(ctor:child("params")) do
-        if __lz_has(prop_types, name) then
-            __lz_push(new_types, Option.unwrap(__lz_get(prop_types, name)))
+    -- StmtParser:571
+    for _, name in List.__lz_each(ctor:child("params")) do
+        -- StmtParser:572
+        if List.__lz_has(prop_types, name) then
+            -- StmtParser:573
+            List.__lz_push(new_types, Option.unwrap(List.__lz_get(prop_types, name)))
         else
-            __lz_push(new_types, __lz_unwrap(__lz_get(ctor:child("param_types"), i)))
+            -- StmtParser:575
+            List.__lz_push(new_types, Option.__lz_unwrap(List.__lz_get(ctor:child("param_types"), i)))
         end
+        -- StmtParser:577
         i = i + 1
     end
+    -- StmtParser:579
     ctor:set("param_types", new_types)
 end
+-- StmtParser:585
 function StmtParser.parse_params(self, out_types)
-    local params = __lz_list()
+    -- StmtParser:586
+    local params = List.__lz_list({})
+    -- StmtParser:587
     if not self.cursor:check("RIGHT_BRACKET") then
+        -- StmtParser:588
         while true do
+            -- StmtParser:589
             local p = self.cursor:consume("IDENTIFIER", "Expected parameter name")
-            __lz_push(params, p.value)
-            __lz_push(out_types, StmtParser.param_type(self, p))
+            -- StmtParser:590
+            List.__lz_push(params, p.value)
+            -- StmtParser:591
+            List.__lz_push(out_types, StmtParser.param_type(self, p))
+            -- StmtParser:592
             if not self.cursor:match("COMMA") then
+                -- StmtParser:593
                 break
             end
         end
     end
+    -- StmtParser:597
     return params
 end
+-- StmtParser:600
 function StmtParser.param_type(self, name_tok)
+    -- StmtParser:601
     if self.cursor:match("COLON") then
+        -- StmtParser:602
         return StmtParser.parse_type(self)
     end
-    return Ast.type_name("dynamic", __lz_list(), name_tok.line, name_tok.column)
+    -- StmtParser:604
+    return Ast.type_name("dynamic", List.__lz_list({}), name_tok.line, name_tok.column)
 end
+-- StmtParser:607
 function StmtParser.parse_return_type(self)
+    -- StmtParser:608
     if self.cursor:match("COLON") then
+        -- StmtParser:609
         return StmtParser.parse_type(self)
     end
-    return Ast.type_name("dynamic", __lz_list(), 0, 0)
+    -- StmtParser:611
+    return Ast.type_name("dynamic", List.__lz_list({}), 0, 0)
 end
+-- StmtParser:614
 function StmtParser.parse_typed_local(self, tok)
+    -- StmtParser:615
     local name = self.cursor:consume("IDENTIFIER", "Expected variable name")
+    -- StmtParser:616
     self.cursor:consume("COLON", "Expected ':' before the type")
+    -- StmtParser:617
     local ty = StmtParser.parse_type(self)
+    -- StmtParser:618
     self.cursor:consume("ASSIGN", "Expected '=' after the type annotation")
+    -- StmtParser:619
     local value = self.exprs:expression()
-    return Ast.node("VariableDecl", __lz_map({["name"] = name.value, ["value"] = value, ["type"] = ty, ["visibility"] = "", ["mutable"] = false, ["is_static"] = false, ["line"] = name.line, ["col"] = name.column}))
+    -- StmtParser:620
+    return Ast.node("VariableDecl", Map.__lz_map({["name"] = name.value, ["value"] = value, ["type"] = ty, ["visibility"] = "", ["mutable"] = false, ["is_static"] = false, ["line"] = name.line, ["col"] = name.column}))
 end
+-- StmtParser:624
 function StmtParser.parse_type_params(self)
-    local params = __lz_list()
+    -- StmtParser:625
+    local params = List.__lz_list({})
+    -- StmtParser:626
     if self.cursor:match("LESS") then
+        -- StmtParser:627
         while true do
+            -- StmtParser:628
             local t = self.cursor:consume("IDENTIFIER", "Expected a type parameter name")
-            __lz_push(params, t.value)
+            -- StmtParser:629
+            List.__lz_push(params, t.value)
+            -- StmtParser:630
             if not self.cursor:match("COMMA") then
+                -- StmtParser:631
                 break
             end
         end
+        -- StmtParser:634
         self.cursor:consume("GREATER", "Expected '>' to close type parameters")
     end
+    -- StmtParser:636
     return params
 end
+-- StmtParser:641
 function StmtParser.parse_type(self)
+    -- StmtParser:642
     if self.cursor:check("LEFT_BRACKET") then
+        -- StmtParser:643
         return StmtParser.parse_type_fn(self)
     end
+    -- StmtParser:645
     local name = self.cursor:consume("IDENTIFIER", "Expected a type name")
-    local args = __lz_list()
+    -- StmtParser:646
+    local args = List.__lz_list({})
+    -- StmtParser:647
     if self.cursor:match("LESS") then
+        -- StmtParser:648
         while true do
-            __lz_push(args, StmtParser.parse_type(self))
+            -- StmtParser:649
+            List.__lz_push(args, StmtParser.parse_type(self))
+            -- StmtParser:650
             if not self.cursor:match("COMMA") then
+                -- StmtParser:651
                 break
             end
         end
+        -- StmtParser:654
         self.cursor:consume("GREATER", "Expected '>' to close type arguments")
     end
+    -- StmtParser:656
     return Ast.type_name(name.value, args, name.line, name.column)
 end
+-- StmtParser:659
 function StmtParser.parse_type_fn(self)
+    -- StmtParser:660
     local open = self.cursor:consume("LEFT_BRACKET", "Expected '(' to open a function type")
-    local params = __lz_list()
+    -- StmtParser:661
+    local params = List.__lz_list({})
+    -- StmtParser:662
     if not self.cursor:check("RIGHT_BRACKET") then
+        -- StmtParser:663
         while true do
-            __lz_push(params, StmtParser.parse_type(self))
+            -- StmtParser:664
+            List.__lz_push(params, StmtParser.parse_type(self))
+            -- StmtParser:665
             if not self.cursor:match("COMMA") then
+                -- StmtParser:666
                 break
             end
         end
     end
+    -- StmtParser:670
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' in the function type")
+    -- StmtParser:671
     self.cursor:consume("ARROW", "Expected '->' in the function type")
+    -- StmtParser:672
     local result = StmtParser.parse_type(self)
+    -- StmtParser:673
     return Ast.type_fn(params, result, open.line, open.column)
 end
+-- StmtParser:679
 function StmtParser.looks_like_decl(self)
+    -- StmtParser:680
     local i = self.cursor:position() + 1
+    -- StmtParser:681
     if self.cursor:token_at(i).kind == "LESS" then
+        -- StmtParser:682
         while true do
+            -- StmtParser:683
             local k = self.cursor:token_at(i).kind
+            -- StmtParser:684
             if k == "EOF" then
+                -- StmtParser:685
                 return false
             end
+            -- StmtParser:687
             i = i + 1
+            -- StmtParser:688
             if k == "GREATER" then
+                -- StmtParser:689
                 break
             end
         end
     end
+    -- StmtParser:693
     if self.cursor:token_at(i).kind ~= "LEFT_BRACKET" then
+        -- StmtParser:694
         return false
     end
+    -- StmtParser:696
     local depth = 0
+    -- StmtParser:697
     while true do
+        -- StmtParser:698
         local kind = self.cursor:token_at(i).kind
+        -- StmtParser:699
         if kind == "EOF" then
+            -- StmtParser:700
             return false
         elseif kind == "LEFT_BRACKET" then
+            -- StmtParser:702
             depth = depth + 1
         elseif kind == "RIGHT_BRACKET" then
+            -- StmtParser:704
             depth = depth - 1
+            -- StmtParser:705
             if depth == 0 then
+                -- StmtParser:706
                 local after = self.cursor:token_at(i + 1).kind
+                -- StmtParser:707
                 return (after == "BODY_START") or (after == "COLON")
             end
         end
+        -- StmtParser:710
         i = i + 1
     end
 end
+-- StmtParser:714
 function StmtParser.parse_return(self, tok)
-    local attrs = __lz_map({["line"] = tok.line, ["col"] = tok.column})
+    -- StmtParser:715
+    local attrs = Map.__lz_map({["line"] = tok.line, ["col"] = tok.column})
+    -- StmtParser:716
     if (not self.cursor:check("BODY_END")) and (not self.cursor:at_end()) then
-        __lz_idx_set(attrs, "value", self.exprs:expression())
+        -- StmtParser:717
+        List.__lz_idx_set(attrs, "value", self.exprs:expression())
     end
+    -- StmtParser:719
     return Ast.node("ReturnStmt", attrs)
 end
+-- StmtParser:722
 function StmtParser.parse_if(self, tok)
-    local clauses = __lz_list(Ast.if_clause(self.exprs:expression(), StmtParser.parse_block(self, "if body")))
-    local attrs = __lz_map({["clauses"] = clauses, ["line"] = tok.line, ["col"] = tok.column})
+    -- StmtParser:723
+    local clauses = List.__lz_list({Ast.if_clause(self.exprs:expression(), StmtParser.parse_block(self, "if body"))})
+    -- StmtParser:724
+    local attrs = Map.__lz_map({["clauses"] = clauses, ["line"] = tok.line, ["col"] = tok.column})
+    -- StmtParser:725
     while true do
+        -- StmtParser:726
         if not self.cursor:match("ELSE") then
+            -- StmtParser:727
             break
         end
+        -- StmtParser:729
         if self.cursor:match("IF") then
-            __lz_push(clauses, Ast.if_clause(self.exprs:expression(), StmtParser.parse_block(self, "else if body")))
+            -- StmtParser:730
+            List.__lz_push(clauses, Ast.if_clause(self.exprs:expression(), StmtParser.parse_block(self, "else if body")))
         else
-            __lz_idx_set(attrs, "else_body", StmtParser.parse_block(self, "else body"))
+            -- StmtParser:732
+            List.__lz_idx_set(attrs, "else_body", StmtParser.parse_block(self, "else body"))
+            -- StmtParser:733
             break
         end
     end
+    -- StmtParser:736
     return Ast.node("IfStmt", attrs)
 end
+-- StmtParser:739
 function StmtParser.parse_while(self, tok)
+    -- StmtParser:740
     local condition = self.exprs:expression()
+    -- StmtParser:741
     local body = StmtParser.parse_block(self, "while body")
+    -- StmtParser:742
     return Ast.while_stmt(condition, body, tok.line, tok.column)
 end
+-- StmtParser:745
 function StmtParser.parse_loop(self, tok)
+    -- StmtParser:746
     return Ast.loop_stmt(StmtParser.parse_block(self, "loop body"), tok.line, tok.column)
 end
+-- StmtParser:749
 function StmtParser.parse_break(self, tok)
+    -- StmtParser:750
     return Ast.break_stmt(tok.line, tok.column)
 end
+-- StmtParser:756
 function StmtParser.starts_match(self)
+    -- StmtParser:757
     local nk = self.cursor:peek_next().kind
+    -- StmtParser:758
     if (((nk == "LEFT_BRACKET") or (nk == "ASSIGN")) or (nk == "DOT")) or (nk == "LSQUARE") then
+        -- StmtParser:759
         return false
     end
+    -- StmtParser:761
     return Option.is_none(StmtParser.compound(self, nk))
 end
+-- StmtParser:764
 function StmtParser.parse_match(self, tok)
+    -- StmtParser:765
     local scrutinee = self.exprs:expression()
+    -- StmtParser:766
     local open = self.cursor:consume("BODY_START", "Expected '{' to open match body")
-    local arms = __lz_list()
+    -- StmtParser:767
+    local arms = List.__lz_list({})
+    -- StmtParser:768
     while true do
-        if self.cursor:check("BODY_END") then
+        -- StmtParser:769
+        if self.cursor:at_end() then
+            -- StmtParser:770
+            self.cursor:fail_at("Expected '}' to close match body", open.line, open.column, 1)
+            -- StmtParser:771
             break
         end
-        if self.cursor:at_end() then
-            self.cursor:fail_at("Expected '}' to close match body", open.line, open.column, 1)
+        -- StmtParser:773
+        if self.cursor:check("BODY_END") then
+            -- StmtParser:774
+            break
         end
-        __lz_push(arms, StmtParser.parse_match_arm(self))
+        -- StmtParser:776
+        List.__lz_push(arms, StmtParser.parse_match_arm(self))
     end
+    -- StmtParser:778
     self.cursor:consume("BODY_END", "Expected '}' to close match body")
+    -- StmtParser:779
     return Ast.match_stmt(scrutinee, arms, tok.line, tok.column)
 end
+-- StmtParser:784
 function StmtParser.parse_match_arm(self)
+    -- StmtParser:785
     local tok = self.cursor:current()
+    -- StmtParser:786
     if (tok.kind == "IDENTIFIER") and (tok.value == "_") then
+        -- StmtParser:787
         self.cursor:advance()
+        -- StmtParser:788
         self.cursor:consume("FAT_ARROW", "Expected '=>' after match pattern")
+        -- StmtParser:789
         return Ast.match_default(StmtParser.parse_block(self, "match arm body"))
     end
+    -- StmtParser:791
     if ((tok.kind == "IDENTIFIER") and StmtParser.is_variant_name(self, tok.value)) and StmtParser.variant_pattern_ahead(self) then
+        -- StmtParser:792
         self.cursor:advance()
+        -- StmtParser:793
         local bindings = StmtParser.parse_variant_bindings(self)
+        -- StmtParser:794
         self.cursor:consume("FAT_ARROW", "Expected '=>' after match pattern")
+        -- StmtParser:795
         return Ast.match_variant(tok.value, bindings, StmtParser.parse_block(self, "match arm body"))
     end
+    -- StmtParser:797
     local pattern = self.exprs:expression()
+    -- StmtParser:798
     self.cursor:consume("FAT_ARROW", "Expected '=>' after match pattern")
+    -- StmtParser:799
     return Ast.match_arm(pattern, StmtParser.parse_block(self, "match arm body"))
 end
+-- StmtParser:802
 function StmtParser.variant_pattern_ahead(self)
+    -- StmtParser:803
     local nk = self.cursor:peek_next().kind
+    -- StmtParser:804
     return (nk == "FAT_ARROW") or (nk == "LEFT_BRACKET")
 end
+-- StmtParser:808
 function StmtParser.parse_variant_bindings(self)
-    local bindings = __lz_list()
+    -- StmtParser:809
+    local bindings = List.__lz_list({})
+    -- StmtParser:810
     if self.cursor:match("LEFT_BRACKET") then
+        -- StmtParser:811
         if not self.cursor:check("RIGHT_BRACKET") then
+            -- StmtParser:812
             while true do
+                -- StmtParser:813
                 local b = self.cursor:consume("IDENTIFIER", "Expected a binding name in the variant pattern")
-                __lz_push(bindings, b.value)
+                -- StmtParser:814
+                List.__lz_push(bindings, b.value)
+                -- StmtParser:815
                 if not self.cursor:match("COMMA") then
+                    -- StmtParser:816
                     break
                 end
             end
         end
+        -- StmtParser:820
         self.cursor:consume("RIGHT_BRACKET", "Expected ')' after the variant pattern bindings")
     end
+    -- StmtParser:822
     return bindings
 end
+-- StmtParser:827
 function StmtParser.is_variant_name(self, name)
-    local first = Option.unwrap_or(__lz_wrap(string.sub(name, 1, 1)), "")
+    -- StmtParser:828
+    local first = Option.unwrap_or(Option.__lz_wrap(string.sub(name, 1, 1)), "")
+    -- StmtParser:829
     return (first >= "A") and (first <= "Z")
 end
+-- StmtParser:834
 function StmtParser.parse_for(self, tok)
+    -- StmtParser:835
     if StmtParser.looks_like_for_in(self) then
+        -- StmtParser:836
         return StmtParser.parse_for_in(self, tok)
     end
+    -- StmtParser:838
     return StmtParser.parse_for_c(self, tok)
 end
+-- StmtParser:841
 function StmtParser.parse_for_in(self, tok)
+    -- StmtParser:842
     local first = self.cursor:consume("IDENTIFIER", "Expected a loop variable after 'for'")
-    local vars = __lz_list(first.value)
+    -- StmtParser:843
+    local vars = List.__lz_list({first.value})
+    -- StmtParser:844
     if self.cursor:match("COMMA") then
+        -- StmtParser:845
         local second = self.cursor:consume("IDENTIFIER", "Expected a second loop variable after ','")
-        __lz_push(vars, second.value)
+        -- StmtParser:846
+        List.__lz_push(vars, second.value)
     end
+    -- StmtParser:848
     self.cursor:consume("IN", "Expected 'in' after the for-in loop variable(s)")
+    -- StmtParser:849
     local iter = self.exprs:expression()
+    -- StmtParser:850
     local body = StmtParser.parse_block(self, "for body")
+    -- StmtParser:851
     return Ast.for_in(vars, iter, body, tok.line, tok.column)
 end
+-- StmtParser:854
 function StmtParser.parse_for_c(self, tok)
-    local attrs = __lz_map({["line"] = tok.line, ["col"] = tok.column})
+    -- StmtParser:855
+    local attrs = Map.__lz_map({["line"] = tok.line, ["col"] = tok.column})
+    -- StmtParser:856
     if not self.cursor:check("SEMICOLON") then
-        __lz_idx_set(attrs, "init", StmtParser.parse_assignment(self, "Expected loop variable in for-init"))
+        -- StmtParser:857
+        List.__lz_idx_set(attrs, "init", StmtParser.parse_assignment(self, "Expected loop variable in for-init"))
     end
+    -- StmtParser:859
     self.cursor:consume("SEMICOLON", "Expected ';' after for-init")
+    -- StmtParser:860
     if not self.cursor:check("SEMICOLON") then
-        __lz_idx_set(attrs, "condition", self.exprs:expression())
+        -- StmtParser:861
+        List.__lz_idx_set(attrs, "condition", self.exprs:expression())
     end
+    -- StmtParser:863
     self.cursor:consume("SEMICOLON", "Expected ';' after for-condition")
+    -- StmtParser:864
     if not self.cursor:check("BODY_START") then
-        __lz_idx_set(attrs, "step", StmtParser.parse_assignment(self, "Expected statement in for-step"))
+        -- StmtParser:865
+        List.__lz_idx_set(attrs, "step", StmtParser.parse_assignment(self, "Expected statement in for-step"))
     end
-    __lz_idx_set(attrs, "body", StmtParser.parse_block(self, "for body"))
+    -- StmtParser:867
+    List.__lz_idx_set(attrs, "body", StmtParser.parse_block(self, "for body"))
+    -- StmtParser:868
     return Ast.node("ForStmt", attrs)
 end
+-- StmtParser:871
 function StmtParser.looks_like_for_in(self)
+    -- StmtParser:872
     if not self.cursor:check("IDENTIFIER") then
+        -- StmtParser:873
         return false
     end
+    -- StmtParser:875
     local k = self.cursor:peek_next().kind
+    -- StmtParser:876
     return (k == "IN") or (k == "COMMA")
 end
+-- StmtParser:881
 function StmtParser.parse_expr_statement(self, tok)
+    -- StmtParser:882
     local expr = self.exprs:expression()
+    -- StmtParser:883
     local assignable = (expr.kind == "MemberExpr") or (expr.kind == "IndexExpr")
+    -- StmtParser:884
     if not assignable then
+        -- StmtParser:885
         return Ast.expression_stmt(expr, tok.line, tok.column)
     end
+    -- StmtParser:887
     if self.cursor:match("ASSIGN") then
+        -- StmtParser:888
         return StmtParser.make_assign(self, expr, self.exprs:expression(), tok)
     end
+    -- StmtParser:890
     local binop = StmtParser.compound(self, self.cursor:current_kind())
+    -- StmtParser:891
     if Option.is_some(binop) then
+        -- StmtParser:892
         self.cursor:advance()
+        -- StmtParser:893
         local value = Ast.binary(Option.unwrap(binop), expr, self.exprs:expression(), tok.line, tok.column)
+        -- StmtParser:894
         return StmtParser.make_assign(self, expr, value, tok)
     end
+    -- StmtParser:896
     return Ast.expression_stmt(expr, tok.line, tok.column)
 end
+-- StmtParser:899
 function StmtParser.make_assign(self, target, value, tok)
+    -- StmtParser:900
     if target.kind == "MemberExpr" then
+        -- StmtParser:901
         return Ast.field_assign(target, value, tok.line, tok.column)
     end
+    -- StmtParser:903
     return Ast.index_assign(target, value, tok.line, tok.column)
 end
+-- StmtParser:906
 function StmtParser.compound(self, kind)
-    return __lz_get(StmtParser.compounds, kind)
+    -- StmtParser:907
+    return List.__lz_get(StmtParser.compounds, kind)
 end
 
 local Parser = {}
 
+-- Parser:12
 function Parser.new(tokens, source)
     local self = {}
     self.parse = Parser.parse
+    -- Parser:13
     local cursor = TokenCursor.new(tokens, source)
+    -- Parser:14
     local exprs = ExprParser.new(cursor)
+    -- Parser:15
     self.stmts = StmtParser.new(cursor, exprs)
+    -- Parser:16
     exprs:inject_stmts(self.stmts)
     return self
 end
+-- Parser:19
 function Parser.parse(self)
+    -- Parser:20
     return self.stmts:parse_program()
 end
 
 local Symbol = {}
 
+-- Symbol:9
 function Symbol.new(kind, mutable, noncallable)
     local self = {}
     self.set_noncallable = Symbol.set_noncallable
+    -- Symbol:9
     self.kind = kind
+    -- Symbol:9
     self.mutable = mutable
+    -- Symbol:9
     self.noncallable = noncallable
     return self
 end
+-- Symbol:12
 function Symbol.set_noncallable(self, flag)
+    -- Symbol:13
     self.noncallable = flag
 end
 
 local Scope = {}
 
+-- Scope:13
 function Scope.new(parent, is_root)
     local self = {}
     self.child = Scope.child
     self.declare = Scope.declare
     self.declared_here = Scope.declared_here
     self.lookup = Scope.lookup
-    self.names = __lz_map({})
+    self.names = Map.__lz_map({})
+    -- Scope:13
     self.parent = parent
+    -- Scope:13
     self.is_root = is_root
     return self
 end
+-- Scope:15
 function Scope.root()
+    -- Scope:16
     return Scope.new(0, true)
 end
+-- Scope:19
 function Scope.child(self)
+    -- Scope:20
     return Scope.new(self, false)
 end
+-- Scope:23
 function Scope.declare(self, name, symbol)
-    __lz_idx_set(self.names, name, symbol)
+    -- Scope:24
+    List.__lz_idx_set(self.names, name, symbol)
 end
+-- Scope:28
 function Scope.declared_here(self, name)
-    return __lz_has(self.names, name)
+    -- Scope:29
+    return List.__lz_has(self.names, name)
 end
+-- Scope:33
 function Scope.lookup(self, name)
-    local here = __lz_get(self.names, name)
+    -- Scope:34
+    local here = List.__lz_get(self.names, name)
+    -- Scope:35
     if Option.is_some(here) then
+        -- Scope:36
         return here
     end
+    -- Scope:38
     if self.is_root then
+        -- Scope:39
         return here
     end
+    -- Scope:41
     return self.parent:lookup(name)
 end
 
 local Frame = {}
 
+-- Frame:9
 function Frame.new(in_function, in_loop, in_constructor)
     local self = {}
     self.in_loop_body = Frame.in_loop_body
+    -- Frame:9
     self.in_function = in_function
+    -- Frame:9
     self.in_loop = in_loop
+    -- Frame:9
     self.in_constructor = in_constructor
     return self
 end
+-- Frame:12
 function Frame.in_loop_body(self)
+    -- Frame:13
     return Frame.new(self.in_function, true, self.in_constructor)
 end
 
 local Booleanity = {}
 
-Booleanity.arithmetic = __lz_map({["PLUS"] = true, ["MINUS"] = true, ["MULTIPLY"] = true, ["DIVIDE"] = true, ["MODULO"] = true, ["POWER"] = true})
-Booleanity.non_bool_builtin = __lz_map({["len"] = "a number (the result of '.len()')", ["get"] = "an Option (the result of '.get()')", ["pop"] = "an Option (the result of '.pop()')"})
+-- Booleanity:7
+Booleanity.arithmetic = Map.__lz_map({["PLUS"] = true, ["MINUS"] = true, ["MULTIPLY"] = true, ["DIVIDE"] = true, ["MODULO"] = true, ["POWER"] = true})
+-- Booleanity:16
+Booleanity.non_bool_builtin = Map.__lz_map({["len"] = "a number (the result of '.len()')", ["get"] = "an Option (the result of '.get()')", ["pop"] = "an Option (the result of '.pop()')"})
+-- Booleanity:22
 function Booleanity.non_bool_reason(node)
+    -- Booleanity:23
     local __lz_m1 = node.kind
     if __lz_m1 == "LiteralExpr" then
+        -- Booleanity:24
         return Booleanity.literal_reason(node:child("lit_kind"))
     elseif __lz_m1 == "ListExpr" then
+        -- Booleanity:25
         return "a list"
     elseif __lz_m1 == "MapExpr" then
+        -- Booleanity:26
         return "a map"
     elseif __lz_m1 == "BinaryExpr" then
+        -- Booleanity:27
         return Booleanity.binary_reason(node:child("op"))
     elseif __lz_m1 == "CallExpr" then
+        -- Booleanity:29
         local callee = node:child("callee")
+        -- Booleanity:30
         if callee.kind == "MemberExpr" then
-            return __lz_unwrap_or(__lz_get(Booleanity.non_bool_builtin, callee:child("field")), "")
+            -- Booleanity:31
+            return Option.__lz_unwrap_or(List.__lz_get(Booleanity.non_bool_builtin, callee:child("field")), "")
         end
     else
     end
+    -- Booleanity:36
     return ""
 end
+-- Booleanity:39
 function Booleanity.literal_reason(lit_kind)
+    -- Booleanity:40
     if (lit_kind == "number") or (lit_kind == "float") then
+        -- Booleanity:41
         return "a number"
     end
+    -- Booleanity:43
     if lit_kind == "string" then
+        -- Booleanity:44
         return "a string"
     end
+    -- Booleanity:46
     return ""
 end
+-- Booleanity:49
 function Booleanity.binary_reason(op)
-    if __lz_has(Booleanity.arithmetic, op) then
+    -- Booleanity:50
+    if List.__lz_has(Booleanity.arithmetic, op) then
+        -- Booleanity:51
         return "an arithmetic value"
     end
+    -- Booleanity:53
     if op == "CONCAT" then
+        -- Booleanity:54
         return "a string"
     end
+    -- Booleanity:56
     return ""
 end
 
 local ExprChecker = {}
 
+-- ExprChecker:20
 function ExprChecker.new(source, properties, methods, variant_owner, gated_externs)
     local self = {}
     self.inject_stmts = ExprChecker.inject_stmts
@@ -2412,192 +4756,309 @@ function ExprChecker.new(source, properties, methods, variant_owner, gated_exter
     self.check_map = ExprChecker.check_map
     self.fail = ExprChecker.fail
     self.in_instance = false
+    -- ExprChecker:20
     self.source = source
+    -- ExprChecker:20
     self.properties = properties
+    -- ExprChecker:20
     self.methods = methods
+    -- ExprChecker:20
     self.variant_owner = variant_owner
+    -- ExprChecker:20
     self.gated_externs = gated_externs
     return self
 end
+-- ExprChecker:24
 function ExprChecker.inject_stmts(self, s)
+    -- ExprChecker:25
     self.stmt_checker = s
 end
+-- ExprChecker:28
 function ExprChecker.set_instance(self, flag)
+    -- ExprChecker:29
     self.in_instance = flag
 end
+-- ExprChecker:32
 function ExprChecker.instance_flag(self)
+    -- ExprChecker:33
     return self.in_instance
 end
+-- ExprChecker:36
 function ExprChecker.check(self, node, scope)
+    -- ExprChecker:37
     local __lz_m1 = node.kind
     if __lz_m1 == "IdentifierExpr" then
+        -- ExprChecker:38
         ExprChecker.check_identifier(self, node, scope)
     elseif __lz_m1 == "BinaryExpr" then
+        -- ExprChecker:40
         ExprChecker.check(self, node:child("left"), scope)
+        -- ExprChecker:41
         ExprChecker.check(self, node:child("right"), scope)
     elseif __lz_m1 == "UnaryExpr" then
+        -- ExprChecker:43
         ExprChecker.check(self, node:child("operand"), scope)
     elseif __lz_m1 == "CallExpr" then
+        -- ExprChecker:44
         ExprChecker.check_call(self, node, scope)
     elseif __lz_m1 == "MemberExpr" then
+        -- ExprChecker:45
         ExprChecker.check_member(self, node, scope)
     elseif __lz_m1 == "SelfExpr" then
+        -- ExprChecker:46
         ExprChecker.check_self(self, node)
     elseif __lz_m1 == "ListExpr" then
+        -- ExprChecker:47
         ExprChecker.check_list(self, node, scope)
     elseif __lz_m1 == "MapExpr" then
+        -- ExprChecker:48
         ExprChecker.check_map(self, node, scope)
     elseif __lz_m1 == "IndexExpr" then
+        -- ExprChecker:50
         ExprChecker.check(self, node:child("object"), scope)
+        -- ExprChecker:51
         ExprChecker.check(self, node:child("index"), scope)
     elseif __lz_m1 == "FnExpr" then
+        -- ExprChecker:53
         ExprChecker.check_fn_expr(self, node, scope)
     elseif __lz_m1 == "PropagateExpr" then
+        -- ExprChecker:54
         ExprChecker.check(self, node:child("inner"), scope)
     elseif __lz_m1 == "ListComp" then
-        ExprChecker.check_comprehension(self, node, scope, __lz_list("element"))
+        -- ExprChecker:55
+        ExprChecker.check_comprehension(self, node, scope, List.__lz_list({"element"}))
     elseif __lz_m1 == "MapComp" then
-        ExprChecker.check_comprehension(self, node, scope, __lz_list("key", "value"))
+        -- ExprChecker:56
+        ExprChecker.check_comprehension(self, node, scope, List.__lz_list({"key", "value"}))
     elseif __lz_m1 == "InterpolatedString" then
+        -- ExprChecker:58
         local parts = node:child("parts")
+        -- ExprChecker:59
         local i = 2
-        while i <= __lz_len(parts) do
-            ExprChecker.check(self, __lz_unwrap(__lz_get(parts, i)), scope)
+        -- ExprChecker:60
+        while i <= List.__lz_len(parts) do
+            -- ExprChecker:61
+            ExprChecker.check(self, Option.__lz_unwrap(List.__lz_get(parts, i)), scope)
+            -- ExprChecker:62
             i = i + 2
         end
     else
     end
 end
+-- ExprChecker:72
 function ExprChecker.check_comprehension(self, node, scope, value_keys)
+    -- ExprChecker:73
     ExprChecker.check(self, node:child("iter"), scope)
+    -- ExprChecker:74
     local inner = scope:child()
-    for _, name in __lz_each(node:child("vars")) do
+    -- ExprChecker:75
+    for _, name in List.__lz_each(node:child("vars")) do
+        -- ExprChecker:76
         inner:declare(name, Symbol.new("variable", false, false))
     end
-    for _, key in __lz_each(value_keys) do
+    -- ExprChecker:78
+    for _, key in List.__lz_each(value_keys) do
+        -- ExprChecker:79
         ExprChecker.check(self, node:child(key), inner)
     end
+    -- ExprChecker:81
     local cond = node:attr("cond")
+    -- ExprChecker:82
     if Option.is_some(cond) then
+        -- ExprChecker:83
         ExprChecker.check_condition(self, Option.unwrap(cond), inner)
     end
 end
+-- ExprChecker:88
 function ExprChecker.check_condition(self, node, scope)
+    -- ExprChecker:89
     ExprChecker.check(self, node, scope)
+    -- ExprChecker:90
     local reason = Booleanity.non_bool_reason(node)
+    -- ExprChecker:91
     if reason ~= "" then
+        -- ExprChecker:92
         ExprChecker.fail(self, node, ("Condition must be a boolean, but this is " .. reason) .. "; the language has no truthiness, so use an explicit comparison or a boolean method (e.g. '.is_some()')", 1)
     end
 end
+-- ExprChecker:96
 function ExprChecker.check_identifier(self, node, scope)
+    -- ExprChecker:97
     local name = node:child("name")
-    if Option.is_none(scope:lookup(name)) and (not __lz_has(self.variant_owner, name)) then
-        local gated = __lz_get(self.gated_externs, name)
+    -- ExprChecker:98
+    if Option.is_none(scope:lookup(name)) and (not List.__lz_has(self.variant_owner, name)) then
+        -- ExprChecker:99
+        local gated = List.__lz_get(self.gated_externs, name)
+        -- ExprChecker:100
         if Option.is_some(gated) then
-            ExprChecker.fail(self, node, (((("extern '" .. name) .. "' is only available on platform '") .. Option.unwrap(gated)) .. "' — compile with --platform ") .. Option.unwrap(gated), Option.unwrap_or(__lz_wrap(string.len(name)), 1))
+            -- ExprChecker:101
+            ExprChecker.fail(self, node, (((("extern '" .. name) .. "' is only available on platform '") .. Option.unwrap(gated)) .. "' — compile with --platform ") .. Option.unwrap(gated), Option.unwrap_or(Option.__lz_wrap(string.len(name)), 1))
         end
-        ExprChecker.fail(self, node, ("Undeclared identifier '" .. name) .. "'", Option.unwrap_or(__lz_wrap(string.len(name)), 1))
+        -- ExprChecker:103
+        ExprChecker.fail(self, node, ("Undeclared identifier '" .. name) .. "'", Option.unwrap_or(Option.__lz_wrap(string.len(name)), 1))
     end
 end
+-- ExprChecker:107
 function ExprChecker.check_call(self, node, scope)
+    -- ExprChecker:108
     local callee = node:child("callee")
+    -- ExprChecker:109
     ExprChecker.check(self, callee, scope)
+    -- ExprChecker:110
     if callee.kind == "IdentifierExpr" then
+        -- ExprChecker:111
         local name = callee:child("name")
+        -- ExprChecker:112
         local entry = scope:lookup(name)
+        -- ExprChecker:113
         if Option.is_some(entry) and Option.unwrap(entry).noncallable then
-            ExprChecker.fail(self, callee, ("'" .. name) .. "' is not callable; it holds a value, not a function", Option.unwrap_or(__lz_wrap(string.len(name)), 1))
+            -- ExprChecker:114
+            ExprChecker.fail(self, callee, ("'" .. name) .. "' is not callable; it holds a value, not a function", Option.unwrap_or(Option.__lz_wrap(string.len(name)), 1))
         end
     end
-    for _, arg in __lz_each(node:child("args")) do
+    -- ExprChecker:117
+    for _, arg in List.__lz_each(node:child("args")) do
+        -- ExprChecker:118
         if arg.kind == "LabeledArg" then
+            -- ExprChecker:119
             ExprChecker.check(self, arg:child("value"), scope)
         else
+            -- ExprChecker:121
             ExprChecker.check(self, arg, scope)
         end
     end
 end
+-- ExprChecker:129
 function ExprChecker.check_member(self, node, scope)
+    -- ExprChecker:130
     local object = node:child("object")
+    -- ExprChecker:131
     if object.kind == "SelfExpr" then
+        -- ExprChecker:132
         local field = node:child("field")
+        -- ExprChecker:133
         if not self.in_instance then
-            ExprChecker.fail(self, node, ("'." .. field) .. "' refers to an instance field, but there is no receiver here; it is valid only inside an instance method or constructor", Option.unwrap_or(__lz_wrap(string.len(field)), 1) + 1)
+            -- ExprChecker:134
+            ExprChecker.fail(self, node, ("'." .. field) .. "' refers to an instance field, but there is no receiver here; it is valid only inside an instance method or constructor", Option.unwrap_or(Option.__lz_wrap(string.len(field)), 1) + 1)
         end
-        local known = __lz_has(self.properties, field) or __lz_has(self.methods, field)
+        -- ExprChecker:136
+        local known = List.__lz_has(self.properties, field) or List.__lz_has(self.methods, field)
+        -- ExprChecker:137
         if not known then
-            ExprChecker.fail(self, node, ("Unknown instance member '." .. field) .. "'; declare it as a 'private'/'public' property or an instance method", Option.unwrap_or(__lz_wrap(string.len(field)), 1) + 1)
+            -- ExprChecker:138
+            ExprChecker.fail(self, node, ("Unknown instance member '." .. field) .. "'; declare it as a 'private'/'public' property or an instance method", Option.unwrap_or(Option.__lz_wrap(string.len(field)), 1) + 1)
         end
     else
+        -- ExprChecker:141
         ExprChecker.check(self, object, scope)
     end
 end
+-- ExprChecker:145
 function ExprChecker.check_self(self, node)
+    -- ExprChecker:146
     if not self.in_instance then
+        -- ExprChecker:147
         ExprChecker.fail(self, node, "'self' has no receiver here; it is valid only inside an instance method or constructor", 4)
     end
 end
+-- ExprChecker:151
 function ExprChecker.check_list(self, node, scope)
-    for _, element in __lz_each(node:child("elements")) do
+    -- ExprChecker:152
+    for _, element in List.__lz_each(node:child("elements")) do
+        -- ExprChecker:153
         ExprChecker.check(self, element, scope)
     end
 end
+-- ExprChecker:157
 function ExprChecker.check_fn_expr(self, node, scope)
+    -- ExprChecker:158
     local inner = scope:child()
-    for _, name in __lz_each(node:child("params")) do
+    -- ExprChecker:159
+    for _, name in List.__lz_each(node:child("params")) do
+        -- ExprChecker:160
         inner:declare(name, Symbol.new("variable", false, false))
     end
+    -- ExprChecker:162
     self.stmt_checker:check_closure_body(node:child("body"), inner)
 end
+-- ExprChecker:165
 function ExprChecker.check_map(self, node, scope)
-    for _, entry in __lz_each(node:child("entries")) do
+    -- ExprChecker:166
+    for _, entry in List.__lz_each(node:child("entries")) do
+        -- ExprChecker:167
         ExprChecker.check(self, entry:child("key"), scope)
+        -- ExprChecker:168
         ExprChecker.check(self, entry:child("value"), scope)
     end
 end
+-- ExprChecker:172
 function ExprChecker.fail(self, node, message, span)
+    -- ExprChecker:173
     Error.new("SemanticError", message, node:line(), node:col(), self.source, span):raise()
 end
 
 local Naming = {}
 
+-- Naming:10
 function Naming.check_value(name, line, col, source, what)
+    -- Naming:11
     if not Naming.is_snake(name) then
-        Error.new("SemanticError", ((what .. " name '") .. name) .. "' must be snake_case", line, col, source, Option.unwrap_or(__lz_wrap(string.len(name)), 1)):raise()
+        -- Naming:12
+        Error.new("SemanticError", ((what .. " name '") .. name) .. "' must be snake_case", line, col, source, Option.unwrap_or(Option.__lz_wrap(string.len(name)), 1)):raise()
     end
 end
+-- Naming:17
 function Naming.is_snake(name)
-    local n = Option.unwrap_or(__lz_wrap(string.len(name)), 0)
+    -- Naming:18
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(name)), 0)
+    -- Naming:19
     if n == 0 then
+        -- Naming:20
         return false
     end
+    -- Naming:22
     local i = 1
+    -- Naming:23
     while true do
+        -- Naming:24
         if i > n then
+            -- Naming:25
             break
         end
-        local ch = Option.unwrap_or(__lz_wrap(string.sub(name, i, i)), "")
+        -- Naming:27
+        local ch = Option.unwrap_or(Option.__lz_wrap(string.sub(name, i, i)), "")
+        -- Naming:28
         local ok = ((ch >= "a") and (ch <= "z")) or (ch == "_")
+        -- Naming:29
         if i > 1 then
+            -- Naming:30
             ok = ok or ((ch >= "0") and (ch <= "9"))
         end
+        -- Naming:32
         if not ok then
+            -- Naming:33
             return false
         end
+        -- Naming:35
         i = i + 1
     end
+    -- Naming:37
     return true
 end
 
 local Callability = {}
 
-Callability.non_function = __lz_map({["LiteralExpr"] = true, ["BinaryExpr"] = true, ["UnaryExpr"] = true, ["ListExpr"] = true, ["MapExpr"] = true})
+-- Callability:6
+Callability.non_function = Map.__lz_map({["LiteralExpr"] = true, ["BinaryExpr"] = true, ["UnaryExpr"] = true, ["ListExpr"] = true, ["MapExpr"] = true})
+-- Callability:14
 function Callability.is_noncallable(node)
-    return __lz_has(Callability.non_function, node.kind)
+    -- Callability:15
+    return List.__lz_has(Callability.non_function, node.kind)
 end
 
 local StmtChecker = {}
 
+-- StmtChecker:20
 function StmtChecker.new(source, exprs, variant_owner, enums, variant_arity)
     local self = {}
     self.check_block = StmtChecker.check_block
@@ -2627,485 +5088,815 @@ function StmtChecker.new(source, exprs, variant_owner, enums, variant_arity)
     self.declare_bindings = StmtChecker.declare_bindings
     self.check_exhaustive = StmtChecker.check_exhaustive
     self.fail = StmtChecker.fail
+    -- StmtChecker:20
     self.source = source
+    -- StmtChecker:20
     self.exprs = exprs
+    -- StmtChecker:20
     self.variant_owner = variant_owner
+    -- StmtChecker:20
     self.enums = enums
+    -- StmtChecker:20
     self.variant_arity = variant_arity
     return self
 end
+-- StmtChecker:24
 function StmtChecker.check_block(self, stmts, scope, frame)
-    local n = __lz_len(stmts)
-    for i, stmt in __lz_each(stmts) do
+    -- StmtChecker:25
+    local n = List.__lz_len(stmts)
+    -- StmtChecker:26
+    for i, stmt in List.__lz_each(stmts) do
+        -- StmtChecker:27
         StmtChecker.check_statement(self, stmt, scope, frame, i == (n - 1))
     end
 end
+-- StmtChecker:33
 function StmtChecker.check_closure_body(self, stmts, scope)
+    -- StmtChecker:34
     StmtChecker.check_block(self, stmts, scope, Frame.new(true, false, false))
 end
+-- StmtChecker:37
 function StmtChecker.check_statement(self, stmt, scope, frame, is_last)
+    -- StmtChecker:39
     local __lz_m1 = stmt.kind
     if __lz_m1 == "VariableDecl" then
+        -- StmtChecker:40
         StmtChecker.check_variable(self, stmt, scope, frame)
     elseif __lz_m1 == "FunctionDecl" then
+        -- StmtChecker:41
         StmtChecker.check_function(self, stmt, scope, frame)
     elseif __lz_m1 == "ConstructorDecl" then
+        -- StmtChecker:42
         StmtChecker.check_constructor(self, stmt, scope, frame)
     elseif __lz_m1 == "ReturnStmt" then
+        -- StmtChecker:43
         StmtChecker.check_return(self, stmt, scope, frame, is_last)
     elseif __lz_m1 == "ExpressionStmt" then
+        -- StmtChecker:44
         StmtChecker.check_expr_statement(self, stmt, scope)
     elseif __lz_m1 == "FieldAssign" then
+        -- StmtChecker:45
         StmtChecker.check_assign(self, stmt, scope)
     elseif __lz_m1 == "IndexAssign" then
+        -- StmtChecker:46
         StmtChecker.check_assign(self, stmt, scope)
     elseif __lz_m1 == "IfStmt" then
+        -- StmtChecker:47
         StmtChecker.check_if(self, stmt, scope, frame)
     elseif __lz_m1 == "WhileStmt" then
+        -- StmtChecker:48
         StmtChecker.check_while(self, stmt, scope, frame)
     elseif __lz_m1 == "LoopStmt" then
+        -- StmtChecker:49
         StmtChecker.check_loop(self, stmt, scope, frame)
     elseif __lz_m1 == "ForStmt" then
+        -- StmtChecker:50
         StmtChecker.check_for(self, stmt, scope, frame)
     elseif __lz_m1 == "ForInStmt" then
+        -- StmtChecker:51
         StmtChecker.check_for_in(self, stmt, scope, frame)
     elseif __lz_m1 == "MatchStmt" then
+        -- StmtChecker:52
         StmtChecker.check_match(self, stmt, scope, frame)
     elseif __lz_m1 == "BreakStmt" then
+        -- StmtChecker:53
         StmtChecker.check_break(self, stmt, frame, is_last)
     else
     end
 end
+-- StmtChecker:61
 function StmtChecker.check_variable(self, stmt, scope, frame)
+    -- StmtChecker:62
     local name = stmt:child("name")
+    -- StmtChecker:63
     local visibility = Option.unwrap_or(stmt:attr("visibility"), "")
+    -- StmtChecker:64
     local is_static = Option.unwrap_or(stmt:attr("is_static"), false)
+    -- StmtChecker:65
     local is_property = ((not frame.in_function) and (visibility ~= "")) and (not is_static)
+    -- StmtChecker:67
     if is_property then
+        -- StmtChecker:68
         Naming.check_value(name, stmt:line(), stmt:col(), self.source, "Property")
+        -- StmtChecker:69
         StmtChecker.check_optional_value(self, stmt, scope)
+        -- StmtChecker:70
         stmt:set("reassign", false)
     else
+        -- StmtChecker:72
         local forced_decl = (visibility ~= "") or Option.unwrap_or(stmt:attr("mutable"), false)
+        -- StmtChecker:73
         local existing = scope:lookup(name)
+        -- StmtChecker:74
         if forced_decl or Option.is_none(existing) then
+            -- StmtChecker:75
             StmtChecker.declare_binding(self, stmt, scope, frame, name, visibility)
         else
+            -- StmtChecker:77
             StmtChecker.reassign_binding(self, stmt, scope, name, Option.unwrap(existing))
         end
     end
 end
+-- StmtChecker:82
 function StmtChecker.declare_binding(self, stmt, scope, frame, name, visibility)
+    -- StmtChecker:83
     if (not frame.in_function) and (visibility == "") then
-        StmtChecker.fail(self, stmt, ("Top-level binding '" .. name) .. "' must declare visibility ('private' or 'public')", Option.unwrap_or(__lz_wrap(string.len(name)), 1))
+        -- StmtChecker:84
+        StmtChecker.fail(self, stmt, ("Top-level binding '" .. name) .. "' must declare visibility ('private' or 'public')", Option.unwrap_or(Option.__lz_wrap(string.len(name)), 1))
     end
+    -- StmtChecker:86
     if scope:declared_here(name) then
-        StmtChecker.fail(self, stmt, ("Duplicate declaration '" .. name) .. "'", Option.unwrap_or(__lz_wrap(string.len(name)), 1))
+        -- StmtChecker:87
+        StmtChecker.fail(self, stmt, ("Duplicate declaration '" .. name) .. "'", Option.unwrap_or(Option.__lz_wrap(string.len(name)), 1))
     end
+    -- StmtChecker:89
     Naming.check_value(name, stmt:line(), stmt:col(), self.source, "Binding")
+    -- StmtChecker:90
     local mutable = Option.unwrap_or(stmt:attr("mutable"), false)
+    -- StmtChecker:91
     local kind = "constant"
+    -- StmtChecker:92
     if mutable then
+        -- StmtChecker:93
         kind = "variable"
     end
+    -- StmtChecker:95
     local bvalue = stmt:attr("value")
+    -- StmtChecker:96
     if Option.is_some(bvalue) and (Option.unwrap(bvalue).kind == "FnExpr") then
+        -- StmtChecker:97
         scope:declare(name, Symbol.new("function", false, false))
+        -- StmtChecker:98
         StmtChecker.check_optional_value(self, stmt, scope)
     else
+        -- StmtChecker:100
         StmtChecker.check_optional_value(self, stmt, scope)
+        -- StmtChecker:101
         scope:declare(name, Symbol.new(kind, mutable, StmtChecker.value_noncallable(self, stmt)))
     end
+    -- StmtChecker:103
     stmt:set("reassign", false)
 end
+-- StmtChecker:106
 function StmtChecker.reassign_binding(self, stmt, scope, name, existing)
+    -- StmtChecker:107
     if not existing.mutable then
-        StmtChecker.fail(self, stmt, ("Cannot assign to immutable binding '" .. name) .. "'", Option.unwrap_or(__lz_wrap(string.len(name)), 1))
+        -- StmtChecker:108
+        StmtChecker.fail(self, stmt, ("Cannot assign to immutable binding '" .. name) .. "'", Option.unwrap_or(Option.__lz_wrap(string.len(name)), 1))
     end
+    -- StmtChecker:110
     local value = stmt:attr("value")
+    -- StmtChecker:111
     if Option.is_some(value) then
+        -- StmtChecker:112
         self.exprs:check(Option.unwrap(value), scope)
+        -- StmtChecker:113
         existing:set_noncallable(Callability.is_noncallable(Option.unwrap(value)))
     end
+    -- StmtChecker:115
     stmt:set("reassign", true)
 end
+-- StmtChecker:119
 function StmtChecker.check_optional_value(self, stmt, scope)
+    -- StmtChecker:120
     local value = stmt:attr("value")
+    -- StmtChecker:121
     if Option.is_some(value) then
+        -- StmtChecker:122
         self.exprs:check(Option.unwrap(value), scope)
     end
 end
+-- StmtChecker:126
 function StmtChecker.value_noncallable(self, stmt)
+    -- StmtChecker:127
     local value = stmt:attr("value")
+    -- StmtChecker:128
     if Option.is_none(value) then
+        -- StmtChecker:129
         return false
     end
+    -- StmtChecker:131
     return Callability.is_noncallable(Option.unwrap(value))
 end
+-- StmtChecker:136
 function StmtChecker.check_function(self, stmt, scope, frame)
+    -- StmtChecker:137
     local name = stmt:child("name")
+    -- StmtChecker:138
     if scope:declared_here(name) then
-        StmtChecker.fail(self, stmt, ("Duplicate declaration '" .. name) .. "'", Option.unwrap_or(__lz_wrap(string.len(name)), 1))
+        -- StmtChecker:139
+        StmtChecker.fail(self, stmt, ("Duplicate declaration '" .. name) .. "'", Option.unwrap_or(Option.__lz_wrap(string.len(name)), 1))
     end
+    -- StmtChecker:141
     Naming.check_value(name, stmt:line(), stmt:col(), self.source, "Function")
+    -- StmtChecker:142
     scope:declare(name, Symbol.new("function", false, false))
+    -- StmtChecker:144
     local is_static = Option.unwrap_or(stmt:attr("is_static"), false)
+    -- StmtChecker:145
     local is_instance = (not is_static) and (not frame.in_function)
+    -- StmtChecker:146
     StmtChecker.check_callable_body(self, stmt, scope, Frame.new(true, false, false), is_instance)
 end
+-- StmtChecker:150
 function StmtChecker.check_constructor(self, stmt, scope, frame)
+    -- StmtChecker:151
     if frame.in_function then
+        -- StmtChecker:152
         StmtChecker.fail(self, stmt, "'constructor' must be at the top level of a class", 11)
     end
+    -- StmtChecker:154
     StmtChecker.check_callable_body(self, stmt, scope, Frame.new(true, false, true), true)
 end
+-- StmtChecker:159
 function StmtChecker.check_callable_body(self, stmt, scope, frame, is_instance)
+    -- StmtChecker:160
+    if Option.is_some(stmt:attr("raw_body")) then
+        -- StmtChecker:161
+        return
+    end
+    -- StmtChecker:163
     local inner = scope:child()
+    -- StmtChecker:164
     StmtChecker.bind_params(self, stmt, inner)
+    -- StmtChecker:165
     local outer = self.exprs:instance_flag()
+    -- StmtChecker:166
     self.exprs:set_instance(is_instance)
+    -- StmtChecker:167
     StmtChecker.check_block(self, stmt:child("body"), inner, frame)
+    -- StmtChecker:168
     self.exprs:set_instance(outer)
 end
+-- StmtChecker:171
 function StmtChecker.bind_params(self, stmt, scope)
-    for _, param in __lz_each(stmt:child("params")) do
+    -- StmtChecker:172
+    for _, param in List.__lz_each(stmt:child("params")) do
+        -- StmtChecker:173
         if scope:declared_here(param) then
-            StmtChecker.fail(self, stmt, ("Duplicate parameter '" .. param) .. "'", Option.unwrap_or(__lz_wrap(string.len(param)), 1))
+            -- StmtChecker:174
+            StmtChecker.fail(self, stmt, ("Duplicate parameter '" .. param) .. "'", Option.unwrap_or(Option.__lz_wrap(string.len(param)), 1))
         end
+        -- StmtChecker:176
         Naming.check_value(param, stmt:line(), stmt:col(), self.source, "Parameter")
+        -- StmtChecker:177
         scope:declare(param, Symbol.new("variable", false, false))
     end
 end
+-- StmtChecker:181
 function StmtChecker.check_return(self, stmt, scope, frame, is_last)
+    -- StmtChecker:182
     if frame.in_constructor then
+        -- StmtChecker:183
         StmtChecker.fail(self, stmt, "'return' is not allowed in a constructor; the instance is returned implicitly", 6)
     end
+    -- StmtChecker:185
     if not frame.in_function then
+        -- StmtChecker:186
         StmtChecker.fail(self, stmt, "'return' outside of a function", 6)
     end
+    -- StmtChecker:188
     if not is_last then
+        -- StmtChecker:189
         StmtChecker.fail(self, stmt, "'return' must be the last statement in a block", 6)
     end
+    -- StmtChecker:191
     local value = stmt:attr("value")
+    -- StmtChecker:192
     if Option.is_some(value) then
+        -- StmtChecker:193
         self.exprs:check(Option.unwrap(value), scope)
     end
 end
+-- StmtChecker:197
 function StmtChecker.check_break(self, stmt, frame, is_last)
+    -- StmtChecker:198
     if not frame.in_loop then
+        -- StmtChecker:199
         StmtChecker.fail(self, stmt, "'break' outside of a loop", 5)
     end
+    -- StmtChecker:201
     if not is_last then
+        -- StmtChecker:202
         StmtChecker.fail(self, stmt, "'break' must be the last statement in a block", 5)
     end
 end
+-- StmtChecker:207
 function StmtChecker.check_expr_statement(self, stmt, scope)
+    -- StmtChecker:208
     local expr = stmt:child("expression")
+    -- StmtChecker:209
     self.exprs:check(expr, scope)
+    -- StmtChecker:210
     if expr.kind ~= "CallExpr" then
+        -- StmtChecker:211
         StmtChecker.fail(self, stmt, "Bare expressions are not valid statements", 1)
     end
 end
+-- StmtChecker:215
 function StmtChecker.check_assign(self, stmt, scope)
+    -- StmtChecker:216
     self.exprs:check(stmt:child("target"), scope)
+    -- StmtChecker:217
     self.exprs:check(stmt:child("value"), scope)
 end
+-- StmtChecker:223
 function StmtChecker.check_if(self, stmt, scope, frame)
-    for _, clause in __lz_each(stmt:child("clauses")) do
+    -- StmtChecker:224
+    for _, clause in List.__lz_each(stmt:child("clauses")) do
+        -- StmtChecker:225
         self.exprs:check_condition(clause:child("condition"), scope)
+        -- StmtChecker:226
         StmtChecker.check_block(self, clause:child("body"), scope:child(), frame)
     end
+    -- StmtChecker:228
     local else_body = stmt:attr("else_body")
+    -- StmtChecker:229
     if Option.is_some(else_body) then
+        -- StmtChecker:230
         StmtChecker.check_block(self, Option.unwrap(else_body), scope:child(), frame)
     end
 end
+-- StmtChecker:234
 function StmtChecker.check_while(self, stmt, scope, frame)
+    -- StmtChecker:235
     self.exprs:check_condition(stmt:child("condition"), scope)
+    -- StmtChecker:236
     StmtChecker.check_block(self, stmt:child("body"), scope:child(), frame:in_loop_body())
 end
+-- StmtChecker:239
 function StmtChecker.check_loop(self, stmt, scope, frame)
+    -- StmtChecker:240
     StmtChecker.check_block(self, stmt:child("body"), scope:child(), frame:in_loop_body())
 end
+-- StmtChecker:246
 function StmtChecker.check_for(self, stmt, scope, frame)
+    -- StmtChecker:247
     local inner = scope:child()
+    -- StmtChecker:248
     local loop_frame = frame:in_loop_body()
+    -- StmtChecker:250
     local init = stmt:attr("init")
+    -- StmtChecker:251
     if Option.is_some(init) then
+        -- StmtChecker:252
         StmtChecker.check_for_init(self, Option.unwrap(init), inner)
     end
+    -- StmtChecker:254
     local condition = stmt:attr("condition")
+    -- StmtChecker:255
     if Option.is_some(condition) then
+        -- StmtChecker:256
         self.exprs:check_condition(Option.unwrap(condition), inner)
     end
+    -- StmtChecker:258
     local step = stmt:attr("step")
+    -- StmtChecker:259
     if Option.is_some(step) then
+        -- StmtChecker:260
         StmtChecker.check_statement(self, Option.unwrap(step), inner, loop_frame, true)
     end
+    -- StmtChecker:262
     StmtChecker.check_block(self, stmt:child("body"), inner:child(), loop_frame)
 end
+-- StmtChecker:265
 function StmtChecker.check_for_init(self, init, scope)
+    -- StmtChecker:266
     local name = init:child("name")
+    -- StmtChecker:267
     Naming.check_value(name, init:line(), init:col(), self.source, "Loop variable")
+    -- StmtChecker:268
     local value = init:attr("value")
+    -- StmtChecker:269
     local noncallable = false
+    -- StmtChecker:270
     if Option.is_some(value) then
+        -- StmtChecker:271
         self.exprs:check(Option.unwrap(value), scope)
+        -- StmtChecker:272
         noncallable = Callability.is_noncallable(Option.unwrap(value))
     end
+    -- StmtChecker:274
     scope:declare(name, Symbol.new("variable", true, noncallable))
+    -- StmtChecker:275
     init:set("reassign", false)
 end
+-- StmtChecker:280
 function StmtChecker.check_for_in(self, stmt, scope, frame)
+    -- StmtChecker:281
     self.exprs:check(stmt:child("iter"), scope)
+    -- StmtChecker:282
     local inner = scope:child()
-    for _, name in __lz_each(stmt:child("vars")) do
+    -- StmtChecker:283
+    for _, name in List.__lz_each(stmt:child("vars")) do
+        -- StmtChecker:284
         if inner:declared_here(name) then
-            StmtChecker.fail(self, stmt, ("Duplicate loop variable '" .. name) .. "'", Option.unwrap_or(__lz_wrap(string.len(name)), 1))
+            -- StmtChecker:285
+            StmtChecker.fail(self, stmt, ("Duplicate loop variable '" .. name) .. "'", Option.unwrap_or(Option.__lz_wrap(string.len(name)), 1))
         end
+        -- StmtChecker:287
         Naming.check_value(name, stmt:line(), stmt:col(), self.source, "Loop variable")
+        -- StmtChecker:288
         inner:declare(name, Symbol.new("variable", false, false))
     end
+    -- StmtChecker:290
     StmtChecker.check_block(self, stmt:child("body"), inner, frame:in_loop_body())
 end
+-- StmtChecker:295
 function StmtChecker.check_match(self, stmt, scope, frame)
+    -- StmtChecker:296
     self.exprs:check(stmt:child("scrutinee"), scope)
+    -- StmtChecker:297
     local enum_name = ""
-    local covered = __lz_map({})
+    -- StmtChecker:298
+    local covered = Map.__lz_map({})
+    -- StmtChecker:299
     local has_wildcard = false
-    for _, arm in __lz_each(stmt:child("arms")) do
+    -- StmtChecker:300
+    for _, arm in List.__lz_each(stmt:child("arms")) do
+        -- StmtChecker:301
         local arm_scope = scope:child()
-        if __lz_unwrap_or(arm:attr("is_wildcard"), false) then
-            if __lz_is_none(arm:attr("guard")) then
+        -- StmtChecker:302
+        if Option.__lz_unwrap_or(arm:attr("is_wildcard"), false) then
+            -- StmtChecker:303
+            if Option.__lz_is_none(arm:attr("guard")) then
+                -- StmtChecker:304
                 has_wildcard = true
             end
-        elseif __lz_unwrap_or(arm:attr("is_variant"), false) then
+        elseif Option.__lz_unwrap_or(arm:attr("is_variant"), false) then
+            -- StmtChecker:307
             enum_name = StmtChecker.check_variant_arm(self, stmt, arm, enum_name, covered)
+            -- StmtChecker:308
             StmtChecker.declare_bindings(self, arm, arm_scope)
         else
+            -- StmtChecker:310
             local patt = arm:child("pattern")
+            -- StmtChecker:311
             if patt.kind == "IdentifierExpr" then
+                -- StmtChecker:312
                 arm_scope:declare(patt:child("name"), Symbol.new("variable", false, false))
+                -- StmtChecker:313
                 arm:set("is_binding", true)
             else
+                -- StmtChecker:315
                 self.exprs:check(patt, scope)
             end
         end
+        -- StmtChecker:318
         local guard = arm:attr("guard")
-        if __lz_is_some(guard) then
-            self.exprs:check_condition(__lz_unwrap(guard), arm_scope)
+        -- StmtChecker:319
+        if Option.__lz_is_some(guard) then
+            -- StmtChecker:320
+            self.exprs:check_condition(Option.__lz_unwrap(guard), arm_scope)
         end
+        -- StmtChecker:322
         StmtChecker.check_block(self, arm:child("body"), arm_scope, frame)
     end
+    -- StmtChecker:324
     if (enum_name ~= "") and (not has_wildcard) then
+        -- StmtChecker:325
         StmtChecker.check_exhaustive(self, stmt, enum_name, covered)
     end
 end
+-- StmtChecker:330
 function StmtChecker.check_variant_arm(self, stmt, arm, enum_name, covered)
+    -- StmtChecker:331
     local v = arm:child("variant")
-    local owner = __lz_get(self.variant_owner, v)
+    -- StmtChecker:332
+    local owner = List.__lz_get(self.variant_owner, v)
+    -- StmtChecker:333
     if Option.is_none(owner) then
-        StmtChecker.fail(self, stmt, ("Unknown enum variant '" .. v) .. "' in match", Option.unwrap_or(__lz_wrap(string.len(v)), 1))
+        -- StmtChecker:334
+        StmtChecker.fail(self, stmt, ("Unknown enum variant '" .. v) .. "' in match", Option.unwrap_or(Option.__lz_wrap(string.len(v)), 1))
     end
+    -- StmtChecker:336
     if (enum_name ~= "") and (enum_name ~= Option.unwrap(owner)) then
-        StmtChecker.fail(self, stmt, ((("match arms mix variants from different enums ('" .. enum_name) .. "' and '") .. Option.unwrap(owner)) .. "')", Option.unwrap_or(__lz_wrap(string.len(v)), 1))
+        -- StmtChecker:337
+        StmtChecker.fail(self, stmt, ((("match arms mix variants from different enums ('" .. enum_name) .. "' and '") .. Option.unwrap(owner)) .. "')", Option.unwrap_or(Option.__lz_wrap(string.len(v)), 1))
     end
-    if __lz_has(covered, v) then
-        StmtChecker.fail(self, stmt, ("Duplicate match arm for variant '" .. v) .. "'", Option.unwrap_or(__lz_wrap(string.len(v)), 1))
+    -- StmtChecker:339
+    if List.__lz_has(covered, v) then
+        -- StmtChecker:340
+        StmtChecker.fail(self, stmt, ("Duplicate match arm for variant '" .. v) .. "'", Option.unwrap_or(Option.__lz_wrap(string.len(v)), 1))
     end
-    local arity = Option.unwrap_or(__lz_get(self.variant_arity, v), 0)
-    local bound = __lz_len(arm:child("bindings"))
+    -- StmtChecker:342
+    local arity = Option.unwrap_or(List.__lz_get(self.variant_arity, v), 0)
+    -- StmtChecker:343
+    local bound = List.__lz_len(arm:child("bindings"))
+    -- StmtChecker:344
     if bound ~= arity then
-        StmtChecker.fail(self, stmt, ("Variant '" .. tostring(v) .. "' carries " .. tostring(arity) .. " value(s), but the pattern binds " .. tostring(bound)), Option.unwrap_or(__lz_wrap(string.len(v)), 1))
+        -- StmtChecker:345
+        StmtChecker.fail(self, stmt, ("Variant '" .. tostring(v) .. "' carries " .. tostring(arity) .. " value(s), but the pattern binds " .. tostring(bound)), Option.unwrap_or(Option.__lz_wrap(string.len(v)), 1))
     end
-    __lz_idx_set(covered, v, true)
+    -- StmtChecker:347
+    List.__lz_idx_set(covered, v, true)
+    -- StmtChecker:348
     return Option.unwrap(owner)
 end
+-- StmtChecker:352
 function StmtChecker.declare_bindings(self, arm, scope)
-    for _, name in __lz_each(arm:child("bindings")) do
+    -- StmtChecker:353
+    for _, name in List.__lz_each(arm:child("bindings")) do
+        -- StmtChecker:354
         if name ~= "_" then
+            -- StmtChecker:355
             scope:declare(name, Symbol.new("variable", false, false))
         end
     end
 end
+-- StmtChecker:360
 function StmtChecker.check_exhaustive(self, stmt, enum_name, covered)
-    for _, variant in __lz_each(Option.unwrap(__lz_get(self.enums, enum_name))) do
-        if not __lz_has(covered, variant) then
+    -- StmtChecker:361
+    for _, variant in List.__lz_each(Option.unwrap(List.__lz_get(self.enums, enum_name))) do
+        -- StmtChecker:362
+        if not List.__lz_has(covered, variant) then
+            -- StmtChecker:363
             StmtChecker.fail(self, stmt, ((("Non-exhaustive match on enum '" .. enum_name) .. "': missing variant '") .. variant) .. "' (add it, or a '_' arm)", 1)
         end
     end
 end
+-- StmtChecker:368
 function StmtChecker.fail(self, node, message, span)
+    -- StmtChecker:369
     Error.new("SemanticError", message, node:line(), node:col(), self.source, span):raise()
 end
 
 local Schematic = {}
 
+-- Schematic:18
 function Schematic.analyze(program, source, class_name, imports, variant_owner, enums, variant_arity, gated_externs)
-    local properties = __lz_map({})
-    local methods = __lz_map({})
+    -- Schematic:19
+    local properties = Map.__lz_map({})
+    -- Schematic:20
+    local methods = Map.__lz_map({})
+    -- Schematic:21
     Schematic.collect_members(program, properties, methods, source)
+    -- Schematic:23
     local root = Scope.root()
+    -- Schematic:24
     root:declare(class_name, Symbol.new("class", false, false))
-    for _, name in __lz_each(imports) do
+    -- Schematic:25
+    for _, name in List.__lz_each(imports) do
+        -- Schematic:26
         root:declare(name, Symbol.new("class", false, false))
     end
-    for _, name in __lz_each(__lz_list("Option", "Result", "List", "Map")) do
+    -- Schematic:30
+    for _, name in List.__lz_each(List.__lz_list({"Option", "Result", "List", "Map"})) do
+        -- Schematic:31
         root:declare(name, Symbol.new("class", false, false))
     end
-    for _, stmt in __lz_each(program:child("body")) do
+    -- Schematic:37
+    for _, stmt in List.__lz_each(program:child("body")) do
+        -- Schematic:38
         if stmt.kind == "ExternDecl" then
+            -- Schematic:39
             local ename = stmt:child("name")
-            if not __lz_has(gated_externs, ename) then
+            -- Schematic:40
+            if not List.__lz_has(gated_externs, ename) then
+                -- Schematic:41
                 root:declare(ename, Symbol.new("function", false, false))
             end
         end
     end
+    -- Schematic:46
     local exprs = ExprChecker.new(source, properties, methods, variant_owner, gated_externs)
+    -- Schematic:47
     local stmts = StmtChecker.new(source, exprs, variant_owner, enums, variant_arity)
+    -- Schematic:48
     exprs:inject_stmts(stmts)
+    -- Schematic:49
     stmts:check_block(program:child("body"), root, Frame.new(false, false, false))
 end
+-- Schematic:54
 function Schematic.collect_members(program, properties, methods, source)
-    for _, stmt in __lz_each(program:child("body")) do
+    -- Schematic:55
+    for _, stmt in List.__lz_each(program:child("body")) do
+        -- Schematic:56
         local k = stmt.kind
+        -- Schematic:57
         if k == "VariableDecl" then
+            -- Schematic:58
             Schematic.collect_property(stmt, properties, source)
         elseif k == "FunctionDecl" then
-            if not __lz_unwrap_or(stmt:attr("is_static"), false) then
-                __lz_idx_set(methods, stmt:child("name"), true)
+            -- Schematic:60
+            if not Option.__lz_unwrap_or(stmt:attr("is_static"), false) then
+                -- Schematic:61
+                List.__lz_idx_set(methods, stmt:child("name"), true)
             end
         end
     end
 end
+-- Schematic:67
 function Schematic.collect_property(stmt, properties, source)
+    -- Schematic:68
     local visibility = Option.unwrap_or(stmt:attr("visibility"), "")
+    -- Schematic:69
     local is_static = Option.unwrap_or(stmt:attr("is_static"), false)
+    -- Schematic:70
     if (visibility ~= "") and (not is_static) then
+        -- Schematic:71
         local name = stmt:child("name")
-        if __lz_has(properties, name) then
-            Error.new("SemanticError", ("Duplicate declaration '" .. name) .. "'", stmt:line(), stmt:col(), source, Option.unwrap_or(__lz_wrap(string.len(name)), 1)):raise()
+        -- Schematic:72
+        if List.__lz_has(properties, name) then
+            -- Schematic:73
+            Error.new("SemanticError", ("Duplicate declaration '" .. name) .. "'", stmt:line(), stmt:col(), source, Option.unwrap_or(Option.__lz_wrap(string.len(name)), 1)):raise()
         end
-        __lz_idx_set(properties, name, true)
+        -- Schematic:75
+        List.__lz_idx_set(properties, name, true)
     end
 end
 
 local Type = {}
 
+-- Type:8
 function Type.new(kind, name, params, result)
     local self = {}
     self.is_dynamic = Type.is_dynamic
     self.is_numeric = Type.is_numeric
     self.equals = Type.equals
     self.describe = Type.describe
+    -- Type:8
     self.kind = kind
+    -- Type:8
     self.name = name
+    -- Type:8
     self.params = params
+    -- Type:8
     self.result = result
     return self
 end
+-- Type:12
 function Type.base(kind)
-    return Type.new(kind, "", __lz_list(), __lz_none())
+    -- Type:13
+    return Type.new(kind, "", List.__lz_list({}), Option.none())
 end
+-- Type:16
 function Type.dynamic()
+    -- Type:17
     return Type.base("dynamic")
 end
+-- Type:20
 function Type.unit()
+    -- Type:21
     return Type.base("unit")
 end
+-- Type:24
 function Type.int()
+    -- Type:25
     return Type.base("int")
 end
+-- Type:28
 function Type.float()
+    -- Type:29
     return Type.base("float")
 end
+-- Type:32
 function Type.bool()
+    -- Type:33
     return Type.base("bool")
 end
+-- Type:36
 function Type.str()
+    -- Type:37
     return Type.base("str")
 end
+-- Type:40
 function Type.class_of(name, args)
-    return Type.new("class", name, args, __lz_none())
+    -- Type:41
+    return Type.new("class", name, args, Option.none())
 end
+-- Type:44
 function Type.enum_of(name, args)
-    return Type.new("enum", name, args, __lz_none())
+    -- Type:45
+    return Type.new("enum", name, args, Option.none())
 end
+-- Type:50
 function Type.iface_of(name, args)
-    return Type.new("iface", name, args, __lz_none())
+    -- Type:51
+    return Type.new("iface", name, args, Option.none())
 end
+-- Type:54
 function Type.func(params, result)
-    return Type.new("fn", "", params, __lz_some(result))
+    -- Type:55
+    return Type.new("fn", "", params, Option.some(result))
 end
+-- Type:58
 function Type.var(name)
-    return Type.new("var", name, __lz_list(), __lz_none())
+    -- Type:59
+    return Type.new("var", name, List.__lz_list({}), Option.none())
 end
+-- Type:62
 function Type.union(members)
-    return Type.new("union", "", members, __lz_none())
+    -- Type:63
+    return Type.new("union", "", members, Option.none())
 end
+-- Type:66
 function Type.is_dynamic(self)
+    -- Type:67
     return self.kind == "dynamic"
 end
+-- Type:70
 function Type.is_numeric(self)
+    -- Type:71
     return (self.kind == "int") or (self.kind == "float")
 end
+-- Type:77
 function Type.equals(self, other)
+    -- Type:78
     if self.kind ~= other.kind then
+        -- Type:79
         return false
     end
+    -- Type:81
     if (((self.kind == "class") or (self.kind == "enum")) or (self.kind == "var")) or (self.kind == "iface") then
+        -- Type:82
         return self.name == other.name
     end
+    -- Type:84
     return true
 end
+-- Type:88
 function Type.describe(self)
+    -- Type:89
     if self.kind == "var" then
+        -- Type:90
         return self.name
     end
+    -- Type:92
     if self.kind == "union" then
+        -- Type:93
         local inner = ""
+        -- Type:94
         local i = 1
-        for _, m in __lz_each(self.params) do
+        -- Type:95
+        for _, m in List.__lz_each(self.params) do
+            -- Type:96
             if i > 1 then
+                -- Type:97
                 inner = inner .. " | "
             end
+            -- Type:99
             inner = inner .. m:describe()
+            -- Type:100
             i = i + 1
         end
+        -- Type:102
         return inner
     end
+    -- Type:104
     if ((self.kind == "class") or (self.kind == "enum")) or (self.kind == "iface") then
-        if __lz_len(self.params) == 0 then
+        -- Type:105
+        if List.__lz_len(self.params) == 0 then
+            -- Type:106
             return self.name
         end
+        -- Type:108
         local inner = ""
+        -- Type:109
         local i = 1
-        for _, a in __lz_each(self.params) do
+        -- Type:110
+        for _, a in List.__lz_each(self.params) do
+            -- Type:111
             if i > 1 then
+                -- Type:112
                 inner = inner .. ", "
             end
+            -- Type:114
             inner = inner .. a:describe()
+            -- Type:115
             i = i + 1
         end
+        -- Type:117
         return ((self.name .. "<") .. inner) .. ">"
     end
+    -- Type:119
     if self.kind == "fn" then
+        -- Type:120
         local inner = ""
+        -- Type:121
         local i = 1
-        for _, p in __lz_each(self.params) do
+        -- Type:122
+        for _, p in List.__lz_each(self.params) do
+            -- Type:123
             if i > 1 then
+                -- Type:124
                 inner = inner .. ", "
             end
+            -- Type:126
             inner = inner .. p:describe()
+            -- Type:127
             i = i + 1
         end
+        -- Type:129
         return (("(" .. inner) .. ") -> ") .. Option.unwrap(self.result):describe()
     end
+    -- Type:131
     return self.kind
 end
 
 local Typecheck = {}
 
+-- Typecheck:30
 function Typecheck.new(source, class_name, imports, enums, classes, variant_fields, variant_owner, enum_type_params, interfaces)
     local self = {}
     self.check = Typecheck.check
@@ -3195,1283 +5986,2186 @@ function Typecheck.new(source, class_name, imports, enums, classes, variant_fiel
     self.merge_vars = Typecheck.merge_vars
     self.iface_method = Typecheck.iface_method
     self.fail = Typecheck.fail
+    -- Typecheck:31
     self.source = source
+    -- Typecheck:32
     self.class_name = class_name
-    self.known_classes = __lz_map({})
-    for _, name in __lz_each(imports) do
-        __lz_idx_set(self.known_classes, name, true)
+    -- Typecheck:33
+    self.known_classes = Map.__lz_map({})
+    -- Typecheck:34
+    for _, name in List.__lz_each(imports) do
+        -- Typecheck:35
+        List.__lz_idx_set(self.known_classes, name, true)
     end
-    __lz_idx_set(self.known_classes, class_name, true)
+    -- Typecheck:37
+    List.__lz_idx_set(self.known_classes, class_name, true)
+    -- Typecheck:38
     self.enums = enums
+    -- Typecheck:39
     self.classes = classes
+    -- Typecheck:40
     self.variant_fields = variant_fields
+    -- Typecheck:41
     self.variant_owner = variant_owner
+    -- Typecheck:42
     self.enum_type_params = enum_type_params
+    -- Typecheck:43
     self.interfaces = interfaces
-    self.type_vars = __lz_map({})
-    self.checking = __lz_map({})
+    -- Typecheck:44
+    self.type_vars = Map.__lz_map({})
+    -- Typecheck:45
+    self.checking = Map.__lz_map({})
+    -- Typecheck:46
     self.iface_reason = ""
     return self
 end
+-- Typecheck:49
 function Typecheck.check(self, program)
+    -- Typecheck:50
     self.type_vars = Typecheck.own_var_set(self)
+    -- Typecheck:51
     Typecheck.type_block(self, program:child("body"), Scope.root(), Type.dynamic())
 end
+-- Typecheck:57
 function Typecheck.own_var_set(self)
-    local out = __lz_map({})
-    for _, p in __lz_each(Typecheck.own_type_params(self)) do
-        __lz_idx_set(out, p, true)
+    -- Typecheck:58
+    local out = Map.__lz_map({})
+    -- Typecheck:59
+    for _, p in List.__lz_each(Typecheck.own_type_params(self)) do
+        -- Typecheck:60
+        List.__lz_idx_set(out, p, true)
     end
+    -- Typecheck:62
     return out
 end
+-- Typecheck:65
 function Typecheck.own_type_params(self)
-    local out = __lz_list()
-    local centry = __lz_get(self.classes, self.class_name)
+    -- Typecheck:66
+    local out = List.__lz_list({})
+    -- Typecheck:67
+    local centry = List.__lz_get(self.classes, self.class_name)
+    -- Typecheck:68
     if Option.is_some(centry) then
-        for _, p in __lz_each(__lz_unwrap_or(__lz_get(Option.unwrap(centry), "type_params"), __lz_list())) do
-            __lz_push(out, p)
+        -- Typecheck:69
+        for _, p in List.__lz_each(Option.__lz_unwrap_or(List.__lz_get(Option.unwrap(centry), "type_params"), List.__lz_list({}))) do
+            -- Typecheck:70
+            List.__lz_push(out, p)
         end
     end
-    for _, p in __lz_each(Option.unwrap_or(__lz_get(self.enum_type_params, self.class_name), __lz_list())) do
-        __lz_push(out, p)
+    -- Typecheck:73
+    for _, p in List.__lz_each(Option.unwrap_or(List.__lz_get(self.enum_type_params, self.class_name), List.__lz_list({}))) do
+        -- Typecheck:74
+        List.__lz_push(out, p)
     end
+    -- Typecheck:76
     return out
 end
+-- Typecheck:81
 function Typecheck.type_block(self, stmts, scope, ret)
-    for _, stmt in __lz_each(stmts) do
+    -- Typecheck:82
+    for _, stmt in List.__lz_each(stmts) do
+        -- Typecheck:83
         Typecheck.type_stmt(self, stmt, scope, ret)
     end
 end
+-- Typecheck:87
 function Typecheck.type_stmt(self, stmt, scope, ret)
+    -- Typecheck:88
     local __lz_m1 = stmt.kind
     if __lz_m1 == "VariableDecl" then
+        -- Typecheck:89
         Typecheck.type_variable(self, stmt, scope)
     elseif __lz_m1 == "FunctionDecl" then
+        -- Typecheck:90
         Typecheck.type_callable(self, stmt, scope)
     elseif __lz_m1 == "ConstructorDecl" then
+        -- Typecheck:91
         Typecheck.type_callable(self, stmt, scope)
     elseif __lz_m1 == "ReturnStmt" then
+        -- Typecheck:92
         Typecheck.type_return(self, stmt, scope, ret)
     elseif __lz_m1 == "ExpressionStmt" then
+        -- Typecheck:93
         Typecheck.type_expr(self, stmt:child("expression"), scope)
     elseif __lz_m1 == "FieldAssign" then
+        -- Typecheck:94
         Typecheck.type_expr(self, stmt:child("value"), scope)
     elseif __lz_m1 == "IndexAssign" then
+        -- Typecheck:95
         Typecheck.type_expr(self, stmt:child("value"), scope)
     elseif __lz_m1 == "IfStmt" then
+        -- Typecheck:96
         Typecheck.type_if(self, stmt, scope, ret)
     elseif __lz_m1 == "WhileStmt" then
+        -- Typecheck:98
         Typecheck.type_condition(self, stmt:child("condition"), scope)
+        -- Typecheck:99
         Typecheck.type_block(self, stmt:child("body"), scope:child(), ret)
     elseif __lz_m1 == "LoopStmt" then
+        -- Typecheck:101
         Typecheck.type_block(self, stmt:child("body"), scope:child(), ret)
     elseif __lz_m1 == "ForStmt" then
+        -- Typecheck:102
         Typecheck.type_for(self, stmt, scope, ret)
     elseif __lz_m1 == "ForInStmt" then
+        -- Typecheck:103
         Typecheck.type_for_in(self, stmt, scope, ret)
     elseif __lz_m1 == "MatchStmt" then
+        -- Typecheck:104
         Typecheck.type_match(self, stmt, scope, ret)
     else
     end
 end
+-- Typecheck:112
 function Typecheck.type_variable(self, stmt, scope)
+    -- Typecheck:113
     local value = stmt:attr("value")
+    -- Typecheck:114
     if Option.unwrap_or(stmt:attr("reassign"), false) then
+        -- Typecheck:115
         if Option.is_some(value) then
+            -- Typecheck:116
             local actual = Typecheck.type_expr(self, Option.unwrap(value), scope)
+            -- Typecheck:117
             local prior = scope:lookup(stmt:child("name"))
+            -- Typecheck:118
             if Option.is_some(prior) then
+                -- Typecheck:119
                 Typecheck.expect(self, Option.unwrap(prior), actual, stmt, "reassignment")
             end
         end
+        -- Typecheck:122
         return
     end
+    -- Typecheck:124
     if Option.is_some(value) and (Option.unwrap(value).kind == "FnExpr") then
+        -- Typecheck:125
         local fn_node = Option.unwrap(value)
-        local ptypes = (function() local __lz_m2 = __lz_list() for _, pt in __lz_each(fn_node:child("param_types")) do __lz_push(__lz_m2, Typecheck.resolve(self, pt)) end return __lz_m2 end)()
+        -- Typecheck:126
+        local ptypes = (function() local __lz_m2 = List.__lz_list({}) for _, pt in List.__lz_each(fn_node:child("param_types")) do List.__lz_push(__lz_m2, Typecheck.resolve(self, pt)) end return __lz_m2 end)()
+        -- Typecheck:127
         local fn_ret = Typecheck.return_type(self, fn_node)
+        -- Typecheck:128
         local fn_type = Type.func(ptypes, fn_ret)
+        -- Typecheck:129
         local fn_ann = stmt:attr("type")
+        -- Typecheck:130
         if Option.is_some(fn_ann) then
+            -- Typecheck:131
             Typecheck.expect(self, Typecheck.resolve(self, Option.unwrap(fn_ann)), fn_type, stmt, "binding")
+            -- Typecheck:132
             scope:declare(stmt:child("name"), Typecheck.resolve(self, Option.unwrap(fn_ann)))
         else
+            -- Typecheck:134
             scope:declare(stmt:child("name"), fn_type)
         end
+        -- Typecheck:136
         Typecheck.type_fn_expr(self, fn_node, scope)
+        -- Typecheck:137
         return
     end
+    -- Typecheck:139
     local actual = Type.dynamic()
+    -- Typecheck:140
     if Option.is_some(value) then
+        -- Typecheck:141
         actual = Typecheck.type_expr(self, Option.unwrap(value), scope)
     end
+    -- Typecheck:143
     local t = actual
+    -- Typecheck:144
     local ann = stmt:attr("type")
+    -- Typecheck:145
     if Option.is_some(ann) then
+        -- Typecheck:146
         t = Typecheck.resolve(self, Option.unwrap(ann))
+        -- Typecheck:147
         if Option.is_some(value) then
+            -- Typecheck:148
             Typecheck.expect(self, t, actual, stmt, "binding")
         end
     end
+    -- Typecheck:151
     scope:declare(stmt:child("name"), t)
 end
+-- Typecheck:156
 function Typecheck.type_callable(self, stmt, scope)
+    -- Typecheck:157
     local saved = self.type_vars
+    -- Typecheck:158
     self.type_vars = Typecheck.callable_var_set(self, stmt)
+    -- Typecheck:159
     Typecheck.check_annotations(self, stmt)
+    -- Typecheck:160
     local ret = Type.unit()
+    -- Typecheck:161
     if stmt.kind == "FunctionDecl" then
+        -- Typecheck:162
         ret = Typecheck.return_type(self, stmt)
     end
+    -- Typecheck:164
     local inner = scope:child()
+    -- Typecheck:165
     Typecheck.bind_params(self, stmt, inner)
-    Typecheck.type_block(self, stmt:child("body"), inner, ret)
+    -- Typecheck:166
+    if Option.is_none(stmt:attr("raw_body")) then
+        -- Typecheck:167
+        Typecheck.type_block(self, stmt:child("body"), inner, ret)
+    end
+    -- Typecheck:169
     self.type_vars = saved
 end
+-- Typecheck:172
 function Typecheck.check_annotations(self, stmt)
+    -- Typecheck:173
     local fname = Option.unwrap_or(stmt:attr("name"), "constructor")
-    for _, pt in __lz_each(Option.unwrap_or(stmt:attr("param_types"), __lz_list())) do
-        if __lz_unwrap_or(pt:attr("inferred"), false) then
+    -- Typecheck:174
+    for _, pt in List.__lz_each(Option.unwrap_or(stmt:attr("param_types"), List.__lz_list({}))) do
+        -- Typecheck:175
+        if Option.__lz_unwrap_or(pt:attr("inferred"), false) then
+            -- Typecheck:176
             Typecheck.fail(self, pt, ("missing type annotation on a parameter of '" .. tostring(fname) .. "' — use ': dynamic' to opt out"))
         end
     end
+    -- Typecheck:179
     if stmt.kind == "FunctionDecl" then
+        -- Typecheck:180
         local rt = stmt:attr("return_type")
-        if Option.is_some(rt) and __lz_unwrap_or(Option.unwrap(rt):attr("inferred"), false) then
+        -- Typecheck:181
+        if Option.is_some(rt) and Option.__lz_unwrap_or(Option.unwrap(rt):attr("inferred"), false) then
+            -- Typecheck:182
             Typecheck.fail(self, stmt, ("missing return type on '" .. tostring(fname) .. "' — use ': dynamic' to opt out"))
         end
     end
 end
+-- Typecheck:187
 function Typecheck.callable_var_set(self, stmt)
+    -- Typecheck:188
     local out = Typecheck.own_var_set(self)
-    for _, p in __lz_each(Option.unwrap_or(stmt:attr("type_params"), __lz_list())) do
-        __lz_idx_set(out, p, true)
+    -- Typecheck:189
+    for _, p in List.__lz_each(Option.unwrap_or(stmt:attr("type_params"), List.__lz_list({}))) do
+        -- Typecheck:190
+        List.__lz_idx_set(out, p, true)
     end
+    -- Typecheck:192
     return out
 end
+-- Typecheck:195
 function Typecheck.bind_params(self, stmt, scope)
+    -- Typecheck:196
     local types = stmt:attr("param_types")
+    -- Typecheck:197
     local i = 1
-    for _, p in __lz_each(stmt:child("params")) do
+    -- Typecheck:198
+    for _, p in List.__lz_each(stmt:child("params")) do
+        -- Typecheck:199
         local t = Type.dynamic()
+        -- Typecheck:200
         if Option.is_some(types) then
-            t = Typecheck.resolve(self, __lz_unwrap(__lz_get(Option.unwrap(types), i)))
+            -- Typecheck:201
+            t = Typecheck.resolve(self, Option.__lz_unwrap(List.__lz_get(Option.unwrap(types), i)))
         end
+        -- Typecheck:203
         scope:declare(p, t)
+        -- Typecheck:204
         i = i + 1
     end
 end
+-- Typecheck:208
 function Typecheck.return_type(self, stmt)
+    -- Typecheck:209
     local rt = stmt:attr("return_type")
+    -- Typecheck:210
     if Option.is_some(rt) then
+        -- Typecheck:211
         return Typecheck.resolve(self, Option.unwrap(rt))
     end
+    -- Typecheck:213
     return Type.dynamic()
 end
+-- Typecheck:216
 function Typecheck.type_return(self, stmt, scope, ret)
+    -- Typecheck:217
     local value = stmt:attr("value")
+    -- Typecheck:218
     if Option.is_some(value) then
+        -- Typecheck:219
         Typecheck.expect(self, ret, Typecheck.type_expr(self, Option.unwrap(value), scope), stmt, "return")
     end
 end
+-- Typecheck:223
 function Typecheck.type_if(self, stmt, scope, ret)
-    for _, clause in __lz_each(stmt:child("clauses")) do
+    -- Typecheck:224
+    for _, clause in List.__lz_each(stmt:child("clauses")) do
+        -- Typecheck:225
         Typecheck.type_condition(self, clause:child("condition"), scope)
+        -- Typecheck:226
         Typecheck.type_block(self, clause:child("body"), scope:child(), ret)
     end
+    -- Typecheck:228
     local else_body = stmt:attr("else_body")
+    -- Typecheck:229
     if Option.is_some(else_body) then
+        -- Typecheck:230
         Typecheck.type_block(self, Option.unwrap(else_body), scope:child(), ret)
     end
 end
+-- Typecheck:234
 function Typecheck.type_condition(self, node, scope)
+    -- Typecheck:235
     local t = Typecheck.type_expr(self, node, scope)
+    -- Typecheck:236
     if (not t:is_dynamic()) and (t.kind ~= "bool") then
+        -- Typecheck:237
         Typecheck.fail(self, node, "a condition must be a bool, found " .. t:describe())
     end
 end
+-- Typecheck:241
 function Typecheck.type_for(self, stmt, scope, ret)
+    -- Typecheck:242
     local inner = scope:child()
+    -- Typecheck:243
     local init = stmt:attr("init")
+    -- Typecheck:244
     if Option.is_some(init) then
+        -- Typecheck:245
         Typecheck.type_stmt(self, Option.unwrap(init), inner, ret)
     end
+    -- Typecheck:247
     local cond = stmt:attr("condition")
+    -- Typecheck:248
     if Option.is_some(cond) then
+        -- Typecheck:249
         Typecheck.type_condition(self, Option.unwrap(cond), inner)
     end
+    -- Typecheck:251
     local step = stmt:attr("step")
+    -- Typecheck:252
     if Option.is_some(step) then
+        -- Typecheck:253
         Typecheck.type_stmt(self, Option.unwrap(step), inner, ret)
     end
+    -- Typecheck:255
     Typecheck.type_block(self, stmt:child("body"), inner:child(), ret)
 end
+-- Typecheck:258
 function Typecheck.type_for_in(self, stmt, scope, ret)
+    -- Typecheck:259
     local it = Typecheck.type_expr(self, stmt:child("iter"), scope)
+    -- Typecheck:260
     local inner = scope:child()
+    -- Typecheck:261
     Typecheck.bind_loop_vars(self, stmt:child("vars"), it, inner)
+    -- Typecheck:262
     Typecheck.type_block(self, stmt:child("body"), inner, ret)
 end
+-- Typecheck:267
 function Typecheck.bind_loop_vars(self, vars, it, scope)
+    -- Typecheck:268
     if (it.kind == "class") and (it.name == "List") then
-        if __lz_len(vars) == 1 then
-            scope:declare(Option.unwrap(__lz_get(vars, 1)), Typecheck.type_arg(self, it, 1))
+        -- Typecheck:269
+        if List.__lz_len(vars) == 1 then
+            -- Typecheck:270
+            scope:declare(Option.unwrap(List.__lz_get(vars, 1)), Typecheck.type_arg(self, it, 1))
         else
-            scope:declare(Option.unwrap(__lz_get(vars, 1)), Type.int())
-            scope:declare(Option.unwrap(__lz_get(vars, 2)), Typecheck.type_arg(self, it, 1))
+            -- Typecheck:272
+            scope:declare(Option.unwrap(List.__lz_get(vars, 1)), Type.int())
+            -- Typecheck:273
+            scope:declare(Option.unwrap(List.__lz_get(vars, 2)), Typecheck.type_arg(self, it, 1))
         end
+        -- Typecheck:275
         return
     end
+    -- Typecheck:277
     if (it.kind == "class") and (it.name == "Map") then
-        if __lz_len(vars) == 1 then
-            scope:declare(Option.unwrap(__lz_get(vars, 1)), Typecheck.type_arg(self, it, 2))
+        -- Typecheck:278
+        if List.__lz_len(vars) == 1 then
+            -- Typecheck:279
+            scope:declare(Option.unwrap(List.__lz_get(vars, 1)), Typecheck.type_arg(self, it, 2))
         else
-            scope:declare(Option.unwrap(__lz_get(vars, 1)), Typecheck.type_arg(self, it, 1))
-            scope:declare(Option.unwrap(__lz_get(vars, 2)), Typecheck.type_arg(self, it, 2))
+            -- Typecheck:281
+            scope:declare(Option.unwrap(List.__lz_get(vars, 1)), Typecheck.type_arg(self, it, 1))
+            -- Typecheck:282
+            scope:declare(Option.unwrap(List.__lz_get(vars, 2)), Typecheck.type_arg(self, it, 2))
         end
+        -- Typecheck:284
         return
     end
-    for _, name in __lz_each(vars) do
+    -- Typecheck:286
+    for _, name in List.__lz_each(vars) do
+        -- Typecheck:287
         scope:declare(name, Type.dynamic())
     end
 end
+-- Typecheck:291
 function Typecheck.type_match(self, stmt, scope, ret)
+    -- Typecheck:292
     Typecheck.type_expr(self, stmt:child("scrutinee"), scope)
-    for _, arm in __lz_each(stmt:child("arms")) do
+    -- Typecheck:293
+    for _, arm in List.__lz_each(stmt:child("arms")) do
+        -- Typecheck:294
         local arm_scope = scope:child()
-        if __lz_unwrap_or(arm:attr("is_variant"), false) then
-            local fields = Option.unwrap_or(__lz_get(self.variant_fields, arm:child("variant")), __lz_list())
+        -- Typecheck:295
+        if Option.__lz_unwrap_or(arm:attr("is_variant"), false) then
+            -- Typecheck:296
+            local fields = Option.unwrap_or(List.__lz_get(self.variant_fields, arm:child("variant")), List.__lz_list({}))
+            -- Typecheck:297
             local i = 1
-            for _, b in __lz_each(arm:child("bindings")) do
+            -- Typecheck:298
+            for _, b in List.__lz_each(arm:child("bindings")) do
+                -- Typecheck:299
                 if b ~= "_" then
-                    arm_scope:declare(b, Typecheck.field_type(self, __lz_get(fields, i)))
+                    -- Typecheck:300
+                    arm_scope:declare(b, Typecheck.field_type(self, List.__lz_get(fields, i)))
                 end
+                -- Typecheck:302
                 i = i + 1
             end
-        elseif not __lz_unwrap_or(arm:attr("is_wildcard"), false) then
-            if __lz_unwrap_or(arm:attr("is_binding"), false) then
+        elseif not Option.__lz_unwrap_or(arm:attr("is_wildcard"), false) then
+            -- Typecheck:305
+            if Option.__lz_unwrap_or(arm:attr("is_binding"), false) then
+                -- Typecheck:306
                 arm_scope:declare(arm:child("pattern"):child("name"), Type.dynamic())
             else
+                -- Typecheck:308
                 Typecheck.type_expr(self, arm:child("pattern"), scope)
             end
         end
+        -- Typecheck:311
         local arm_guard = arm:attr("guard")
-        if __lz_is_some(arm_guard) then
-            Typecheck.type_condition(self, __lz_unwrap(arm_guard), arm_scope)
+        -- Typecheck:312
+        if Option.__lz_is_some(arm_guard) then
+            -- Typecheck:313
+            Typecheck.type_condition(self, Option.__lz_unwrap(arm_guard), arm_scope)
         end
+        -- Typecheck:315
         Typecheck.type_block(self, arm:child("body"), arm_scope, ret)
     end
 end
+-- Typecheck:321
 function Typecheck.type_expr(self, node, scope)
+    -- Typecheck:322
     local __lz_m3 = node.kind
     if __lz_m3 == "LiteralExpr" then
+        -- Typecheck:323
         return Typecheck.literal_type(self, node)
     elseif __lz_m3 == "IdentifierExpr" then
+        -- Typecheck:324
         return Typecheck.identifier_type(self, node:child("name"), scope)
     elseif __lz_m3 == "SelfExpr" then
+        -- Typecheck:325
         return Type.class_of(self.class_name, Typecheck.self_args(self))
     elseif __lz_m3 == "BinaryExpr" then
+        -- Typecheck:326
         return Typecheck.type_binary(self, node, scope)
     elseif __lz_m3 == "UnaryExpr" then
+        -- Typecheck:328
         Typecheck.type_expr(self, node:child("operand"), scope)
+        -- Typecheck:329
         return Type.bool()
     elseif __lz_m3 == "CallExpr" then
+        -- Typecheck:331
         return Typecheck.type_call(self, node, scope)
     elseif __lz_m3 == "MemberExpr" then
+        -- Typecheck:332
         return Typecheck.type_member(self, node, scope)
     elseif __lz_m3 == "IndexExpr" then
+        -- Typecheck:333
         return Typecheck.type_index(self, node, scope)
     elseif __lz_m3 == "ListExpr" then
+        -- Typecheck:334
         return Typecheck.type_list(self, node, scope)
     elseif __lz_m3 == "MapExpr" then
+        -- Typecheck:335
         return Typecheck.type_map(self, node, scope)
     elseif __lz_m3 == "ListComp" then
+        -- Typecheck:336
         return Typecheck.type_list_comp(self, node, scope)
     elseif __lz_m3 == "MapComp" then
+        -- Typecheck:337
         return Typecheck.type_map_comp(self, node, scope)
     elseif __lz_m3 == "InterpolatedString" then
+        -- Typecheck:339
         local parts = node:child("parts")
+        -- Typecheck:340
         local i = 2
-        while i <= __lz_len(parts) do
-            Typecheck.type_expr(self, __lz_unwrap(__lz_get(parts, i)), scope)
+        -- Typecheck:341
+        while i <= List.__lz_len(parts) do
+            -- Typecheck:342
+            Typecheck.type_expr(self, Option.__lz_unwrap(List.__lz_get(parts, i)), scope)
+            -- Typecheck:343
             i = i + 2
         end
+        -- Typecheck:345
         return Type.str()
     elseif __lz_m3 == "FnExpr" then
+        -- Typecheck:347
         return Typecheck.type_fn_expr(self, node, scope)
     elseif __lz_m3 == "PropagateExpr" then
+        -- Typecheck:349
         Typecheck.type_expr(self, node:child("inner"), scope)
+        -- Typecheck:350
         return Type.dynamic()
     else
     end
+    -- Typecheck:354
     return Type.dynamic()
 end
+-- Typecheck:357
 function Typecheck.type_fn_expr(self, node, scope)
-    for _, pt in __lz_each(node:child("param_types")) do
-        if __lz_unwrap_or(pt:attr("inferred"), false) then
+    -- Typecheck:358
+    for _, pt in List.__lz_each(node:child("param_types")) do
+        -- Typecheck:359
+        if Option.__lz_unwrap_or(pt:attr("inferred"), false) then
+            -- Typecheck:360
             Typecheck.fail(self, pt, "missing type annotation on a 'fn' parameter — use ': dynamic' to opt out")
         end
     end
-    local ptypes = (function() local __lz_m4 = __lz_list() for _, pt in __lz_each(node:child("param_types")) do __lz_push(__lz_m4, Typecheck.resolve(self, pt)) end return __lz_m4 end)()
+    -- Typecheck:363
+    local ptypes = (function() local __lz_m4 = List.__lz_list({}) for _, pt in List.__lz_each(node:child("param_types")) do List.__lz_push(__lz_m4, Typecheck.resolve(self, pt)) end return __lz_m4 end)()
+    -- Typecheck:364
     local ret = Typecheck.return_type(self, node)
+    -- Typecheck:365
     local inner = scope:child()
+    -- Typecheck:366
     local i = 1
-    for _, pname in __lz_each(node:child("params")) do
-        inner:declare(pname, Option.unwrap_or(__lz_get(ptypes, i), Type.dynamic()))
+    -- Typecheck:367
+    for _, pname in List.__lz_each(node:child("params")) do
+        -- Typecheck:368
+        inner:declare(pname, Option.unwrap_or(List.__lz_get(ptypes, i), Type.dynamic()))
+        -- Typecheck:369
         i = i + 1
     end
+    -- Typecheck:371
     Typecheck.type_block(self, node:child("body"), inner, ret)
+    -- Typecheck:372
     return Type.func(ptypes, ret)
 end
+-- Typecheck:377
 function Typecheck.type_list_comp(self, node, scope)
+    -- Typecheck:378
     local inner = Typecheck.comp_scope(self, node, scope)
-    return Type.class_of("List", __lz_list(Typecheck.type_expr(self, node:child("element"), inner)))
+    -- Typecheck:379
+    return Type.class_of("List", List.__lz_list({Typecheck.type_expr(self, node:child("element"), inner)}))
 end
+-- Typecheck:382
 function Typecheck.type_map_comp(self, node, scope)
+    -- Typecheck:383
     local inner = Typecheck.comp_scope(self, node, scope)
+    -- Typecheck:384
     local k = Typecheck.type_expr(self, node:child("key"), inner)
+    -- Typecheck:385
     local v = Typecheck.type_expr(self, node:child("value"), inner)
-    return Type.class_of("Map", __lz_list(k, v))
+    -- Typecheck:386
+    return Type.class_of("Map", List.__lz_list({k, v}))
 end
+-- Typecheck:389
 function Typecheck.comp_scope(self, node, scope)
+    -- Typecheck:390
     local it = Typecheck.type_expr(self, node:child("iter"), scope)
+    -- Typecheck:391
     local inner = scope:child()
+    -- Typecheck:392
     Typecheck.bind_loop_vars(self, node:child("vars"), it, inner)
+    -- Typecheck:393
     local cond = node:attr("cond")
+    -- Typecheck:394
     if Option.is_some(cond) then
+        -- Typecheck:395
         Typecheck.type_expr(self, Option.unwrap(cond), inner)
     end
+    -- Typecheck:397
     return inner
 end
+-- Typecheck:402
 function Typecheck.is_builtin_name(self, name)
+    -- Typecheck:403
     return (((name == "Option") or (name == "Result")) or (name == "List")) or (name == "Map")
 end
+-- Typecheck:409
 function Typecheck.is_builtin_type(self, t)
+    -- Typecheck:410
     return ((t.kind == "class") or (t.kind == "enum")) and Typecheck.is_builtin_name(self, t.name)
 end
+-- Typecheck:414
 function Typecheck.type_arg(self, t, i)
-    return Option.unwrap_or(__lz_get(t.params, i), Type.dynamic())
+    -- Typecheck:415
+    return Option.unwrap_or(List.__lz_get(t.params, i), Type.dynamic())
 end
+-- Typecheck:418
 function Typecheck.opt_of(self, t)
-    return Type.class_of("Option", __lz_list(t))
+    -- Typecheck:419
+    return Type.class_of("Option", List.__lz_list({t}))
 end
+-- Typecheck:425
 function Typecheck.unify_elem(self, acc, next)
+    -- Typecheck:426
     if next:is_dynamic() then
+        -- Typecheck:427
         return acc
     end
+    -- Typecheck:429
     if acc:is_dynamic() then
+        -- Typecheck:430
         return next
     end
+    -- Typecheck:432
     if not acc:equals(next) then
+        -- Typecheck:433
         return Type.dynamic()
     end
+    -- Typecheck:435
     return acc
 end
+-- Typecheck:438
 function Typecheck.type_list(self, node, scope)
+    -- Typecheck:439
     local elem = Type.dynamic()
-    for _, e in __lz_each(node:child("elements")) do
+    -- Typecheck:440
+    for _, e in List.__lz_each(node:child("elements")) do
+        -- Typecheck:441
         elem = Typecheck.unify_elem(self, elem, Typecheck.type_expr(self, e, scope))
     end
-    return Type.class_of("List", __lz_list(elem))
+    -- Typecheck:443
+    return Type.class_of("List", List.__lz_list({elem}))
 end
+-- Typecheck:446
 function Typecheck.type_map(self, node, scope)
+    -- Typecheck:447
     local kt = Type.dynamic()
+    -- Typecheck:448
     local vt = Type.dynamic()
-    for _, entry in __lz_each(node:child("entries")) do
+    -- Typecheck:449
+    for _, entry in List.__lz_each(node:child("entries")) do
+        -- Typecheck:450
         kt = Typecheck.unify_elem(self, kt, Typecheck.type_expr(self, entry:child("key"), scope))
+        -- Typecheck:451
         vt = Typecheck.unify_elem(self, vt, Typecheck.type_expr(self, entry:child("value"), scope))
     end
-    return Type.class_of("Map", __lz_list(kt, vt))
+    -- Typecheck:453
+    return Type.class_of("Map", List.__lz_list({kt, vt}))
 end
+-- Typecheck:456
 function Typecheck.type_index(self, node, scope)
+    -- Typecheck:457
     local obj = Typecheck.type_expr(self, node:child("object"), scope)
+    -- Typecheck:458
     Typecheck.type_expr(self, node:child("index"), scope)
+    -- Typecheck:459
     if (obj.kind == "class") and (obj.name == "List") then
+        -- Typecheck:460
         return Typecheck.type_arg(self, obj, 1)
     end
+    -- Typecheck:462
     if (obj.kind == "class") and (obj.name == "Map") then
+        -- Typecheck:463
         return Typecheck.type_arg(self, obj, 2)
     end
+    -- Typecheck:465
     return Type.dynamic()
 end
+-- Typecheck:470
 function Typecheck.type_builtin_ctor(self, ns, field, args, scope)
+    -- Typecheck:471
     local elem = Type.dynamic()
-    for _, arg in __lz_each(args) do
+    -- Typecheck:472
+    for _, arg in List.__lz_each(args) do
+        -- Typecheck:473
         local at = Typecheck.type_expr(self, arg, scope)
+        -- Typecheck:474
         if elem:is_dynamic() then
+            -- Typecheck:475
             elem = at
         end
     end
+    -- Typecheck:478
     if ns == "Option" then
+        -- Typecheck:479
         if field == "some" then
+            -- Typecheck:480
             return Typecheck.opt_of(self, elem)
         end
+        -- Typecheck:482
         return Typecheck.opt_of(self, Type.dynamic())
     end
+    -- Typecheck:484
     if field == "ok" then
-        return Type.class_of("Result", __lz_list(elem))
+        -- Typecheck:485
+        return Type.class_of("Result", List.__lz_list({elem}))
     end
-    return Type.class_of("Result", __lz_list(Type.dynamic()))
+    -- Typecheck:487
+    return Type.class_of("Result", List.__lz_list({Type.dynamic()}))
 end
+-- Typecheck:491
 function Typecheck.builtin_method(self, recv, method, args, scope)
-    for _, arg in __lz_each(args) do
+    -- Typecheck:492
+    for _, arg in List.__lz_each(args) do
+        -- Typecheck:493
         Typecheck.type_expr(self, arg, scope)
     end
+    -- Typecheck:495
     local a = Typecheck.type_arg(self, recv, 1)
+    -- Typecheck:496
     if recv.name == "List" then
+        -- Typecheck:497
         if (method == "get") or (method == "pop") then
+            -- Typecheck:498
             return Typecheck.opt_of(self, a)
         end
+        -- Typecheck:500
         if method == "len" then
+            -- Typecheck:501
             return Type.int()
         end
+        -- Typecheck:503
         if method == "has" then
+            -- Typecheck:504
             return Type.bool()
         end
+        -- Typecheck:506
         return Type.unit()
     end
+    -- Typecheck:508
     if recv.name == "Map" then
+        -- Typecheck:509
         if method == "get" then
+            -- Typecheck:510
             return Typecheck.opt_of(self, Typecheck.type_arg(self, recv, 2))
         end
+        -- Typecheck:512
         if method == "has" then
+            -- Typecheck:513
             return Type.bool()
         end
+        -- Typecheck:515
         if method == "len" then
+            -- Typecheck:516
             return Type.int()
         end
+        -- Typecheck:518
+        if method == "delete" then
+            -- Typecheck:519
+            return Type.unit()
+        end
+        -- Typecheck:521
         return Type.unit()
     end
+    -- Typecheck:523
     if recv.name == "Option" then
+        -- Typecheck:524
         if (method == "unwrap") or (method == "unwrap_or") then
+            -- Typecheck:525
             return a
         end
+        -- Typecheck:527
         return Type.bool()
     end
+    -- Typecheck:529
     if (method == "unwrap") or (method == "unwrap_or") then
+        -- Typecheck:530
         return a
     end
+    -- Typecheck:532
     if method == "error" then
+        -- Typecheck:533
         return Type.str()
     end
+    -- Typecheck:535
     return Type.bool()
 end
+-- Typecheck:538
 function Typecheck.literal_type(self, node)
+    -- Typecheck:539
     local lk = node:child("lit_kind")
+    -- Typecheck:540
     if lk == "number" then
+        -- Typecheck:541
         return Type.int()
     end
+    -- Typecheck:543
     if lk == "float" then
+        -- Typecheck:544
         return Type.float()
     end
+    -- Typecheck:546
     if lk == "string" then
+        -- Typecheck:547
         return Type.str()
     end
+    -- Typecheck:549
     if lk == "boolean" then
+        -- Typecheck:550
         return Type.bool()
     end
+    -- Typecheck:552
     return Type.dynamic()
 end
+-- Typecheck:555
 function Typecheck.type_binary(self, node, scope)
+    -- Typecheck:556
     local lt = Typecheck.type_expr(self, node:child("left"), scope)
+    -- Typecheck:557
     local rt = Typecheck.type_expr(self, node:child("right"), scope)
+    -- Typecheck:558
     local op = node:child("op")
+    -- Typecheck:559
     if Typecheck.is_arith(self, op) then
+        -- Typecheck:560
         return Typecheck.arith_type(self, node, op, lt, rt)
     end
+    -- Typecheck:562
     if op == "CONCAT" then
+        -- Typecheck:563
         return Typecheck.concat_type(self, node, lt, rt)
     end
+    -- Typecheck:565
     if (op == "EQ") or (op == "NEQ") then
+        -- Typecheck:566
         return Typecheck.equality_type(self, node, lt, rt)
     end
+    -- Typecheck:568
     if Typecheck.is_ordering(self, op) then
+        -- Typecheck:569
         return Typecheck.ordering_type(self, node, lt, rt)
     end
+    -- Typecheck:571
     return Type.bool()
 end
+-- Typecheck:574
 function Typecheck.is_arith(self, op)
+    -- Typecheck:575
     return (((((op == "PLUS") or (op == "MINUS")) or (op == "MULTIPLY")) or (op == "DIVIDE")) or (op == "MODULO")) or (op == "POWER")
 end
+-- Typecheck:578
 function Typecheck.is_ordering(self, op)
+    -- Typecheck:579
     return (((op == "LESS") or (op == "LESS_EQUAL")) or (op == "GREATER")) or (op == "GREATER_EQUAL")
 end
+-- Typecheck:584
 function Typecheck.concat_type(self, node, lt, rt)
+    -- Typecheck:585
     if (not Typecheck.str_or_dynamic(self, lt)) or (not Typecheck.str_or_dynamic(self, rt)) then
+        -- Typecheck:586
         Typecheck.fail(self, node, ((("++ joins strings, found " .. lt:describe()) .. " and ") .. rt:describe()) .. "; convert explicitly")
     end
+    -- Typecheck:588
     return Type.str()
 end
+-- Typecheck:591
 function Typecheck.str_or_dynamic(self, t)
+    -- Typecheck:592
     return t:is_dynamic() or (t.kind == "str")
 end
+-- Typecheck:596
 function Typecheck.equality_type(self, node, lt, rt)
+    -- Typecheck:597
     if ((not lt:is_dynamic()) and (not rt:is_dynamic())) and (not lt:equals(rt)) then
+        -- Typecheck:598
         Typecheck.fail(self, node, ((("cannot compare " .. lt:describe()) .. " and ") .. rt:describe()) .. " for equality")
     end
+    -- Typecheck:600
     return Type.bool()
 end
+-- Typecheck:604
 function Typecheck.ordering_type(self, node, lt, rt)
+    -- Typecheck:605
     if lt:is_dynamic() or rt:is_dynamic() then
+        -- Typecheck:606
         return Type.bool()
     end
+    -- Typecheck:608
     if (lt.kind == "str") and (rt.kind == "str") then
+        -- Typecheck:609
         return Type.bool()
     end
+    -- Typecheck:611
     if (not lt:is_numeric()) or (not rt:is_numeric()) then
+        -- Typecheck:612
         Typecheck.fail(self, node, (("ordering needs numbers or strings, found " .. lt:describe()) .. " and ") .. rt:describe())
     end
+    -- Typecheck:614
     if not lt:equals(rt) then
+        -- Typecheck:615
         Typecheck.fail(self, node, ((("cannot order " .. lt:describe()) .. " against ") .. rt:describe()) .. "; convert explicitly")
     end
+    -- Typecheck:617
     return Type.bool()
 end
+-- Typecheck:620
 function Typecheck.arith_type(self, node, op, lt, rt)
+    -- Typecheck:621
     if lt:is_dynamic() or rt:is_dynamic() then
+        -- Typecheck:622
         return Type.dynamic()
     end
+    -- Typecheck:624
     if (not lt:is_numeric()) or (not rt:is_numeric()) then
+        -- Typecheck:625
         Typecheck.fail(self, node, (("arithmetic needs numbers, found " .. lt:describe()) .. " and ") .. rt:describe())
     end
+    -- Typecheck:627
     if not lt:equals(rt) then
+        -- Typecheck:628
         Typecheck.fail(self, node, ((("cannot mix " .. lt:describe()) .. " and ") .. rt:describe()) .. " in arithmetic; convert explicitly")
     end
+    -- Typecheck:630
     if op == "DIVIDE" then
+        -- Typecheck:631
         return Type.float()
     end
+    -- Typecheck:633
     return lt
 end
+-- Typecheck:640
 function Typecheck.identifier_type(self, name, scope)
+    -- Typecheck:641
     local found = scope:lookup(name)
+    -- Typecheck:642
     if Option.is_some(found) then
+        -- Typecheck:643
         return Option.unwrap(found)
     end
-    if __lz_has(self.variant_owner, name) then
-        return Typecheck.enum_instance(self, Option.unwrap(__lz_get(self.variant_owner, name)), __lz_map({}))
+    -- Typecheck:645
+    if List.__lz_has(self.variant_owner, name) then
+        -- Typecheck:646
+        return Typecheck.enum_instance(self, Option.unwrap(List.__lz_get(self.variant_owner, name)), Map.__lz_map({}))
     end
-    if __lz_has(self.classes, name) then
-        return Type.class_of(name, __lz_list())
+    -- Typecheck:648
+    if List.__lz_has(self.classes, name) then
+        -- Typecheck:649
+        return Type.class_of(name, List.__lz_list({}))
     end
+    -- Typecheck:651
     return Type.dynamic()
 end
+-- Typecheck:656
 function Typecheck.type_call(self, node, scope)
+    -- Typecheck:657
     local callee = node:child("callee")
+    -- Typecheck:658
     local args = node:child("args")
+    -- Typecheck:659
     if callee.kind == "MemberExpr" then
+        -- Typecheck:660
         local obj = callee:child("object")
+        -- Typecheck:661
         if (obj.kind == "IdentifierExpr") and ((obj:child("name") == "Option") or (obj:child("name") == "Result")) then
+            -- Typecheck:662
             return Typecheck.type_builtin_ctor(self, obj:child("name"), callee:child("field"), args, scope)
         end
+        -- Typecheck:664
         return Typecheck.type_method_call(self, callee, args, scope, node)
     end
+    -- Typecheck:666
     if callee.kind == "IdentifierExpr" then
+        -- Typecheck:667
         local name = callee:child("name")
-        if __lz_has(self.variant_owner, name) then
+        -- Typecheck:668
+        if List.__lz_has(self.variant_owner, name) then
+            -- Typecheck:669
             return Typecheck.type_variant(self, name, args, scope, node)
         end
-        if (not Option.is_some(scope:lookup(name))) and __lz_has(self.interfaces, name) then
+        -- Typecheck:671
+        if (not Option.is_some(scope:lookup(name))) and List.__lz_has(self.interfaces, name) then
+            -- Typecheck:672
             Typecheck.fail(self, callee, ("cannot construct interface '" .. name) .. "'")
         end
-        if (not Option.is_some(scope:lookup(name))) and __lz_has(self.classes, name) then
+        -- Typecheck:674
+        if (not Option.is_some(scope:lookup(name))) and List.__lz_has(self.classes, name) then
+            -- Typecheck:675
             return Typecheck.type_construction(self, name, args, scope, node)
         end
     end
+    -- Typecheck:678
     if Typecheck.is_labeled(self, args) then
+        -- Typecheck:679
         Typecheck.fail(self, node, "labeled arguments can only be used with a known method or constructor")
     end
+    -- Typecheck:681
     local callee_type = Typecheck.type_expr(self, callee, scope)
+    -- Typecheck:682
     if callee_type.kind == "fn" then
+        -- Typecheck:683
         return Typecheck.type_fn_call(self, callee_type, args, scope, node)
     end
-    for _, arg in __lz_each(args) do
+    -- Typecheck:685
+    for _, arg in List.__lz_each(args) do
+        -- Typecheck:686
         Typecheck.type_expr(self, arg, scope)
     end
+    -- Typecheck:688
     return Type.dynamic()
 end
+-- Typecheck:691
 function Typecheck.type_fn_call(self, fn_type, args, scope, node)
+    -- Typecheck:692
     local params = fn_type.params
-    if __lz_len(args) ~= __lz_len(params) then
-        Typecheck.fail(self, node, (("wrong number of arguments: expected " .. Typecheck.count(self, __lz_len(params))) .. ", found ") .. Typecheck.count(self, __lz_len(args)))
+    -- Typecheck:693
+    if List.__lz_len(args) ~= List.__lz_len(params) then
+        -- Typecheck:694
+        Typecheck.fail(self, node, (("wrong number of arguments: expected " .. Typecheck.count(self, List.__lz_len(params))) .. ", found ") .. Typecheck.count(self, List.__lz_len(args)))
     end
+    -- Typecheck:696
     local i = 1
-    for _, arg in __lz_each(args) do
-        local expected = Option.unwrap_or(__lz_get(params, i), Type.dynamic())
+    -- Typecheck:697
+    for _, arg in List.__lz_each(args) do
+        -- Typecheck:698
+        local expected = Option.unwrap_or(List.__lz_get(params, i), Type.dynamic())
+        -- Typecheck:699
         local actual = Typecheck.type_expr(self, arg, scope)
+        -- Typecheck:700
         Typecheck.expect(self, expected, actual, arg, "argument")
+        -- Typecheck:701
         i = i + 1
     end
+    -- Typecheck:703
     return Option.unwrap_or(fn_type.result, Type.dynamic())
 end
+-- Typecheck:708
 function Typecheck.type_construction(self, name, args, scope, node)
-    local ctor = __lz_unwrap(__lz_get(Option.unwrap(__lz_get(self.classes, name)), "ctor"))
+    -- Typecheck:709
+    local ctor = Option.__lz_unwrap(List.__lz_get(Option.unwrap(List.__lz_get(self.classes, name)), "ctor"))
+    -- Typecheck:710
     local call_args = args
+    -- Typecheck:711
     if Typecheck.is_labeled(self, args) then
-        local ctor_names = __lz_unwrap_or(__lz_get(Option.unwrap(__lz_get(self.classes, name)), "ctor_names"), __lz_list())
+        -- Typecheck:712
+        local ctor_names = Option.__lz_unwrap_or(List.__lz_get(Option.unwrap(List.__lz_get(self.classes, name)), "ctor_names"), List.__lz_list({}))
+        -- Typecheck:713
         call_args = Typecheck.resolve_labeled(self, ctor, ctor_names, args, node)
+        -- Typecheck:714
         node:set("args", call_args)
     end
-    local subst = __lz_map({})
+    -- Typecheck:716
+    local subst = Map.__lz_map({})
+    -- Typecheck:717
     if ctor == 0 then
-        for _, arg in __lz_each(call_args) do
+        -- Typecheck:718
+        for _, arg in List.__lz_each(call_args) do
+            -- Typecheck:719
             Typecheck.type_expr(self, arg, scope)
         end
     else
+        -- Typecheck:722
         Typecheck.infer_and_check(self, ctor, Typecheck.class_var_set(self, name), call_args, scope, node, subst)
     end
+    -- Typecheck:724
     return Typecheck.class_instance(self, name, subst)
 end
+-- Typecheck:729
 function Typecheck.type_variant(self, name, args, scope, node)
-    local owner = Option.unwrap(__lz_get(self.variant_owner, name))
-    local subst = __lz_map({})
-    Typecheck.infer_and_check(self, Option.unwrap_or(__lz_get(self.variant_fields, name), __lz_list()), Typecheck.enum_var_set(self, owner), args, scope, node, subst)
+    -- Typecheck:730
+    local owner = Option.unwrap(List.__lz_get(self.variant_owner, name))
+    -- Typecheck:731
+    local subst = Map.__lz_map({})
+    -- Typecheck:732
+    Typecheck.infer_and_check(self, Option.unwrap_or(List.__lz_get(self.variant_fields, name), List.__lz_list({})), Typecheck.enum_var_set(self, owner), args, scope, node, subst)
+    -- Typecheck:733
     return Typecheck.enum_instance(self, owner, subst)
 end
+-- Typecheck:736
 function Typecheck.type_method_call(self, member, args, scope, call)
+    -- Typecheck:737
     local object = member:child("object")
+    -- Typecheck:738
     local method = member:child("field")
+    -- Typecheck:739
     local recv = Typecheck.receiver_type(self, object, scope)
+    -- Typecheck:740
     if Typecheck.is_builtin_type(self, recv) then
-        local class_entry = __lz_get(self.classes, recv.name)
+        -- Typecheck:741
+        local class_entry = List.__lz_get(self.classes, recv.name)
+        -- Typecheck:742
         if Option.is_some(class_entry) then
-            local sig = __lz_get(__lz_unwrap(__lz_get(Option.unwrap(class_entry), "methods")), method)
-            if __lz_is_some(sig) and __lz_unwrap_or(__lz_get(__lz_unwrap(sig), "is_static"), false) then
+            -- Typecheck:743
+            local sig = List.__lz_get(Option.__lz_unwrap(List.__lz_get(Option.unwrap(class_entry), "methods")), method)
+            -- Typecheck:744
+            if Option.__lz_is_some(sig) and Option.__lz_unwrap_or(List.__lz_get(Option.__lz_unwrap(sig), "is_static"), false) then
+                -- Typecheck:745
                 call:set("dispatch_class", recv.name)
-                local full_args = __lz_list(object)
-                for _, arg in __lz_each(args) do
-                    __lz_push(full_args, arg)
+                -- Typecheck:746
+                local full_args = List.__lz_list({object})
+                -- Typecheck:747
+                for _, arg in List.__lz_each(args) do
+                    -- Typecheck:747
+                    List.__lz_push(full_args, arg)
                 end
-                return Typecheck.type_method_sig(self, recv.name, recv, __lz_unwrap(sig), full_args, scope, call)
+                -- Typecheck:748
+                return Typecheck.type_method_sig(self, recv.name, recv, Option.__lz_unwrap(sig), full_args, scope, call)
             end
         end
+        -- Typecheck:751
         return Typecheck.builtin_method(self, recv, method, args, scope)
     end
+    -- Typecheck:753
     if recv.kind == "iface" then
-        return Typecheck.iface_method(self, recv, method, args, scope, call)
+        -- Typecheck:754
+        local t = Typecheck.iface_method(self, recv, method, args, scope, call)
+        -- Typecheck:755
+        call:set("known_method", true)
+        -- Typecheck:756
+        return t
     end
+    -- Typecheck:758
     local cls = Typecheck.class_name_of(self, recv)
+    -- Typecheck:759
     if cls == "" then
-        for _, arg in __lz_each(args) do
+        -- Typecheck:760
+        for _, arg in List.__lz_each(args) do
+            -- Typecheck:761
             Typecheck.type_expr(self, arg, scope)
         end
+        -- Typecheck:763
         return Type.dynamic()
     end
-    local sig = __lz_get(__lz_unwrap(__lz_get(Option.unwrap(__lz_get(self.classes, cls)), "methods")), method)
-    if not __lz_is_some(sig) then
-        local fields = __lz_unwrap(__lz_get(Option.unwrap(__lz_get(self.classes, cls)), "fields"))
-        local field_opt = __lz_get(fields, method)
-        if __lz_is_some(field_opt) then
-            local field_node_opt = __lz_unwrap(field_opt)
-            if __lz_is_some(field_node_opt) then
-                local ft = Typecheck.substitute(self, Typecheck.resolve_with(self, __lz_unwrap(field_node_opt), Typecheck.class_var_set(self, cls)), Typecheck.receiver_subst(self, cls, recv))
+    -- Typecheck:765
+    call:set("known_method", true)
+    -- Typecheck:766
+    local sig = List.__lz_get(Option.__lz_unwrap(List.__lz_get(Option.unwrap(List.__lz_get(self.classes, cls)), "methods")), method)
+    -- Typecheck:767
+    if not Option.__lz_is_some(sig) then
+        -- Typecheck:768
+        local fields = Option.__lz_unwrap(List.__lz_get(Option.unwrap(List.__lz_get(self.classes, cls)), "fields"))
+        -- Typecheck:769
+        local field_opt = List.__lz_get(fields, method)
+        -- Typecheck:770
+        if Option.__lz_is_some(field_opt) then
+            -- Typecheck:771
+            local field_node_opt = Option.__lz_unwrap(field_opt)
+            -- Typecheck:772
+            if Option.__lz_is_some(field_node_opt) then
+                -- Typecheck:773
+                local ft = Typecheck.substitute(self, Typecheck.resolve_with(self, Option.__lz_unwrap(field_node_opt), Typecheck.class_var_set(self, cls)), Typecheck.receiver_subst(self, cls, recv))
+                -- Typecheck:774
                 if ft.kind == "fn" then
+                    -- Typecheck:775
                     return Typecheck.type_fn_call(self, ft, args, scope, call)
                 end
             end
         end
+        -- Typecheck:779
         if Typecheck.static_receiver(self, object, scope) then
-            for _, arg in __lz_each(args) do
+            -- Typecheck:780
+            for _, arg in List.__lz_each(args) do
+                -- Typecheck:781
                 Typecheck.type_expr(self, arg, scope)
             end
+            -- Typecheck:783
             return Type.dynamic()
         end
+        -- Typecheck:785
         Typecheck.fail(self, member, (("no method '" .. method) .. "' on ") .. cls)
     end
-    return Typecheck.type_method_sig(self, cls, recv, __lz_unwrap(sig), args, scope, call)
+    -- Typecheck:787
+    return Typecheck.type_method_sig(self, cls, recv, Option.__lz_unwrap(sig), args, scope, call)
 end
+-- Typecheck:792
 function Typecheck.type_method_sig(self, cls, recv, sig, args, scope, call)
+    -- Typecheck:793
     local call_args = args
+    -- Typecheck:794
     if Typecheck.is_labeled(self, args) then
-        local names = Option.unwrap_or(__lz_get(sig, "param_names"), __lz_list())
-        call_args = Typecheck.resolve_labeled(self, Option.unwrap(__lz_get(sig, "params")), names, args, call)
+        -- Typecheck:795
+        local names = Option.unwrap_or(List.__lz_get(sig, "param_names"), List.__lz_list({}))
+        -- Typecheck:796
+        call_args = Typecheck.resolve_labeled(self, Option.unwrap(List.__lz_get(sig, "params")), names, args, call)
+        -- Typecheck:797
         call:set("args", call_args)
     end
+    -- Typecheck:799
     local vars = Typecheck.method_var_set(self, cls, sig)
+    -- Typecheck:800
     local subst = Typecheck.receiver_subst(self, cls, recv)
-    Typecheck.infer_and_check(self, Option.unwrap(__lz_get(sig, "params")), vars, call_args, scope, call, subst)
-    local result = Option.unwrap_or(__lz_get(sig, "result"), 0)
+    -- Typecheck:801
+    Typecheck.infer_and_check(self, Option.unwrap(List.__lz_get(sig, "params")), vars, call_args, scope, call, subst)
+    -- Typecheck:802
+    local result = Option.unwrap_or(List.__lz_get(sig, "result"), 0)
+    -- Typecheck:803
     if result == 0 then
+        -- Typecheck:804
         return Type.dynamic()
     end
+    -- Typecheck:806
     return Typecheck.substitute(self, Typecheck.resolve_with(self, result, vars), subst)
 end
+-- Typecheck:813
 function Typecheck.type_member(self, node, scope)
+    -- Typecheck:814
     local object = node:child("object")
+    -- Typecheck:815
     local field = node:child("field")
+    -- Typecheck:816
     local recv = Typecheck.receiver_type(self, object, scope)
+    -- Typecheck:817
     local cls = Typecheck.class_name_of(self, recv)
+    -- Typecheck:818
     if cls == "" then
+        -- Typecheck:819
         return Type.dynamic()
     end
-    local entry = Option.unwrap(__lz_get(self.classes, cls))
-    local ft = __lz_get(__lz_unwrap(__lz_get(entry, "fields")), field)
-    if __lz_is_some(ft) then
-        local fnode = __lz_unwrap(ft)
-        if __lz_is_none(fnode) then
+    -- Typecheck:821
+    local entry = Option.unwrap(List.__lz_get(self.classes, cls))
+    -- Typecheck:822
+    local ft = List.__lz_get(Option.__lz_unwrap(List.__lz_get(entry, "fields")), field)
+    -- Typecheck:823
+    if Option.__lz_is_some(ft) then
+        -- Typecheck:824
+        local fnode = Option.__lz_unwrap(ft)
+        -- Typecheck:825
+        if Option.__lz_is_none(fnode) then
+            -- Typecheck:826
             return Type.dynamic()
         end
-        return Typecheck.substitute(self, Typecheck.resolve_with(self, __lz_unwrap(fnode), Typecheck.class_var_set(self, cls)), Typecheck.receiver_subst(self, cls, recv))
+        -- Typecheck:828
+        return Typecheck.substitute(self, Typecheck.resolve_with(self, Option.__lz_unwrap(fnode), Typecheck.class_var_set(self, cls)), Typecheck.receiver_subst(self, cls, recv))
     end
-    if __lz_has(__lz_unwrap(__lz_get(entry, "methods")), field) then
+    -- Typecheck:830
+    if List.__lz_has(Option.__lz_unwrap(List.__lz_get(entry, "methods")), field) then
+        -- Typecheck:831
         return Type.dynamic()
     end
+    -- Typecheck:833
     if Typecheck.static_receiver(self, object, scope) then
+        -- Typecheck:834
         return Type.dynamic()
     end
+    -- Typecheck:836
     Typecheck.fail(self, node, (("no field '" .. field) .. "' on ") .. cls)
 end
+-- Typecheck:841
 function Typecheck.receiver_type(self, object, scope)
+    -- Typecheck:842
     if object.kind == "SelfExpr" then
+        -- Typecheck:843
         return Type.class_of(self.class_name, Typecheck.self_args(self))
     end
+    -- Typecheck:845
     if object.kind == "IdentifierExpr" then
+        -- Typecheck:846
         local found = scope:lookup(object:child("name"))
+        -- Typecheck:847
         if Option.is_some(found) then
+            -- Typecheck:848
             return Option.unwrap(found)
         end
-        if __lz_has(self.classes, object:child("name")) then
-            return Type.class_of(object:child("name"), __lz_list())
+        -- Typecheck:850
+        if List.__lz_has(self.classes, object:child("name")) then
+            -- Typecheck:851
+            return Type.class_of(object:child("name"), List.__lz_list({}))
         end
+        -- Typecheck:853
         return Type.dynamic()
     end
+    -- Typecheck:855
     return Typecheck.type_expr(self, object, scope)
 end
+-- Typecheck:858
 function Typecheck.class_name_of(self, t)
+    -- Typecheck:859
     if (t.kind == "class") or (t.kind == "enum") then
+        -- Typecheck:860
         return t.name
     end
+    -- Typecheck:862
     return ""
 end
+-- Typecheck:868
 function Typecheck.static_receiver(self, object, scope)
+    -- Typecheck:869
     if object.kind ~= "IdentifierExpr" then
+        -- Typecheck:870
         return false
     end
-    return (not Option.is_some(scope:lookup(object:child("name")))) and __lz_has(self.classes, object:child("name"))
+    -- Typecheck:872
+    return (not Option.is_some(scope:lookup(object:child("name")))) and List.__lz_has(self.classes, object:child("name"))
 end
+-- Typecheck:875
 function Typecheck.is_labeled(self, args)
-    local first = __lz_get(args, 1)
+    -- Typecheck:876
+    local first = List.__lz_get(args, 1)
+    -- Typecheck:877
     if Option.is_none(first) then
+        -- Typecheck:878
         return false
     end
+    -- Typecheck:880
     return Option.unwrap(first).kind == "LabeledArg"
 end
+-- Typecheck:885
 function Typecheck.resolve_labeled(self, param_nodes, param_names, args, node)
-    local named = __lz_map({})
-    for _, arg in __lz_each(args) do
+    -- Typecheck:886
+    local named = Map.__lz_map({})
+    -- Typecheck:887
+    for _, arg in List.__lz_each(args) do
+        -- Typecheck:888
         local label = arg:child("name")
-        if __lz_has(named, label) then
+        -- Typecheck:889
+        if List.__lz_has(named, label) then
+            -- Typecheck:890
             Typecheck.fail(self, node, ("duplicate labeled argument '" .. label) .. "'")
         end
-        __lz_idx_set(named, label, arg:child("value"))
+        -- Typecheck:892
+        List.__lz_idx_set(named, label, arg:child("value"))
     end
-    for label, _ in __lz_each(named) do
+    -- Typecheck:894
+    for label, _ in List.__lz_each(named) do
+        -- Typecheck:895
         local found = false
-        for _, pname in __lz_each(param_names) do
+        -- Typecheck:896
+        for _, pname in List.__lz_each(param_names) do
+            -- Typecheck:897
             if pname == label then
+                -- Typecheck:898
                 found = true
             end
         end
+        -- Typecheck:901
         if not found then
+            -- Typecheck:902
             Typecheck.fail(self, node, ("unknown labeled argument '" .. label) .. "'")
         end
     end
-    local resolved = __lz_list()
+    -- Typecheck:905
+    local resolved = List.__lz_list({})
+    -- Typecheck:906
     local i = 1
-    for _, pname in __lz_each(param_names) do
-        if __lz_has(named, pname) then
-            __lz_push(resolved, Option.unwrap(__lz_get(named, pname)))
+    -- Typecheck:907
+    for _, pname in List.__lz_each(param_names) do
+        -- Typecheck:908
+        if List.__lz_has(named, pname) then
+            -- Typecheck:909
+            List.__lz_push(resolved, Option.unwrap(List.__lz_get(named, pname)))
         else
-            if not Option.is_some(Option.unwrap(__lz_get(param_nodes, i)):attr("default")) then
+            -- Typecheck:911
+            if not Option.is_some(Option.unwrap(List.__lz_get(param_nodes, i)):attr("default")) then
+                -- Typecheck:912
                 Typecheck.fail(self, node, ("missing required argument '" .. pname) .. "'")
             end
-            __lz_push(resolved, Node.new("LiteralExpr", __lz_map({["lit_kind"] = "nil", ["value"] = 0, ["line"] = node:line(), ["col"] = node:col()})))
+            -- Typecheck:914
+            List.__lz_push(resolved, Node.new("LiteralExpr", Map.__lz_map({["lit_kind"] = "nil", ["value"] = 0, ["line"] = node:line(), ["col"] = node:col()})))
         end
+        -- Typecheck:916
         i = i + 1
     end
+    -- Typecheck:918
     return resolved
 end
+-- Typecheck:925
 function Typecheck.infer_and_check(self, param_nodes, callee_vars, args, scope, node, subst)
-    if __lz_len(args) > __lz_len(param_nodes) then
-        Typecheck.fail(self, node, (("wrong number of arguments: expected " .. Typecheck.count(self, __lz_len(param_nodes))) .. ", found ") .. Typecheck.count(self, __lz_len(args)))
+    -- Typecheck:926
+    if List.__lz_len(args) > List.__lz_len(param_nodes) then
+        -- Typecheck:927
+        Typecheck.fail(self, node, (("wrong number of arguments: expected " .. Typecheck.count(self, List.__lz_len(param_nodes))) .. ", found ") .. Typecheck.count(self, List.__lz_len(args)))
     end
-    if __lz_len(args) < __lz_len(param_nodes) then
-        local i = __lz_len(args) + 1
-        while i <= __lz_len(param_nodes) do
-            if not Option.is_some(Option.unwrap(__lz_get(param_nodes, i)):attr("default")) then
-                Typecheck.fail(self, node, ((((("wrong number of arguments: expected " .. Typecheck.count(self, __lz_len(param_nodes))) .. ", found ") .. Typecheck.count(self, __lz_len(args))) .. " (parameter ") .. Typecheck.count(self, i)) .. " has no default)")
+    -- Typecheck:929
+    if List.__lz_len(args) < List.__lz_len(param_nodes) then
+        -- Typecheck:930
+        local i = List.__lz_len(args) + 1
+        -- Typecheck:931
+        while i <= List.__lz_len(param_nodes) do
+            -- Typecheck:932
+            if not Option.is_some(Option.unwrap(List.__lz_get(param_nodes, i)):attr("default")) then
+                -- Typecheck:933
+                Typecheck.fail(self, node, ((((("wrong number of arguments: expected " .. Typecheck.count(self, List.__lz_len(param_nodes))) .. ", found ") .. Typecheck.count(self, List.__lz_len(args))) .. " (parameter ") .. Typecheck.count(self, i)) .. " has no default)")
             end
+            -- Typecheck:935
             i = i + 1
         end
     end
-    local ptypes = __lz_list()
-    local atypes = __lz_list()
+    -- Typecheck:938
+    local ptypes = List.__lz_list({})
+    -- Typecheck:939
+    local atypes = List.__lz_list({})
+    -- Typecheck:940
     local i = 1
-    for _, arg in __lz_each(args) do
-        local pt = Typecheck.resolve_with(self, Option.unwrap(__lz_get(param_nodes, i)), callee_vars)
+    -- Typecheck:941
+    for _, arg in List.__lz_each(args) do
+        -- Typecheck:942
+        local pt = Typecheck.resolve_with(self, Option.unwrap(List.__lz_get(param_nodes, i)), callee_vars)
+        -- Typecheck:943
         local at = Typecheck.type_expr(self, arg, scope)
+        -- Typecheck:944
         Typecheck.unify(self, pt, at, subst)
-        __lz_push(ptypes, pt)
-        __lz_push(atypes, at)
+        -- Typecheck:945
+        List.__lz_push(ptypes, pt)
+        -- Typecheck:946
+        List.__lz_push(atypes, at)
+        -- Typecheck:947
         i = i + 1
     end
+    -- Typecheck:949
     local j = 1
-    for _, arg in __lz_each(args) do
-        Typecheck.expect(self, Typecheck.substitute(self, Option.unwrap(__lz_get(ptypes, j)), subst), Option.unwrap(__lz_get(atypes, j)), arg, "argument")
+    -- Typecheck:950
+    for _, arg in List.__lz_each(args) do
+        -- Typecheck:951
+        Typecheck.expect(self, Typecheck.substitute(self, Option.unwrap(List.__lz_get(ptypes, j)), subst), Option.unwrap(List.__lz_get(atypes, j)), arg, "argument")
+        -- Typecheck:952
         j = j + 1
     end
 end
+-- Typecheck:956
 function Typecheck.count(self, n)
-    return __lz_unwrap_or(__lz_wrap(string.format("%d", n)), "?")
+    -- Typecheck:957
+    return Option.__lz_unwrap_or(Option.__lz_wrap(string.format("%d", n)), "?")
 end
+-- Typecheck:962
 function Typecheck.field_type(self, opt)
+    -- Typecheck:963
     if not Option.is_some(opt) then
+        -- Typecheck:964
         return Type.dynamic()
     end
+    -- Typecheck:966
     return Typecheck.resolve(self, Option.unwrap(opt))
 end
+-- Typecheck:973
 function Typecheck.self_args(self)
-    return (function() local __lz_m5 = __lz_list() for _, p in __lz_each(Typecheck.own_type_params(self)) do __lz_push(__lz_m5, Type.var(p)) end return __lz_m5 end)()
+    -- Typecheck:974
+    return (function() local __lz_m5 = List.__lz_list({}) for _, p in List.__lz_each(Typecheck.own_type_params(self)) do List.__lz_push(__lz_m5, Type.var(p)) end return __lz_m5 end)()
 end
+-- Typecheck:977
 function Typecheck.class_instance(self, name, subst)
+    -- Typecheck:978
     return Type.class_of(name, Typecheck.solved_args(self, Typecheck.class_params(self, name), subst))
 end
+-- Typecheck:981
 function Typecheck.enum_instance(self, owner, subst)
-    return Type.enum_of(owner, Typecheck.solved_args(self, Option.unwrap_or(__lz_get(self.enum_type_params, owner), __lz_list()), subst))
+    -- Typecheck:982
+    return Type.enum_of(owner, Typecheck.solved_args(self, Option.unwrap_or(List.__lz_get(self.enum_type_params, owner), List.__lz_list({})), subst))
 end
+-- Typecheck:987
 function Typecheck.solved_args(self, params, subst)
-    return (function() local __lz_m6 = __lz_list() for _, p in __lz_each(params) do __lz_push(__lz_m6, Typecheck.subst_lookup(self, subst, p)) end return __lz_m6 end)()
+    -- Typecheck:988
+    return (function() local __lz_m6 = List.__lz_list({}) for _, p in List.__lz_each(params) do List.__lz_push(__lz_m6, Typecheck.subst_lookup(self, subst, p)) end return __lz_m6 end)()
 end
+-- Typecheck:991
 function Typecheck.subst_lookup(self, subst, name)
-    local v = __lz_get(subst, name)
+    -- Typecheck:992
+    local v = List.__lz_get(subst, name)
+    -- Typecheck:993
     if Option.is_some(v) then
+        -- Typecheck:994
         return Option.unwrap(v)
     end
+    -- Typecheck:996
     return Type.dynamic()
 end
+-- Typecheck:999
 function Typecheck.class_params(self, name)
-    local centry = __lz_get(self.classes, name)
+    -- Typecheck:1000
+    local centry = List.__lz_get(self.classes, name)
+    -- Typecheck:1001
     if Option.is_some(centry) then
-        return __lz_unwrap_or(__lz_get(Option.unwrap(centry), "type_params"), __lz_list())
+        -- Typecheck:1002
+        return Option.__lz_unwrap_or(List.__lz_get(Option.unwrap(centry), "type_params"), List.__lz_list({}))
     end
-    return __lz_list()
+    -- Typecheck:1004
+    return List.__lz_list({})
 end
+-- Typecheck:1007
 function Typecheck.class_var_set(self, name)
-    local out = __lz_map({})
-    for _, p in __lz_each(Typecheck.class_params(self, name)) do
-        __lz_idx_set(out, p, true)
+    -- Typecheck:1008
+    local out = Map.__lz_map({})
+    -- Typecheck:1009
+    for _, p in List.__lz_each(Typecheck.class_params(self, name)) do
+        -- Typecheck:1010
+        List.__lz_idx_set(out, p, true)
     end
+    -- Typecheck:1012
     return out
 end
+-- Typecheck:1015
 function Typecheck.enum_var_set(self, name)
-    local out = __lz_map({})
-    for _, p in __lz_each(Option.unwrap_or(__lz_get(self.enum_type_params, name), __lz_list())) do
-        __lz_idx_set(out, p, true)
+    -- Typecheck:1016
+    local out = Map.__lz_map({})
+    -- Typecheck:1017
+    for _, p in List.__lz_each(Option.unwrap_or(List.__lz_get(self.enum_type_params, name), List.__lz_list({}))) do
+        -- Typecheck:1018
+        List.__lz_idx_set(out, p, true)
     end
+    -- Typecheck:1020
     return out
 end
+-- Typecheck:1023
 function Typecheck.method_var_set(self, cls, sig)
+    -- Typecheck:1024
     local out = Typecheck.class_var_set(self, cls)
-    for _, p in __lz_each(Option.unwrap_or(__lz_get(sig, "type_params"), __lz_list())) do
-        __lz_idx_set(out, p, true)
+    -- Typecheck:1025
+    for _, p in List.__lz_each(Option.unwrap_or(List.__lz_get(sig, "type_params"), List.__lz_list({}))) do
+        -- Typecheck:1026
+        List.__lz_idx_set(out, p, true)
     end
+    -- Typecheck:1028
     return out
 end
+-- Typecheck:1036
 function Typecheck.receiver_subst(self, cls, recv)
-    local subst = __lz_map({})
+    -- Typecheck:1037
+    local subst = Map.__lz_map({})
+    -- Typecheck:1038
     local i = 1
-    for _, p in __lz_each(Typecheck.class_params(self, cls)) do
-        local arg = __lz_get(recv.params, i)
+    -- Typecheck:1039
+    for _, p in List.__lz_each(Typecheck.class_params(self, cls)) do
+        -- Typecheck:1040
+        local arg = List.__lz_get(recv.params, i)
+        -- Typecheck:1041
         if Option.is_some(arg) then
-            __lz_idx_set(subst, p, Option.unwrap(arg))
+            -- Typecheck:1042
+            List.__lz_idx_set(subst, p, Option.unwrap(arg))
         end
+        -- Typecheck:1044
         i = i + 1
     end
+    -- Typecheck:1046
     return subst
 end
+-- Typecheck:1051
 function Typecheck.resolve_with(self, node, vars)
+    -- Typecheck:1052
     local saved = self.type_vars
+    -- Typecheck:1053
     self.type_vars = vars
+    -- Typecheck:1054
     local r = Typecheck.resolve(self, node)
+    -- Typecheck:1055
     self.type_vars = saved
+    -- Typecheck:1056
     return r
 end
+-- Typecheck:1062
 function Typecheck.unify(self, param, arg, subst)
+    -- Typecheck:1063
     if param.kind == "var" then
-        if not __lz_has(subst, param.name) then
-            __lz_idx_set(subst, param.name, arg)
+        -- Typecheck:1064
+        if not List.__lz_has(subst, param.name) then
+            -- Typecheck:1065
+            List.__lz_idx_set(subst, param.name, arg)
         end
+        -- Typecheck:1067
         return
     end
+    -- Typecheck:1069
     if param:is_dynamic() or arg:is_dynamic() then
+        -- Typecheck:1070
         return
     end
+    -- Typecheck:1072
     if ((param.kind == arg.kind) and ((param.kind == "class") or (param.kind == "enum"))) and (param.name == arg.name) then
+        -- Typecheck:1073
         local i = 1
-        for _, p in __lz_each(param.params) do
-            Typecheck.unify(self, p, Option.unwrap_or(__lz_get(arg.params, i), Type.dynamic()), subst)
+        -- Typecheck:1074
+        for _, p in List.__lz_each(param.params) do
+            -- Typecheck:1075
+            Typecheck.unify(self, p, Option.unwrap_or(List.__lz_get(arg.params, i), Type.dynamic()), subst)
+            -- Typecheck:1076
             i = i + 1
         end
     end
 end
+-- Typecheck:1083
 function Typecheck.substitute(self, t, subst)
+    -- Typecheck:1084
     if t.kind == "var" then
+        -- Typecheck:1085
         return Typecheck.subst_lookup(self, subst, t.name)
     end
+    -- Typecheck:1087
     if t.kind == "fn" then
-        return Type.func((function() local __lz_m7 = __lz_list() for _, p in __lz_each(t.params) do __lz_push(__lz_m7, Typecheck.substitute(self, p, subst)) end return __lz_m7 end)(), Typecheck.substitute(self, Option.unwrap(t.result), subst))
+        -- Typecheck:1088
+        return Type.func((function() local __lz_m7 = List.__lz_list({}) for _, p in List.__lz_each(t.params) do List.__lz_push(__lz_m7, Typecheck.substitute(self, p, subst)) end return __lz_m7 end)(), Typecheck.substitute(self, Option.unwrap(t.result), subst))
     end
-    if ((t.kind == "class") or (t.kind == "enum")) and (__lz_len(t.params) > 0) then
-        return Type.new(t.kind, t.name, (function() local __lz_m8 = __lz_list() for _, a in __lz_each(t.params) do __lz_push(__lz_m8, Typecheck.substitute(self, a, subst)) end return __lz_m8 end)(), t.result)
+    -- Typecheck:1090
+    if ((t.kind == "class") or (t.kind == "enum")) and (List.__lz_len(t.params) > 0) then
+        -- Typecheck:1091
+        return Type.new(t.kind, t.name, (function() local __lz_m8 = List.__lz_list({}) for _, a in List.__lz_each(t.params) do List.__lz_push(__lz_m8, Typecheck.substitute(self, a, subst)) end return __lz_m8 end)(), t.result)
     end
+    -- Typecheck:1093
     return t
 end
+-- Typecheck:1101
 function Typecheck.resolve(self, t)
+    -- Typecheck:1102
     if t.kind == "TypeUnion" then
-        return Type.union((function() local __lz_m9 = __lz_list() for _, m in __lz_each(t:child("members")) do __lz_push(__lz_m9, Typecheck.resolve(self, m)) end return __lz_m9 end)())
+        -- Typecheck:1103
+        return Type.union((function() local __lz_m9 = List.__lz_list({}) for _, m in List.__lz_each(t:child("members")) do List.__lz_push(__lz_m9, Typecheck.resolve(self, m)) end return __lz_m9 end)())
     end
+    -- Typecheck:1105
     if t.kind == "TypeFn" then
-        return Type.func((function() local __lz_m10 = __lz_list() for _, p in __lz_each(t:child("params")) do __lz_push(__lz_m10, Typecheck.resolve(self, p)) end return __lz_m10 end)(), Typecheck.resolve(self, t:child("result")))
+        -- Typecheck:1106
+        return Type.func((function() local __lz_m10 = List.__lz_list({}) for _, p in List.__lz_each(t:child("params")) do List.__lz_push(__lz_m10, Typecheck.resolve(self, p)) end return __lz_m10 end)(), Typecheck.resolve(self, t:child("result")))
     end
+    -- Typecheck:1108
     local name = t:child("name")
+    -- Typecheck:1109
     local __lz_m11 = name
     if __lz_m11 == "int" then
+        -- Typecheck:1110
         return Type.int()
     elseif __lz_m11 == "float" then
+        -- Typecheck:1111
         return Type.float()
     elseif __lz_m11 == "bool" then
+        -- Typecheck:1112
         return Type.bool()
     elseif __lz_m11 == "str" then
+        -- Typecheck:1113
         return Type.str()
     elseif __lz_m11 == "unit" then
+        -- Typecheck:1114
         return Type.unit()
     elseif __lz_m11 == "dynamic" then
+        -- Typecheck:1115
         return Type.dynamic()
     else
     end
-    if __lz_has(self.type_vars, name) then
+    -- Typecheck:1118
+    if List.__lz_has(self.type_vars, name) then
+        -- Typecheck:1119
         return Type.var(name)
     end
+    -- Typecheck:1121
     if Typecheck.is_builtin_name(self, name) then
+        -- Typecheck:1122
         return Type.class_of(name, Typecheck.resolve_args(self, t, name))
     end
-    if __lz_has(self.enums, name) then
+    -- Typecheck:1124
+    if List.__lz_has(self.enums, name) then
+        -- Typecheck:1125
         return Type.enum_of(name, Typecheck.resolve_args(self, t, name))
     end
-    if __lz_has(self.interfaces, name) then
+    -- Typecheck:1127
+    if List.__lz_has(self.interfaces, name) then
+        -- Typecheck:1128
         return Type.iface_of(name, Typecheck.resolve_args(self, t, name))
     end
-    if __lz_has(self.known_classes, name) or __lz_has(self.classes, name) then
+    -- Typecheck:1130
+    if List.__lz_has(self.known_classes, name) or List.__lz_has(self.classes, name) then
+        -- Typecheck:1131
         return Type.class_of(name, Typecheck.resolve_args(self, t, name))
     end
+    -- Typecheck:1133
     return Type.dynamic()
 end
+-- Typecheck:1138
 function Typecheck.resolve_args(self, t, name)
+    -- Typecheck:1139
     local nodes = t:child("args")
-    if __lz_len(nodes) == 0 then
-        return __lz_list()
+    -- Typecheck:1140
+    if List.__lz_len(nodes) == 0 then
+        -- Typecheck:1141
+        return List.__lz_list({})
     end
+    -- Typecheck:1143
     local declared = Typecheck.declared_arity(self, name)
-    if (declared >= 0) and (__lz_len(nodes) ~= declared) then
-        Typecheck.fail(self, t, (((name .. " expects ") .. Typecheck.count(self, declared)) .. " type argument(s), found ") .. Typecheck.count(self, __lz_len(nodes)))
+    -- Typecheck:1144
+    if (declared >= 0) and (List.__lz_len(nodes) ~= declared) then
+        -- Typecheck:1145
+        Typecheck.fail(self, t, (((name .. " expects ") .. Typecheck.count(self, declared)) .. " type argument(s), found ") .. Typecheck.count(self, List.__lz_len(nodes)))
     end
-    return (function() local __lz_m12 = __lz_list() for _, a in __lz_each(nodes) do __lz_push(__lz_m12, Typecheck.resolve(self, a)) end return __lz_m12 end)()
+    -- Typecheck:1147
+    return (function() local __lz_m12 = List.__lz_list({}) for _, a in List.__lz_each(nodes) do List.__lz_push(__lz_m12, Typecheck.resolve(self, a)) end return __lz_m12 end)()
 end
+-- Typecheck:1150
 function Typecheck.declared_arity(self, name)
+    -- Typecheck:1151
     if ((name == "Option") or (name == "Result")) or (name == "List") then
+        -- Typecheck:1152
         return 1
     end
+    -- Typecheck:1154
     if name == "Map" then
+        -- Typecheck:1155
         return 2
     end
-    if __lz_has(self.enum_type_params, name) then
-        return __lz_len(Option.unwrap(__lz_get(self.enum_type_params, name)))
+    -- Typecheck:1157
+    if List.__lz_has(self.enum_type_params, name) then
+        -- Typecheck:1158
+        return List.__lz_len(Option.unwrap(List.__lz_get(self.enum_type_params, name)))
     end
-    if __lz_has(self.interfaces, name) then
-        return __lz_len(__lz_unwrap_or(__lz_get(Option.unwrap(__lz_get(self.interfaces, name)), "type_params"), __lz_list()))
+    -- Typecheck:1160
+    if List.__lz_has(self.interfaces, name) then
+        -- Typecheck:1161
+        return List.__lz_len(Option.__lz_unwrap_or(List.__lz_get(Option.unwrap(List.__lz_get(self.interfaces, name)), "type_params"), List.__lz_list({})))
     end
-    local centry = __lz_get(self.classes, name)
+    -- Typecheck:1163
+    local centry = List.__lz_get(self.classes, name)
+    -- Typecheck:1164
     if Option.is_some(centry) then
-        return __lz_len(__lz_unwrap_or(__lz_get(Option.unwrap(centry), "type_params"), __lz_list()))
+        -- Typecheck:1165
+        return List.__lz_len(Option.__lz_unwrap_or(List.__lz_get(Option.unwrap(centry), "type_params"), List.__lz_list({})))
     end
+    -- Typecheck:1167
     return -1
 end
+-- Typecheck:1170
 function Typecheck.expect(self, expected, actual, node, what)
+    -- Typecheck:1171
     if not Typecheck.compatible(self, expected, actual) then
+        -- Typecheck:1172
         if (expected.kind == "iface") and (self.iface_reason ~= "") then
+            -- Typecheck:1173
             Typecheck.fail(self, node, (((actual:describe() .. " does not satisfy ") .. expected:describe()) .. ": ") .. self.iface_reason)
         end
+        -- Typecheck:1175
         Typecheck.fail(self, node, (((("type mismatch in " .. what) .. ": expected ") .. expected:describe()) .. ", found ") .. actual:describe())
     end
 end
+-- Typecheck:1183
 function Typecheck.compatible(self, expected, actual)
+    -- Typecheck:1184
     if expected:is_dynamic() or actual:is_dynamic() then
+        -- Typecheck:1185
         return true
     end
+    -- Typecheck:1187
     if (expected.kind == "var") or (actual.kind == "var") then
+        -- Typecheck:1188
         return true
     end
+    -- Typecheck:1191
     if expected.kind == "union" then
-        for _, m in __lz_each(expected.params) do
+        -- Typecheck:1192
+        for _, m in List.__lz_each(expected.params) do
+            -- Typecheck:1193
             if Typecheck.compatible(self, m, actual) then
+                -- Typecheck:1194
                 return true
             end
         end
+        -- Typecheck:1197
         return false
     end
+    -- Typecheck:1200
     if actual.kind == "union" then
-        for _, m in __lz_each(actual.params) do
+        -- Typecheck:1201
+        for _, m in List.__lz_each(actual.params) do
+            -- Typecheck:1202
             if not Typecheck.compatible(self, expected, m) then
+                -- Typecheck:1203
                 return false
             end
         end
+        -- Typecheck:1206
         return true
     end
+    -- Typecheck:1208
     if expected.kind == "iface" then
+        -- Typecheck:1209
         return Typecheck.satisfies(self, expected, actual)
     end
+    -- Typecheck:1211
     if expected.kind == "fn" then
+        -- Typecheck:1212
         if actual.kind ~= "fn" then
+            -- Typecheck:1213
             return false
         end
-        if __lz_len(expected.params) ~= __lz_len(actual.params) then
+        -- Typecheck:1215
+        if List.__lz_len(expected.params) ~= List.__lz_len(actual.params) then
+            -- Typecheck:1216
             return false
         end
+        -- Typecheck:1218
         local i = 1
-        for _, p in __lz_each(expected.params) do
-            if not Typecheck.compatible(self, p, Option.unwrap_or(__lz_get(actual.params, i), Type.dynamic())) then
+        -- Typecheck:1219
+        for _, p in List.__lz_each(expected.params) do
+            -- Typecheck:1220
+            if not Typecheck.compatible(self, p, Option.unwrap_or(List.__lz_get(actual.params, i), Type.dynamic())) then
+                -- Typecheck:1221
                 return false
             end
+            -- Typecheck:1223
             i = i + 1
         end
+        -- Typecheck:1225
         return Typecheck.compatible(self, Option.unwrap_or(expected.result, Type.dynamic()), Option.unwrap_or(actual.result, Type.dynamic()))
     end
+    -- Typecheck:1229
     if (((expected.kind == "class") or (expected.kind == "enum")) and ((actual.kind == "class") or (actual.kind == "enum"))) and (expected.name == actual.name) then
+        -- Typecheck:1232
         return Typecheck.args_compatible(self, expected.params, actual.params)
     end
+    -- Typecheck:1234
     if not expected:equals(actual) then
+        -- Typecheck:1235
         return false
     end
+    -- Typecheck:1237
     if (expected.kind == "class") or (expected.kind == "enum") then
+        -- Typecheck:1238
         return Typecheck.args_compatible(self, expected.params, actual.params)
     end
+    -- Typecheck:1240
     return true
 end
+-- Typecheck:1243
 function Typecheck.args_compatible(self, a, b)
-    local n = __lz_len(a)
-    if __lz_len(b) > n then
-        n = __lz_len(b)
+    -- Typecheck:1244
+    local n = List.__lz_len(a)
+    -- Typecheck:1245
+    if List.__lz_len(b) > n then
+        -- Typecheck:1246
+        n = List.__lz_len(b)
     end
+    -- Typecheck:1248
     local i = 1
+    -- Typecheck:1249
     while true do
+        -- Typecheck:1250
         if i > n then
+            -- Typecheck:1251
             break
         end
-        if not Typecheck.compatible(self, Option.unwrap_or(__lz_get(a, i), Type.dynamic()), Option.unwrap_or(__lz_get(b, i), Type.dynamic())) then
+        -- Typecheck:1253
+        if not Typecheck.compatible(self, Option.unwrap_or(List.__lz_get(a, i), Type.dynamic()), Option.unwrap_or(List.__lz_get(b, i), Type.dynamic())) then
+            -- Typecheck:1254
             return false
         end
+        -- Typecheck:1256
         i = i + 1
     end
+    -- Typecheck:1258
     return true
 end
+-- Typecheck:1266
 function Typecheck.satisfies(self, iface, actual)
+    -- Typecheck:1267
     if actual:is_dynamic() or (actual.kind == "var") then
+        -- Typecheck:1268
         return true
     end
+    -- Typecheck:1270
     if (actual.kind == "iface") and (actual.name == iface.name) then
+        -- Typecheck:1271
         return Typecheck.args_compatible(self, iface.params, actual.params)
     end
-    if not __lz_has(self.interfaces, iface.name) then
+    -- Typecheck:1273
+    if not List.__lz_has(self.interfaces, iface.name) then
+        -- Typecheck:1274
         return true
     end
+    -- Typecheck:1276
     local key = (iface.name .. "<:") .. actual.name
-    if Option.unwrap_or(__lz_get(self.checking, key), false) then
+    -- Typecheck:1277
+    if Option.unwrap_or(List.__lz_get(self.checking, key), false) then
+        -- Typecheck:1278
         return true
     end
-    __lz_idx_set(self.checking, key, true)
+    -- Typecheck:1280
+    List.__lz_idx_set(self.checking, key, true)
+    -- Typecheck:1281
     local ok = Typecheck.conforms(self, iface, actual)
-    __lz_idx_set(self.checking, key, false)
+    -- Typecheck:1282
+    List.__lz_idx_set(self.checking, key, false)
+    -- Typecheck:1283
     return ok
 end
+-- Typecheck:1289
 function Typecheck.conforms(self, iface, actual)
-    local centry = __lz_get(self.classes, actual.name)
+    -- Typecheck:1290
+    local centry = List.__lz_get(self.classes, actual.name)
+    -- Typecheck:1291
     if not Option.is_some(centry) then
+        -- Typecheck:1292
         return true
     end
+    -- Typecheck:1294
     local cls = Option.unwrap(centry)
-    local cmethods = __lz_unwrap(__lz_get(cls, "methods"))
-    local cfields = __lz_unwrap(__lz_get(cls, "fields"))
-    local def = Option.unwrap(__lz_get(self.interfaces, iface.name))
-    local ivars = Typecheck.name_set(self, __lz_unwrap_or(__lz_get(def, "type_params"), __lz_list()))
-    local isubst = Typecheck.pair_subst(self, __lz_unwrap_or(__lz_get(def, "type_params"), __lz_list()), iface.params)
+    -- Typecheck:1295
+    local cmethods = Option.__lz_unwrap(List.__lz_get(cls, "methods"))
+    -- Typecheck:1296
+    local cfields = Option.__lz_unwrap(List.__lz_get(cls, "fields"))
+    -- Typecheck:1297
+    local def = Option.unwrap(List.__lz_get(self.interfaces, iface.name))
+    -- Typecheck:1299
+    local ivars = Typecheck.name_set(self, Option.__lz_unwrap_or(List.__lz_get(def, "type_params"), List.__lz_list({})))
+    -- Typecheck:1300
+    local isubst = Typecheck.pair_subst(self, Option.__lz_unwrap_or(List.__lz_get(def, "type_params"), List.__lz_list({})), iface.params)
+    -- Typecheck:1301
     local cvars = Typecheck.class_var_set(self, actual.name)
+    -- Typecheck:1302
     local csubst = Typecheck.receiver_subst(self, actual.name, actual)
-    for mname, msig in __lz_each(__lz_unwrap(__lz_get(def, "methods"))) do
-        local found = __lz_get(cmethods, mname)
-        if not __lz_is_some(found) then
+    -- Typecheck:1304
+    for mname, msig in List.__lz_each(Option.__lz_unwrap(List.__lz_get(def, "methods"))) do
+        -- Typecheck:1305
+        local found = List.__lz_get(cmethods, mname)
+        -- Typecheck:1306
+        if not Option.__lz_is_some(found) then
+            -- Typecheck:1307
             return Typecheck.reject(self, iface, ("missing method '" .. mname) .. "'")
         end
-        local csig = __lz_unwrap(found)
-        if __lz_unwrap_or(__lz_get(csig, "is_static"), false) then
+        -- Typecheck:1309
+        local csig = Option.__lz_unwrap(found)
+        -- Typecheck:1310
+        if Option.__lz_unwrap_or(List.__lz_get(csig, "is_static"), false) then
+            -- Typecheck:1311
             return Typecheck.reject(self, iface, ("method '" .. mname) .. "' must be an instance method")
         end
-        local iparams = __lz_unwrap(__lz_get(msig, "params"))
-        local cparams = __lz_unwrap(__lz_get(csig, "params"))
-        if __lz_len(iparams) ~= __lz_len(cparams) then
-            return Typecheck.reject(self, iface, ((("method '" .. mname) .. "' expects ") .. Typecheck.count(self, __lz_len(iparams))) .. " parameter(s)")
+        -- Typecheck:1313
+        local iparams = Option.__lz_unwrap(List.__lz_get(msig, "params"))
+        -- Typecheck:1314
+        local cparams = Option.__lz_unwrap(List.__lz_get(csig, "params"))
+        -- Typecheck:1315
+        if List.__lz_len(iparams) ~= List.__lz_len(cparams) then
+            -- Typecheck:1316
+            return Typecheck.reject(self, iface, ((("method '" .. mname) .. "' expects ") .. Typecheck.count(self, List.__lz_len(iparams))) .. " parameter(s)")
         end
-        local imvars = Typecheck.merge_vars(self, ivars, __lz_unwrap_or(__lz_get(msig, "type_params"), __lz_list()))
-        local cmvars = Typecheck.merge_vars(self, cvars, __lz_unwrap_or(__lz_get(csig, "type_params"), __lz_list()))
+        -- Typecheck:1318
+        local imvars = Typecheck.merge_vars(self, ivars, Option.__lz_unwrap_or(List.__lz_get(msig, "type_params"), List.__lz_list({})))
+        -- Typecheck:1319
+        local cmvars = Typecheck.merge_vars(self, cvars, Option.__lz_unwrap_or(List.__lz_get(csig, "type_params"), List.__lz_list({})))
+        -- Typecheck:1320
         local i = 1
-        for _, ip in __lz_each(iparams) do
+        -- Typecheck:1321
+        for _, ip in List.__lz_each(iparams) do
+            -- Typecheck:1322
             local it = Typecheck.substitute(self, Typecheck.resolve_with(self, ip, imvars), isubst)
-            local ct = Typecheck.substitute(self, Typecheck.resolve_with(self, __lz_unwrap(__lz_get(cparams, i)), cmvars), csubst)
+            -- Typecheck:1323
+            local ct = Typecheck.substitute(self, Typecheck.resolve_with(self, Option.__lz_unwrap(List.__lz_get(cparams, i)), cmvars), csubst)
+            -- Typecheck:1324
             if not Typecheck.compatible(self, it, ct) then
+                -- Typecheck:1325
                 return Typecheck.reject(self, iface, (((((("method '" .. mname) .. "' parameter ") .. Typecheck.count(self, i)) .. " is ") .. ct:describe()) .. ", expected ") .. it:describe())
             end
+            -- Typecheck:1327
             i = i + 1
         end
-        local iret = Typecheck.substitute(self, Typecheck.resolve_with(self, __lz_unwrap(__lz_get(msig, "result")), imvars), isubst)
-        local cret = Typecheck.node_type(self, __lz_unwrap_or(__lz_get(csig, "result"), 0), cmvars, csubst)
+        -- Typecheck:1329
+        local iret = Typecheck.substitute(self, Typecheck.resolve_with(self, Option.__lz_unwrap(List.__lz_get(msig, "result")), imvars), isubst)
+        -- Typecheck:1330
+        local cret = Typecheck.node_type(self, Option.__lz_unwrap_or(List.__lz_get(csig, "result"), 0), cmvars, csubst)
+        -- Typecheck:1331
         if not Typecheck.compatible(self, iret, cret) then
+            -- Typecheck:1332
             return Typecheck.reject(self, iface, (((("method '" .. mname) .. "' returns ") .. cret:describe()) .. ", expected ") .. iret:describe())
         end
     end
-    for pname, pnode in __lz_each(__lz_unwrap(__lz_get(def, "properties"))) do
-        local pf = __lz_get(cfields, pname)
-        if not __lz_is_some(pf) then
+    -- Typecheck:1336
+    for pname, pnode in List.__lz_each(Option.__lz_unwrap(List.__lz_get(def, "properties"))) do
+        -- Typecheck:1337
+        local pf = List.__lz_get(cfields, pname)
+        -- Typecheck:1338
+        if not Option.__lz_is_some(pf) then
+            -- Typecheck:1339
             return Typecheck.reject(self, iface, ("missing property '" .. pname) .. "'")
         end
+        -- Typecheck:1341
         local it = Typecheck.substitute(self, Typecheck.resolve_with(self, pnode, ivars), isubst)
-        local ct = Typecheck.opt_node_type(self, __lz_unwrap(pf), cvars, csubst)
+        -- Typecheck:1342
+        local ct = Typecheck.opt_node_type(self, Option.__lz_unwrap(pf), cvars, csubst)
+        -- Typecheck:1343
         if not Typecheck.compatible(self, it, ct) then
+            -- Typecheck:1344
             return Typecheck.reject(self, iface, (((("property '" .. pname) .. "' is ") .. ct:describe()) .. ", expected ") .. it:describe())
         end
     end
+    -- Typecheck:1347
     return true
 end
+-- Typecheck:1352
 function Typecheck.reject(self, iface, why)
+    -- Typecheck:1353
     self.iface_reason = why
+    -- Typecheck:1354
     return false
 end
+-- Typecheck:1358
 function Typecheck.node_type(self, node, vars, subst)
+    -- Typecheck:1359
     if node == 0 then
+        -- Typecheck:1360
         return Type.dynamic()
     end
+    -- Typecheck:1362
     return Typecheck.substitute(self, Typecheck.resolve_with(self, node, vars), subst)
 end
+-- Typecheck:1367
 function Typecheck.opt_node_type(self, opt, vars, subst)
+    -- Typecheck:1368
     if not Option.is_some(opt) then
+        -- Typecheck:1369
         return Type.dynamic()
     end
+    -- Typecheck:1371
     return Typecheck.node_type(self, Option.unwrap(opt), vars, subst)
 end
+-- Typecheck:1374
 function Typecheck.name_set(self, names)
-    local out = __lz_map({})
-    for _, n in __lz_each(names) do
-        __lz_idx_set(out, n, true)
+    -- Typecheck:1375
+    local out = Map.__lz_map({})
+    -- Typecheck:1376
+    for _, n in List.__lz_each(names) do
+        -- Typecheck:1377
+        List.__lz_idx_set(out, n, true)
     end
+    -- Typecheck:1379
     return out
 end
+-- Typecheck:1382
 function Typecheck.pair_subst(self, names, types)
-    local out = __lz_map({})
+    -- Typecheck:1383
+    local out = Map.__lz_map({})
+    -- Typecheck:1384
     local i = 1
-    for _, n in __lz_each(names) do
-        local t = __lz_get(types, i)
+    -- Typecheck:1385
+    for _, n in List.__lz_each(names) do
+        -- Typecheck:1386
+        local t = List.__lz_get(types, i)
+        -- Typecheck:1387
         if Option.is_some(t) then
-            __lz_idx_set(out, n, Option.unwrap(t))
+            -- Typecheck:1388
+            List.__lz_idx_set(out, n, Option.unwrap(t))
         end
+        -- Typecheck:1390
         i = i + 1
     end
+    -- Typecheck:1392
     return out
 end
+-- Typecheck:1395
 function Typecheck.merge_vars(self, base, names)
-    local out = __lz_map({})
-    for k, v in __lz_each(base) do
-        __lz_idx_set(out, k, v)
+    -- Typecheck:1396
+    local out = Map.__lz_map({})
+    -- Typecheck:1397
+    for k, v in List.__lz_each(base) do
+        -- Typecheck:1398
+        List.__lz_idx_set(out, k, v)
     end
-    for _, n in __lz_each(names) do
-        __lz_idx_set(out, n, true)
+    -- Typecheck:1400
+    for _, n in List.__lz_each(names) do
+        -- Typecheck:1401
+        List.__lz_idx_set(out, n, true)
     end
+    -- Typecheck:1403
     return out
 end
+-- Typecheck:1409
 function Typecheck.iface_method(self, recv, method, args, scope, call)
-    local def = Option.unwrap(__lz_get(self.interfaces, recv.name))
-    local msig_opt = __lz_get(__lz_unwrap(__lz_get(def, "methods")), method)
-    if not __lz_is_some(msig_opt) then
+    -- Typecheck:1410
+    local def = Option.unwrap(List.__lz_get(self.interfaces, recv.name))
+    -- Typecheck:1411
+    local msig_opt = List.__lz_get(Option.__lz_unwrap(List.__lz_get(def, "methods")), method)
+    -- Typecheck:1412
+    if not Option.__lz_is_some(msig_opt) then
+        -- Typecheck:1413
         Typecheck.fail(self, call, (("no method '" .. method) .. "' on interface ") .. recv.name)
     end
-    local msig = __lz_unwrap(msig_opt)
-    local vars = Typecheck.merge_vars(self, Typecheck.name_set(self, __lz_unwrap_or(__lz_get(def, "type_params"), __lz_list())), __lz_unwrap_or(__lz_get(msig, "type_params"), __lz_list()))
-    local subst = Typecheck.pair_subst(self, __lz_unwrap_or(__lz_get(def, "type_params"), __lz_list()), recv.params)
-    Typecheck.infer_and_check(self, __lz_unwrap(__lz_get(msig, "params")), vars, args, scope, call, subst)
-    local result = __lz_unwrap_or(__lz_get(msig, "result"), 0)
+    -- Typecheck:1415
+    local msig = Option.__lz_unwrap(msig_opt)
+    -- Typecheck:1416
+    local vars = Typecheck.merge_vars(self, Typecheck.name_set(self, Option.__lz_unwrap_or(List.__lz_get(def, "type_params"), List.__lz_list({}))), Option.__lz_unwrap_or(List.__lz_get(msig, "type_params"), List.__lz_list({})))
+    -- Typecheck:1417
+    local subst = Typecheck.pair_subst(self, Option.__lz_unwrap_or(List.__lz_get(def, "type_params"), List.__lz_list({})), recv.params)
+    -- Typecheck:1418
+    Typecheck.infer_and_check(self, Option.__lz_unwrap(List.__lz_get(msig, "params")), vars, args, scope, call, subst)
+    -- Typecheck:1419
+    local result = Option.__lz_unwrap_or(List.__lz_get(msig, "result"), 0)
+    -- Typecheck:1420
     if result == 0 then
+        -- Typecheck:1421
         return Type.dynamic()
     end
+    -- Typecheck:1423
     return Typecheck.substitute(self, Typecheck.resolve_with(self, result, vars), subst)
 end
+-- Typecheck:1426
 function Typecheck.fail(self, node, message)
+    -- Typecheck:1427
     Error.new("TypeError", message, node:line(), node:col(), self.source, 1):raise()
 end
 
 local Constants = {}
 
+-- Constants:10
 function Constants.new(entries)
     local self = {}
     self.record = Constants.record
     self.lookup = Constants.lookup
     self.child = Constants.child
+    -- Constants:10
     self.entries = entries
     return self
 end
+-- Constants:12
 function Constants.empty()
-    return Constants.new(__lz_map({}))
+    -- Constants:13
+    return Constants.new(Map.__lz_map({}))
 end
+-- Constants:16
 function Constants.record(self, name, literal)
-    __lz_idx_set(self.entries, name, literal)
+    -- Constants:17
+    List.__lz_idx_set(self.entries, name, literal)
 end
+-- Constants:21
 function Constants.lookup(self, name)
-    return __lz_get(self.entries, name)
+    -- Constants:22
+    return List.__lz_get(self.entries, name)
 end
+-- Constants:26
 function Constants.child(self, shadowed)
-    local blocked = __lz_map({})
-    for _, name in __lz_each(shadowed) do
-        __lz_idx_set(blocked, name, true)
+    -- Constants:27
+    local blocked = Map.__lz_map({})
+    -- Constants:28
+    for _, name in List.__lz_each(shadowed) do
+        -- Constants:29
+        List.__lz_idx_set(blocked, name, true)
     end
-    local copy = __lz_map({})
-    for key, literal in __lz_each(self.entries) do
-        if not __lz_has(blocked, key) then
-            __lz_idx_set(copy, key, literal)
+    -- Constants:31
+    local copy = Map.__lz_map({})
+    -- Constants:32
+    for key, literal in List.__lz_each(self.entries) do
+        -- Constants:33
+        if not List.__lz_has(blocked, key) then
+            -- Constants:34
+            List.__lz_idx_set(copy, key, literal)
         end
     end
+    -- Constants:37
     return Constants.new(copy)
 end
 
 local Num = {}
 
+-- Num:22
 function Num.clamp(v, lo, hi)
+    -- Num:23
     if v < lo then
+        -- Num:24
         return lo
     end
+    -- Num:26
     if v > hi then
+        -- Num:27
         return hi
     end
+    -- Num:29
     return v
 end
+-- Num:33
 function Num.pow(base, exp)
+    -- Num:34
     local result = 1
+    -- Num:35
     local i = 0
+    -- Num:36
     while i < exp do
+        -- Num:37
         result = result * base
+        -- Num:38
         i = i + 1
     end
+    -- Num:40
     return result
 end
+-- Num:44
 function Num.round(x)
-    return Option.unwrap_or(__lz_wrap(math.floor(x + 0.5)), 0)
+    -- Num:45
+    return Option.unwrap_or(Option.__lz_wrap(math.floor(x + 0.5)), 0)
 end
 
 local ExprFolder = {}
 
+-- ExprFolder:13
 function ExprFolder.new()
     local self = {}
     self.fold_count = ExprFolder.fold_count
@@ -4490,132 +8184,218 @@ function ExprFolder.new()
     self.folds = 0
     return self
 end
+-- ExprFolder:15
 function ExprFolder.fold_count(self)
+    -- ExprFolder:16
     return self.folds
 end
+-- ExprFolder:19
 function ExprFolder.fold(self, node, constants)
+    -- ExprFolder:20
     local __lz_m1 = node.kind
     if __lz_m1 == "IdentifierExpr" then
+        -- ExprFolder:21
         return ExprFolder.fold_identifier(self, node, constants)
     elseif __lz_m1 == "BinaryExpr" then
+        -- ExprFolder:22
         return ExprFolder.fold_binary(self, node, constants)
     elseif __lz_m1 == "CallExpr" then
+        -- ExprFolder:23
         return ExprFolder.fold_call(self, node, constants)
     elseif __lz_m1 == "ListExpr" then
+        -- ExprFolder:24
         return ExprFolder.fold_list(self, node, constants)
     elseif __lz_m1 == "MapExpr" then
+        -- ExprFolder:25
         return ExprFolder.fold_map(self, node, constants)
     elseif __lz_m1 == "UnaryExpr" then
+        -- ExprFolder:27
         node:set("operand", ExprFolder.fold(self, node:child("operand"), constants))
+        -- ExprFolder:28
         return node
     elseif __lz_m1 == "MemberExpr" then
+        -- ExprFolder:31
         node:set("object", ExprFolder.fold(self, node:child("object"), constants))
+        -- ExprFolder:32
         return node
     elseif __lz_m1 == "IndexExpr" then
+        -- ExprFolder:35
         node:set("object", ExprFolder.fold(self, node:child("object"), constants))
+        -- ExprFolder:36
         node:set("index", ExprFolder.fold(self, node:child("index"), constants))
+        -- ExprFolder:37
         return node
     elseif __lz_m1 == "ListComp" then
+        -- ExprFolder:40
         node:set("iter", ExprFolder.fold(self, node:child("iter"), constants))
+        -- ExprFolder:41
         local inner = constants:child(node:child("vars"))
+        -- ExprFolder:42
         node:set("element", ExprFolder.fold(self, node:child("element"), inner))
+        -- ExprFolder:43
         ExprFolder.fold_comp_cond(self, node, inner)
+        -- ExprFolder:44
         return node
     elseif __lz_m1 == "MapComp" then
+        -- ExprFolder:47
         node:set("iter", ExprFolder.fold(self, node:child("iter"), constants))
+        -- ExprFolder:48
         local inner = constants:child(node:child("vars"))
+        -- ExprFolder:49
         node:set("key", ExprFolder.fold(self, node:child("key"), inner))
+        -- ExprFolder:50
         node:set("value", ExprFolder.fold(self, node:child("value"), inner))
+        -- ExprFolder:51
         ExprFolder.fold_comp_cond(self, node, inner)
+        -- ExprFolder:52
         return node
     else
     end
+    -- ExprFolder:56
     return node
 end
+-- ExprFolder:60
 function ExprFolder.fold_comp_cond(self, node, constants)
+    -- ExprFolder:61
     local cond = node:attr("cond")
+    -- ExprFolder:62
     if Option.is_some(cond) then
+        -- ExprFolder:63
         node:set("cond", ExprFolder.fold(self, Option.unwrap(cond), constants))
     end
 end
+-- ExprFolder:67
 function ExprFolder.fold_identifier(self, node, constants)
+    -- ExprFolder:68
     local hit = constants:lookup(node:child("name"))
+    -- ExprFolder:69
     if Option.is_some(hit) then
+        -- ExprFolder:70
         self.folds = self.folds + 1
+        -- ExprFolder:71
         return Option.unwrap(hit)
     end
+    -- ExprFolder:73
     return node
 end
+-- ExprFolder:76
 function ExprFolder.fold_binary(self, node, constants)
+    -- ExprFolder:77
     local left = ExprFolder.fold(self, node:child("left"), constants)
+    -- ExprFolder:78
     local right = ExprFolder.fold(self, node:child("right"), constants)
+    -- ExprFolder:79
     local op = node:child("op")
+    -- ExprFolder:80
     if ExprFolder.foldable(self, op, left, right) then
-        local lv = Option.unwrap_or(__lz_wrap(tonumber(left:child("value"))), 0.0)
-        local rv = Option.unwrap_or(__lz_wrap(tonumber(right:child("value"))), 0.0)
+        -- ExprFolder:81
+        local lv = Option.unwrap_or(Option.__lz_wrap(tonumber(left:child("value"))), 0.0)
+        -- ExprFolder:82
+        local rv = Option.unwrap_or(Option.__lz_wrap(tonumber(right:child("value"))), 0.0)
+        -- ExprFolder:83
         if (op ~= "DIVIDE") or (rv ~= 0.0) then
+            -- ExprFolder:84
             local result = ExprFolder.apply(self, op, lv, rv)
+            -- ExprFolder:85
             self.folds = self.folds + 1
-            return Ast.literal(ExprFolder.result_kind(self, op, left, right), __lz_unwrap_or(__lz_wrap(tostring(result)), "0"), node:line(), node:col())
+            -- ExprFolder:86
+            return Ast.literal(ExprFolder.result_kind(self, op, left, right), Option.__lz_unwrap_or(Option.__lz_wrap(tostring(result)), "0"), node:line(), node:col())
         end
     end
+    -- ExprFolder:89
     node:set("left", left)
+    -- ExprFolder:90
     node:set("right", right)
+    -- ExprFolder:91
     return node
 end
+-- ExprFolder:94
 function ExprFolder.foldable(self, op, left, right)
+    -- ExprFolder:95
     return (ExprFolder.can_fold(self, op) and ExprFolder.is_number(self, left)) and ExprFolder.is_number(self, right)
 end
+-- ExprFolder:98
 function ExprFolder.can_fold(self, op)
+    -- ExprFolder:99
     return (((op == "PLUS") or (op == "MINUS")) or (op == "MULTIPLY")) or (op == "DIVIDE")
 end
+-- ExprFolder:102
 function ExprFolder.is_number(self, node)
+    -- ExprFolder:103
     if node.kind ~= "LiteralExpr" then
+        -- ExprFolder:104
         return false
     end
+    -- ExprFolder:106
     local lk = node:child("lit_kind")
+    -- ExprFolder:107
     return (lk == "number") or (lk == "float")
 end
+-- ExprFolder:112
 function ExprFolder.result_kind(self, op, left, right)
+    -- ExprFolder:113
     if op == "DIVIDE" then
+        -- ExprFolder:114
         return "float"
     end
+    -- ExprFolder:116
     if (left:child("lit_kind") == "float") or (right:child("lit_kind") == "float") then
+        -- ExprFolder:117
         return "float"
     end
+    -- ExprFolder:119
     return "number"
 end
+-- ExprFolder:122
 function ExprFolder.apply(self, op, a, b)
+    -- ExprFolder:123
     local __lz_m2 = op
     if __lz_m2 == "PLUS" then
+        -- ExprFolder:124
         return a + b
     elseif __lz_m2 == "MINUS" then
+        -- ExprFolder:125
         return a - b
     elseif __lz_m2 == "MULTIPLY" then
+        -- ExprFolder:126
         return a * b
     else
     end
+    -- ExprFolder:129
     return a / b
 end
+-- ExprFolder:132
 function ExprFolder.fold_call(self, node, constants)
+    -- ExprFolder:133
     node:set("callee", ExprFolder.fold(self, node:child("callee"), constants))
-    node:set("args", (function() local __lz_m3 = __lz_list() for _, arg in __lz_each(node:child("args")) do __lz_push(__lz_m3, ExprFolder.fold(self, arg, constants)) end return __lz_m3 end)())
+    -- ExprFolder:134
+    node:set("args", (function() local __lz_m3 = List.__lz_list({}) for _, arg in List.__lz_each(node:child("args")) do List.__lz_push(__lz_m3, ExprFolder.fold(self, arg, constants)) end return __lz_m3 end)())
+    -- ExprFolder:135
     return node
 end
+-- ExprFolder:138
 function ExprFolder.fold_list(self, node, constants)
-    node:set("elements", (function() local __lz_m4 = __lz_list() for _, element in __lz_each(node:child("elements")) do __lz_push(__lz_m4, ExprFolder.fold(self, element, constants)) end return __lz_m4 end)())
+    -- ExprFolder:139
+    node:set("elements", (function() local __lz_m4 = List.__lz_list({}) for _, element in List.__lz_each(node:child("elements")) do List.__lz_push(__lz_m4, ExprFolder.fold(self, element, constants)) end return __lz_m4 end)())
+    -- ExprFolder:140
     return node
 end
+-- ExprFolder:143
 function ExprFolder.fold_map(self, node, constants)
-    for _, entry in __lz_each(node:child("entries")) do
+    -- ExprFolder:144
+    for _, entry in List.__lz_each(node:child("entries")) do
+        -- ExprFolder:145
         entry:set("key", ExprFolder.fold(self, entry:child("key"), constants))
+        -- ExprFolder:146
         entry:set("value", ExprFolder.fold(self, entry:child("value"), constants))
     end
+    -- ExprFolder:148
     return node
 end
 
 local StmtFolder = {}
 
+-- StmtFolder:13
 function StmtFolder.new(exprs)
     local self = {}
     self.fold_block = StmtFolder.fold_block
@@ -4628,115 +8408,187 @@ function StmtFolder.new(exprs)
     self.fold_for_in = StmtFolder.fold_for_in
     self.fold_match = StmtFolder.fold_match
     self.is_value_arm = StmtFolder.is_value_arm
+    -- StmtFolder:13
     self.exprs = exprs
     return self
 end
+-- StmtFolder:15
 function StmtFolder.fold_block(self, stmts, constants)
-    for _, stmt in __lz_each(stmts) do
+    -- StmtFolder:16
+    for _, stmt in List.__lz_each(stmts) do
+        -- StmtFolder:17
         StmtFolder.fold_statement(self, stmt, constants)
     end
 end
+-- StmtFolder:21
 function StmtFolder.fold_statement(self, stmt, constants)
+    -- StmtFolder:23
     local __lz_m1 = stmt.kind
     if __lz_m1 == "VariableDecl" then
+        -- StmtFolder:24
         StmtFolder.fold_variable(self, stmt, constants)
     elseif __lz_m1 == "FunctionDecl" then
-        StmtFolder.fold_block(self, stmt:child("body"), constants:child(stmt:child("params")))
+        -- StmtFolder:26
+        if Option.is_none(stmt:attr("raw_body")) then
+            -- StmtFolder:27
+            StmtFolder.fold_block(self, stmt:child("body"), constants:child(stmt:child("params")))
+        end
     elseif __lz_m1 == "ConstructorDecl" then
+        -- StmtFolder:30
         StmtFolder.fold_block(self, stmt:child("body"), constants:child(stmt:child("params")))
     elseif __lz_m1 == "ReturnStmt" then
+        -- StmtFolder:31
         StmtFolder.fold_optional(self, stmt, "value", constants)
     elseif __lz_m1 == "ExpressionStmt" then
+        -- StmtFolder:32
         stmt:set("expression", self.exprs:fold(stmt:child("expression"), constants))
     elseif __lz_m1 == "FieldAssign" then
+        -- StmtFolder:33
         StmtFolder.fold_assign(self, stmt, constants)
     elseif __lz_m1 == "IndexAssign" then
+        -- StmtFolder:34
         StmtFolder.fold_assign(self, stmt, constants)
     elseif __lz_m1 == "IfStmt" then
+        -- StmtFolder:35
         StmtFolder.fold_if(self, stmt, constants)
     elseif __lz_m1 == "WhileStmt" then
+        -- StmtFolder:37
         stmt:set("condition", self.exprs:fold(stmt:child("condition"), constants))
-        StmtFolder.fold_block(self, stmt:child("body"), constants:child(__lz_list()))
+        -- StmtFolder:38
+        StmtFolder.fold_block(self, stmt:child("body"), constants:child(List.__lz_list({})))
     elseif __lz_m1 == "LoopStmt" then
-        StmtFolder.fold_block(self, stmt:child("body"), constants:child(__lz_list()))
+        -- StmtFolder:40
+        StmtFolder.fold_block(self, stmt:child("body"), constants:child(List.__lz_list({})))
     elseif __lz_m1 == "ForStmt" then
+        -- StmtFolder:41
         StmtFolder.fold_for(self, stmt, constants)
     elseif __lz_m1 == "ForInStmt" then
+        -- StmtFolder:42
         StmtFolder.fold_for_in(self, stmt, constants)
     elseif __lz_m1 == "MatchStmt" then
+        -- StmtFolder:43
         StmtFolder.fold_match(self, stmt, constants)
     else
     end
 end
+-- StmtFolder:48
 function StmtFolder.fold_variable(self, stmt, constants)
+    -- StmtFolder:49
     StmtFolder.fold_optional(self, stmt, "value", constants)
+    -- StmtFolder:50
     local mutable = Option.unwrap_or(stmt:attr("mutable"), false)
+    -- StmtFolder:51
     local reassign = Option.unwrap_or(stmt:attr("reassign"), false)
+    -- StmtFolder:52
     if (not mutable) and (not reassign) then
+        -- StmtFolder:53
         local value = stmt:attr("value")
+        -- StmtFolder:54
         if Option.is_some(value) and (Option.unwrap(value).kind == "LiteralExpr") then
+            -- StmtFolder:55
             constants:record(stmt:child("name"), Option.unwrap(value))
         end
     end
 end
+-- StmtFolder:61
 function StmtFolder.fold_optional(self, stmt, key, constants)
+    -- StmtFolder:62
     local value = stmt:attr(key)
+    -- StmtFolder:63
     if Option.is_some(value) then
+        -- StmtFolder:64
         stmt:set(key, self.exprs:fold(Option.unwrap(value), constants))
     end
 end
+-- StmtFolder:68
 function StmtFolder.fold_assign(self, stmt, constants)
+    -- StmtFolder:69
     stmt:set("target", self.exprs:fold(stmt:child("target"), constants))
+    -- StmtFolder:70
     stmt:set("value", self.exprs:fold(stmt:child("value"), constants))
 end
+-- StmtFolder:73
 function StmtFolder.fold_if(self, stmt, constants)
-    for _, clause in __lz_each(stmt:child("clauses")) do
+    -- StmtFolder:74
+    for _, clause in List.__lz_each(stmt:child("clauses")) do
+        -- StmtFolder:75
         clause:set("condition", self.exprs:fold(clause:child("condition"), constants))
-        StmtFolder.fold_block(self, clause:child("body"), constants:child(__lz_list()))
+        -- StmtFolder:76
+        StmtFolder.fold_block(self, clause:child("body"), constants:child(List.__lz_list({})))
     end
+    -- StmtFolder:78
     local else_body = stmt:attr("else_body")
+    -- StmtFolder:79
     if Option.is_some(else_body) then
-        StmtFolder.fold_block(self, Option.unwrap(else_body), constants:child(__lz_list()))
+        -- StmtFolder:80
+        StmtFolder.fold_block(self, Option.unwrap(else_body), constants:child(List.__lz_list({})))
     end
 end
+-- StmtFolder:87
 function StmtFolder.fold_for(self, stmt, constants)
-    local shadowed = __lz_list()
+    -- StmtFolder:88
+    local shadowed = List.__lz_list({})
+    -- StmtFolder:89
     local init = stmt:attr("init")
+    -- StmtFolder:90
     if Option.is_some(init) then
+        -- StmtFolder:91
         local init_node = Option.unwrap(init)
-        __lz_push(shadowed, init_node:child("name"))
+        -- StmtFolder:92
+        List.__lz_push(shadowed, init_node:child("name"))
+        -- StmtFolder:93
         StmtFolder.fold_optional(self, init_node, "value", constants)
     end
+    -- StmtFolder:95
     local inner = constants:child(shadowed)
+    -- StmtFolder:96
     local condition = stmt:attr("condition")
+    -- StmtFolder:97
     if Option.is_some(condition) then
+        -- StmtFolder:98
         stmt:set("condition", self.exprs:fold(Option.unwrap(condition), inner))
     end
+    -- StmtFolder:100
     local step = stmt:attr("step")
+    -- StmtFolder:101
     if Option.is_some(step) then
+        -- StmtFolder:102
         StmtFolder.fold_statement(self, Option.unwrap(step), inner)
     end
+    -- StmtFolder:104
     StmtFolder.fold_block(self, stmt:child("body"), inner)
 end
+-- StmtFolder:107
 function StmtFolder.fold_for_in(self, stmt, constants)
+    -- StmtFolder:108
     stmt:set("iter", self.exprs:fold(stmt:child("iter"), constants))
+    -- StmtFolder:109
     StmtFolder.fold_block(self, stmt:child("body"), constants:child(stmt:child("vars")))
 end
+-- StmtFolder:114
 function StmtFolder.fold_match(self, stmt, constants)
+    -- StmtFolder:115
     stmt:set("scrutinee", self.exprs:fold(stmt:child("scrutinee"), constants))
-    for _, arm in __lz_each(stmt:child("arms")) do
+    -- StmtFolder:116
+    for _, arm in List.__lz_each(stmt:child("arms")) do
+        -- StmtFolder:117
         if StmtFolder.is_value_arm(self, arm) then
+            -- StmtFolder:118
             arm:set("pattern", self.exprs:fold(arm:child("pattern"), constants))
         end
-        StmtFolder.fold_block(self, arm:child("body"), constants:child(__lz_list()))
+        -- StmtFolder:120
+        StmtFolder.fold_block(self, arm:child("body"), constants:child(List.__lz_list({})))
     end
 end
+-- StmtFolder:125
 function StmtFolder.is_value_arm(self, arm)
+    -- StmtFolder:126
     return (not Option.unwrap_or(arm:attr("is_wildcard"), false)) and (not Option.unwrap_or(arm:attr("is_variant"), false))
 end
 
 local Optimizer = {}
 
+-- Optimizer:11
 function Optimizer.new()
     local self = {}
     self.optimize = Optimizer.optimize
@@ -4744,19 +8596,28 @@ function Optimizer.new()
     self.folds = 0
     return self
 end
+-- Optimizer:13
 function Optimizer.optimize(self, program)
+    -- Optimizer:14
     local exprs = ExprFolder.new()
+    -- Optimizer:15
     local stmts = StmtFolder.new(exprs)
+    -- Optimizer:16
     stmts:fold_block(program:child("body"), Constants.empty())
+    -- Optimizer:17
     self.folds = exprs:fold_count()
+    -- Optimizer:18
     return program
 end
+-- Optimizer:21
 function Optimizer.fold_count(self)
+    -- Optimizer:22
     return self.folds
 end
 
 local CgContext = {}
 
+-- CgContext:18
 function CgContext.new(cls, members, instance_methods, instance_order, properties, known_classes, externs, variant_owner)
     local self = {}
     self.fresh_temp = CgContext.fresh_temp
@@ -4767,8 +8628,6 @@ function CgContext.new(cls, members, instance_methods, instance_order, propertie
     self.is_instance_method = CgContext.is_instance_method
     self.is_construction = CgContext.is_construction
     self.extern_target = CgContext.extern_target
-    self.mark_collections = CgContext.mark_collections
-    self.used_collections = CgContext.used_collections
     self.push_scope = CgContext.push_scope
     self.pop_scope = CgContext.pop_scope
     self.declare_local = CgContext.declare_local
@@ -4776,145 +8635,227 @@ function CgContext.new(cls, members, instance_methods, instance_order, propertie
     self.is_variant = CgContext.is_variant
     self.variant_qualified = CgContext.variant_qualified
     self.emit_name = CgContext.emit_name
-    self.scopes = __lz_list(__lz_map({}))
-    self.collections = false
+    self.scopes = List.__lz_list({Map.__lz_map({})})
     self.temp_seq = 0
+    -- CgContext:18
     self.cls = cls
+    -- CgContext:18
     self.members = members
+    -- CgContext:18
     self.instance_methods = instance_methods
+    -- CgContext:18
     self.instance_order = instance_order
+    -- CgContext:18
     self.properties = properties
+    -- CgContext:18
     self.known_classes = known_classes
+    -- CgContext:18
     self.externs = externs
+    -- CgContext:18
     self.variant_owner = variant_owner
     return self
 end
+-- CgContext:24
 function CgContext.fresh_temp(self)
+    -- CgContext:25
     self.temp_seq = self.temp_seq + 1
+    -- CgContext:26
     return ("__lz_m" .. tostring(self.temp_seq))
 end
+-- CgContext:29
 function CgContext.name(self)
+    -- CgContext:30
     return self.cls
 end
+-- CgContext:34
 function CgContext.instance_method_names(self)
+    -- CgContext:35
     return self.instance_order
 end
+-- CgContext:39
 function CgContext.property_decls(self)
+    -- CgContext:40
     return self.properties
 end
+-- CgContext:43
 function CgContext.is_member(self, name)
-    return __lz_has(self.members, name)
+    -- CgContext:44
+    return List.__lz_has(self.members, name)
 end
+-- CgContext:47
 function CgContext.is_instance_method(self, name)
-    return __lz_has(self.instance_methods, name)
+    -- CgContext:48
+    return List.__lz_has(self.instance_methods, name)
 end
+-- CgContext:53
 function CgContext.is_construction(self, name)
+    -- CgContext:54
     if name == self.cls then
+        -- CgContext:55
         return true
     end
-    return __lz_has(self.known_classes, name)
+    -- CgContext:57
+    return List.__lz_has(self.known_classes, name)
 end
+-- CgContext:62
 function CgContext.extern_target(self, ns, member)
-    local table = __lz_get(self.externs, ns)
+    -- CgContext:63
+    local table = List.__lz_get(self.externs, ns)
+    -- CgContext:64
     if Option.is_none(table) then
+        -- CgContext:65
         return table
     end
-    return __lz_get(Option.unwrap(table), member)
+    -- CgContext:67
+    return List.__lz_get(Option.unwrap(table), member)
 end
-function CgContext.mark_collections(self)
-    self.collections = true
-end
-function CgContext.used_collections(self)
-    return self.collections
-end
+-- CgContext:70
 function CgContext.push_scope(self)
-    __lz_push(self.scopes, __lz_map({}))
+    -- CgContext:71
+    List.__lz_push(self.scopes, Map.__lz_map({}))
 end
+-- CgContext:74
 function CgContext.pop_scope(self)
-    __lz_pop(self.scopes)
+    -- CgContext:75
+    List.__lz_pop(self.scopes)
 end
+-- CgContext:78
 function CgContext.declare_local(self, name)
-    local top = Option.unwrap(__lz_get(self.scopes, __lz_len(self.scopes)))
-    __lz_idx_set(top, name, true)
+    -- CgContext:79
+    local top = Option.unwrap(List.__lz_get(self.scopes, List.__lz_len(self.scopes)))
+    -- CgContext:80
+    List.__lz_idx_set(top, name, true)
 end
+-- CgContext:83
 function CgContext.is_local(self, name)
-    for _, scope in __lz_each(self.scopes) do
-        if __lz_has(scope, name) then
+    -- CgContext:84
+    for _, scope in List.__lz_each(self.scopes) do
+        -- CgContext:85
+        if List.__lz_has(scope, name) then
+            -- CgContext:86
             return true
         end
     end
+    -- CgContext:89
     return false
 end
+-- CgContext:94
 function CgContext.is_variant(self, name)
-    return __lz_has(self.variant_owner, name)
+    -- CgContext:95
+    return List.__lz_has(self.variant_owner, name)
 end
+-- CgContext:98
 function CgContext.variant_qualified(self, name)
-    return (Option.unwrap(__lz_get(self.variant_owner, name)) .. ".") .. name
+    -- CgContext:99
+    return (Option.unwrap(List.__lz_get(self.variant_owner, name)) .. ".") .. name
 end
+-- CgContext:103
 function CgContext.emit_name(self, name)
+    -- CgContext:104
     if CgContext.is_local(self, name) then
+        -- CgContext:105
         return name
     end
+    -- CgContext:107
     if CgContext.is_member(self, name) then
+        -- CgContext:108
         return (self.cls .. ".") .. name
     end
+    -- CgContext:110
     return name
 end
 
 local Text = {}
 
+-- Text:8
 function Text.nl()
-    return Option.unwrap_or(__lz_wrap(string.char(10)), "")
+    -- Text:9
+    return Option.unwrap_or(Option.__lz_wrap(string.char(10)), "")
 end
+-- Text:12
 function Text.join(parts, sep)
+    -- Text:13
     local out = ""
+    -- Text:14
     local first = true
-    for _, part in __lz_each(parts) do
+    -- Text:15
+    for _, part in List.__lz_each(parts) do
+        -- Text:16
         if first then
+            -- Text:17
             out = part
+            -- Text:18
             first = false
         else
+            -- Text:20
             out = (out .. sep) .. part
         end
     end
+    -- Text:23
     return out
 end
+-- Text:26
 function Text.lines(parts)
+    -- Text:27
     return Text.join(parts, Text.nl())
 end
+-- Text:32
 function Text.indent(text)
+    -- Text:33
     local newline = Text.nl()
-    local n = Option.unwrap_or(__lz_wrap(string.len(text)), 0)
+    -- Text:34
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(text)), 0)
+    -- Text:35
     local out = ""
+    -- Text:36
     local line = ""
+    -- Text:37
     local i = 1
+    -- Text:38
     while true do
+        -- Text:39
         if i > n then
+            -- Text:40
             break
         end
-        local ch = Option.unwrap_or(__lz_wrap(string.sub(text, i, i)), "")
+        -- Text:42
+        local ch = Option.unwrap_or(Option.__lz_wrap(string.sub(text, i, i)), "")
+        -- Text:43
         if ch == newline then
+            -- Text:44
             out = (out .. Text.prefix(line)) .. newline
+            -- Text:45
             line = ""
         else
+            -- Text:47
             line = line .. ch
         end
+        -- Text:49
         i = i + 1
     end
+    -- Text:51
     return out .. Text.prefix(line)
 end
+-- Text:54
 function Text.prefix(line)
+    -- Text:55
     if line == "" then
+        -- Text:56
         return ""
     end
+    -- Text:58
     return "    " .. line
 end
 
 local ExprEmitter = {}
 
-ExprEmitter.op_map = __lz_map({["PLUS"] = "+", ["MINUS"] = "-", ["MULTIPLY"] = "*", ["DIVIDE"] = "/", ["POWER"] = "^", ["CONCAT"] = "..", ["EQ"] = "==", ["NEQ"] = "~=", ["LESS"] = "<", ["LESS_EQUAL"] = "<=", ["GREATER"] = ">", ["GREATER_EQUAL"] = ">=", ["AND"] = "and", ["OR"] = "or"})
-ExprEmitter.builtins = __lz_map({["len"] = "__lz_len", ["push"] = "__lz_push", ["pop"] = "__lz_pop", ["get"] = "__lz_get", ["has"] = "__lz_has", ["is_some"] = "__lz_is_some", ["is_none"] = "__lz_is_none", ["is_ok"] = "__lz_is_ok", ["is_err"] = "__lz_is_err", ["unwrap"] = "__lz_unwrap", ["unwrap_or"] = "__lz_unwrap_or", ["error"] = "__lz_error"})
-ExprEmitter.constructors = __lz_map({["Option.some"] = "__lz_some", ["Option.none"] = "__lz_none", ["Result.ok"] = "__lz_ok", ["Result.err"] = "__lz_err"})
+-- ExprEmitter:13
+ExprEmitter.op_map = Map.__lz_map({["PLUS"] = "+", ["MINUS"] = "-", ["MULTIPLY"] = "*", ["DIVIDE"] = "/", ["POWER"] = "^", ["CONCAT"] = "..", ["EQ"] = "==", ["NEQ"] = "~=", ["LESS"] = "<", ["LESS_EQUAL"] = "<=", ["GREATER"] = ">", ["GREATER_EQUAL"] = ">=", ["AND"] = "and", ["OR"] = "or"})
+-- ExprEmitter:33
+ExprEmitter.builtins = Map.__lz_map({["len"] = "List.__lz_len", ["push"] = "List.__lz_push", ["pop"] = "List.__lz_pop", ["get"] = "List.__lz_get", ["has"] = "List.__lz_has", ["delete"] = "List.__lz_delete", ["is_some"] = "Option.__lz_is_some", ["is_none"] = "Option.__lz_is_none", ["is_ok"] = "Result.__lz_is_ok", ["is_err"] = "Result.__lz_is_err", ["unwrap"] = "Option.__lz_unwrap", ["unwrap_or"] = "Option.__lz_unwrap_or", ["error"] = "Result.error"})
+-- ExprEmitter:52
+ExprEmitter.constructors = Map.__lz_map({["Option.some"] = "Option.some", ["Option.none"] = "Option.none", ["Result.ok"] = "Result.ok", ["Result.err"] = "Result.err"})
+-- ExprEmitter:63
 function ExprEmitter.new(ctx)
     local self = {}
     self.inject_stmts = ExprEmitter.inject_stmts
@@ -4943,295 +8884,479 @@ function ExprEmitter.new(ctx)
     self.emit_args = ExprEmitter.emit_args
     self.lua_quote_str = ExprEmitter.lua_quote_str
     self.emit_interp = ExprEmitter.emit_interp
-    self.pending = __lz_list()
+    self.pending = List.__lz_list({})
+    -- ExprEmitter:63
     self.ctx = ctx
     return self
 end
+-- ExprEmitter:65
 function ExprEmitter.inject_stmts(self, s)
+    -- ExprEmitter:66
     self.stmt_emitter = s
 end
+-- ExprEmitter:71
 function ExprEmitter.take_pending(self)
+    -- ExprEmitter:72
     local out = self.pending
-    self.pending = __lz_list()
+    -- ExprEmitter:73
+    self.pending = List.__lz_list({})
+    -- ExprEmitter:74
     return out
 end
+-- ExprEmitter:77
 function ExprEmitter.emit(self, node)
+    -- ExprEmitter:78
     local __lz_m1 = node.kind
     if __lz_m1 == "LiteralExpr" then
+        -- ExprEmitter:79
         return ExprEmitter.emit_literal(self, node)
     elseif __lz_m1 == "IdentifierExpr" then
+        -- ExprEmitter:80
         return ExprEmitter.emit_identifier(self, node)
     elseif __lz_m1 == "SelfExpr" then
+        -- ExprEmitter:81
         return "self"
     elseif __lz_m1 == "MemberExpr" then
+        -- ExprEmitter:82
         return ExprEmitter.emit_field(self, node)
     elseif __lz_m1 == "ListExpr" then
+        -- ExprEmitter:83
         return ExprEmitter.emit_list(self, node)
     elseif __lz_m1 == "MapExpr" then
+        -- ExprEmitter:84
         return ExprEmitter.emit_map(self, node)
     elseif __lz_m1 == "IndexExpr" then
+        -- ExprEmitter:85
         return ExprEmitter.emit_index(self, node)
     elseif __lz_m1 == "CallExpr" then
+        -- ExprEmitter:86
         return ExprEmitter.emit_call(self, node)
     elseif __lz_m1 == "UnaryExpr" then
+        -- ExprEmitter:87
         return ExprEmitter.emit_unary(self, node)
     elseif __lz_m1 == "BinaryExpr" then
+        -- ExprEmitter:88
         return ExprEmitter.emit_binary(self, node)
     elseif __lz_m1 == "ListComp" then
+        -- ExprEmitter:89
         return ExprEmitter.emit_list_comp(self, node)
     elseif __lz_m1 == "MapComp" then
+        -- ExprEmitter:90
         return ExprEmitter.emit_map_comp(self, node)
     elseif __lz_m1 == "InterpolatedString" then
+        -- ExprEmitter:91
         return ExprEmitter.emit_interp(self, node)
     elseif __lz_m1 == "FnExpr" then
+        -- ExprEmitter:92
         return ExprEmitter.emit_fn_expr(self, node)
     elseif __lz_m1 == "PropagateExpr" then
+        -- ExprEmitter:93
         return ExprEmitter.emit_propagate(self, node)
     else
     end
+    -- ExprEmitter:96
     return ""
 end
+-- ExprEmitter:102
 function ExprEmitter.emit_propagate(self, node)
+    -- ExprEmitter:103
     local temp = self.ctx:fresh_temp()
-    __lz_push(self.pending, (("local " .. temp) .. " = ") .. ExprEmitter.emit(self, node:child("inner")))
-    __lz_push(self.pending, ((("if " .. temp) .. ".kind == 'err' then return ") .. temp) .. " end")
+    -- ExprEmitter:104
+    List.__lz_push(self.pending, (("local " .. temp) .. " = ") .. ExprEmitter.emit(self, node:child("inner")))
+    -- ExprEmitter:105
+    List.__lz_push(self.pending, ((("if " .. temp) .. ".kind == 'err' then return ") .. temp) .. " end")
+    -- ExprEmitter:106
     return temp .. ".value"
 end
+-- ExprEmitter:109
 function ExprEmitter.emit_fn_expr(self, node)
+    -- ExprEmitter:110
     return self.stmt_emitter:emit_closure(node:child("params"), node:child("param_types"), node:child("body"))
 end
+-- ExprEmitter:117
 function ExprEmitter.emit_list_comp(self, node)
-    self.ctx:mark_collections()
+    -- ExprEmitter:118
     local iter = ExprEmitter.emit(self, node:child("iter"))
+    -- ExprEmitter:119
     local temp = self.ctx:fresh_temp()
+    -- ExprEmitter:120
     self.ctx:push_scope()
+    -- ExprEmitter:121
     ExprEmitter.declare_loop_vars(self, node:child("vars"))
+    -- ExprEmitter:122
     local header = ExprEmitter.each_header(self, node:child("vars"), iter)
-    local body = ExprEmitter.comp_body(self, node, ((("__lz_push(" .. temp) .. ", ") .. ExprEmitter.emit(self, node:child("element"))) .. ")")
+    -- ExprEmitter:123
+    local body = ExprEmitter.comp_body(self, node, ((("List.__lz_push(" .. temp) .. ", ") .. ExprEmitter.emit(self, node:child("element"))) .. ")")
+    -- ExprEmitter:124
     self.ctx:pop_scope()
-    return ((((((("(function() local " .. temp) .. " = __lz_list() ") .. header) .. " ") .. body) .. " end return ") .. temp) .. " end)()"
+    -- ExprEmitter:125
+    return ((((((("(function() local " .. temp) .. " = List.__lz_list({}) ") .. header) .. " ") .. body) .. " end return ") .. temp) .. " end)()"
 end
+-- ExprEmitter:128
 function ExprEmitter.emit_map_comp(self, node)
-    self.ctx:mark_collections()
+    -- ExprEmitter:129
     local iter = ExprEmitter.emit(self, node:child("iter"))
+    -- ExprEmitter:130
     local temp = self.ctx:fresh_temp()
+    -- ExprEmitter:131
     self.ctx:push_scope()
+    -- ExprEmitter:132
     ExprEmitter.declare_loop_vars(self, node:child("vars"))
+    -- ExprEmitter:133
     local header = ExprEmitter.each_header(self, node:child("vars"), iter)
-    local body = ExprEmitter.comp_body(self, node, ((((("__lz_idx_set(" .. temp) .. ", ") .. ExprEmitter.emit(self, node:child("key"))) .. ", ") .. ExprEmitter.emit(self, node:child("value"))) .. ")")
+    -- ExprEmitter:134
+    local body = ExprEmitter.comp_body(self, node, ((((("List.__lz_idx_set(" .. temp) .. ", ") .. ExprEmitter.emit(self, node:child("key"))) .. ", ") .. ExprEmitter.emit(self, node:child("value"))) .. ")")
+    -- ExprEmitter:135
     self.ctx:pop_scope()
-    return ((((((("(function() local " .. temp) .. " = __lz_map({}) ") .. header) .. " ") .. body) .. " end return ") .. temp) .. " end)()"
+    -- ExprEmitter:136
+    return ((((((("(function() local " .. temp) .. " = Map.__lz_map({}) ") .. header) .. " ") .. body) .. " end return ") .. temp) .. " end)()"
 end
+-- ExprEmitter:139
 function ExprEmitter.declare_loop_vars(self, vars)
-    for _, name in __lz_each(vars) do
+    -- ExprEmitter:140
+    for _, name in List.__lz_each(vars) do
+        -- ExprEmitter:141
         self.ctx:declare_local(name)
     end
 end
+-- ExprEmitter:147
 function ExprEmitter.comp_body(self, node, add)
+    -- ExprEmitter:148
     local cond = node:attr("cond")
+    -- ExprEmitter:149
     if Option.is_some(cond) then
+        -- ExprEmitter:150
         return ((("if " .. ExprEmitter.emit(self, Option.unwrap(cond))) .. " then ") .. add) .. " end"
     end
+    -- ExprEmitter:152
     return add
 end
+-- ExprEmitter:157
 function ExprEmitter.each_header(self, vars, iter)
-    if __lz_len(vars) == 1 then
-        return ((("for _, " .. Option.unwrap(__lz_get(vars, 1))) .. " in __lz_each(") .. iter) .. ") do"
+    -- ExprEmitter:158
+    if List.__lz_len(vars) == 1 then
+        -- ExprEmitter:159
+        return ((("for _, " .. Option.unwrap(List.__lz_get(vars, 1))) .. " in List.__lz_each(") .. iter) .. ") do"
     end
-    return ((("for " .. Text.join(vars, ", ")) .. " in __lz_each(") .. iter) .. ") do"
+    -- ExprEmitter:161
+    return ((("for " .. Text.join(vars, ", ")) .. " in List.__lz_each(") .. iter) .. ") do"
 end
+-- ExprEmitter:166
 function ExprEmitter.emit_identifier(self, node)
+    -- ExprEmitter:167
     local id = node:child("name")
+    -- ExprEmitter:168
     if self.ctx:is_variant(id) then
+        -- ExprEmitter:169
         return self.ctx:variant_qualified(id)
     end
+    -- ExprEmitter:171
     return self.ctx:emit_name(id)
 end
+-- ExprEmitter:174
 function ExprEmitter.emit_literal(self, node)
+    -- ExprEmitter:175
     local lit_kind = node:child("lit_kind")
+    -- ExprEmitter:176
     local value = node:child("value")
+    -- ExprEmitter:177
     if lit_kind == "string" then
+        -- ExprEmitter:178
         return ExprEmitter.lua_quote_str(self, value)
     end
+    -- ExprEmitter:180
     if lit_kind == "boolean" then
+        -- ExprEmitter:181
         if value then
+            -- ExprEmitter:182
             return "true"
         end
+        -- ExprEmitter:184
         return "false"
     end
+    -- ExprEmitter:186
     if lit_kind == "nil" then
+        -- ExprEmitter:187
         return "nil"
     end
+    -- ExprEmitter:189
     return value
 end
+-- ExprEmitter:192
 function ExprEmitter.emit_field(self, node)
+    -- ExprEmitter:193
     return (ExprEmitter.emit_operand(self, node:child("object")) .. ".") .. node:child("field")
 end
+-- ExprEmitter:196
 function ExprEmitter.emit_list(self, node)
-    self.ctx:mark_collections()
-    return ("__lz_list(" .. Text.join(ExprEmitter.emit_args(self, node:child("elements")), ", ")) .. ")"
+    -- ExprEmitter:197
+    return ("List.__lz_list({" .. Text.join(ExprEmitter.emit_args(self, node:child("elements")), ", ")) .. "})"
 end
+-- ExprEmitter:200
 function ExprEmitter.emit_map(self, node)
-    self.ctx:mark_collections()
-    local parts = (function() local __lz_m2 = __lz_list() for _, entry in __lz_each(node:child("entries")) do __lz_push(__lz_m2, (("[" .. ExprEmitter.emit(self, entry:child("key"))) .. "] = ") .. ExprEmitter.emit(self, entry:child("value"))) end return __lz_m2 end)()
-    return ("__lz_map({" .. Text.join(parts, ", ")) .. "})"
+    -- ExprEmitter:201
+    local parts = (function() local __lz_m2 = List.__lz_list({}) for _, entry in List.__lz_each(node:child("entries")) do List.__lz_push(__lz_m2, (("[" .. ExprEmitter.emit(self, entry:child("key"))) .. "] = ") .. ExprEmitter.emit(self, entry:child("value"))) end return __lz_m2 end)()
+    -- ExprEmitter:202
+    return ("Map.__lz_map({" .. Text.join(parts, ", ")) .. "})"
 end
+-- ExprEmitter:205
 function ExprEmitter.emit_index(self, node)
-    self.ctx:mark_collections()
-    return ((("__lz_idx_get(" .. ExprEmitter.emit(self, node:child("object"))) .. ", ") .. ExprEmitter.emit(self, node:child("index"))) .. ")"
+    -- ExprEmitter:206
+    return ((("List.__lz_idx_get(" .. ExprEmitter.emit(self, node:child("object"))) .. ", ") .. ExprEmitter.emit(self, node:child("index"))) .. ")"
 end
+-- ExprEmitter:209
 function ExprEmitter.emit_unary(self, node)
+    -- ExprEmitter:210
     return "not " .. ExprEmitter.emit_operand(self, node:child("operand"))
 end
+-- ExprEmitter:213
 function ExprEmitter.emit_binary(self, node)
+    -- ExprEmitter:214
     local left = ExprEmitter.emit_operand(self, node:child("left"))
+    -- ExprEmitter:215
     local right = ExprEmitter.emit_operand(self, node:child("right"))
+    -- ExprEmitter:216
     local op = node:child("op")
+    -- ExprEmitter:217
     if op == "MODULO" then
+        -- ExprEmitter:218
         return ((((((("(" .. left) .. " - math.floor(") .. left) .. " / ") .. right) .. ") * ") .. right) .. ")"
     end
-    return (((left .. " ") .. __lz_unwrap_or(__lz_get(ExprEmitter.op_map, op), op)) .. " ") .. right
+    -- ExprEmitter:220
+    return (((left .. " ") .. Option.__lz_unwrap_or(List.__lz_get(ExprEmitter.op_map, op), op)) .. " ") .. right
 end
+-- ExprEmitter:223
 function ExprEmitter.emit_call(self, node)
+    -- ExprEmitter:224
     local callee = node:child("callee")
+    -- ExprEmitter:225
     local args = ExprEmitter.emit_args(self, node:child("args"))
+    -- ExprEmitter:227
     if callee.kind == "MemberExpr" then
+        -- ExprEmitter:228
         local object = callee:child("object")
+        -- ExprEmitter:229
         local field = callee:child("field")
+        -- ExprEmitter:231
         if object.kind == "IdentifierExpr" then
+            -- ExprEmitter:232
             local target = self.ctx:extern_target(object:child("name"), field)
+            -- ExprEmitter:233
             if Option.is_some(target) then
-                self.ctx:mark_collections()
+                -- ExprEmitter:234
                 local ext = Option.unwrap(target)
-                local call = ((__lz_idx_get(ext, "target") .. "(") .. Text.join(args, ", ")) .. ")"
-                if __lz_idx_get(ext, "wrap") then
-                    return ("__lz_wrap(" .. call) .. ")"
+                -- ExprEmitter:235
+                local call = ((List.__lz_idx_get(ext, "target") .. "(") .. Text.join(args, ", ")) .. ")"
+                -- ExprEmitter:236
+                if List.__lz_idx_get(ext, "wrap") then
+                    -- ExprEmitter:237
+                    return ("Option.__lz_wrap(" .. call) .. ")"
                 end
+                -- ExprEmitter:239
                 return call
             end
-            local ctor = __lz_get(ExprEmitter.constructors, (object:child("name") .. ".") .. field)
-            if __lz_is_some(ctor) then
-                self.ctx:mark_collections()
-                return ((__lz_unwrap(ctor) .. "(") .. Text.join(args, ", ")) .. ")"
+            -- ExprEmitter:241
+            local ctor = List.__lz_get(ExprEmitter.constructors, (object:child("name") .. ".") .. field)
+            -- ExprEmitter:242
+            if Option.__lz_is_some(ctor) then
+                -- ExprEmitter:243
+                return ((Option.__lz_unwrap(ctor) .. "(") .. Text.join(args, ", ")) .. ")"
             end
         end
+        -- ExprEmitter:247
         local dispatch_cls = node:attr("dispatch_class")
+        -- ExprEmitter:248
         if Option.is_some(dispatch_cls) then
-            self.ctx:mark_collections()
+            -- ExprEmitter:249
             return ((((Option.unwrap(dispatch_cls) .. ".") .. field) .. "(") .. Text.join(ExprEmitter.with_receiver(self, object, args), ", ")) .. ")"
         end
-        local helper = __lz_get(ExprEmitter.builtins, field)
-        if __lz_is_some(helper) then
-            self.ctx:mark_collections()
-            return ((__lz_unwrap(helper) .. "(") .. Text.join(ExprEmitter.with_receiver(self, object, args), ", ")) .. ")"
+        -- ExprEmitter:251
+        if not Option.unwrap_or(node:attr("known_method"), false) then
+            -- ExprEmitter:252
+            local helper = List.__lz_get(ExprEmitter.builtins, field)
+            -- ExprEmitter:253
+            if Option.__lz_is_some(helper) then
+                -- ExprEmitter:254
+                return ((Option.__lz_unwrap(helper) .. "(") .. Text.join(ExprEmitter.with_receiver(self, object, args), ", ")) .. ")"
+            end
         end
     end
+    -- ExprEmitter:259
     if callee.kind == "IdentifierExpr" then
+        -- ExprEmitter:260
         local name = callee:child("name")
+        -- ExprEmitter:261
         if self.ctx:is_construction(name) then
+            -- ExprEmitter:262
             return ((name .. ".new(") .. Text.join(args, ", ")) .. ")"
         end
     end
+    -- ExprEmitter:266
     if callee.kind == "MemberExpr" then
+        -- ExprEmitter:267
         local object = callee:child("object")
+        -- ExprEmitter:268
         local field = callee:child("field")
+        -- ExprEmitter:269
         if (object.kind == "SelfExpr") and self.ctx:is_instance_method(field) then
+            -- ExprEmitter:270
             return ((((self.ctx:name() .. ".") .. field) .. "(") .. Text.join(ExprEmitter.with_receiver(self, object, args), ", ")) .. ")"
         end
+        -- ExprEmitter:272
         if not ExprEmitter.receiver_is_class(self, object) then
+            -- ExprEmitter:273
             return ((((ExprEmitter.emit_operand(self, object) .. ":") .. field) .. "(") .. Text.join(args, ", ")) .. ")"
         end
     end
+    -- ExprEmitter:277
     local callee_src = ExprEmitter.emit(self, callee)
+    -- ExprEmitter:278
     if callee.kind == "BinaryExpr" then
+        -- ExprEmitter:279
         callee_src = ("(" .. callee_src) .. ")"
     end
+    -- ExprEmitter:281
     return ((callee_src .. "(") .. Text.join(args, ", ")) .. ")"
 end
+-- ExprEmitter:286
 function ExprEmitter.emit_operand(self, node)
+    -- ExprEmitter:287
     local src = ExprEmitter.emit(self, node)
+    -- ExprEmitter:288
     if ExprEmitter.needs_parens(self, node) then
+        -- ExprEmitter:289
         return ("(" .. src) .. ")"
     end
+    -- ExprEmitter:291
     return src
 end
+-- ExprEmitter:294
 function ExprEmitter.needs_parens(self, node)
+    -- ExprEmitter:295
     return (node.kind == "BinaryExpr") or (node.kind == "UnaryExpr")
 end
+-- ExprEmitter:298
 function ExprEmitter.receiver_is_class(self, object)
+    -- ExprEmitter:299
     if object.kind ~= "IdentifierExpr" then
+        -- ExprEmitter:300
         return false
     end
+    -- ExprEmitter:302
     return self.ctx:is_construction(object:child("name"))
 end
+-- ExprEmitter:307
 function ExprEmitter.with_receiver(self, object, args)
-    local out = __lz_list(ExprEmitter.emit_operand(self, object))
-    for _, arg in __lz_each(args) do
-        __lz_push(out, arg)
+    -- ExprEmitter:308
+    local out = List.__lz_list({ExprEmitter.emit_operand(self, object)})
+    -- ExprEmitter:309
+    for _, arg in List.__lz_each(args) do
+        -- ExprEmitter:310
+        List.__lz_push(out, arg)
     end
+    -- ExprEmitter:312
     return out
 end
+-- ExprEmitter:315
 function ExprEmitter.emit_args(self, nodes)
-    return (function() local __lz_m3 = __lz_list() for _, node in __lz_each(nodes) do __lz_push(__lz_m3, ExprEmitter.emit(self, node)) end return __lz_m3 end)()
+    -- ExprEmitter:316
+    return (function() local __lz_m3 = List.__lz_list({}) for _, node in List.__lz_each(nodes) do List.__lz_push(__lz_m3, ExprEmitter.emit(self, node)) end return __lz_m3 end)()
 end
+-- ExprEmitter:322
 function ExprEmitter.lua_quote_str(self, value)
-    local n = Option.unwrap_or(__lz_wrap(string.len(value)), 0)
-    local dq = Option.unwrap_or(__lz_wrap(string.char(34)), "")
-    local bs = Option.unwrap_or(__lz_wrap(string.char(92)), "")
-    local lf = Option.unwrap_or(__lz_wrap(string.char(10)), "")
-    local cr = Option.unwrap_or(__lz_wrap(string.char(13)), "")
+    -- ExprEmitter:323
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(value)), 0)
+    -- ExprEmitter:324
+    local dq = Option.unwrap_or(Option.__lz_wrap(string.char(34)), "")
+    -- ExprEmitter:325
+    local bs = Option.unwrap_or(Option.__lz_wrap(string.char(92)), "")
+    -- ExprEmitter:326
+    local lf = Option.unwrap_or(Option.__lz_wrap(string.char(10)), "")
+    -- ExprEmitter:327
+    local cr = Option.unwrap_or(Option.__lz_wrap(string.char(13)), "")
+    -- ExprEmitter:328
     local result = ""
+    -- ExprEmitter:329
     local i = 1
+    -- ExprEmitter:330
     while i <= n do
-        local c = Option.unwrap_or(__lz_wrap(string.sub(value, i, i)), "")
+        -- ExprEmitter:331
+        local c = Option.unwrap_or(Option.__lz_wrap(string.sub(value, i, i)), "")
+        -- ExprEmitter:332
         if c == dq then
+            -- ExprEmitter:333
             result = (result .. bs) .. dq
         elseif c == lf then
+            -- ExprEmitter:335
             result = (result .. bs) .. "n"
         elseif c == cr then
+            -- ExprEmitter:337
             result = (result .. bs) .. "r"
         elseif c == bs then
+            -- ExprEmitter:339
             result = (result .. bs) .. bs
         else
+            -- ExprEmitter:341
             result = result .. c
         end
+        -- ExprEmitter:343
         i = i + 1
     end
+    -- ExprEmitter:345
     return (dq .. result) .. dq
 end
+-- ExprEmitter:351
 function ExprEmitter.emit_interp(self, node)
+    -- ExprEmitter:352
     local parts = node:child("parts")
-    local pieces = __lz_list()
+    -- ExprEmitter:353
+    local pieces = List.__lz_list({})
+    -- ExprEmitter:354
     local i = 1
-    while i <= __lz_len(parts) do
-        local part = __lz_unwrap(__lz_get(parts, i))
+    -- ExprEmitter:355
+    while i <= List.__lz_len(parts) do
+        -- ExprEmitter:356
+        local part = Option.__lz_unwrap(List.__lz_get(parts, i))
+        -- ExprEmitter:357
         if (part.kind == "LiteralExpr") and (part:child("lit_kind") == "string") then
+            -- ExprEmitter:358
             local v = part:child("value")
+            -- ExprEmitter:359
             if v ~= "" then
-                __lz_push(pieces, ExprEmitter.lua_quote_str(self, v))
+                -- ExprEmitter:360
+                List.__lz_push(pieces, ExprEmitter.lua_quote_str(self, v))
             end
         else
-            __lz_push(pieces, ("tostring(" .. ExprEmitter.emit(self, part)) .. ")")
+            -- ExprEmitter:363
+            List.__lz_push(pieces, ("tostring(" .. ExprEmitter.emit(self, part)) .. ")")
         end
+        -- ExprEmitter:365
         i = i + 1
     end
-    if __lz_len(pieces) == 0 then
+    -- ExprEmitter:367
+    if List.__lz_len(pieces) == 0 then
+        -- ExprEmitter:368
         return "''"
     end
-    if __lz_len(pieces) == 1 then
-        return Option.unwrap(__lz_get(pieces, 1))
+    -- ExprEmitter:370
+    if List.__lz_len(pieces) == 1 then
+        -- ExprEmitter:371
+        return Option.unwrap(List.__lz_get(pieces, 1))
     end
+    -- ExprEmitter:373
     return ("(" .. Text.join(pieces, " .. ")) .. ")"
 end
 
 local StmtEmitter = {}
 
+-- StmtEmitter:19
 function StmtEmitter.new(ctx, exprs)
     local self = {}
     self.emit_member = StmtEmitter.emit_member
     self.emit_enum = StmtEmitter.emit_enum
     self.emit_variant_ctor = StmtEmitter.emit_variant_ctor
     self.emit_stmt = StmtEmitter.emit_stmt
+    self.source_hint = StmtEmitter.source_hint
     self.emit_stmt_inner = StmtEmitter.emit_stmt_inner
     self.emit_match = StmtEmitter.emit_match
     self.match_condition = StmtEmitter.match_condition
@@ -5250,983 +9375,1722 @@ function StmtEmitter.new(ctx, exprs)
     self.emit_for = StmtEmitter.emit_for
     self.emit_for_in = StmtEmitter.emit_for_in
     self.emit_method = StmtEmitter.emit_method
+    self.emit_lua_method = StmtEmitter.emit_lua_method
     self.emit_static_field = StmtEmitter.emit_static_field
     self.emit_constructor = StmtEmitter.emit_constructor
     self.emit_closure = StmtEmitter.emit_closure
     self.wrap_body = StmtEmitter.wrap_body
     self.push_block = StmtEmitter.push_block
     self.with_self = StmtEmitter.with_self
+    -- StmtEmitter:19
     self.ctx = ctx
+    -- StmtEmitter:19
     self.exprs = exprs
     return self
 end
+-- StmtEmitter:21
 function StmtEmitter.emit_member(self, node)
+    -- StmtEmitter:22
+    local hint = StmtEmitter.source_hint(self, node)
+    -- StmtEmitter:23
+    local body = ""
+    -- StmtEmitter:24
     local __lz_m1 = node.kind
     if __lz_m1 == "FunctionDecl" then
-        return StmtEmitter.emit_method(self, node)
-    elseif __lz_m1 == "VariableDecl" then
-        return StmtEmitter.emit_static_field(self, node)
-    elseif __lz_m1 == "ConstructorDecl" then
-        return StmtEmitter.emit_constructor(self, node)
-    elseif __lz_m1 == "EnumDecl" then
-        return StmtEmitter.emit_enum(self, node)
-    else
-    end
-    return StmtEmitter.emit_stmt(self, node)
-end
-function StmtEmitter.emit_enum(self, node)
-    local lines = __lz_list()
-    for _, variant in __lz_each(node:child("variants")) do
-        local name = variant:child("name")
-        if __lz_len(variant:child("fields")) == 0 then
-            __lz_push(lines, ((((self.ctx:name() .. ".") .. name) .. " = '") .. name) .. "'")
+        -- StmtEmitter:26
+        if Option.is_some(node:attr("raw_body")) then
+            -- StmtEmitter:27
+            body = StmtEmitter.emit_lua_method(self, node)
         else
-            __lz_push(lines, StmtEmitter.emit_variant_ctor(self, name, variant:child("fields")))
+            -- StmtEmitter:29
+            body = StmtEmitter.emit_method(self, node)
+        end
+    elseif __lz_m1 == "VariableDecl" then
+        -- StmtEmitter:32
+        body = StmtEmitter.emit_static_field(self, node)
+    elseif __lz_m1 == "ConstructorDecl" then
+        -- StmtEmitter:33
+        body = StmtEmitter.emit_constructor(self, node)
+    elseif __lz_m1 == "EnumDecl" then
+        -- StmtEmitter:34
+        body = StmtEmitter.emit_enum(self, node)
+    else
+        -- StmtEmitter:35
+        return StmtEmitter.emit_stmt(self, node)
+    end
+    -- StmtEmitter:37
+    if hint == "" then
+        -- StmtEmitter:38
+        return body
+    end
+    -- StmtEmitter:40
+    return (hint .. Text.nl()) .. body
+end
+-- StmtEmitter:45
+function StmtEmitter.emit_enum(self, node)
+    -- StmtEmitter:46
+    local lines = List.__lz_list({})
+    -- StmtEmitter:47
+    for _, variant in List.__lz_each(node:child("variants")) do
+        -- StmtEmitter:48
+        local name = variant:child("name")
+        -- StmtEmitter:49
+        if List.__lz_len(variant:child("fields")) == 0 then
+            -- StmtEmitter:50
+            List.__lz_push(lines, ((((self.ctx:name() .. ".") .. name) .. " = '") .. name) .. "'")
+        else
+            -- StmtEmitter:52
+            List.__lz_push(lines, StmtEmitter.emit_variant_ctor(self, name, variant:child("fields")))
         end
     end
+    -- StmtEmitter:55
     return Text.lines(lines)
 end
+-- StmtEmitter:58
 function StmtEmitter.emit_variant_ctor(self, name, fields)
-    local params = __lz_list()
-    local assigns = __lz_list(("kind = '" .. name) .. "'")
+    -- StmtEmitter:59
+    local params = List.__lz_list({})
+    -- StmtEmitter:60
+    local assigns = List.__lz_list({("kind = '" .. name) .. "'"})
+    -- StmtEmitter:61
     local i = 1
-    for _, field in __lz_each(fields) do
-        local s = __lz_unwrap_or(__lz_wrap(tostring(i)), "0")
-        __lz_push(params, "_" .. s)
-        __lz_push(assigns, (("_" .. s) .. " = _") .. s)
+    -- StmtEmitter:62
+    for _, field in List.__lz_each(fields) do
+        -- StmtEmitter:63
+        local s = Option.__lz_unwrap_or(Option.__lz_wrap(tostring(i)), "0")
+        -- StmtEmitter:64
+        List.__lz_push(params, "_" .. s)
+        -- StmtEmitter:65
+        List.__lz_push(assigns, (("_" .. s) .. " = _") .. s)
+        -- StmtEmitter:66
         i = i + 1
     end
+    -- StmtEmitter:68
     local header = ((((("function " .. self.ctx:name()) .. ".") .. name) .. "(") .. Text.join(params, ", ")) .. ")"
-    return Text.lines(__lz_list(header, Text.indent(("return { " .. Text.join(assigns, ", ")) .. " }"), "end"))
+    -- StmtEmitter:69
+    return Text.lines(List.__lz_list({header, Text.indent(("return { " .. Text.join(assigns, ", ")) .. " }"), "end"}))
 end
+-- StmtEmitter:75
 function StmtEmitter.emit_stmt(self, node)
+    -- StmtEmitter:76
     local result = StmtEmitter.emit_stmt_inner(self, node)
+    -- StmtEmitter:77
     local prefix = self.exprs:take_pending()
-    if __lz_len(prefix) == 0 then
-        return result
+    -- StmtEmitter:78
+    local hint = StmtEmitter.source_hint(self, node)
+    -- StmtEmitter:79
+    if List.__lz_len(prefix) == 0 then
+        -- StmtEmitter:80
+        if hint == "" then
+            -- StmtEmitter:81
+            return result
+        end
+        -- StmtEmitter:83
+        return (hint .. Text.nl()) .. result
     end
-    __lz_push(prefix, result)
-    return Text.lines(prefix)
+    -- StmtEmitter:85
+    List.__lz_push(prefix, result)
+    -- StmtEmitter:86
+    local body = Text.lines(prefix)
+    -- StmtEmitter:87
+    if hint == "" then
+        -- StmtEmitter:88
+        return body
+    end
+    -- StmtEmitter:90
+    return (hint .. Text.nl()) .. body
 end
+-- StmtEmitter:93
+function StmtEmitter.source_hint(self, node)
+    -- StmtEmitter:94
+    local ln = node:line()
+    -- StmtEmitter:95
+    if ln == 0 then
+        -- StmtEmitter:96
+        return ""
+    end
+    -- StmtEmitter:98
+    return (("-- " .. self.ctx:name()) .. ":") .. Option.__lz_unwrap_or(Option.__lz_wrap(tostring(ln)), "?")
+end
+-- StmtEmitter:101
 function StmtEmitter.emit_stmt_inner(self, node)
+    -- StmtEmitter:102
     local __lz_m2 = node.kind
     if __lz_m2 == "VariableDecl" then
+        -- StmtEmitter:103
         return StmtEmitter.emit_variable(self, node)
     elseif __lz_m2 == "FieldAssign" then
+        -- StmtEmitter:104
         return (self.exprs:emit(node:child("target")) .. " = ") .. self.exprs:emit(node:child("value"))
     elseif __lz_m2 == "IndexAssign" then
+        -- StmtEmitter:105
         return StmtEmitter.emit_index_assign(self, node)
     elseif __lz_m2 == "ExpressionStmt" then
+        -- StmtEmitter:106
         return self.exprs:emit(node:child("expression"))
     elseif __lz_m2 == "FunctionDecl" then
+        -- StmtEmitter:107
         return StmtEmitter.emit_local_function(self, node)
     elseif __lz_m2 == "ReturnStmt" then
+        -- StmtEmitter:108
         return StmtEmitter.emit_return(self, node)
     elseif __lz_m2 == "IfStmt" then
+        -- StmtEmitter:109
         return StmtEmitter.emit_if(self, node)
     elseif __lz_m2 == "WhileStmt" then
+        -- StmtEmitter:110
         return StmtEmitter.emit_while(self, node)
     elseif __lz_m2 == "LoopStmt" then
+        -- StmtEmitter:111
         return StmtEmitter.emit_loop(self, node)
     elseif __lz_m2 == "BreakStmt" then
+        -- StmtEmitter:112
         return "break"
     elseif __lz_m2 == "ForStmt" then
+        -- StmtEmitter:113
         return StmtEmitter.emit_for(self, node)
     elseif __lz_m2 == "ForInStmt" then
+        -- StmtEmitter:114
         return StmtEmitter.emit_for_in(self, node)
     elseif __lz_m2 == "MatchStmt" then
+        -- StmtEmitter:115
         return StmtEmitter.emit_match(self, node)
     else
     end
+    -- StmtEmitter:118
     return ""
 end
+-- StmtEmitter:125
 function StmtEmitter.emit_match(self, node)
+    -- StmtEmitter:126
     local temp = self.ctx:fresh_temp()
-    local parts = __lz_list((("local " .. temp) .. " = ") .. self.exprs:emit(node:child("scrutinee")))
+    -- StmtEmitter:127
+    local parts = List.__lz_list({(("local " .. temp) .. " = ") .. self.exprs:emit(node:child("scrutinee"))})
+    -- StmtEmitter:129
     self.ctx:push_scope()
-    for _, arm in __lz_each(node:child("arms")) do
-        if __lz_unwrap_or(arm:attr("is_binding"), false) then
+    -- StmtEmitter:130
+    for _, arm in List.__lz_each(node:child("arms")) do
+        -- StmtEmitter:131
+        if Option.__lz_unwrap_or(arm:attr("is_binding"), false) then
+            -- StmtEmitter:132
             local bname = arm:child("pattern"):child("name")
+            -- StmtEmitter:133
             if not self.ctx:is_local(bname) then
+                -- StmtEmitter:134
                 self.ctx:declare_local(bname)
-                __lz_push(parts, (("local " .. bname) .. " = ") .. temp)
+                -- StmtEmitter:135
+                List.__lz_push(parts, (("local " .. bname) .. " = ") .. temp)
             end
         end
     end
+    -- StmtEmitter:139
     local first = true
+    -- StmtEmitter:140
     local has_default = false
-    local default_body = __lz_list()
-    for _, arm in __lz_each(node:child("arms")) do
-        if __lz_unwrap_or(arm:attr("is_binding"), false) then
+    -- StmtEmitter:141
+    local default_body = List.__lz_list({})
+    -- StmtEmitter:142
+    for _, arm in List.__lz_each(node:child("arms")) do
+        -- StmtEmitter:143
+        if Option.__lz_unwrap_or(arm:attr("is_binding"), false) then
+            -- StmtEmitter:144
             local bguard = arm:attr("guard")
-            if __lz_is_some(bguard) then
+            -- StmtEmitter:145
+            if Option.__lz_is_some(bguard) then
+                -- StmtEmitter:146
                 local keyword = "elseif "
+                -- StmtEmitter:147
                 if first then
+                    -- StmtEmitter:148
                     keyword = "if "
                 end
+                -- StmtEmitter:150
                 first = false
-                __lz_push(parts, (keyword .. self.exprs:emit(__lz_unwrap(bguard))) .. " then")
+                -- StmtEmitter:151
+                List.__lz_push(parts, (keyword .. self.exprs:emit(Option.__lz_unwrap(bguard))) .. " then")
+                -- StmtEmitter:152
                 StmtEmitter.push_block(self, parts, arm:child("body"))
             else
+                -- StmtEmitter:154
                 has_default = true
+                -- StmtEmitter:155
                 default_body = arm:child("body")
             end
-        elseif __lz_unwrap_or(arm:attr("is_wildcard"), false) then
+        elseif Option.__lz_unwrap_or(arm:attr("is_wildcard"), false) then
+            -- StmtEmitter:158
             local wguard = arm:attr("guard")
-            if __lz_is_some(wguard) then
+            -- StmtEmitter:159
+            if Option.__lz_is_some(wguard) then
+                -- StmtEmitter:160
                 local keyword = "elseif "
+                -- StmtEmitter:161
                 if first then
+                    -- StmtEmitter:162
                     keyword = "if "
                 end
+                -- StmtEmitter:164
                 first = false
-                __lz_push(parts, (keyword .. self.exprs:emit(__lz_unwrap(wguard))) .. " then")
+                -- StmtEmitter:165
+                List.__lz_push(parts, (keyword .. self.exprs:emit(Option.__lz_unwrap(wguard))) .. " then")
+                -- StmtEmitter:166
                 StmtEmitter.push_block(self, parts, arm:child("body"))
             else
+                -- StmtEmitter:168
                 has_default = true
+                -- StmtEmitter:169
                 default_body = arm:child("body")
             end
         else
+            -- StmtEmitter:172
             local keyword = "elseif "
+            -- StmtEmitter:173
             if first then
+                -- StmtEmitter:174
                 keyword = "if "
             end
+            -- StmtEmitter:176
             first = false
-            __lz_push(parts, (keyword .. StmtEmitter.match_condition(self, temp, arm)) .. " then")
+            -- StmtEmitter:177
+            List.__lz_push(parts, (keyword .. StmtEmitter.match_condition(self, temp, arm)) .. " then")
+            -- StmtEmitter:178
             if StmtEmitter.has_bindings(self, arm) then
+                -- StmtEmitter:179
                 StmtEmitter.push_payload_body(self, parts, temp, arm)
             else
+                -- StmtEmitter:181
                 StmtEmitter.push_block(self, parts, arm:child("body"))
             end
         end
     end
+    -- StmtEmitter:185
     if first then
+        -- StmtEmitter:186
         if has_default then
-            __lz_push(parts, "do")
+            -- StmtEmitter:187
+            List.__lz_push(parts, "do")
+            -- StmtEmitter:188
             StmtEmitter.push_block(self, parts, default_body)
-            __lz_push(parts, "end")
+            -- StmtEmitter:189
+            List.__lz_push(parts, "end")
         end
+        -- StmtEmitter:191
         self.ctx:pop_scope()
+        -- StmtEmitter:192
         return Text.lines(parts)
     end
+    -- StmtEmitter:194
     if has_default then
-        __lz_push(parts, "else")
+        -- StmtEmitter:195
+        List.__lz_push(parts, "else")
+        -- StmtEmitter:196
         StmtEmitter.push_block(self, parts, default_body)
     end
-    __lz_push(parts, "end")
+    -- StmtEmitter:198
+    List.__lz_push(parts, "end")
+    -- StmtEmitter:199
     self.ctx:pop_scope()
+    -- StmtEmitter:200
     return Text.lines(parts)
 end
+-- StmtEmitter:206
 function StmtEmitter.match_condition(self, temp, arm)
+    -- StmtEmitter:207
     local base = ""
+    -- StmtEmitter:208
     if Option.unwrap_or(arm:attr("is_variant"), false) then
+        -- StmtEmitter:209
         if StmtEmitter.has_bindings(self, arm) then
+            -- StmtEmitter:210
             base = ((temp .. ".kind == '") .. arm:child("variant")) .. "'"
         else
+            -- StmtEmitter:212
             base = ((temp .. " == '") .. arm:child("variant")) .. "'"
         end
     else
+        -- StmtEmitter:215
         base = (temp .. " == ") .. self.exprs:emit(arm:child("pattern"))
     end
+    -- StmtEmitter:217
     local guard = arm:attr("guard")
+    -- StmtEmitter:218
     if Option.is_some(guard) then
+        -- StmtEmitter:219
         return (base .. " and ") .. self.exprs:emit(Option.unwrap(guard))
     end
+    -- StmtEmitter:221
     return base
 end
+-- StmtEmitter:224
 function StmtEmitter.has_bindings(self, arm)
-    return Option.unwrap_or(arm:attr("is_variant"), false) and (__lz_len(arm:child("bindings")) > 0)
+    -- StmtEmitter:225
+    return Option.unwrap_or(arm:attr("is_variant"), false) and (List.__lz_len(arm:child("bindings")) > 0)
 end
+-- StmtEmitter:230
 function StmtEmitter.push_payload_body(self, parts, temp, arm)
+    -- StmtEmitter:231
     self.ctx:push_scope()
-    local lines = __lz_list()
+    -- StmtEmitter:232
+    local lines = List.__lz_list({})
+    -- StmtEmitter:233
     local i = 1
-    for _, name in __lz_each(arm:child("bindings")) do
+    -- StmtEmitter:234
+    for _, name in List.__lz_each(arm:child("bindings")) do
+        -- StmtEmitter:235
         if name ~= "_" then
+            -- StmtEmitter:236
             self.ctx:declare_local(name)
-            __lz_push(lines, (((("local " .. name) .. " = ") .. temp) .. "._") .. __lz_unwrap_or(__lz_wrap(tostring(i)), "0"))
+            -- StmtEmitter:237
+            List.__lz_push(lines, (((("local " .. name) .. " = ") .. temp) .. "._") .. Option.__lz_unwrap_or(Option.__lz_wrap(tostring(i)), "0"))
         end
+        -- StmtEmitter:239
         i = i + 1
     end
-    for _, stmt in __lz_each(arm:child("body")) do
-        __lz_push(lines, StmtEmitter.emit_stmt(self, stmt))
+    -- StmtEmitter:241
+    for _, stmt in List.__lz_each(arm:child("body")) do
+        -- StmtEmitter:242
+        List.__lz_push(lines, StmtEmitter.emit_stmt(self, stmt))
     end
+    -- StmtEmitter:244
     self.ctx:pop_scope()
-    if __lz_len(lines) > 0 then
-        __lz_push(parts, Text.indent(Text.lines(lines)))
+    -- StmtEmitter:245
+    if List.__lz_len(lines) > 0 then
+        -- StmtEmitter:246
+        List.__lz_push(parts, Text.indent(Text.lines(lines)))
     end
 end
+-- StmtEmitter:251
 function StmtEmitter.emit_block(self, stmts)
-    if __lz_len(stmts) == 0 then
+    -- StmtEmitter:252
+    if List.__lz_len(stmts) == 0 then
+        -- StmtEmitter:253
         return ""
     end
-    return Text.indent(Text.lines((function() local __lz_m3 = __lz_list() for _, stmt in __lz_each(stmts) do __lz_push(__lz_m3, StmtEmitter.emit_stmt(self, stmt)) end return __lz_m3 end)()))
+    -- StmtEmitter:255
+    return Text.indent(Text.lines((function() local __lz_m3 = List.__lz_list({}) for _, stmt in List.__lz_each(stmts) do List.__lz_push(__lz_m3, StmtEmitter.emit_stmt(self, stmt)) end return __lz_m3 end)()))
 end
+-- StmtEmitter:260
 function StmtEmitter.emit_fn_body(self, params, param_types, body)
+    -- StmtEmitter:261
     self.ctx:push_scope()
-    for _, param in __lz_each(params) do
+    -- StmtEmitter:262
+    for _, param in List.__lz_each(params) do
+        -- StmtEmitter:263
         self.ctx:declare_local(param)
     end
+    -- StmtEmitter:265
     local lines = StmtEmitter.default_guards(self, params, param_types)
-    for _, stmt in __lz_each(body) do
-        __lz_push(lines, StmtEmitter.emit_stmt(self, stmt))
+    -- StmtEmitter:266
+    for _, stmt in List.__lz_each(body) do
+        -- StmtEmitter:267
+        List.__lz_push(lines, StmtEmitter.emit_stmt(self, stmt))
     end
+    -- StmtEmitter:269
     self.ctx:pop_scope()
-    if __lz_len(lines) == 0 then
+    -- StmtEmitter:270
+    if List.__lz_len(lines) == 0 then
+        -- StmtEmitter:271
         return ""
     end
+    -- StmtEmitter:273
     return Text.indent(Text.lines(lines))
 end
+-- StmtEmitter:278
 function StmtEmitter.default_guards(self, params, param_types)
-    local lines = __lz_list()
+    -- StmtEmitter:279
+    local lines = List.__lz_list({})
+    -- StmtEmitter:280
     local type_i = 1
-    for _, pname in __lz_each(params) do
+    -- StmtEmitter:281
+    for _, pname in List.__lz_each(params) do
+        -- StmtEmitter:282
         if pname ~= "self" then
-            local pt = __lz_get(param_types, type_i)
+            -- StmtEmitter:283
+            local pt = List.__lz_get(param_types, type_i)
+            -- StmtEmitter:284
             if Option.is_some(pt) then
+                -- StmtEmitter:285
                 local def = Option.unwrap(pt):attr("default")
+                -- StmtEmitter:286
                 if Option.is_some(def) then
-                    __lz_push(lines, ((((("if " .. pname) .. " == nil then ") .. pname) .. " = ") .. self.exprs:emit(Option.unwrap(def))) .. " end")
+                    -- StmtEmitter:287
+                    List.__lz_push(lines, ((((("if " .. pname) .. " == nil then ") .. pname) .. " = ") .. self.exprs:emit(Option.unwrap(def))) .. " end")
                 end
             end
+            -- StmtEmitter:290
             type_i = type_i + 1
         end
     end
+    -- StmtEmitter:293
     return lines
 end
+-- StmtEmitter:296
 function StmtEmitter.emit_variable(self, node)
+    -- StmtEmitter:297
     local name = node:child("name")
+    -- StmtEmitter:298
     local value = node:attr("value")
+    -- StmtEmitter:299
     if Option.unwrap_or(node:attr("reassign"), false) then
+        -- StmtEmitter:300
         local rhs = "nil"
+        -- StmtEmitter:301
         if Option.is_some(value) then
+            -- StmtEmitter:302
             rhs = self.exprs:emit(Option.unwrap(value))
         end
+        -- StmtEmitter:304
         return (self.ctx:emit_name(name) .. " = ") .. rhs
     end
+    -- StmtEmitter:306
     self.ctx:declare_local(name)
+    -- StmtEmitter:307
     if Option.is_some(value) then
+        -- StmtEmitter:308
         return (("local " .. name) .. " = ") .. self.exprs:emit(Option.unwrap(value))
     end
+    -- StmtEmitter:310
     return "local " .. name
 end
+-- StmtEmitter:313
 function StmtEmitter.emit_index_assign(self, node)
-    self.ctx:mark_collections()
+    -- StmtEmitter:314
     local target = node:child("target")
-    return ((((("__lz_idx_set(" .. self.exprs:emit(target:child("object"))) .. ", ") .. self.exprs:emit(target:child("index"))) .. ", ") .. self.exprs:emit(node:child("value"))) .. ")"
+    -- StmtEmitter:315
+    return ((((("List.__lz_idx_set(" .. self.exprs:emit(target:child("object"))) .. ", ") .. self.exprs:emit(target:child("index"))) .. ", ") .. self.exprs:emit(node:child("value"))) .. ")"
 end
+-- StmtEmitter:318
 function StmtEmitter.emit_local_function(self, node)
+    -- StmtEmitter:319
     self.ctx:declare_local(node:child("name"))
+    -- StmtEmitter:320
     local header = ((("local function " .. node:child("name")) .. "(") .. Text.join(node:child("params"), ", ")) .. ")"
+    -- StmtEmitter:321
     return StmtEmitter.wrap_body(self, header, StmtEmitter.emit_fn_body(self, node:child("params"), node:child("param_types"), node:child("body")))
 end
+-- StmtEmitter:324
 function StmtEmitter.emit_return(self, node)
+    -- StmtEmitter:325
     local value = node:attr("value")
+    -- StmtEmitter:326
     if Option.is_some(value) then
+        -- StmtEmitter:327
         return "return " .. self.exprs:emit(Option.unwrap(value))
     end
+    -- StmtEmitter:329
     return "return"
 end
+-- StmtEmitter:332
 function StmtEmitter.emit_if(self, node)
-    local parts = __lz_list()
-    for i, clause in __lz_each(node:child("clauses")) do
+    -- StmtEmitter:333
+    local parts = List.__lz_list({})
+    -- StmtEmitter:334
+    for i, clause in List.__lz_each(node:child("clauses")) do
+        -- StmtEmitter:335
         local keyword = "elseif "
+        -- StmtEmitter:336
         if i == 0 then
+            -- StmtEmitter:337
             keyword = "if "
         end
-        __lz_push(parts, (keyword .. self.exprs:emit(clause:child("condition"))) .. " then")
+        -- StmtEmitter:339
+        List.__lz_push(parts, (keyword .. self.exprs:emit(clause:child("condition"))) .. " then")
+        -- StmtEmitter:340
         StmtEmitter.push_block(self, parts, clause:child("body"))
     end
+    -- StmtEmitter:342
     local else_body = node:attr("else_body")
+    -- StmtEmitter:343
     if Option.is_some(else_body) then
-        __lz_push(parts, "else")
+        -- StmtEmitter:344
+        List.__lz_push(parts, "else")
+        -- StmtEmitter:345
         StmtEmitter.push_block(self, parts, Option.unwrap(else_body))
     end
-    __lz_push(parts, "end")
+    -- StmtEmitter:347
+    List.__lz_push(parts, "end")
+    -- StmtEmitter:348
     return Text.lines(parts)
 end
+-- StmtEmitter:351
 function StmtEmitter.emit_while(self, node)
-    local parts = __lz_list(("while " .. self.exprs:emit(node:child("condition"))) .. " do")
+    -- StmtEmitter:352
+    local parts = List.__lz_list({("while " .. self.exprs:emit(node:child("condition"))) .. " do"})
+    -- StmtEmitter:353
     StmtEmitter.push_block(self, parts, node:child("body"))
-    __lz_push(parts, "end")
+    -- StmtEmitter:354
+    List.__lz_push(parts, "end")
+    -- StmtEmitter:355
     return Text.lines(parts)
 end
+-- StmtEmitter:358
 function StmtEmitter.emit_loop(self, node)
-    local parts = __lz_list("while true do")
+    -- StmtEmitter:359
+    local parts = List.__lz_list({"while true do"})
+    -- StmtEmitter:360
     StmtEmitter.push_block(self, parts, node:child("body"))
-    __lz_push(parts, "end")
+    -- StmtEmitter:361
+    List.__lz_push(parts, "end")
+    -- StmtEmitter:362
     return Text.lines(parts)
 end
+-- StmtEmitter:367
 function StmtEmitter.emit_for(self, node)
-    local loop_body = __lz_list()
-    for _, stmt in __lz_each(node:child("body")) do
-        __lz_push(loop_body, stmt)
+    -- StmtEmitter:368
+    local loop_body = List.__lz_list({})
+    -- StmtEmitter:369
+    for _, stmt in List.__lz_each(node:child("body")) do
+        -- StmtEmitter:370
+        List.__lz_push(loop_body, stmt)
     end
+    -- StmtEmitter:372
     local step = node:attr("step")
+    -- StmtEmitter:373
     if Option.is_some(step) then
-        __lz_push(loop_body, Option.unwrap(step))
+        -- StmtEmitter:374
+        List.__lz_push(loop_body, Option.unwrap(step))
     end
-    local do_body = __lz_list()
+    -- StmtEmitter:377
+    local do_body = List.__lz_list({})
+    -- StmtEmitter:378
     local init = node:attr("init")
+    -- StmtEmitter:379
     if Option.is_some(init) then
-        __lz_push(do_body, StmtEmitter.emit_stmt(self, Option.unwrap(init)))
+        -- StmtEmitter:380
+        List.__lz_push(do_body, StmtEmitter.emit_stmt(self, Option.unwrap(init)))
     end
+    -- StmtEmitter:383
     local cond = "true"
+    -- StmtEmitter:384
     local condition = node:attr("condition")
+    -- StmtEmitter:385
     if Option.is_some(condition) then
+        -- StmtEmitter:386
         cond = self.exprs:emit(Option.unwrap(condition))
     end
-    local while_parts = __lz_list(("while " .. cond) .. " do")
+    -- StmtEmitter:388
+    local while_parts = List.__lz_list({("while " .. cond) .. " do"})
+    -- StmtEmitter:389
     StmtEmitter.push_block(self, while_parts, loop_body)
-    __lz_push(while_parts, "end")
-    __lz_push(do_body, Text.lines(while_parts))
-    return Text.lines(__lz_list("do", Text.indent(Text.lines(do_body)), "end"))
+    -- StmtEmitter:390
+    List.__lz_push(while_parts, "end")
+    -- StmtEmitter:391
+    List.__lz_push(do_body, Text.lines(while_parts))
+    -- StmtEmitter:393
+    return Text.lines(List.__lz_list({"do", Text.indent(Text.lines(do_body)), "end"}))
 end
+-- StmtEmitter:399
 function StmtEmitter.emit_for_in(self, node)
-    self.ctx:mark_collections()
+    -- StmtEmitter:400
     local iter = self.exprs:emit(node:child("iter"))
+    -- StmtEmitter:401
     self.ctx:push_scope()
+    -- StmtEmitter:402
     local vars = node:child("vars")
-    for _, name in __lz_each(vars) do
+    -- StmtEmitter:403
+    for _, name in List.__lz_each(vars) do
+        -- StmtEmitter:404
         self.ctx:declare_local(name)
     end
+    -- StmtEmitter:406
     local header = ""
-    if __lz_len(vars) == 1 then
-        header = ((("for _, " .. __lz_unwrap(__lz_get(vars, 1))) .. " in __lz_each(") .. iter) .. ") do"
+    -- StmtEmitter:407
+    if List.__lz_len(vars) == 1 then
+        -- StmtEmitter:408
+        header = ((("for _, " .. Option.__lz_unwrap(List.__lz_get(vars, 1))) .. " in List.__lz_each(") .. iter) .. ") do"
     else
-        header = ((("for " .. Text.join(vars, ", ")) .. " in __lz_each(") .. iter) .. ") do"
+        -- StmtEmitter:410
+        header = ((("for " .. Text.join(vars, ", ")) .. " in List.__lz_each(") .. iter) .. ") do"
     end
-    local parts = __lz_list(header)
+    -- StmtEmitter:412
+    local parts = List.__lz_list({header})
+    -- StmtEmitter:413
     StmtEmitter.push_block(self, parts, node:child("body"))
-    __lz_push(parts, "end")
+    -- StmtEmitter:414
+    List.__lz_push(parts, "end")
+    -- StmtEmitter:415
     self.ctx:pop_scope()
+    -- StmtEmitter:416
     return Text.lines(parts)
 end
+-- StmtEmitter:419
 function StmtEmitter.emit_method(self, node)
+    -- StmtEmitter:420
     local params = node:child("params")
+    -- StmtEmitter:421
     local lua_params = params
+    -- StmtEmitter:422
     if not Option.unwrap_or(node:attr("is_static"), false) then
+        -- StmtEmitter:423
         lua_params = StmtEmitter.with_self(self, params)
     end
+    -- StmtEmitter:425
     local header = ((((("function " .. self.ctx:name()) .. ".") .. node:child("name")) .. "(") .. Text.join(lua_params, ", ")) .. ")"
+    -- StmtEmitter:426
     return StmtEmitter.wrap_body(self, header, StmtEmitter.emit_fn_body(self, lua_params, node:child("param_types"), node:child("body")))
 end
+-- StmtEmitter:429
+function StmtEmitter.emit_lua_method(self, node)
+    -- StmtEmitter:430
+    local params = node:child("params")
+    -- StmtEmitter:431
+    local lua_params = params
+    -- StmtEmitter:432
+    if not Option.unwrap_or(node:attr("is_static"), false) then
+        -- StmtEmitter:433
+        lua_params = StmtEmitter.with_self(self, params)
+    end
+    -- StmtEmitter:435
+    local header = ((((("function " .. self.ctx:name()) .. ".") .. node:child("name")) .. "(") .. Text.join(lua_params, ", ")) .. ")"
+    -- StmtEmitter:436
+    return Text.lines(List.__lz_list({header, Text.indent(node:child("raw_body")), "end"}))
+end
+-- StmtEmitter:439
 function StmtEmitter.emit_static_field(self, node)
+    -- StmtEmitter:440
     local value = node:attr("value")
+    -- StmtEmitter:441
     local rhs = "nil"
+    -- StmtEmitter:442
     if Option.is_some(value) then
+        -- StmtEmitter:443
         rhs = self.exprs:emit(Option.unwrap(value))
     end
+    -- StmtEmitter:445
     return (((self.ctx:name() .. ".") .. node:child("name")) .. " = ") .. rhs
 end
+-- StmtEmitter:448
 function StmtEmitter.emit_constructor(self, node)
+    -- StmtEmitter:449
     self.ctx:push_scope()
-    for _, param in __lz_each(node:child("params")) do
+    -- StmtEmitter:450
+    for _, param in List.__lz_each(node:child("params")) do
+        -- StmtEmitter:451
         self.ctx:declare_local(param)
     end
+    -- StmtEmitter:453
     self.ctx:declare_local("self")
-    local lines = __lz_list("local self = {}")
-    for _, guard in __lz_each(StmtEmitter.default_guards(self, node:child("params"), node:child("param_types"))) do
-        __lz_push(lines, guard)
+    -- StmtEmitter:455
+    local lines = List.__lz_list({"local self = {}"})
+    -- StmtEmitter:456
+    for _, guard in List.__lz_each(StmtEmitter.default_guards(self, node:child("params"), node:child("param_types"))) do
+        -- StmtEmitter:457
+        List.__lz_push(lines, guard)
     end
-    for _, method in __lz_each(self.ctx:instance_method_names()) do
-        __lz_push(lines, (((("self." .. method) .. " = ") .. self.ctx:name()) .. ".") .. method)
+    -- StmtEmitter:459
+    for _, method in List.__lz_each(self.ctx:instance_method_names()) do
+        -- StmtEmitter:460
+        List.__lz_push(lines, (((("self." .. method) .. " = ") .. self.ctx:name()) .. ".") .. method)
     end
-    for _, prop in __lz_each(self.ctx:property_decls()) do
+    -- StmtEmitter:462
+    for _, prop in List.__lz_each(self.ctx:property_decls()) do
+        -- StmtEmitter:463
         local value = prop:attr("value")
+        -- StmtEmitter:464
         if Option.is_some(value) then
-            __lz_push(lines, (("self." .. prop:child("name")) .. " = ") .. self.exprs:emit(Option.unwrap(value)))
+            -- StmtEmitter:465
+            List.__lz_push(lines, (("self." .. prop:child("name")) .. " = ") .. self.exprs:emit(Option.unwrap(value)))
         end
     end
-    for _, stmt in __lz_each(node:child("body")) do
-        __lz_push(lines, StmtEmitter.emit_stmt(self, stmt))
+    -- StmtEmitter:468
+    for _, stmt in List.__lz_each(node:child("body")) do
+        -- StmtEmitter:469
+        List.__lz_push(lines, StmtEmitter.emit_stmt(self, stmt))
     end
-    __lz_push(lines, "return self")
+    -- StmtEmitter:471
+    List.__lz_push(lines, "return self")
+    -- StmtEmitter:472
     self.ctx:pop_scope()
+    -- StmtEmitter:474
     local header = ((("function " .. self.ctx:name()) .. ".new(") .. Text.join(node:child("params"), ", ")) .. ")"
-    return Text.lines(__lz_list(header, Text.indent(Text.lines(lines)), "end"))
+    -- StmtEmitter:475
+    return Text.lines(List.__lz_list({header, Text.indent(Text.lines(lines)), "end"}))
 end
+-- StmtEmitter:478
 function StmtEmitter.emit_closure(self, params, param_types, body)
+    -- StmtEmitter:479
     local header = ("function(" .. Text.join(params, ", ")) .. ")"
+    -- StmtEmitter:480
     return StmtEmitter.wrap_body(self, header, StmtEmitter.emit_fn_body(self, params, param_types, body))
 end
+-- StmtEmitter:484
 function StmtEmitter.wrap_body(self, header, body)
+    -- StmtEmitter:485
     if body == "" then
-        return Text.lines(__lz_list(header, "end"))
+        -- StmtEmitter:486
+        return Text.lines(List.__lz_list({header, "end"}))
     end
-    return Text.lines(__lz_list(header, body, "end"))
+    -- StmtEmitter:488
+    return Text.lines(List.__lz_list({header, body, "end"}))
 end
+-- StmtEmitter:492
 function StmtEmitter.push_block(self, parts, stmts)
+    -- StmtEmitter:493
     local body = StmtEmitter.emit_block(self, stmts)
+    -- StmtEmitter:494
     if body ~= "" then
-        __lz_push(parts, body)
+        -- StmtEmitter:495
+        List.__lz_push(parts, body)
     end
 end
+-- StmtEmitter:499
 function StmtEmitter.with_self(self, params)
-    local out = __lz_list("self")
-    for _, param in __lz_each(params) do
-        __lz_push(out, param)
+    -- StmtEmitter:500
+    local out = List.__lz_list({"self"})
+    -- StmtEmitter:501
+    for _, param in List.__lz_each(params) do
+        -- StmtEmitter:502
+        List.__lz_push(out, param)
     end
+    -- StmtEmitter:504
     return out
-end
-
-local Runtime = {}
-
-function Runtime.prelude()
-    return Text.lines(__lz_list("local function __lz_list(...)", "    return { kind = 'list', items = { ... } }", "end", "local function __lz_map(items)", "    return { kind = 'map', items = items }", "end", "local function __lz_some(v)", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_none()", "    return 'None'", "end", "local function __lz_ok(v)", "    return { kind = 'Ok', _1 = v }", "end", "local function __lz_err(m)", "    return { kind = 'Err', _1 = m }", "end", "local function __lz_wrap(v)", "    if v == nil then return 'None' end", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_is_some(o)", "    return type(o) == 'table' and o.kind == 'Some'", "end", "local function __lz_is_none(o)", "    return o == 'None'", "end", "local function __lz_is_ok(o)", "    return type(o) == 'table' and o.kind == 'Ok'", "end", "local function __lz_is_err(o)", "    return type(o) == 'table' and o.kind == 'Err'", "end", "local function __lz_unwrap(o)", "    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end", "    if type(o) == 'table' and o.kind == 'Err' then error(o._1) end", "    error('unwrap of a None value')", "end", "local function __lz_unwrap_or(o, d)", "    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end", "    return d", "end", "local function __lz_error(o)", "    return o._1", "end", "local function __lz_len(c)", "    if c.kind == 'list' then return #c.items end", "    local n = 0", "    for _ in pairs(c.items) do n = n + 1 end", "    return n", "end", "local function __lz_push(c, v)", "    c.items[#c.items + 1] = v", "end", "local function __lz_pop(c)", "    local n = #c.items", "    if n == 0 then return 'None' end", "    local v = c.items[n]", "    c.items[n] = nil", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_get(c, k)", "    local v = c.items[k]", "    if v == nil then return 'None' end", "    return { kind = 'Some', _1 = v }", "end", "local function __lz_has(c, k)", "    return c.items[k] ~= nil", "end", "local function __lz_idx_get(c, i)", "    if c.kind == 'list' then return c.items[i + 1] end", "    return c.items[i]", "end", "local function __lz_idx_set(c, i, v)", "    if c.kind == 'list' then", "        c.items[i + 1] = v", "    else", "        c.items[i] = v", "    end", "end", "local function __lz_str_find(s, sub)", "    return (string.find(s, sub, 1, true))", "end", "local function __lz_str_split(s, sep)", "    local items = {}", "    if sep == '' then", "        items[1] = s", "        return { kind = 'list', items = items }", "    end", "    local start = 1", "    while true do", "        local pos = string.find(s, sep, start, true)", "        if pos == nil then", "            items[#items + 1] = string.sub(s, start)", "            break", "        end", "        items[#items + 1] = string.sub(s, start, pos - 1)", "        start = pos + #sep", "    end", "    return { kind = 'list', items = items }", "end", "local function __lz_fread(h, fmt)", "    return h:read(fmt)", "end", "local function __lz_fwrite(h, s)", "    local ok = h:write(s)", "    return ok ~= nil", "end", "local function __lz_str_to_int(s)", "    local n = tonumber(s)", "    if n == nil or n % 1 ~= 0 then return nil end", "    return math.floor(n)", "end", "local function __lz_argv(i)", "    if arg == nil then return nil end", "    return arg[i]", "end", "local function __lz_readfile(path)", "    local f = io.open(path, 'r')", "    if f == nil then return nil end", "    local data = f:read('*a')", "    f:close()", "    return data", "end", "local function __lz_each(c)", "    if c.kind == 'list' then", "        local i = 0", "        return function()", "            i = i + 1", "            if i > #c.items then return nil end", "            return i - 1, c.items[i]", "        end", "    end", "    return pairs(c.items)", "end", "local function __lz_exec(cmd)", "    local ok = os.execute(cmd)", "    if ok == true or ok == 0 then return 0 end", "    return 1", "end", "local function __lz_popen(cmd)", "    local h = io.popen(cmd .. ' 2>&1')", "    if h == nil then return nil end", "    local s = h:read('*a')", "    h:close()", "    return s", "end", "local function __lz_write_file(path, content)", "    local f = io.open(path, 'w')", "    if f == nil then return false end", "    local ok = f:write(content)", "    f:close()", "    return ok ~= nil", "end", "local function __lz_exists(path)", "    local f = io.open(path, 'r')", "    if f then f:close(); return true end", "    local ok = os.rename(path, path)", "    return ok == true", "end", "local function __lz_mkdir(path)", "    local ok = os.execute('mkdir -p ' .. path)", "    return ok == true or ok == 0", "end"))
 end
 
 local Meta = {}
 
+-- Meta:4
 Meta.name = "Lazarus"
+-- Meta:5
 Meta.version = "1.0"
+-- Meta:6
 Meta.target = "Lua 5.1"
 
 local Codegen = {}
 
-function Codegen.new(class_name, imports, externs, variant_owner)
+-- Codegen:21
+function Codegen.new(class_name, imports, externs, variant_owner, platform)
     local self = {}
     self.generate = Codegen.generate
     self.class_block = Codegen.class_block
-    self.uses_collections = Codegen.uses_collections
     self.build_context = Codegen.build_context
     self.is_property = Codegen.is_property
     self.is_emittable = Codegen.is_emittable
     self.has_constructor = Codegen.has_constructor
+    -- Codegen:22
     self.class_name = class_name
-    self.known_classes = __lz_map({})
-    for _, name in __lz_each(imports) do
-        __lz_idx_set(self.known_classes, name, true)
+    -- Codegen:23
+    self.known_classes = Map.__lz_map({})
+    -- Codegen:24
+    for _, name in List.__lz_each(imports) do
+        -- Codegen:25
+        List.__lz_idx_set(self.known_classes, name, true)
     end
+    -- Codegen:27
     self.externs = externs
+    -- Codegen:28
     self.variant_owner = variant_owner
-    self.collections_used = false
+    -- Codegen:29
+    self.platform = platform
     return self
 end
+-- Codegen:35
 function Codegen.generate(self, program)
+    -- Codegen:36
     local block = Codegen.class_block(self, program)
-    local sections = __lz_list(Codegen.header())
-    if Codegen.uses_collections(self) then
-        __lz_push(sections, Runtime.prelude())
-    end
-    __lz_push(sections, block)
+    -- Codegen:38
+    local sections = List.__lz_list({Codegen.header(), block})
+    -- Codegen:39
     if Codegen.has_constructor(self, program:child("body")) then
-        __lz_push(sections, ("return " .. self.class_name) .. ".new(...)")
+        -- Codegen:40
+        List.__lz_push(sections, ("return " .. self.class_name) .. ".new(...)")
     end
+    -- Codegen:42
     return Text.join(sections, Text.nl() .. Text.nl())
 end
+-- Codegen:48
 function Codegen.class_block(self, program)
+    -- Codegen:49
     local body = program:child("body")
+    -- Codegen:50
     local ctx = Codegen.build_context(self, body)
+    -- Codegen:51
     local exprs = ExprEmitter.new(ctx)
+    -- Codegen:52
     local stmts = StmtEmitter.new(ctx, exprs)
+    -- Codegen:53
     exprs:inject_stmts(stmts)
-    local member_lines = (function() local __lz_m1 = __lz_list() for _, stmt in __lz_each(body) do if Codegen.is_emittable(self, stmt) then __lz_push(__lz_m1, stmts:emit_member(stmt)) end end return __lz_m1 end)()
-    self.collections_used = ctx:used_collections()
+    -- Codegen:55
+    local member_lines = (function() local __lz_m1 = List.__lz_list({}) for _, stmt in List.__lz_each(body) do if Codegen.is_emittable(self, stmt) then List.__lz_push(__lz_m1, stmts:emit_member(stmt)) end end return __lz_m1 end)()
+    -- Codegen:57
     local block = ("local " .. self.class_name) .. " = {}"
-    if __lz_len(member_lines) > 0 then
+    -- Codegen:58
+    if List.__lz_len(member_lines) > 0 then
+        -- Codegen:59
         block = ((block .. Text.nl()) .. Text.nl()) .. Text.join(member_lines, Text.nl())
     end
+    -- Codegen:61
     return block
 end
-function Codegen.uses_collections(self)
-    return self.collections_used
-end
+-- Codegen:66
 function Codegen.build_context(self, body)
-    local members = __lz_map({})
-    local instance_methods = __lz_map({})
-    local instance_order = __lz_list()
-    local properties = __lz_list()
-    for _, stmt in __lz_each(body) do
-        local k = stmt.kind
-        if k == "FunctionDecl" then
-            __lz_idx_set(members, stmt:child("name"), true)
-            if not Option.unwrap_or(stmt:attr("is_static"), false) then
-                __lz_idx_set(instance_methods, stmt:child("name"), true)
-                __lz_push(instance_order, stmt:child("name"))
-            end
-        elseif k == "VariableDecl" then
-            if Codegen.is_property(self, stmt) then
-                __lz_push(properties, stmt)
-            else
-                __lz_idx_set(members, stmt:child("name"), true)
+    -- Codegen:67
+    local members = Map.__lz_map({})
+    -- Codegen:68
+    local instance_methods = Map.__lz_map({})
+    -- Codegen:69
+    local instance_order = List.__lz_list({})
+    -- Codegen:70
+    local properties = List.__lz_list({})
+    -- Codegen:71
+    for _, stmt in List.__lz_each(body) do
+        -- Codegen:72
+        local stmt_platform = Option.unwrap_or(stmt:attr("platform"), "")
+        -- Codegen:73
+        if (stmt_platform ~= "") and (stmt_platform ~= self.platform) then
+        else
+            -- Codegen:77
+            local k = stmt.kind
+            -- Codegen:78
+            if k == "FunctionDecl" then
+                -- Codegen:79
+                List.__lz_idx_set(members, stmt:child("name"), true)
+                -- Codegen:80
+                if not Option.unwrap_or(stmt:attr("is_static"), false) then
+                    -- Codegen:81
+                    List.__lz_idx_set(instance_methods, stmt:child("name"), true)
+                    -- Codegen:82
+                    List.__lz_push(instance_order, stmt:child("name"))
+                end
+            elseif k == "VariableDecl" then
+                -- Codegen:85
+                if Codegen.is_property(self, stmt) then
+                    -- Codegen:86
+                    List.__lz_push(properties, stmt)
+                else
+                    -- Codegen:88
+                    List.__lz_idx_set(members, stmt:child("name"), true)
+                end
             end
         end
     end
+    -- Codegen:93
     return CgContext.new(self.class_name, members, instance_methods, instance_order, properties, self.known_classes, self.externs, self.variant_owner)
 end
+-- Codegen:96
 function Codegen.is_property(self, stmt)
+    -- Codegen:97
     local visibility = Option.unwrap_or(stmt:attr("visibility"), "")
+    -- Codegen:98
     local is_static = Option.unwrap_or(stmt:attr("is_static"), false)
+    -- Codegen:99
     return (visibility ~= "") and (not is_static)
 end
+-- Codegen:104
 function Codegen.is_emittable(self, stmt)
+    -- Codegen:105
     local k = stmt.kind
+    -- Codegen:106
     if k == "ImportDecl" then
+        -- Codegen:107
         return false
     end
+    -- Codegen:109
     if k == "ExternDecl" then
+        -- Codegen:110
         return false
     end
+    -- Codegen:112
     if k == "InterfaceDecl" then
+        -- Codegen:113
         return false
     end
+    -- Codegen:115
     if (k == "VariableDecl") and Codegen.is_property(self, stmt) then
+        -- Codegen:116
         return false
     end
+    -- Codegen:118
+    local stmt_platform = Option.unwrap_or(stmt:attr("platform"), "")
+    -- Codegen:119
+    if (stmt_platform ~= "") and (stmt_platform ~= self.platform) then
+        -- Codegen:120
+        return false
+    end
+    -- Codegen:122
     return true
 end
+-- Codegen:125
 function Codegen.has_constructor(self, body)
-    for _, stmt in __lz_each(body) do
+    -- Codegen:126
+    for _, stmt in List.__lz_each(body) do
+        -- Codegen:127
         if stmt.kind == "ConstructorDecl" then
+            -- Codegen:128
             return true
         end
     end
+    -- Codegen:131
     return false
 end
+-- Codegen:134
 function Codegen.header()
-    return Text.lines(__lz_list("--------------------------------------------------------------------", ((("-- Generated by the " .. Meta.name) .. " compiler v") .. Meta.version) .. " (self-hosted)", "-- Target runtime: " .. Meta.target, "-- This file is auto-generated. Do not edit by hand.", "--------------------------------------------------------------------"))
+    -- Codegen:135
+    return Text.lines(List.__lz_list({"--------------------------------------------------------------------", ((("-- Generated by the " .. Meta.name) .. " compiler v") .. Meta.version) .. " (self-hosted)", "-- Target runtime: " .. Meta.target, "-- This file is auto-generated. Do not edit by hand.", "--------------------------------------------------------------------"}))
 end
 
 local Module = {}
 
+-- Module:15
 function Module.new(path, class_name, source, ast, imports, is_interface)
     local self = {}
+    -- Module:15
     self.path = path
+    -- Module:15
     self.class_name = class_name
+    -- Module:15
     self.source = source
+    -- Module:15
     self.ast = ast
+    -- Module:15
     self.imports = imports
+    -- Module:15
     self.is_interface = is_interface
     return self
 end
 
 local Bundler = {}
 
-function Bundler.new(modules, entry_class, variant_owner)
+-- Bundler:20
+function Bundler.new(modules, entry_class, variant_owner, platform)
     local self = {}
     self.bundle = Bundler.bundle
     self.collect_externs = Bundler.collect_externs
     self.extern_wraps = Bundler.extern_wraps
     self.is_extern_module = Bundler.is_extern_module
+    -- Bundler:20
     self.modules = modules
+    -- Bundler:20
     self.entry_class = entry_class
+    -- Bundler:20
     self.variant_owner = variant_owner
+    -- Bundler:20
+    self.platform = platform
     return self
 end
+-- Bundler:22
 function Bundler.bundle(self)
+    -- Bundler:23
     local externs = Bundler.collect_externs(self)
-    local blocks = __lz_list()
-    local any_collections = false
+    -- Bundler:25
+    local blocks = List.__lz_list({})
+    -- Bundler:26
     local entry_has_ctor = false
+    -- Bundler:27
     local entry_source = ""
+    -- Bundler:28
     local entry_is_interface = false
-    for _, m in __lz_each(self.modules) do
+    -- Bundler:29
+    for _, m in List.__lz_each(self.modules) do
+        -- Bundler:30
         if m.class_name == self.entry_class then
+            -- Bundler:31
             entry_is_interface = m.is_interface
+            -- Bundler:32
             entry_source = m.source
         end
+        -- Bundler:34
         if (not Bundler.is_extern_module(self, m)) and (not m.is_interface) then
-            local cg = Codegen.new(m.class_name, m.imports, externs, self.variant_owner)
-            __lz_push(blocks, cg:class_block(m.ast))
-            if cg:uses_collections() then
-                any_collections = true
-            end
+            -- Bundler:35
+            local cg = Codegen.new(m.class_name, m.imports, externs, self.variant_owner, self.platform)
+            -- Bundler:36
+            List.__lz_push(blocks, cg:class_block(m.ast))
+            -- Bundler:37
             if m.class_name == self.entry_class then
+                -- Bundler:38
                 entry_has_ctor = cg:has_constructor(m.ast:child("body"))
             end
         end
     end
+    -- Bundler:43
     if (not entry_is_interface) and (not entry_has_ctor) then
+        -- Bundler:44
         Error.new("LinkError", ("entry class '" .. self.entry_class) .. "' must define a constructor", 1, 1, entry_source, 1):raise()
     end
-    local sections = __lz_list(Codegen.header())
-    if any_collections then
-        __lz_push(sections, Runtime.prelude())
+    -- Bundler:47
+    local sections = List.__lz_list({Codegen.header()})
+    -- Bundler:48
+    for _, block in List.__lz_each(blocks) do
+        -- Bundler:49
+        List.__lz_push(sections, block)
     end
-    for _, block in __lz_each(blocks) do
-        __lz_push(sections, block)
-    end
+    -- Bundler:51
     if entry_is_interface then
-        __lz_push(sections, "return nil")
+        -- Bundler:52
+        List.__lz_push(sections, "return nil")
     else
-        __lz_push(sections, ("return " .. self.entry_class) .. ".new(...)")
+        -- Bundler:54
+        List.__lz_push(sections, ("return " .. self.entry_class) .. ".new(...)")
     end
+    -- Bundler:56
     return Text.join(sections, Text.nl() .. Text.nl())
 end
+-- Bundler:64
 function Bundler.collect_externs(self)
-    local externs = __lz_map({})
-    for _, m in __lz_each(self.modules) do
-        local binds = __lz_map({})
-        for _, node in __lz_each(m.ast:child("body")) do
+    -- Bundler:65
+    local externs = Map.__lz_map({})
+    -- Bundler:66
+    for _, m in List.__lz_each(self.modules) do
+        -- Bundler:67
+        local binds = Map.__lz_map({})
+        -- Bundler:68
+        for _, node in List.__lz_each(m.ast:child("body")) do
+            -- Bundler:69
             if node.kind == "ExternDecl" then
-                __lz_idx_set(binds, node:child("name"), __lz_map({["target"] = node:child("target"), ["wrap"] = Bundler.extern_wraps(self, node)}))
+                -- Bundler:70
+                List.__lz_idx_set(binds, node:child("name"), Map.__lz_map({["target"] = node:child("target"), ["wrap"] = Bundler.extern_wraps(self, node)}))
             end
         end
-        if __lz_len(binds) > 0 then
-            __lz_idx_set(externs, m.class_name, binds)
+        -- Bundler:73
+        if List.__lz_len(binds) > 0 then
+            -- Bundler:74
+            List.__lz_idx_set(externs, m.class_name, binds)
         end
     end
+    -- Bundler:77
     return externs
 end
+-- Bundler:80
 function Bundler.extern_wraps(self, node)
+    -- Bundler:81
     local rt = node:attr("return_type")
+    -- Bundler:82
     if Option.is_none(rt) then
+        -- Bundler:83
         return true
     end
+    -- Bundler:85
     local name = Option.unwrap(rt):child("name")
+    -- Bundler:86
     return (name == "Option") or (name == "dynamic")
 end
+-- Bundler:91
 function Bundler.is_extern_module(self, m)
+    -- Bundler:92
     local has_extern = false
+    -- Bundler:93
     local has_other = false
-    for _, node in __lz_each(m.ast:child("body")) do
+    -- Bundler:94
+    for _, node in List.__lz_each(m.ast:child("body")) do
+        -- Bundler:95
         if node.kind == "ExternDecl" then
+            -- Bundler:96
             has_extern = true
         else
+            -- Bundler:98
             has_other = true
         end
     end
+    -- Bundler:101
     return has_extern and (not has_other)
 end
 
 local Path = {}
 
+-- Path:11
 function Path.join(a, b)
+    -- Path:12
     if a == "" then
+        -- Path:13
         return b
     end
+    -- Path:15
     if Str.is_suffix(a, "/") then
+        -- Path:16
         return a .. b
     end
+    -- Path:18
     return (a .. "/") .. b
 end
+-- Path:22
 function Path.last_slash(s)
-    local n = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
+    -- Path:23
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(s)), 0)
+    -- Path:24
     local cut = 0
+    -- Path:25
     local i = 1
+    -- Path:26
     while i <= n do
-        if Option.unwrap_or(__lz_wrap(string.byte(s, i)), 0) == 47 then
+        -- Path:27
+        if Option.unwrap_or(Option.__lz_wrap(string.byte(s, i)), 0) == 47 then
+            -- Path:28
             cut = i
         end
+        -- Path:30
         i = i + 1
     end
+    -- Path:32
     return cut
 end
+-- Path:36
 function Path.dirname(s)
+    -- Path:37
     local cut = Path.last_slash(s)
+    -- Path:38
     if cut == 0 then
+        -- Path:39
         return ""
     end
+    -- Path:41
     if cut == 1 then
+        -- Path:42
         return "/"
     end
-    return Option.unwrap_or(__lz_wrap(string.sub(s, 1, cut - 1)), "")
+    -- Path:44
+    return Option.unwrap_or(Option.__lz_wrap(string.sub(s, 1, cut - 1)), "")
 end
+-- Path:48
 function Path.basename(s)
+    -- Path:49
     local cut = Path.last_slash(s)
+    -- Path:50
     if cut == 0 then
+        -- Path:51
         return s
     end
-    local n = Option.unwrap_or(__lz_wrap(string.len(s)), 0)
-    return Option.unwrap_or(__lz_wrap(string.sub(s, cut + 1, n)), "")
+    -- Path:53
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(s)), 0)
+    -- Path:54
+    return Option.unwrap_or(Option.__lz_wrap(string.sub(s, cut + 1, n)), "")
 end
+-- Path:59
 function Path.ext_dot(base)
-    local n = Option.unwrap_or(__lz_wrap(string.len(base)), 0)
+    -- Path:60
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(base)), 0)
+    -- Path:61
     local dot = 0
+    -- Path:62
     local i = 2
+    -- Path:63
     while i <= n do
-        if Option.unwrap_or(__lz_wrap(string.byte(base, i)), 0) == 46 then
+        -- Path:64
+        if Option.unwrap_or(Option.__lz_wrap(string.byte(base, i)), 0) == 46 then
+            -- Path:65
             dot = i
         end
+        -- Path:67
         i = i + 1
     end
+    -- Path:69
     return dot
 end
+-- Path:73
 function Path.stem(s)
+    -- Path:74
     local base = Path.basename(s)
+    -- Path:75
     local dot = Path.ext_dot(base)
+    -- Path:76
     if dot == 0 then
+        -- Path:77
         return base
     end
-    return Option.unwrap_or(__lz_wrap(string.sub(base, 1, dot - 1)), base)
+    -- Path:79
+    return Option.unwrap_or(Option.__lz_wrap(string.sub(base, 1, dot - 1)), base)
 end
+-- Path:83
 function Path.ext(s)
+    -- Path:84
     local base = Path.basename(s)
+    -- Path:85
     local dot = Path.ext_dot(base)
+    -- Path:86
     if dot == 0 then
+        -- Path:87
         return ""
     end
-    local n = Option.unwrap_or(__lz_wrap(string.len(base)), 0)
-    return Option.unwrap_or(__lz_wrap(string.sub(base, dot, n)), "")
+    -- Path:89
+    local n = Option.unwrap_or(Option.__lz_wrap(string.len(base)), 0)
+    -- Path:90
+    return Option.unwrap_or(Option.__lz_wrap(string.sub(base, dot, n)), "")
 end
+-- Path:93
 function Path.is_absolute(s)
+    -- Path:94
     return Str.is_prefix(s, "/")
 end
+-- Path:100
 function Path.normalize(s)
+    -- Path:101
     local absolute = Path.is_absolute(s)
-    local stack = __lz_list()
-    for _, part in __lz_each(__lz_str_split(s, "/")) do
+    -- Path:102
+    local stack = List.__lz_list({})
+    -- Path:103
+    for _, part in List.__lz_each(Str.__lz_str_split(s, "/")) do
+        -- Path:104
         if (part ~= "") and (part ~= ".") then
+            -- Path:105
             if part == ".." then
-                local top = Option.unwrap_or(__lz_get(stack, __lz_len(stack)), "")
-                if (__lz_len(stack) > 0) and (top ~= "..") then
-                    __lz_pop(stack)
+                -- Path:106
+                local top = Option.unwrap_or(List.__lz_get(stack, List.__lz_len(stack)), "")
+                -- Path:107
+                if (List.__lz_len(stack) > 0) and (top ~= "..") then
+                    -- Path:108
+                    List.__lz_pop(stack)
                 elseif not absolute then
-                    __lz_push(stack, "..")
+                    -- Path:110
+                    List.__lz_push(stack, "..")
                 end
             else
-                __lz_push(stack, part)
+                -- Path:113
+                List.__lz_push(stack, part)
             end
         end
     end
+    -- Path:117
     local out = ""
+    -- Path:118
     local first = true
-    for _, part in __lz_each(stack) do
+    -- Path:119
+    for _, part in List.__lz_each(stack) do
+        -- Path:120
         if first then
+            -- Path:121
             out = part
+            -- Path:122
             first = false
         else
+            -- Path:124
             out = (out .. "/") .. part
         end
     end
+    -- Path:127
     if absolute then
+        -- Path:128
         return "/" .. out
     end
+    -- Path:130
     if out == "" then
+        -- Path:131
         return "."
     end
+    -- Path:133
     return out
 end
 
 local Linker = {}
 
+-- Linker:24
 function Linker.new(entry, pkg_root)
     local self = {}
     self.link = Linker.link
+    self.preload_core = Linker.preload_core
     self.entry_class = Linker.entry_class
     self.load = Linker.load
     self.resolve = Linker.resolve
+    self.resolve_rel = Linker.resolve_rel
     self.body_is_interface = Linker.body_is_interface
+    -- Linker:25
     self.entry = entry
+    -- Linker:26
     self.root = Path.dirname(entry)
+    -- Linker:27
     self.pkg_root = pkg_root
-    self.loaded = __lz_map({})
-    self.visiting = __lz_map({})
-    self.ordered = __lz_list()
+    -- Linker:28
+    self.loaded = Map.__lz_map({})
+    -- Linker:29
+    self.visiting = Map.__lz_map({})
+    -- Linker:30
+    self.ordered = List.__lz_list({})
     return self
 end
+-- Linker:36
 function Linker.link(self)
+    -- Linker:37
+    Linker.preload_core(self)
+    -- Linker:38
     Linker.load(self, self.entry, "", 0, 0, 1)
+    -- Linker:39
     return self.ordered
 end
+-- Linker:46
+function Linker.preload_core(self)
+    -- Linker:47
+    local list_loaded = false
+    -- Linker:48
+    for _, name in List.__lz_each(List.__lz_list({"Option", "Result", "List", "Map"})) do
+        -- Linker:49
+        local path = Linker.resolve_rel(self, ("std/" .. name) .. ".laz")
+        -- Linker:50
+        if Sys.__lz_exists(path) then
+            -- Linker:51
+            Linker.load(self, path, "", 0, 0, 1)
+            -- Linker:52
+            if name == "List" then
+                -- Linker:53
+                list_loaded = true
+            end
+        end
+    end
+    -- Linker:57
+    if not list_loaded then
+        -- Linker:58
+        Error.new("LinkError", "stdlib not found: place std/ beside your source or pass --pkg-path <dir>", 0, 0, "", 1):raise()
+    end
+end
+-- Linker:62
 function Linker.entry_class(self)
+    -- Linker:63
     return Path.stem(self.entry)
 end
+-- Linker:69
 function Linker.load(self, path, origin_source, origin_line, origin_col, origin_span)
-    if __lz_has(self.loaded, path) then
+    -- Linker:70
+    if List.__lz_has(self.loaded, path) then
+        -- Linker:71
         return
     end
-    if Option.unwrap_or(__lz_get(self.visiting, path), false) then
+    -- Linker:75
+    if Option.unwrap_or(List.__lz_get(self.visiting, path), false) then
+        -- Linker:76
         return
     end
-    __lz_idx_set(self.visiting, path, true)
-    local source_opt = __lz_wrap(__lz_readfile(path))
+    -- Linker:78
+    List.__lz_idx_set(self.visiting, path, true)
+    -- Linker:80
+    local source_opt = Option.__lz_wrap(Sys.__lz_readfile(path))
+    -- Linker:81
     if Option.is_none(source_opt) then
+        -- Linker:82
         Error.new("LinkError", ("cannot resolve import '" .. path) .. "'", origin_line, origin_col, origin_source, origin_span):raise()
     end
+    -- Linker:84
     local source = Option.unwrap(source_opt)
+    -- Linker:86
     local class_name = Path.stem(path)
+    -- Linker:87
     local tokens = Lexer.new(source):scan()
+    -- Linker:88
     local program = Parser.new(tokens, source):parse()
-    local imports = __lz_list()
-    local body = __lz_list()
-    for _, node in __lz_each(program:child("body")) do
+    -- Linker:90
+    local imports = List.__lz_list({})
+    -- Linker:91
+    local body = List.__lz_list({})
+    -- Linker:92
+    for _, node in List.__lz_each(program:child("body")) do
+        -- Linker:93
         if node.kind == "ImportDecl" then
-            local span = Option.unwrap_or(__lz_wrap(string.len(node:child("name"))), 1)
+            -- Linker:94
+            local span = Option.unwrap_or(Option.__lz_wrap(string.len(node:child("name"))), 1)
+            -- Linker:95
             Linker.load(self, Linker.resolve(self, node), source, node:line(), node:col(), span)
-            __lz_push(imports, node:child("name"))
+            -- Linker:96
+            List.__lz_push(imports, node:child("name"))
         else
-            __lz_push(body, node)
+            -- Linker:98
+            List.__lz_push(body, node)
         end
     end
+    -- Linker:101
     program:set("body", body)
-    __lz_push(self.ordered, Module.new(path, class_name, source, program, imports, Linker.body_is_interface(self, body)))
-    __lz_idx_set(self.loaded, path, true)
+    -- Linker:103
+    List.__lz_push(self.ordered, Module.new(path, class_name, source, program, imports, Linker.body_is_interface(self, body)))
+    -- Linker:104
+    List.__lz_idx_set(self.loaded, path, true)
 end
+-- Linker:108
 function Linker.resolve(self, node)
-    local rel = Text.join(node:child("segments"), "/") .. ".laz"
+    -- Linker:109
+    return Linker.resolve_rel(self, Text.join(node:child("segments"), "/") .. ".laz")
+end
+-- Linker:114
+function Linker.resolve_rel(self, rel)
+    -- Linker:115
     local local_path = Path.join(self.root, rel)
-    if __lz_exists(local_path) then
+    -- Linker:116
+    if Sys.__lz_exists(local_path) then
+        -- Linker:117
         return local_path
     end
+    -- Linker:119
     if self.pkg_root ~= "" then
+        -- Linker:120
         return Path.join(self.pkg_root, rel)
     end
+    -- Linker:122
     return local_path
 end
+-- Linker:128
 function Linker.body_is_interface(self, body)
-    if __lz_len(body) == 0 then
+    -- Linker:129
+    if List.__lz_len(body) == 0 then
+        -- Linker:130
         return false
     end
+    -- Linker:132
     local has_interface_decl = false
+    -- Linker:133
     local has_object_module = false
-    for _, node in __lz_each(body) do
+    -- Linker:134
+    for _, node in List.__lz_each(body) do
+        -- Linker:135
         if node.kind == "InterfaceDecl" then
+            -- Linker:136
             has_interface_decl = true
         end
+        -- Linker:138
         if node.kind == "ObjectModule" then
+            -- Linker:139
             has_object_module = true
         end
     end
+    -- Linker:142
     return has_interface_decl or has_object_module
 end
 
 local Main = {}
 
+-- Main:21
 function Main.new()
     local self = {}
-    local path = __lz_wrap(__lz_argv(1))
+    -- Main:22
+    local path = Option.__lz_wrap(Sys.__lz_argv(1))
+    -- Main:23
     if Option.is_some(path) then
+        -- Main:24
         local platform = ""
+        -- Main:25
         local pkg_path = ""
+        -- Main:26
         local i = 2
+        -- Main:27
         while true do
-            local flag = __lz_wrap(__lz_argv(i))
+            -- Main:28
+            local flag = Option.__lz_wrap(Sys.__lz_argv(i))
+            -- Main:29
             if Option.is_none(flag) then
+                -- Main:30
                 break
             end
+            -- Main:32
             local f = Option.unwrap(flag)
+            -- Main:33
             if f == "--platform" then
+                -- Main:34
                 i = i + 1
-                local val = __lz_wrap(__lz_argv(i))
+                -- Main:35
+                local val = Option.__lz_wrap(Sys.__lz_argv(i))
+                -- Main:36
                 if Option.is_some(val) then
+                    -- Main:37
                     platform = Option.unwrap(val)
                 end
             elseif f == "--pkg-path" then
+                -- Main:40
                 i = i + 1
-                local val = __lz_wrap(__lz_argv(i))
+                -- Main:41
+                local val = Option.__lz_wrap(Sys.__lz_argv(i))
+                -- Main:42
                 if Option.is_some(val) then
+                    -- Main:43
                     pkg_path = Option.unwrap(val)
                 else
+                    -- Main:45
                     Error.new("MissingFlagValue", "--pkg-path requires a directory argument", 0, 0, "", 1):raise()
                 end
             end
+            -- Main:48
             i = i + 1
         end
+        -- Main:50
         Main.build_file(Option.unwrap(path), platform, pkg_path)
     else
+        -- Main:52
         Error.new("NoFileAppended", "No file appended, use 'lazarus <FILE.laz>'", 0, 0, "", 2):raise()
     end
     return self
 end
+-- Main:58
 function Main.build_file(path, platform, pkg_path)
+    -- Main:59
     local linker = Linker.new(path, pkg_path)
+    -- Main:60
     local modules = linker:link()
-    local variant_owner = __lz_map({})
-    local enums = __lz_map({})
-    local variant_arity = __lz_map({})
-    local variant_fields = __lz_map({})
-    local enum_type_params = __lz_map({})
-    local classes = __lz_map({})
-    local interfaces = __lz_map({})
-    local gated_externs = __lz_map({})
-    for _, m in __lz_each(modules) do
+    -- Main:62
+    local variant_owner = Map.__lz_map({})
+    -- Main:63
+    local enums = Map.__lz_map({})
+    -- Main:64
+    local variant_arity = Map.__lz_map({})
+    -- Main:65
+    local variant_fields = Map.__lz_map({})
+    -- Main:66
+    local enum_type_params = Map.__lz_map({})
+    -- Main:67
+    local classes = Map.__lz_map({})
+    -- Main:68
+    local interfaces = Map.__lz_map({})
+    -- Main:69
+    local gated_externs = Map.__lz_map({})
+    -- Main:70
+    for _, m in List.__lz_each(modules) do
+        -- Main:71
         Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
+        -- Main:72
         Main.collect_interfaces(m.ast, interfaces, m.class_name)
+        -- Main:73
         if not m.is_interface then
+            -- Main:74
             Main.collect_signatures(m.ast, m.class_name, classes, platform, gated_externs)
         end
     end
-    for _, m in __lz_each(modules) do
+    -- Main:78
+    for _, m in List.__lz_each(modules) do
+        -- Main:79
         if not m.is_interface then
+            -- Main:80
             Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity, gated_externs)
+            -- Main:81
             Typecheck.new(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, interfaces):check(m.ast)
+            -- Main:82
             Optimizer.new():optimize(m.ast)
         end
     end
-    local file = __lz_unwrap(__lz_wrap(io.open("Main.lua", "w")))
-    file:write(Bundler.new(modules, linker:entry_class(), variant_owner):bundle())
+    -- Main:85
+    local file = Option.__lz_unwrap(Option.__lz_wrap(io.open("Main.lua", "w")))
+    -- Main:86
+    file:write(Bundler.new(modules, linker:entry_class(), variant_owner, platform):bundle())
+    -- Main:87
     file:close()
 end
+-- Main:94
 function Main.collect_enums(ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
-    for _, stmt in __lz_each(ast:child("body")) do
+    -- Main:95
+    for _, stmt in List.__lz_each(ast:child("body")) do
+        -- Main:96
         if stmt.kind == "EnumDecl" then
+            -- Main:97
             local name = stmt:child("name")
-            __lz_idx_set(enum_type_params, name, __lz_unwrap_or(stmt:attr("type_params"), __lz_list()))
-            local names = __lz_list()
-            for _, v in __lz_each(stmt:child("variants")) do
+            -- Main:98
+            List.__lz_idx_set(enum_type_params, name, Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_list({})))
+            -- Main:99
+            local names = List.__lz_list({})
+            -- Main:100
+            for _, v in List.__lz_each(stmt:child("variants")) do
+                -- Main:101
                 local vn = v:child("name")
-                __lz_push(names, vn)
-                __lz_idx_set(variant_owner, vn, name)
-                __lz_idx_set(variant_arity, vn, __lz_len(v:child("fields")))
-                __lz_idx_set(variant_fields, vn, v:child("fields"))
+                -- Main:102
+                List.__lz_push(names, vn)
+                -- Main:103
+                List.__lz_idx_set(variant_owner, vn, name)
+                -- Main:104
+                List.__lz_idx_set(variant_arity, vn, List.__lz_len(v:child("fields")))
+                -- Main:105
+                List.__lz_idx_set(variant_fields, vn, v:child("fields"))
             end
-            __lz_idx_set(enums, name, names)
+            -- Main:107
+            List.__lz_idx_set(enums, name, names)
         end
     end
 end
+-- Main:117
 function Main.collect_signatures(ast, class_name, classes, platform, gated_externs)
-    local fields = __lz_map({})
-    local methods = __lz_map({})
+    -- Main:118
+    local fields = Map.__lz_map({})
+    -- Main:119
+    local methods = Map.__lz_map({})
+    -- Main:120
     local ctor = 0
-    local ctor_names = __lz_list()
-    local type_params = __lz_list()
-    for _, stmt in __lz_each(ast:child("body")) do
+    -- Main:121
+    local ctor_names = List.__lz_list({})
+    -- Main:122
+    local type_params = List.__lz_list({})
+    -- Main:123
+    for _, stmt in List.__lz_each(ast:child("body")) do
+        -- Main:124
         local k = stmt.kind
+        -- Main:125
         if k == "VariableDecl" then
-            local visibility = __lz_unwrap_or(stmt:attr("visibility"), "")
-            local is_static = __lz_unwrap_or(stmt:attr("is_static"), false)
+            -- Main:126
+            local visibility = Option.__lz_unwrap_or(stmt:attr("visibility"), "")
+            -- Main:127
+            local is_static = Option.__lz_unwrap_or(stmt:attr("is_static"), false)
+            -- Main:128
             if (visibility ~= "") and (not is_static) then
-                __lz_idx_set(fields, stmt:child("name"), stmt:attr("type"))
+                -- Main:129
+                List.__lz_idx_set(fields, stmt:child("name"), stmt:attr("type"))
             end
         elseif k == "FunctionDecl" then
-            local params = __lz_unwrap_or(stmt:attr("param_types"), __lz_list())
+            -- Main:132
+            local params = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_list({}))
+            -- Main:133
             local param_names = stmt:child("params")
-            local result = __lz_unwrap_or(stmt:attr("return_type"), 0)
-            local is_static = __lz_unwrap_or(stmt:attr("is_static"), false)
-            local mtype_params = __lz_unwrap_or(stmt:attr("type_params"), __lz_list())
-            __lz_idx_set(methods, stmt:child("name"), __lz_map({["params"] = params, ["param_names"] = param_names, ["result"] = result, ["is_static"] = is_static, ["type_params"] = mtype_params}))
+            -- Main:134
+            local result = Option.__lz_unwrap_or(stmt:attr("return_type"), 0)
+            -- Main:135
+            local is_static = Option.__lz_unwrap_or(stmt:attr("is_static"), false)
+            -- Main:136
+            local mtype_params = Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_list({}))
+            -- Main:137
+            List.__lz_idx_set(methods, stmt:child("name"), Map.__lz_map({["params"] = params, ["param_names"] = param_names, ["result"] = result, ["is_static"] = is_static, ["type_params"] = mtype_params}))
         elseif k == "ConstructorDecl" then
-            ctor = __lz_unwrap_or(stmt:attr("param_types"), __lz_list())
+            -- Main:139
+            ctor = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_list({}))
+            -- Main:140
             ctor_names = stmt:child("params")
-            type_params = __lz_unwrap_or(stmt:attr("type_params"), __lz_list())
+            -- Main:141
+            type_params = Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_list({}))
         elseif k == "ExternDecl" then
-            local params = __lz_unwrap_or(stmt:attr("param_types"), __lz_list())
+            -- Main:143
+            local params = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_list({}))
+            -- Main:144
             local all_typed = true
-            for _, pt in __lz_each(params) do
-                if __lz_unwrap_or(pt:attr("inferred"), false) or (pt:child("name") == "dynamic") then
+            -- Main:145
+            for _, pt in List.__lz_each(params) do
+                -- Main:146
+                if Option.__lz_unwrap_or(pt:attr("inferred"), false) or (pt:child("name") == "dynamic") then
+                    -- Main:147
                     all_typed = false
                 end
             end
-            if all_typed and (__lz_len(params) > 0) then
-                local extern_platform = __lz_unwrap_or(stmt:attr("platform"), "")
+            -- Main:150
+            if all_typed and (List.__lz_len(params) > 0) then
+                -- Main:151
+                local extern_platform = Option.__lz_unwrap_or(stmt:attr("platform"), "")
+                -- Main:152
                 if (extern_platform == "") or (extern_platform == platform) then
-                    local extern_result = __lz_unwrap_or(stmt:attr("return_type"), 0)
-                    __lz_idx_set(methods, stmt:child("name"), __lz_map({["params"] = params, ["result"] = extern_result, ["is_static"] = true, ["type_params"] = __lz_list()}))
+                    -- Main:153
+                    local extern_result = Option.__lz_unwrap_or(stmt:attr("return_type"), 0)
+                    -- Main:154
+                    List.__lz_idx_set(methods, stmt:child("name"), Map.__lz_map({["params"] = params, ["result"] = extern_result, ["is_static"] = true, ["type_params"] = List.__lz_list({})}))
                 else
-                    __lz_idx_set(gated_externs, stmt:child("name"), extern_platform)
+                    -- Main:156
+                    List.__lz_idx_set(gated_externs, stmt:child("name"), extern_platform)
                 end
             end
         end
     end
-    __lz_idx_set(classes, class_name, __lz_map({["fields"] = fields, ["methods"] = methods, ["ctor"] = ctor, ["ctor_names"] = ctor_names, ["type_params"] = type_params}))
+    -- Main:161
+    List.__lz_idx_set(classes, class_name, Map.__lz_map({["fields"] = fields, ["methods"] = methods, ["ctor"] = ctor, ["ctor_names"] = ctor_names, ["type_params"] = type_params}))
 end
+-- Main:169
 function Main.collect_interfaces(ast, interfaces, class_name)
-    for _, stmt in __lz_each(ast:child("body")) do
+    -- Main:170
+    for _, stmt in List.__lz_each(ast:child("body")) do
+        -- Main:171
         if stmt.kind == "InterfaceDecl" then
+            -- Main:172
             local name = stmt:child("name")
+            -- Main:173
             if name == "" then
+                -- Main:174
                 name = class_name
             end
-            local methods = __lz_map({})
-            for _, m in __lz_each(stmt:child("methods")) do
-                __lz_idx_set(methods, m:child("name"), __lz_map({["params"] = m:child("param_types"), ["result"] = m:child("return_type"), ["type_params"] = m:child("type_params")}))
+            -- Main:176
+            local methods = Map.__lz_map({})
+            -- Main:177
+            for _, m in List.__lz_each(stmt:child("methods")) do
+                -- Main:178
+                List.__lz_idx_set(methods, m:child("name"), Map.__lz_map({["params"] = m:child("param_types"), ["result"] = m:child("return_type"), ["type_params"] = m:child("type_params")}))
             end
-            local properties = __lz_map({})
-            for _, p in __lz_each(stmt:child("properties")) do
-                __lz_idx_set(properties, p:child("name"), p:child("type"))
+            -- Main:180
+            local properties = Map.__lz_map({})
+            -- Main:181
+            for _, p in List.__lz_each(stmt:child("properties")) do
+                -- Main:182
+                List.__lz_idx_set(properties, p:child("name"), p:child("type"))
             end
-            __lz_idx_set(interfaces, name, __lz_map({["methods"] = methods, ["properties"] = properties, ["type_params"] = stmt:child("type_params")}))
+            -- Main:184
+            List.__lz_idx_set(interfaces, name, Map.__lz_map({["methods"] = methods, ["properties"] = properties, ["type_params"] = stmt:child("type_params")}))
         end
     end
 end

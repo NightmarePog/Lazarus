@@ -31,7 +31,11 @@ public parse_program(): Node {
     // (a contract) or `#object` (a static module). `@auto constructor(...)` is a
     // statement annotation (uses `@`, not `#`), parsed in the body loop.
     if .cursor.check("HASH") and .is_file_directive() {
-        return .parse_file_directive()
+        mut result = .parse_file_directive()
+        if .cursor.has_errors() {
+            .cursor.flush()
+        }
+        return result
     }
     mut body = []
     loop {
@@ -40,7 +44,12 @@ public parse_program(): Node {
         }
         body.push(.parse_statement())
     }
-    return Ast.program(.expand_field_params(body))
+    // Filter sentinel nodes injected during error recovery, then report all errors.
+    mut clean = [s for s in body if s.kind != "ErrorNode"]
+    if .cursor.has_errors() {
+        .cursor.flush()
+    }
+    return Ast.program(.expand_field_params(clean))
 }
 
 // True when the leading `#` opens a whole-file directive (`#interface`/`#object`)
@@ -125,7 +134,8 @@ private parse_interface_body(at: Token): Node {
         }
     }
     body.push(Ast.interface_decl("", methods, properties, [], at.line, at.column))
-    return Ast.program(body)
+    mut clean = [s for s in body if s.kind != "ErrorNode"]
+    return Ast.program(clean)
 }
 
 // `#object` body: a static module — every member is forced static, so the file
@@ -144,7 +154,8 @@ private parse_object_body(): Node {
             body.push(.parse_object_member())
         }
     }
-    return Ast.program(body)
+    mut clean = [s for s in body if s.kind != "ErrorNode"]
+    return Ast.program(clean)
 }
 
 private parse_object_member(): Node {
@@ -160,10 +171,17 @@ private parse_object_member(): Node {
         visibility = "public"
     }
     if .cursor.check("STATIC") {
+        .cursor.advance()
         .cursor.fail("'static' is implied in an #object file; remove it")
+        return Ast.error_node()
     }
     if .cursor.check("CONSTRUCTOR") {
+        .cursor.advance()
         .cursor.fail("an #object file has no instances; remove the constructor")
+        return Ast.error_node()
+    }
+    if .cursor.match("LUA") {
+        return .parse_lua_decl(visibility, true)
     }
     if .cursor.check("IDENTIFIER") and .looks_like_decl() {
         return .parse_method(visibility, true)
@@ -177,6 +195,7 @@ private parse_statement(): Node {
     match tok.kind {
         "IMPORT" => { .cursor.advance() return .parse_import(tok) }
         "EXTERN" => { .cursor.advance() return .parse_extern(tok) }
+        "LUA" => { .cursor.advance() return .parse_lua_decl("", false) }
         "ENUM" => { .cursor.advance() return .parse_enum(tok) }
         "INTERFACE" => { .cursor.advance() return .parse_interface(tok) }
         "PRIVATE" => { .cursor.advance() return .parse_member("private") }
@@ -223,11 +242,12 @@ private parse_block(context: str): List<Node> {
     mut open = .cursor.consume("BODY_START", "Expected '{' to open " ++ context)
     mut body = []
     loop {
-        if .cursor.check("BODY_END") {
-            break
-        }
         if .cursor.at_end() {
             .cursor.fail_at("Expected '}' to close " ++ context, open.line, open.column, 1)
+            break
+        }
+        if .cursor.check("BODY_END") {
+            break
         }
         body.push(.parse_statement())
     }
@@ -258,11 +278,12 @@ private parse_enum(tok: Token): Node {
     mut open = .cursor.consume("BODY_START", "Expected '{' to open enum body")
     mut variants = []
     loop {
-        if .cursor.check("BODY_END") {
-            break
-        }
         if .cursor.at_end() {
             .cursor.fail_at("Expected '}' to close enum body", open.line, open.column, 1)
+            break
+        }
+        if .cursor.check("BODY_END") {
+            break
         }
         variants.push(.parse_enum_variant())
         .cursor.match("COMMA")
@@ -298,11 +319,12 @@ private parse_interface(tok: Token): Node {
     mut methods = []
     mut properties = []
     loop {
-        if .cursor.check("BODY_END") {
-            break
-        }
         if .cursor.at_end() {
             .cursor.fail_at("Expected '}' to close interface body", open.line, open.column, 1)
+            break
+        }
+        if .cursor.check("BODY_END") {
+            break
         }
         .parse_interface_member(methods, properties)
     }
@@ -328,6 +350,20 @@ private parse_interface_member(methods: List<Node>, properties: List<Node>): uni
     }
 }
 
+// `[visibility] [static] lua name<T>(params): return_type LUA_BODY`
+// The LUA keyword has already been consumed by the caller.
+private parse_lua_decl(visibility: str, is_static: bool): Node {
+    mut name = .cursor.consume("IDENTIFIER", "Expected function name after 'lua'")
+    mut type_params = .parse_type_params()
+    .cursor.consume("LEFT_BRACKET", "Expected '(' after lua function name")
+    mut param_types = []
+    mut params = .parse_params(param_types)
+    .cursor.consume("RIGHT_BRACKET", "Expected ')' after lua function parameters")
+    mut return_type = .parse_return_type()
+    mut body_tok = .cursor.consume("LUA_BODY", "Expected '{' to open lua function body")
+    return Ast.lua_decl(name.value, params, param_types, return_type, body_tok.value, is_static, visibility, name.line, name.column, type_params)
+}
+
 private parse_extern(tok: Token): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected a name after 'extern'")
     .cursor.consume("LEFT_BRACKET", "Expected '(' after extern name")
@@ -343,11 +379,17 @@ private parse_extern(tok: Token): Node {
 // A `private`/`public` declaration: a property, a class member, or a method.
 private parse_member(visibility: str): Node {
     if .cursor.match("STATIC") {
+        if .cursor.match("LUA") {
+            return .parse_lua_decl(visibility, true)
+        }
         if .cursor.check("IDENTIFIER") and .looks_like_decl() {
             return .parse_method(visibility, true)
         }
         mut static_mut = .cursor.match("MUTABLE")
         return .parse_binding(visibility, static_mut, "Expected member name", true)
+    }
+    if .cursor.match("LUA") {
+        return .parse_lua_decl(visibility, false)
     }
     if .cursor.check("IDENTIFIER") and .looks_like_decl() {
         return .parse_method(visibility, false)
@@ -357,6 +399,9 @@ private parse_member(visibility: str): Node {
 }
 
 private parse_static(): Node {
+    if .cursor.match("LUA") {
+        return .parse_lua_decl("", true)
+    }
     if .cursor.check("IDENTIFIER") and .looks_like_decl() {
         return .parse_method("", true)
     }
@@ -396,7 +441,7 @@ private parse_assignment(name_err: str): Node {
         return .local_binding(name, value)
     }
     .cursor.fail("Expected '=' or a compound assignment after '" ++ name.value ++ "'")
-    return Ast.node("VariableDecl", ["name": name.value, "visibility": "", "mutable": false, "is_static": false])
+    return Ast.error_node()
 }
 
 private local_binding(name: Token, value: Node): Node {
@@ -432,8 +477,16 @@ private parse_annotation(): Node {
         mut tok = .cursor.consume("CONSTRUCTOR", "@auto must annotate a constructor")
         return .parse_constructor(tok, true)
     }
+    if name.value == "platform" {
+        .cursor.consume("LEFT_BRACKET", "Expected '(' after '@platform'")
+        mut plat_tok = .cursor.consume("IDENTIFIER", "Expected platform name after '@platform('")
+        .cursor.consume("RIGHT_BRACKET", "Expected ')' after platform name")
+        mut next_node = .parse_statement()
+        next_node.set("platform", plat_tok.value)
+        return next_node
+    }
     .cursor.fail("unknown annotation '@" ++ name.value ++ "'")
-    return Ast.constructor_decl([], [], 0, 0, [], [])
+    return Ast.error_node()
 }
 
 private parse_constructor(tok: Token, auto: bool): Node {
@@ -713,11 +766,12 @@ private parse_match(tok: Token): Node {
     mut open = .cursor.consume("BODY_START", "Expected '{' to open match body")
     mut arms = []
     loop {
-        if .cursor.check("BODY_END") {
-            break
-        }
         if .cursor.at_end() {
             .cursor.fail_at("Expected '}' to close match body", open.line, open.column, 1)
+            break
+        }
+        if .cursor.check("BODY_END") {
+            break
         }
         arms.push(.parse_match_arm())
     }
