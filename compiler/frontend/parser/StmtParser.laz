@@ -199,7 +199,7 @@ private parse_statement(): Node {
         "MUTABLE" => { .cursor.advance() return .parse_binding("", true, "Expected variable name after 'mut'", false) }
         "STATIC" => { .cursor.advance() return .parse_static() }
         "AT" => { return .parse_annotation() }
-        "CONSTRUCTOR" => { .cursor.advance() return .parse_constructor(tok, false) }
+        "CONSTRUCTOR" => { .cursor.advance() return .parse_constructor(tok) }
         "RETURN" => { .cursor.advance() return .parse_return(tok) }
         "IF" => { .cursor.advance() return .parse_if(tok) }
         "WHILE" => { .cursor.advance() return .parse_while(tok) }
@@ -499,7 +499,7 @@ private parse_annotation(): Node {
     return next_node
 }
 
-private parse_constructor(tok: Token, auto: bool): Node {
+private parse_constructor(tok: Token): Node {
     mut type_params = .parse_type_params()
     .cursor.consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
     mut param_types = []
@@ -507,16 +507,8 @@ private parse_constructor(tok: Token, auto: bool): Node {
     mut params = .parse_ctor_params(param_types, field_params)
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after parameters")
     mut body = []
-    if auto {
-        // `@auto`: assign every param to its same-named property (declared
-        // elsewhere; its type is inherited in `expand_field_params`).
-        for name in params {
-            body.push(.field_param_assign(["name": name, "line": tok.line, "col": tok.column]))
-        }
-    } else {
-        for fp in field_params {
-            body.push(.field_param_assign(fp))
-        }
+    for fp in field_params {
+        body.push(.field_param_assign(fp))
     }
     if .cursor.check("BODY_START") {
         for stmt in .parse_block("constructor body") {
@@ -525,7 +517,6 @@ private parse_constructor(tok: Token, auto: bool): Node {
     }
     mut node = Ast.constructor_decl(params, body, tok.line, tok.column, param_types, type_params)
     node.set("field_params", field_params)
-    node.set("auto", auto)
     return node
 }
 
