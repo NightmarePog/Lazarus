@@ -70,15 +70,11 @@ private is_file_directive(): bool {
 // pipeline sees an ordinary class. The `.f = f` assignments are added in
 // `parse_constructor`.
 private expand_field_params(body: List<Node>): List<Node> {
-    mut prop_types = .declared_property_types(body)
     mut props = []
     for stmt in body {
         if stmt.kind == "ConstructorDecl" {
             for fp in stmt.attr("field_params").unwrap_or([]) {
                 props.push(.field_property(fp))
-            }
-            if stmt.attr("auto").unwrap_or(false) {
-                .resolve_auto_params(stmt, prop_types)
             }
         }
     }
@@ -474,8 +470,10 @@ private parse_annotation(): Node {
     .cursor.consume("AT", "Expected '@'")
     mut name = .cursor.consume("IDENTIFIER", "Expected an annotation name after '@'")
     if name.value == "auto" {
-        mut tok = .cursor.consume("CONSTRUCTOR", "@auto must annotate a constructor")
-        return .parse_constructor(tok, true)
+        mut next_node = .parse_statement()
+        next_node.set("annotation_class", "Auto")
+        next_node.set("annotation_args", ["auto"])
+        return next_node
     }
     if name.value == "platform" {
         .cursor.consume("LEFT_BRACKET", "Expected '(' after '@platform'")
@@ -558,37 +556,6 @@ private field_param_assign<A>(fp: A): Node {
     mut l = fp.get("line").unwrap()
     mut c = fp.get("col").unwrap()
     return Ast.field_assign(Ast.member(Ast.self_expr(l, c), name, l, c), Ast.identifier(name, l, c), l, c)
-}
-
-// Every constructor parameter as a field param (for `@auto constructor(...)`).
-// The declared instance properties' type nodes, keyed by name — the source of an
-// `@auto` constructor's parameter types.
-private declared_property_types(body: List<Node>): Map<str, Node> {
-    mut out = [:]
-    for stmt in body {
-        if stmt.kind == "VariableDecl" and stmt.attr("visibility").unwrap_or("") != "" and not stmt.attr("is_static").unwrap_or(false) {
-            out[stmt.child("name")] = stmt.attr("type").unwrap_or(Ast.type_name("dynamic", [], stmt.line(), stmt.col()))
-        }
-    }
-    return out
-}
-
-// Fill an `@auto` constructor's parameter types from the matching declared
-// properties. A param with no declared property keeps its own (untyped) annotation
-// — its synthesized `.p = p` assignment then fails the unknown-instance-member
-// check, so an `@auto` param must have a declared property.
-private resolve_auto_params(ctor: Node, prop_types: Map<str, Node>): unit {
-    mut new_types = []
-    mut i = 1
-    for name in ctor.child("params") {
-        if prop_types.has(name) {
-            new_types.push(prop_types.get(name).unwrap())
-        } else {
-            new_types.push(ctor.child("param_types").get(i).unwrap())
-        }
-        i = i + 1
-    }
-    ctor.set("param_types", new_types)
 }
 
 // A comma-separated parameter list, the opening `(` consumed. Names are returned;

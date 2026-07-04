@@ -6,13 +6,22 @@
 import std.Option
 import std.Sys
 
-extern fread(h, fmt: str): Option<str> = "__lz_fread"
-extern fwrite(h, content: str): bool = "__lz_fwrite"
+private static lua __lz_fread(h, fmt): str {
+    return h:read(fmt)
+}
+private static lua __lz_fwrite(h, content): bool {
+    local ok = h:write(content)
+    return ok ~= nil
+}
+
+extern fread(h, fmt: str): Option<str> = "File.__lz_fread"
+extern fwrite(h, content: str): bool = "File.__lz_fwrite"
 
 private handle: dynamic
 
-@auto
-constructor(handle: dynamic)
+constructor(handle: dynamic) {
+    .handle = handle
+}
 
 static open(path: str, mode: str): Option<File> {
     mut h = Sys.open(path, mode)

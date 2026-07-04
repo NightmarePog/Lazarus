@@ -6,8 +6,11 @@ public annotated: dynamic
 public body: List<dynamic>
 public class_name: str
 
-@auto
-constructor(annotated: dynamic, body: List<dynamic>, class_name: str)
+constructor(annotated: dynamic, body: List<dynamic>, class_name: str) {
+    .annotated = annotated
+    .body = body
+    .class_name = class_name
+}
 
 // Returns [{name, visibility}] for each non-static instance property in the class.
 static fields(ctx: Macro): List<Map<str, str>> {

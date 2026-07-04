@@ -1,6 +1,6 @@
 import std.annotation.Macro
 
-@auto constructor()
+constructor() {}
 
 // @Derive(Debug): inject to_str() that formats all public instance fields.
 // Place @Derive(Debug) immediately before the constructor.

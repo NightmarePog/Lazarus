@@ -4,6 +4,7 @@ import backend.Codegen
 import backend.Text
 import frontend.parser.Node
 import std.annotation.Macro
+import std.annotation.Auto
 
 // Annotation expansion pass. Construct with the current module's class_name and
 // a shared handler_cache (a Map from Main.laz — shared across modules by reference).
