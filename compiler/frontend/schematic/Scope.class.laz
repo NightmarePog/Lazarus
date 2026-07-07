@@ -7,10 +7,7 @@
 // the value slot is dynamic so both passes can reuse the same structure.
 
 private names: Map<str, dynamic> = [:]
-private parent: dynamic
-private is_root: bool
-@auto
-constructor(parent: dynamic, is_root: bool)
+constructor(.parent: dynamic, .is_root: bool)
 
 static root(): Scope {
     return Scope(0, true)

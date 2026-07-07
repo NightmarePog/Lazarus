@@ -4,8 +4,12 @@ public kind: str
 public name: str
 public params: List<Type>
 public result: Option<Type>
-@auto
-constructor(kind, name, params, result)
+constructor(kind: str, name: str, params: List<Type>, result: Option<Type>) {
+    .kind = kind
+    .name = name
+    .params = params
+    .result = result
+}
 
 // `result` carries the return type only for a `fn`; every other kind is `none`, so
 // the base helpers never recurse into it.

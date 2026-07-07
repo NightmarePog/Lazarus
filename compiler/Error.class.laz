@@ -11,11 +11,13 @@ public line: int
 public column: int
 public source: str
 public span: int
-@auto
-constructor(kind: str, message: str, line: int, column: int, source: str, span: int)
-
-public to_string(): str {
-    return .format()
+constructor(kind: str, message: str, line: int, column: int, source: str, span: int) {
+    .kind = kind
+    .message = message
+    .line = line
+    .column = column
+    .source = source
+    .span = span
 }
 
 public lua raise(): unit {

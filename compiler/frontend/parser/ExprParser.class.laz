@@ -29,10 +29,8 @@ private static precedences = [
     "POWER": 6
 ]
 
-private cursor: TokenCursor
 private stmts: dynamic
-@auto
-constructor(cursor: TokenCursor)
+constructor(.cursor: TokenCursor)
 
 public inject_stmts(s: dynamic): unit {
     .stmts = s

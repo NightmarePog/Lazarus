@@ -5,8 +5,11 @@
 public in_function: bool
 public in_loop: bool
 public in_constructor: bool
-@auto
-constructor(in_function, in_loop, in_constructor)
+constructor(in_function: bool, in_loop: bool, in_constructor: bool) {
+    .in_function = in_function
+    .in_loop = in_loop
+    .in_constructor = in_constructor
+}
 
 // The frame for a loop body: like this one, but with `break` now legal.
 public in_loop_body(): Frame {

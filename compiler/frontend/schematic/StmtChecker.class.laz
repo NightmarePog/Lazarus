@@ -11,13 +11,7 @@ import frontend.schematic.Frame
 import frontend.schematic.Naming
 import frontend.schematic.Callability
 
-private source: str
-private exprs: ExprChecker
-private variant_owner: Map<str, str>
-private enums: Map<str, List<str>>
-private variant_arity: Map<str, int>
-@auto
-constructor(source: str, exprs: ExprChecker, variant_owner: Map<str, str>, enums: Map<str, List<str>>, variant_arity: Map<str, int>)
+constructor(.source: str, .exprs: ExprChecker, .variant_owner: Map<str, str>, .enums: Map<str, List<str>>, .variant_arity: Map<str, int>)
 
 // Walk a block, marking each statement with whether it is the block's last (the
 // placement rule for `return` / `break`).

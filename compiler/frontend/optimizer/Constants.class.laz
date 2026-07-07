@@ -5,9 +5,7 @@
 
 import frontend.parser.Node
 
-private entries: Map<str, Node>
-@auto
-constructor(entries: Map<str, Node>)
+constructor(.entries: Map<str, Node>)
 
 static empty(): Constants {
     return Constants([:])

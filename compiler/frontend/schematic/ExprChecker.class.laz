@@ -11,13 +11,7 @@ import frontend.schematic.Symbol
 import frontend.schematic.Scope
 import frontend.schematic.Booleanity
 
-private source: str
-private properties: Map<str, bool>
-private methods: Map<str, bool>
-private variant_owner: Map<str, str>
-private gated_externs: Map<str, str>
-@auto
-constructor(source: str, properties: Map<str, bool>, methods: Map<str, bool>, variant_owner: Map<str, str>, gated_externs: Map<str, str>)
+constructor(.source: str, .properties: Map<str, bool>, .methods: Map<str, bool>, .variant_owner: Map<str, str>, .gated_externs: Map<str, str>)
 private in_instance: bool = false
 private stmt_checker: dynamic
 
