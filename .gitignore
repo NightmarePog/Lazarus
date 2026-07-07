@@ -8,3 +8,5 @@ book/book/
 compiler/Main.lua
 examples/multi/Main.lua
 examples/std_demo/Main.lua
+/test_*.lua
+/*.lua

@@ -1,8 +1,0 @@
-[book]
-title = "The Lazarus Language Reference"
-authors = ["Nightmare Pog"]
-language = "en"
-src = "src"
-
-[output.html]
-git-repository-url = "https://github.com/NightmarePog/Lazarus"
