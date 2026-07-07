@@ -13,8 +13,19 @@ public source: str
 public ast: Node
 public imports: List<str>
 public is_trait: bool
+public is_macro: bool
 public is_prebuilt: bool
 public prebuilt_lua: str
 public meta_sig: dynamic
-@auto
-constructor(path: str, class_name: str, source: str, ast: Node, imports: List<str>, is_trait: bool, is_prebuilt: bool, prebuilt_lua: str, meta_sig: dynamic)
+constructor(path: str, class_name: str, source: str, ast: Node, imports: List<str>, is_trait: bool, is_macro: bool, is_prebuilt: bool, prebuilt_lua: str, meta_sig: dynamic) {
+    .path = path
+    .class_name = class_name
+    .source = source
+    .ast = ast
+    .imports = imports
+    .is_trait = is_trait
+    .is_macro = is_macro
+    .is_prebuilt = is_prebuilt
+    .prebuilt_lua = prebuilt_lua
+    .meta_sig = meta_sig
+}

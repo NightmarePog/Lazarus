@@ -1,16 +1,16 @@
-import std.annotation.Macro
+import std.macro.Macro
 
 constructor() {}
 
-// @Derive(Debug): inject to_str() that formats all public instance fields.
-// Place @Derive(Debug) immediately before the constructor.
+// Debug: inject to_str() that formats all public instance fields.
+// Usage: `Debug constructor(...)` or `Debug(apply) constructor(...)`
 //
 // Example output for class Point with fields x, y:
 //   Point { x=3 y=7 }
 // Written as raw Lua so that mutable accumulation of `body` works correctly
 // when this module is compiled for the handler bundle (before the Schematic pass
 // has set the reassign flag on VariableDecl nodes).
-static lua debug(ctx: dynamic): dynamic {
+static lua apply(ctx: dynamic): dynamic {
     local flds = Macro.fields(ctx)
     local body = "return \"" .. ctx.class_name .. " {\""
     for _, f in List.__lz_each(flds) do

@@ -98,6 +98,8 @@ private load(path: str, origin_source: str, origin_line: int, origin_col: int, o
         class_name = Str.sub(class_name, 1, Str.len(class_name).unwrap_or(0) - 7).unwrap_or(class_name) // len(".object")
     } else if kind == "trait" {
         class_name = Str.sub(class_name, 1, Str.len(class_name).unwrap_or(0) - 6).unwrap_or(class_name) // len(".trait")
+    } else if kind == "macro" {
+        class_name = Str.sub(class_name, 1, Str.len(class_name).unwrap_or(0) - 6).unwrap_or(class_name) // len(".macro")
     } else if Str.is_suffix(class_name, ".class") {
         class_name = Str.sub(class_name, 1, Str.len(class_name).unwrap_or(0) - 6).unwrap_or(class_name) // len(".class")
     }
@@ -117,7 +119,7 @@ private load(path: str, origin_source: str, origin_line: int, origin_col: int, o
     }
     program.set("body", body)
 
-    .ordered.push(Module(path, class_name, source, program, imports, kind == "trait", false, "", 0))
+    .ordered.push(Module(path, class_name, source, program, imports, kind == "trait", kind == "macro", false, "", 0))
     .loaded[path] = true
 }
 
@@ -138,7 +140,7 @@ private load_prebuilt(path: str, origin_source: str, origin_line: int, origin_co
     }
     mut class_name = Path.stem(path)
     mut dummy_ast = Node("Program", ["body": []])
-    .ordered.push(Module(path, class_name, "", dummy_ast, [], false, true, lua_source, sig_opt.unwrap()))
+    .ordered.push(Module(path, class_name, "", dummy_ast, [], false, false, true, lua_source, sig_opt.unwrap()))
     .loaded[path] = true
 }
 
@@ -200,6 +202,9 @@ private file_kind(path: str): str {
     }
     if Str.is_suffix(path, ".trait.laz") {
         return "trait"
+    }
+    if Str.is_suffix(path, ".macro.laz") {
+        return "macro"
     }
     return "class"
 }

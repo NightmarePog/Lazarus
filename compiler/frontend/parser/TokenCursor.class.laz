@@ -13,13 +13,10 @@ private static recovery_tokens = [
     "PRIVATE": true, "PUBLIC": true, "STATIC": true, "CONSTRUCTOR": true,
     "EXTERN": true, "LUA": true, "RETURN": true, "IF": true, "WHILE": true,
     "LOOP": true, "FOR": true, "BREAK": true, "BODY_END": true, "MUTABLE": true,
-    "AT": true, "IMPORT": true, "ENUM": true
+    "IMPORT": true, "ENUM": true
 ]
 
-private tokens: List<Token>
-private source: str
-@auto
-constructor(tokens: List<Token>, source: str)
+constructor(.tokens: List<Token>, .source: str)
 private pos: int = 1
 private errors: List<dynamic> = []
 

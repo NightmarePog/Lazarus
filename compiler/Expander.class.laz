@@ -3,46 +3,41 @@ import backend.linker.Module
 import backend.Codegen
 import backend.Text
 import frontend.parser.Node
-import std.annotation.Macro
-import std.annotation.Auto
+import std.macro.Macro
 
 // Annotation expansion pass. Construct with the current module's class_name and
 // a shared handler_cache (a Map from Main.laz — shared across modules by reference).
 
-private class_name: str
-private handler_cache: Map<str, dynamic>
-
-@auto
-constructor(class_name: str, handler_cache: Map<str, dynamic>)
+constructor(.class_name: str, .handler_cache: Map<str, dynamic>)
 
 public expand(program: Node, modules: List<Module>): unit {
     mut body = program.child("body")
     mut new_body = []
     for node in body {
-        mut ann_opt = node.attr("annotation_class")
-        if ann_opt.is_none() or ann_opt.unwrap() == "" {
-            new_body.push(node)
-        } else {
-            new_body.push(node)
-            mut ann_class = ann_opt.unwrap()
-            mut args = node.attr("annotation_args").unwrap_or([])
-            if args.len() == 0 {
-                node.set("annotation_class", "")
-                node.set("annotation_args", [])
-            } else {
-                mut handler = .get_handler(ann_class, modules)
-                // body is the original list — nodes injected by earlier handlers in this class are not visible
+        mut modifiers = node.attr("macro_modifiers").unwrap_or([])
+        new_body.push(node)
+        if modifiers.len() > 0 {
+            for modifier in modifiers {
+                mut handler_class = modifier.get("name").unwrap()
+                mut args = modifier.get("args").unwrap_or([])
+                mut handler = .get_handler(handler_class, modules)
                 mut ctx = Macro(node, body, .class_name)
-                for arg in args {
-                    mut method_name = Str.lower(arg).unwrap_or(arg)
-                    mut injected = Expander.call_handler(handler, method_name, ctx)
+                if args.len() == 0 {
+                    mut injected = Expander.call_handler(handler, "apply", ctx)
                     for n in injected {
                         new_body.push(n)
                     }
+                } else {
+                    for arg in args {
+                        mut method_name = Str.lower(arg).unwrap_or(arg)
+                        mut injected = Expander.call_handler(handler, method_name, ctx)
+                        for n in injected {
+                            new_body.push(n)
+                        }
+                    }
                 }
-                node.set("annotation_class", "")
-                node.set("annotation_args", [])
             }
+            node.set("macro_modifiers", [])
         }
     }
     program.set("body", new_body)
@@ -57,25 +52,24 @@ private get_handler(handler_class: str, modules: List<Module>): dynamic {
     return handler
 }
 
-// Codegen all non-interface modules (no typecheck) into one Lua chunk, then load it.
-// All modules are included so core stdlib (List, Map, Option, Result) are in scope as
-// locals — they are NOT globals, so they must appear in the same Lua chunk as the handler.
+// Codegen all non-trait, non-macro-excluded modules into one Lua chunk, then
+// load it. Macro modules ARE included so handlers can import each other.
+// All stdlib modules are present so handlers can use List, Map, Option, etc.
 static compile_handler(handler_class: str, modules: List<Module>): dynamic {
     mut blocks = []
     for m in modules {
         if not m.is_trait {
-            // externs and variant_owner left empty — handler modules must not use match on enums or extern bindings
             mut cg = Codegen(m.class_name, m.imports, [:], [:], "", 0, 0, 0)
             blocks.push(cg.class_block(m.ast))
         }
     }
     blocks.push("return " ++ handler_class)
-    return Expander.load_lua(Text.join(blocks, "\n\n"), handler_class)
+    return Expander.load_lua(Text.join(blocks, "\n\n"), handler_class, Node)
 }
 
-static lua load_lua(src: str, class_name: str): dynamic {
+static lua load_lua(src: str, class_name: str, node_cls: dynamic): dynamic {
     local env = setmetatable({
-        Node = Node,
+        Node = node_cls,
         List = List,
         Map = Map,
         Option = Option,
@@ -83,14 +77,14 @@ static lua load_lua(src: str, class_name: str): dynamic {
     }, {__index = _ENV})
     local chunk, err = load(src, "@" .. class_name, "t", env)
     if not chunk then
-        error("failed to load annotation handler '" .. class_name .. "': " .. tostring(err))
+        error("failed to load macro handler '" .. class_name .. "': " .. tostring(err))
     end
     local ok, result = pcall(chunk)
     if not ok then
-        error("failed to initialize annotation handler '" .. class_name .. "': " .. tostring(result))
+        error("failed to initialize macro handler '" .. class_name .. "': " .. tostring(result))
     end
     if result == nil then
-        error("failed to load annotation handler '" .. class_name .. "': class not found in compiled modules")
+        error("failed to load macro handler '" .. class_name .. "': class not found in compiled modules")
     end
     return result
 }
@@ -98,7 +92,7 @@ static lua load_lua(src: str, class_name: str): dynamic {
 static lua call_handler(handler: dynamic, method: str, ctx: dynamic): dynamic {
     local fn = handler[method]
     if not fn then
-        error("annotation handler has no method '" .. method .. "'")
+        error("macro handler has no method '" .. method .. "'")
     end
     local ok, result = pcall(fn, ctx)
     if not ok then
@@ -106,7 +100,7 @@ static lua call_handler(handler: dynamic, method: str, ctx: dynamic): dynamic {
     end
     if result == nil then return List.__lz_list({}) end
     if result ~= nil and not (type(result) == "table" and result.items ~= nil) then
-        error("annotation handler method '" .. method .. "' must return List<dynamic>, got " .. type(result))
+        error("macro handler method '" .. method .. "' must return List<dynamic>, got " .. type(result))
     end
     return result
 }

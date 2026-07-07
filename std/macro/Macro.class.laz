@@ -1,4 +1,4 @@
-// Context passed to every annotation handler method.
+// Context passed to every macro handler method.
 // Construct with Macro(annotated, body, class_name).
 // Use Macro.fields(ctx) and Macro.make_method(...) as static helpers.
 
@@ -33,7 +33,7 @@ static fields(ctx: Macro): List<Map<str, str>> {
 // Returns a FunctionDecl node with a verbatim Lua body (same as the `lua` keyword).
 // All params are typed dynamic. body_lua is emitted verbatim by the backend.
 // Node and Map are referenced by name — they are in scope in the handler bundle
-// and in the compiler bundle at annotation-expansion time.
+// and in the compiler bundle at macro-expansion time.
 static lua make_method(name: str, params: dynamic, body_lua: str, visibility: str): dynamic {
     local empty_list = List.__lz_list({})
     local pt = List.__lz_list({})
