@@ -1,7 +1,6 @@
 // Ast — the factory for AST nodes: one named constructor per node kind, so every
 // Node is built here and the parser stays free of stringly-typed map literals.
 
-#object
 import frontend.parser.Node
 
 // The generic escape hatch: a node from a kind and a ready-made attrs map, for
@@ -12,6 +11,11 @@ node<A>(kind: str, attrs: A): Node {
 
 program(body: List<Node>): Node {
     return Node("Program", ["body": body])
+}
+
+// Sentinel used when a parse error occurs; filtered out before AST is returned.
+error_node(): Node {
+    return Node("ErrorNode", [:])
 }
 
 import_decl(segments: List<str>, name: str, line: int, col: int): Node {
@@ -26,6 +30,13 @@ extern_decl(name: str, params: List<str>, param_types: List<Node>, return_type: 
 // lists the method's own generic parameter names (empty when not generic).
 function_decl(name: str, params: List<str>, body: List<Node>, is_static: bool, visibility: str, line: int, col: int, param_types: List<Node>, return_type: Node, type_params: List<str>): Node {
     return Node("FunctionDecl", ["name": name, "params": params, "body": body, "is_static": is_static, "visibility": visibility, "line": line, "col": col, "param_types": param_types, "return_type": return_type, "type_params": type_params])
+}
+
+// A `lua` function: emits a FunctionDecl with `raw_body` set to the verbatim
+// Lua text. Downstream consumers check `node.attr("raw_body")` to distinguish
+// from a regular FunctionDecl (which never has that attr).
+lua_decl(name: str, params: List<str>, param_types: List<Node>, return_type: Node, raw_body: str, is_static: bool, visibility: str, line: int, col: int, type_params: List<str>): Node {
+    return Node("FunctionDecl", ["name": name, "params": params, "param_types": param_types, "return_type": return_type, "raw_body": raw_body, "is_static": is_static, "visibility": visibility, "line": line, "col": col, "type_params": type_params])
 }
 
 // `type_params` lists the class's generic parameter names (declared on the
@@ -76,20 +87,26 @@ enum_variant(name: str, fields: List<Node>, line: int, col: int): Node {
     return Node("EnumVariant", ["name": name, "fields": fields, "line": line, "col": col])
 }
 
-// An interface `interface Name<T> { sig…; prop… }` — a structural contract. A
-// \`#interface\` file desugars to one of these with an empty `name`, filled in from
+// A trait `trait Name<T> { sig…; prop… }` — a structural contract. A
+// `#trait` file desugars to one of these with an empty `name`, filled in from
 // the filename. `methods` are signatures (no body), `properties` requirements.
 // Fully erased at codegen.
-interface_decl(name: str, methods: List<Node>, properties: List<Node>, type_params: List<str>, line: int, col: int): Node {
-    return Node("InterfaceDecl", ["name": name, "methods": methods, "properties": properties, "type_params": type_params, "line": line, "col": col])
+trait_decl(name: str, methods: List<Node>, properties: List<Node>, type_params: List<str>, line: int, col: int): Node {
+    return Node("TraitDecl", ["name": name, "methods": methods, "properties": properties, "type_params": type_params, "line": line, "col": col])
 }
 
-interface_method(name: str, param_types: List<Node>, return_type: Node, type_params: List<str>): Node {
-    return Node("InterfaceMethod", ["name": name, "param_types": param_types, "return_type": return_type, "type_params": type_params])
+trait_method(name: str, param_types: List<Node>, return_type: Node, type_params: List<str>): Node {
+    return Node("TraitMethod", ["name": name, "param_types": param_types, "return_type": return_type, "type_params": type_params])
 }
 
-interface_property(name: str, type: Node): Node {
-    return Node("InterfaceProperty", ["name": name, "type": type])
+trait_property(name: str, type: Node): Node {
+    return Node("TraitProperty", ["name": name, "type": type])
+}
+
+// `implement TraitName` at the file level — declares that this class satisfies
+// the named trait. The typechecker verifies conformance; erased at codegen.
+implement_decl(name: str, line: int, col: int): Node {
+    return Node("ImplementDecl", ["name": name, "line": line, "col": col])
 }
 
 // A named (optionally generic) type: `int`, `dynamic`, `Result<int>`; `args` is

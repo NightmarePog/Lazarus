@@ -2,12 +2,13 @@
 // two-character operators win over their leading character (maximal munch).
 
 
-#object
 private words = [
     "import": "IMPORT",
     "extern": "EXTERN",
+    "lua": "LUA",
     "enum": "ENUM",
-    "interface": "INTERFACE",
+    "trait": "TRAIT",
+    "implement": "IMPLEMENT",
     "fn": "FN",
     "private": "PRIVATE",
     "public": "PUBLIC",

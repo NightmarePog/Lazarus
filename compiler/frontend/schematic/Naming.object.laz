@@ -1,7 +1,6 @@
 // Naming — identifier casing. Values (functions, variables, parameters, loop
 // variables, properties) must be snake_case; there are no type names to check.
 
-#object
 import std.Str
 import Error
 

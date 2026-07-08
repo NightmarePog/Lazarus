@@ -3,7 +3,6 @@
 // order), binds the class name and imports into a root scope (so construction and
 // `Other.static()` resolve), then walks the top-level block. First violation raises.
 
-#object
 import std.Str
 import Error
 import frontend.schematic.Symbol

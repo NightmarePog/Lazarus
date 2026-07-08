@@ -34,16 +34,6 @@ public parse_program(): Node {
     if .kind == "trait" {
         return .parse_trait_body()
     }
-    // kind == "class": A leading `#<kind>` directive makes the whole file that kind: `#interface`
-    // (a contract) or `#object` (a static module). `@auto constructor(...)` is a
-    // statement annotation (uses `@`, not `#`), parsed in the body loop.
-    if .cursor.check("HASH") and .is_file_directive() {
-        mut result = .parse_file_directive()
-        if .cursor.has_errors() {
-            .cursor.flush()
-        }
-        return result
-    }
     mut body = []
     loop {
         if .cursor.at_end() {
@@ -57,19 +47,6 @@ public parse_program(): Node {
         .cursor.flush()
     }
     return Ast.program(.expand_field_params(clean))
-}
-
-// True when the leading `#` opens a whole-file directive (`#trait`/`#object`)
-// rather than something else at the start of the file.
-private is_file_directive(): bool {
-    mut after = .cursor.peek_next()
-    if after.kind == "TRAIT" {
-        return true
-    }
-    if after.kind == "IDENTIFIER" and after.value == "object" {
-        return true
-    }
-    return false
 }
 
 // A `.`-prefixed constructor param (`constructor(.cursor, .exprs)`) declares the
@@ -100,22 +77,6 @@ private expand_field_params(body: List<Node>): List<Node> {
 
 private field_property<A>(fp: A): Node {
     return Ast.node("VariableDecl", ["name": fp.get("name").unwrap(), "visibility": "private", "mutable": false, "is_static": false, "type": fp.get("type").unwrap(), "line": fp.get("line").unwrap(), "col": fp.get("col").unwrap()])
-}
-
-// `#trait` uses the `trait` keyword; `#object` is `#` + the identifier
-// `object` (not a keyword, since `object` is used as a variable name). Imports are
-// still allowed in either form and lifted by the Linker.
-private parse_file_directive(): Node {
-    mut at = .cursor.consume("HASH", "Expected a file directive")
-    if .cursor.match("TRAIT") {
-        return .parse_trait_body()
-    }
-    if .cursor.check("IDENTIFIER") and .cursor.current().value == "object" {
-        .cursor.advance()
-        return .parse_object_body()
-    }
-    .cursor.fail("unknown file directive '#" ++ .cursor.current().value ++ "'")
-    return Ast.program([])
 }
 
 // `#trait` body: signatures + property requirements (and imports), folded into

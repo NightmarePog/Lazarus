@@ -2,7 +2,6 @@
 // block indentation. The lexer does not process escapes, so a literal newline
 // comes from `Str.char(10)`, not a `\n`.
 
-#object
 import std.Str
 
 nl(): str {

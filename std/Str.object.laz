@@ -5,8 +5,34 @@
 // at the boundary; `split` returns its list directly. All matching is
 // plain-text — no Lua patterns leak through this API.
 
-#object
 import std.Option
+
+private lua __lz_str_find(s, sub): int {
+    return (string.find(s, sub, 1, true))
+}
+private lua __lz_str_split(s, sep): dynamic {
+    local items = {}
+    if sep == '' then
+        items[1] = s
+        return { kind = 'list', items = items }
+    end
+    local start = 1
+    while true do
+        local pos = string.find(s, sep, start, true)
+        if pos == nil then
+            items[#items + 1] = string.sub(s, start)
+            break
+        end
+        items[#items + 1] = string.sub(s, start, pos - 1)
+        start = pos + #sep
+    end
+    return { kind = 'list', items = items }
+}
+private lua __lz_str_to_int(s): int {
+    local n = tonumber(s)
+    if n == nil or n % 1 ~= 0 then return nil end
+    return math.floor(n)
+}
 
 extern upper(s: str): Option<str> = "string.upper"
 extern lower(s: str): Option<str> = "string.lower"
@@ -15,9 +41,9 @@ extern sub(s: str, i: int, j: int): Option<str> = "string.sub"
 extern byte(s: str, i: int): Option<int> = "string.byte"
 extern char(n: int): Option<str> = "string.char"
 extern rep(s: str, n: int): Option<str> = "string.rep"
-extern find(s: str, sub: str): Option<int> = "__lz_str_find"
-extern split(s: str, sep: str): List<str> = "__lz_str_split"
-extern to_int(s: str): Option<int> = "__lz_str_to_int"
+extern find(s: str, sub: str): Option<int> = "Str.__lz_str_find"
+extern split(s: str, sep: str): List<str> = "Str.__lz_str_split"
+extern to_int(s: str): Option<int> = "Str.__lz_str_to_int"
 extern to_float(s: str): Option<float> = "tonumber"
 // format is variadic in Lua — left untyped so callers can pass any number of args.
 extern format(fmt) = "string.format"

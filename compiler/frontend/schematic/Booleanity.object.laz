@@ -3,7 +3,6 @@
 // is conservative: it fires only on a value that cannot be a boolean and returns
 // a short reason string, or "" when the expression is allowed.
 
-#object
 private arithmetic = [
     "PLUS": true,
     "MINUS": true,

@@ -1,0 +1,7 @@
+<T>
+map<U>(f: (T) -> U): List<U>
+filter(f: (T) -> bool): List<T>
+fold<A>(init: A, f: (A, T) -> A): A
+any(f: (T) -> bool): bool
+all(f: (T) -> bool): bool
+find(f: (T) -> bool): Option<T>

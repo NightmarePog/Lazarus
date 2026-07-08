@@ -3,7 +3,6 @@
 // dirname/basename follow POSIX-ish conventions: dirname("/a") is "/",
 // dirname("a") is "", a name starting with '.' has no extension.
 
-#object
 import std.Str
 
 // Join two segments with a single '/'. An empty `a` yields `b` unchanged; a
