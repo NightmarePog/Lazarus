@@ -35,19 +35,6 @@ constructor(class_name: str, imports: List<str>, externs: Map<str, Map<str, str>
     .prebuilt_classes = prebuilt_classes
 }
 
-// A whole single-file program as a self-contained Lua chunk: header, the class
-// table, and — with a constructor — an entry footer. The stdlib helpers (List,
-// Map, Option, Result) are pre-loaded by the Linker; no separate preamble needed.
-public generate(program: Node): str {
-    mut block = .class_block(program)
-
-    mut sections = [Codegen.header(), block]
-    if .has_constructor(program.child("body")) {
-        sections.push("return " ++ .class_name ++ ".new(...)")
-    }
-    return Text.join(sections, Text.nl() ++ Text.nl())
-}
-
 // Just the class table `local C = {}` plus its member lines. The bundler emits the
 // header/footer once for the whole program, so it composes class blocks instead of
 // calling `generate`.
