@@ -23,11 +23,18 @@ private static compounds = [
 
 private cursor: TokenCursor
 private exprs: ExprParser
+private kind: str
 @auto
-constructor(cursor: TokenCursor, exprs: ExprParser)
+constructor(cursor: TokenCursor, exprs: ExprParser, kind: str)
 
 public parse_program(): Node {
-    // A leading `#<kind>` directive makes the whole file that kind: `#interface`
+    if .kind == "object" {
+        return .parse_object_body()
+    }
+    if .kind == "trait" {
+        return .parse_trait_body()
+    }
+    // kind == "class": A leading `#<kind>` directive makes the whole file that kind: `#interface`
     // (a contract) or `#object` (a static module). `@auto constructor(...)` is a
     // statement annotation (uses `@`, not `#`), parsed in the body loop.
     if .cursor.check("HASH") and .is_file_directive() {
@@ -52,11 +59,11 @@ public parse_program(): Node {
     return Ast.program(.expand_field_params(clean))
 }
 
-// True when the leading `#` opens a whole-file directive (`#interface`/`#object`)
+// True when the leading `#` opens a whole-file directive (`#trait`/`#object`)
 // rather than something else at the start of the file.
 private is_file_directive(): bool {
     mut after = .cursor.peek_next()
-    if after.kind == "INTERFACE" {
+    if after.kind == "TRAIT" {
         return true
     }
     if after.kind == "IDENTIFIER" and after.value == "object" {
@@ -95,13 +102,13 @@ private field_property<A>(fp: A): Node {
     return Ast.node("VariableDecl", ["name": fp.get("name").unwrap(), "visibility": "private", "mutable": false, "is_static": false, "type": fp.get("type").unwrap(), "line": fp.get("line").unwrap(), "col": fp.get("col").unwrap()])
 }
 
-// `#interface` uses the `interface` keyword; `#object` is `#` + the identifier
+// `#trait` uses the `trait` keyword; `#object` is `#` + the identifier
 // `object` (not a keyword, since `object` is used as a variable name). Imports are
 // still allowed in either form and lifted by the Linker.
 private parse_file_directive(): Node {
     mut at = .cursor.consume("HASH", "Expected a file directive")
-    if .cursor.match("INTERFACE") {
-        return .parse_interface_body(at)
+    if .cursor.match("TRAIT") {
+        return .parse_trait_body()
     }
     if .cursor.check("IDENTIFIER") and .cursor.current().value == "object" {
         .cursor.advance()
@@ -111,9 +118,13 @@ private parse_file_directive(): Node {
     return Ast.program([])
 }
 
-// `#interface` body: signatures + property requirements (and imports), folded into
-// one interface decl named after the file (empty name filled in downstream).
-private parse_interface_body(at: Token): Node {
+// `#trait` body: signatures + property requirements (and imports), folded into
+// one trait decl named after the file (empty name filled in downstream).
+private parse_trait_body(): Node {
+    mut type_params = []
+    if .cursor.check("LESS") {
+        type_params = .parse_type_params()
+    }
     mut body = []
     mut methods = []
     mut properties = []
@@ -126,11 +137,14 @@ private parse_interface_body(at: Token): Node {
             .cursor.advance()
             body.push(.parse_import(itok))
         } else {
-            .parse_interface_member(methods, properties)
+            .parse_trait_member(methods, properties)
         }
     }
-    body.push(Ast.interface_decl("", methods, properties, [], at.line, at.column))
+    body.push(Ast.trait_decl("", methods, properties, type_params, 1, 1))
     mut clean = [s for s in body if s.kind != "ErrorNode"]
+    if .cursor.has_errors() {
+        .cursor.flush()
+    }
     return Ast.program(clean)
 }
 
@@ -193,7 +207,8 @@ private parse_statement(): Node {
         "EXTERN" => { .cursor.advance() return .parse_extern(tok) }
         "LUA" => { .cursor.advance() return .parse_lua_decl("", false) }
         "ENUM" => { .cursor.advance() return .parse_enum(tok) }
-        "INTERFACE" => { .cursor.advance() return .parse_interface(tok) }
+        "TRAIT" => { .cursor.advance() return .parse_trait(tok) }
+        "IMPLEMENT" => { .cursor.advance() return .parse_implement(tok) }
         "PRIVATE" => { .cursor.advance() return .parse_member("private") }
         "PUBLIC" => { .cursor.advance() return .parse_member("public") }
         "MUTABLE" => { .cursor.advance() return .parse_binding("", true, "Expected variable name after 'mut'", false) }
@@ -305,45 +320,51 @@ private parse_enum_variant(): Node {
     return Ast.enum_variant(v.value, fields, v.line, v.column)
 }
 
-// `interface Name<T> { fetch(): int  ;  name: str }` — a structural contract of
+// `trait Name<T> { fetch(): int  ;  name: str }` — a structural contract of
 // method signatures (no bodies) and property requirements. Shares the member
-// grammar with the `#interface` file form.
-private parse_interface(tok: Token): Node {
-    mut name = .cursor.consume("IDENTIFIER", "Expected an interface name after 'interface'")
+// grammar with the `#trait` file form.
+private parse_trait(tok: Token): Node {
+    mut name = .cursor.consume("IDENTIFIER", "Expected a trait name after 'trait'")
     mut type_params = .parse_type_params()
-    mut open = .cursor.consume("BODY_START", "Expected '{' to open interface body")
+    mut open = .cursor.consume("BODY_START", "Expected '{' to open trait body")
     mut methods = []
     mut properties = []
     loop {
         if .cursor.at_end() {
-            .cursor.fail_at("Expected '}' to close interface body", open.line, open.column, 1)
+            .cursor.fail_at("Expected '}' to close trait body", open.line, open.column, 1)
             break
         }
         if .cursor.check("BODY_END") {
             break
         }
-        .parse_interface_member(methods, properties)
+        .parse_trait_member(methods, properties)
     }
-    .cursor.consume("BODY_END", "Expected '}' to close interface body")
-    return Ast.interface_decl(name.value, methods, properties, type_params, tok.line, tok.column)
+    .cursor.consume("BODY_END", "Expected '}' to close trait body")
+    return Ast.trait_decl(name.value, methods, properties, type_params, tok.line, tok.column)
 }
 
-// One interface requirement: a method signature `name<T>(params): ret` (a `<` or
+// One trait requirement: a method signature `name<T>(params): ret` (a `<` or
 // `(` follows the name) or a property `name: Type`.
-private parse_interface_member(methods: List<Node>, properties: List<Node>): unit {
-    mut name = .cursor.consume("IDENTIFIER", "Expected a member name in the interface body")
+private parse_trait_member(methods: List<Node>, properties: List<Node>): unit {
+    mut name = .cursor.consume("IDENTIFIER", "Expected a member name in the trait body")
     if .cursor.check("LESS") or .cursor.check("LEFT_BRACKET") {
         mut type_params = .parse_type_params()
-        .cursor.consume("LEFT_BRACKET", "Expected '(' in an interface method signature")
+        .cursor.consume("LEFT_BRACKET", "Expected '(' in a trait method signature")
         mut param_types = []
         .parse_params(param_types)
-        .cursor.consume("RIGHT_BRACKET", "Expected ')' in an interface method signature")
+        .cursor.consume("RIGHT_BRACKET", "Expected ')' in a trait method signature")
         mut return_type = .parse_return_type()
-        methods.push(Ast.interface_method(name.value, param_types, return_type, type_params))
+        methods.push(Ast.trait_method(name.value, param_types, return_type, type_params))
     } else {
-        .cursor.consume("COLON", "Expected ':' for an interface property requirement")
-        properties.push(Ast.interface_property(name.value, .parse_type()))
+        .cursor.consume("COLON", "Expected ':' for a trait property requirement")
+        properties.push(Ast.trait_property(name.value, .parse_type()))
     }
+}
+
+// `implement TraitName` — declares that this class satisfies the named trait.
+private parse_implement(tok: Token): Node {
+    mut name = .cursor.consume("IDENTIFIER", "Expected a trait name after 'implement'")
+    return Ast.implement_decl(name.value, tok.line, tok.column)
 }
 
 // `[visibility] [static] lua name<T>(params): return_type LUA_BODY`

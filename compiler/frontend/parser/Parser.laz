@@ -8,14 +8,19 @@ import frontend.parser.ExprParser
 import frontend.parser.StmtParser
 
 private stmts: StmtParser
+private cursor: TokenCursor
 
-constructor(tokens: List<Token>, source: str) {
-    mut cursor = TokenCursor(tokens, source)
-    mut exprs = ExprParser(cursor)
-    .stmts = StmtParser(cursor, exprs)
+constructor(tokens: List<Token>, source: str, kind: str) {
+    .cursor = TokenCursor(tokens, source)
+    mut exprs = ExprParser(.cursor)
+    .stmts = StmtParser(.cursor, exprs, kind)
     exprs.inject_stmts(.stmts)
 }
 
 public parse(): Node {
     return .stmts.parse_program()
+}
+
+public errors(): List<dynamic> {
+    return .cursor.get_errors()
 }

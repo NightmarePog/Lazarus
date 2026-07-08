@@ -3,6 +3,10 @@
 // walks imports depth-first (each dependency emitted before its user), so later
 // stages see a plain single-class program. An already-loaded file is skipped,
 // breaking cycles; an unreadable import raises at its `import` line.
+//
+// When a `.laz` file is absent but a `.lua` file with a LAZARUS_META block exists,
+// the linker loads it as a prebuilt module: the metadata drives typechecking and
+// the Lua source is bundled verbatim without re-compilation.
 
 import std.Path
 import std.Str
@@ -11,6 +15,7 @@ import frontend.lexer.Lexer
 import frontend.parser.Node
 import frontend.parser.Parser
 import backend.linker.Module
+import backend.MetaParser
 import backend.Text
 import Error
 
@@ -31,9 +36,32 @@ constructor(entry: str, pkg_root: str) {
 }
 
 // The full module set reachable from the entry file, dependencies-first.
+// Core stdlib modules (Option, Result, List, Map) are always pre-loaded so
+// every bundle can rely on their runtime helpers without an explicit import.
 public link(): List<Module> {
+    .preload_core()
     .load(.entry, "", 0, 0, 1)
     return .ordered
+}
+
+// Attempt to load each core module using the same resolution logic as imports.
+// Missing files (e.g. when compiling without a stdlib) are silently skipped,
+// except for List: codegen unconditionally emits List.__lz_* helpers, so a
+// missing List is a hard error rather than a silent skip.
+private preload_core(): unit {
+    mut list_loaded = false
+    for name in ["Option", "Result", "List", "Map"] {
+        mut path = .resolve_rel("std/" ++ name ++ ".laz")
+        if Sys.file_exists(path) {
+            .load(path, "", 0, 0, 1)
+            if name == "List" {
+                list_loaded = true
+            }
+        }
+    }
+    if not list_loaded {
+        Error("LinkError", "stdlib not found: place std/ beside your source or pass --pkg-path <dir>", 0, 0, "", 1).raise()
+    }
 }
 
 public entry_class(): str {
@@ -60,16 +88,22 @@ private load(path: str, origin_source: str, origin_line: int, origin_col: int, o
     }
     mut source = source_opt.unwrap()
 
+    mut kind = .file_kind(path)
     mut class_name = Path.stem(path)
+    if kind == "object" {
+        class_name = Str.sub(class_name, 1, Str.len(class_name).unwrap_or(0) - 7).unwrap_or(class_name) // len(".object")
+    } else if kind == "trait" {
+        class_name = Str.sub(class_name, 1, Str.len(class_name).unwrap_or(0) - 6).unwrap_or(class_name) // len(".trait")
+    }
     mut tokens = Lexer(source).scan()
-    mut program = Parser(tokens, source).parse()
+    mut program = Parser(tokens, source, kind).parse()
 
     mut imports = []
     mut body = []
     for node in program.child("body") {
         if node.kind == "ImportDecl" {
             mut span = Str.len(node.child("name")).unwrap_or(1)
-            .load(.resolve(node), source, node.line(), node.col(), span)
+            .load_by_ext(.resolve(node), source, node.line(), node.col(), span)
             imports.push(node.child("name"))
         } else {
             body.push(node)
@@ -77,15 +111,69 @@ private load(path: str, origin_source: str, origin_line: int, origin_col: int, o
     }
     program.set("body", body)
 
-    .ordered.push(Module(path, class_name, source, program, imports, .body_is_interface(body)))
+    .ordered.push(Module(path, class_name, source, program, imports, kind == "trait", false, "", 0))
+    .loaded[path] = true
+}
+
+// Load a prebuilt .lua module: parse its LAZARUS_META block for type signatures
+// and mark it for verbatim Lua emission (no re-compilation).
+private load_prebuilt(path: str, origin_source: str, origin_line: int, origin_col: int, origin_span: int): unit {
+    if .loaded.has(path) {
+        return
+    }
+    mut source_opt = Sys.read_file(path)
+    if source_opt.is_none() {
+        Error("LinkError", "cannot resolve import '" ++ path ++ "'", origin_line, origin_col, origin_source, origin_span).raise()
+    }
+    mut lua_source = source_opt.unwrap()
+    mut sig_opt = MetaParser.parse_meta(lua_source)
+    if sig_opt.is_none() {
+        Error("LinkError", "prebuilt library '" ++ path ++ "' has no LAZARUS_META block", origin_line, origin_col, origin_source, origin_span).raise()
+    }
+    mut class_name = Path.stem(path)
+    mut dummy_ast = Node("Program", ["body": []])
+    .ordered.push(Module(path, class_name, "", dummy_ast, [], false, true, lua_source, sig_opt.unwrap()))
     .loaded[path] = true
 }
 
 // Resolve one import node to a source path: `import a.b.Name` -> `<root>/a/b/Name.laz`.
-// When pkg_root is non-empty the local root is tried first; if the file is
-// absent there, pkg_root is used.
+// Extensions are tried in order: .laz, .object.laz, .trait.laz, .lua. The first
+// existing path is returned. If none exist, .laz is returned so load() raises the
+// precise error. The .lua path is returned so load_by_ext() can delegate to
+// load_prebuilt() when a prebuilt module is found.
 private resolve(node: Node): str {
-    mut rel = Text.join(node.child("segments"), "/") ++ ".laz"
+    mut base = Text.join(node.child("segments"), "/")
+    mut laz_path = .resolve_rel(base ++ ".laz")
+    if Sys.file_exists(laz_path) {
+        return laz_path
+    }
+    mut object_path = .resolve_rel(base ++ ".object.laz")
+    if Sys.file_exists(object_path) {
+        return object_path
+    }
+    mut trait_path = .resolve_rel(base ++ ".trait.laz")
+    if Sys.file_exists(trait_path) {
+        return trait_path
+    }
+    mut lua_path = .resolve_rel(base ++ ".lua")
+    if Sys.file_exists(lua_path) {
+        return lua_path
+    }
+    return laz_path
+}
+
+// Dispatch to load() or load_prebuilt() based on file extension.
+private load_by_ext(path: str, origin_source: str, origin_line: int, origin_col: int, origin_span: int): unit {
+    if Str.is_suffix(path, ".lua") {
+        .load_prebuilt(path, origin_source, origin_line, origin_col, origin_span)
+    } else {
+        .load(path, origin_source, origin_line, origin_col, origin_span)
+    }
+}
+
+// Try the local root first; fall back to pkg_root. Returns the local path as
+// the default even when neither exists — load() will raise the precise error.
+private resolve_rel(rel: str): str {
     mut local_path = Path.join(.root, rel)
     if Sys.file_exists(local_path) {
         return local_path
@@ -96,22 +184,15 @@ private resolve(node: Node): str {
     return local_path
 }
 
-// A module is an interface when its body holds only interface declarations (a
-// `#interface` file, or a file whose sole content is `interface` blocks): it
-// contributes a contract to the checker but no class table.
-private body_is_interface(body: List<Node>): bool {
-    if body.len() == 0 {
-        return false
+// Derive parse kind from the file extension.
+// Files ending in ".object.laz" are static modules; ".trait.laz" are trait-only
+// modules; everything else (plain ".laz" or ".lua") is treated as a class.
+private file_kind(path: str): str {
+    if Str.is_suffix(path, ".object.laz") {
+        return "object"
     }
-    mut has_interface_decl = false
-    mut has_object_module = false
-    for node in body {
-        if node.kind == "InterfaceDecl" {
-            has_interface_decl = true
-        }
-        if node.kind == "ObjectModule" {
-            has_object_module = true
-        }
+    if Str.is_suffix(path, ".trait.laz") {
+        return "trait"
     }
-    return has_interface_decl or has_object_module
+    return "class"
 }

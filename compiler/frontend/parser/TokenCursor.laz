@@ -1,16 +1,27 @@
 // Walks the flat token list for the parsers. Reads past the end return an "EOF"
 // sentinel token instead of an Option, so callers never guard for the end. The
-// cursor also raises syntax errors, since it holds the source and position.
+// cursor also collects syntax errors for multi-error reporting: `fail` / `fail_at`
+// record an error and synchronize to the next safe boundary; `flush` prints all
+// collected errors and exits.
 
 import std.Str
+import std.Sys
 import Error
 import frontend.lexer.Token
+
+private static recovery_tokens = [
+    "PRIVATE": true, "PUBLIC": true, "STATIC": true, "CONSTRUCTOR": true,
+    "EXTERN": true, "LUA": true, "RETURN": true, "IF": true, "WHILE": true,
+    "LOOP": true, "FOR": true, "BREAK": true, "BODY_END": true, "MUTABLE": true,
+    "AT": true, "IMPORT": true, "ENUM": true
+]
 
 private tokens: List<Token>
 private source: str
 @auto
 constructor(tokens: List<Token>, source: str)
 private pos: int = 1
+private errors: List<dynamic> = []
 
 public position(): int {
     return .pos
@@ -77,7 +88,8 @@ public consume(kind: str, message: str): Token {
     return .eof()
 }
 
-// Raise a syntax error at the current token (else the last consumed one).
+// Record a syntax error at the current token (else the last consumed one), then
+// synchronize to the next safe parse boundary.
 public fail(message: str): unit {
     mut t = .error_pos()
     mut span = Str.len(t.value).unwrap_or(1)
@@ -88,7 +100,64 @@ public fail(message: str): unit {
 }
 
 public fail_at(message: str, line: int, col: int, span: int): unit {
-    Error("SyntaxError", message, line, col, .source, span).raise()
+    .errors.push(["message": message, "line": line, "col": col, "span": span])
+    .synchronize()
+}
+
+// Skip forward until a token that can safely begin a new declaration or statement,
+// or a closing brace, or EOF. Advances at least one token to avoid infinite loops.
+private synchronize(): unit {
+    mut start = .pos
+    loop {
+        if .at_end() {
+            break
+        }
+        mut k = .current().kind
+        if TokenCursor.recovery_tokens.has(k) {
+            break
+        }
+        .pos = .pos + 1
+    }
+    if .pos == start and not .at_end() {
+        .pos = .pos + 1
+    }
+}
+
+public has_errors(): bool {
+    return .errors.len() > 0
+}
+
+public get_errors(): List<dynamic> {
+    return .errors
+}
+
+// Report all collected syntax errors and exit. In --check mode, outputs JSON
+// lines instead of coloured boxes so the LSP can parse them.
+public lua flush(): unit {
+    local function json_str(s)
+        return '"' .. tostring(s):gsub('\\', '\\\\'):gsub('"', '\\"'):gsub('\n', '\\n'):gsub('\r', '\\r'):gsub('\t', '\\t') .. '"'
+    end
+    local errs = self.errors
+    if _G._lz_check_mode then
+        for i = 1, #errs.items do
+            local e = errs.items[i]
+            local msg = e.items['message'] or 'syntax error'
+            local ln  = e.items['line'] or 0
+            local col = e.items['col']  or 1
+            print('{"kind":"SyntaxError","line":' .. ln .. ',"col":' .. col .. ',"message":' .. json_str(msg) .. '}')
+        end
+        os.exit(0)
+    else
+        for i = 1, #errs.items do
+            local e = errs.items[i]
+            local msg  = e.items['message'] or 'syntax error'
+            local ln   = e.items['line'] or 0
+            local col  = e.items['col']  or 1
+            local span = e.items['span'] or 1
+            Error.new('SyntaxError', msg, ln, col, self.source, span):print()
+        end
+        os.exit(1)
+    end
 }
 
 // The token an error points at: the current one, else the last consumed.

@@ -7,6 +7,7 @@
 
 import std.Str
 import std.Sys
+import backend.Text
 import frontend.lexer.Lexer
 import frontend.parser.Node
 import frontend.parser.Parser
@@ -16,6 +17,7 @@ import frontend.optimizer.Optimizer
 import Expander
 import backend.Codegen
 import backend.Bundler
+import backend.MetaEmitter
 import backend.linker.Linker
 import Error
 
@@ -24,6 +26,8 @@ constructor() {
     if path.is_some() {
         mut platform = ""
         mut pkg_path = ""
+        mut is_lib = false
+        mut is_check = false
         mut i = 2
         loop {
             mut flag = Sys.argv(i)
@@ -45,17 +49,48 @@ constructor() {
                 } else {
                     Error("MissingFlagValue", "--pkg-path requires a directory argument", 0, 0, "", 1).raise()
                 }
+            } else if f == "--lib" {
+                is_lib = true
+            } else if f == "--check" {
+                is_check = true
             }
             i = i + 1
         }
-        Main.build_file(path.unwrap(), platform, pkg_path)
+        if is_check {
+            Main.check_file(path.unwrap(), pkg_path)
+        } else if is_lib {
+            Main.build_lib(path.unwrap(), platform, pkg_path)
+        } else {
+            Main.build_file(path.unwrap(), platform, pkg_path)
+        }
     } else {
         Error("NoFileAppended", "No file appended, use 'lazarus <FILE.laz>'", 0, 0, "", 2).raise()
     }
 }
 
+// Syntax-check mode: lex + parse the file, output errors as JSON lines on stdout
+// (one object per error), then exit 0. Used by the LSP to get diagnostics.
+// Schematic and Typecheck are not run; imports are not followed.
+private static lua check_file(path: str, pkg_path: str): unit {
+    _G._lz_check_mode = true
+    local f = io.open(path, 'r')
+    if not f then
+        print('{"kind":"IOError","line":0,"col":0,"message":"cannot read file"}')
+        os.exit(0)
+    end
+    local source = f:read('*a')
+    f:close()
+    local kind = 'class'
+    if path:match('%.object%.laz$') then kind = 'object'
+    elseif path:match('%.trait%.laz$') then kind = 'trait' end
+    local tokens = Lexer.new(source):scan()
+    Parser.new(tokens, source, kind):parse()
+    os.exit(0)
+}
+
 // A file entry point: follow its imports and bundle the whole program. Each
 // module is analysed and optimised on its own before the bundler composes them.
+// Output is written to <EntryClass>.lua with a LAZARUS_META header.
 static build_file(path: str, platform: str, pkg_path: str): unit {
     mut linker = Linker(path, pkg_path)
     mut modules = linker.link()
@@ -66,36 +101,135 @@ static build_file(path: str, platform: str, pkg_path: str): unit {
     mut variant_fields = [:]
     mut enum_type_params = [:]
     mut classes = [:]
-    mut interfaces = [:]
+    mut traits = [:]
     mut gated_externs = [:]
 
     for m in modules {
-        Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
-        Main.collect_interfaces(m.ast, interfaces, m.class_name)
+        if not m.is_prebuilt {
+            Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
+            Main.collect_traits(m.ast, traits, m.class_name)
+        }
     }
 
     mut handler_cache = [:]
     for m in modules {
-        if not m.is_interface {
+        if not m.is_trait and not m.is_prebuilt {
             Expander(m.class_name, handler_cache).expand(m.ast, modules)
         }
     }
 
     for m in modules {
-        if not m.is_interface {
+        if m.is_prebuilt {
+            classes[m.class_name] = m.meta_sig
+        } else if not m.is_trait {
             Main.collect_signatures(m.ast, m.class_name, classes, platform, gated_externs)
         }
     }
 
     for m in modules {
-        if not m.is_interface {
+        if not m.is_trait and not m.is_prebuilt {
             Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity, gated_externs)
-            Typecheck(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, interfaces).check(m.ast)
+            Typecheck(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, traits).check(m.ast)
             Optimizer().optimize(m.ast)
         }
     }
-    file = Sys.open("Main.lua", "w").unwrap()
-    file.write(Bundler(modules, linker.entry_class(), variant_owner, platform).bundle())
+
+    mut entry_class = linker.entry_class()
+    mut bundle = Bundler(modules, entry_class, variant_owner, platform).bundle()
+
+    mut entry_sig = classes.get(entry_class).unwrap_or(0)
+    mut meta_block = ""
+    if entry_sig != 0 {
+        meta_block = MetaEmitter.emit(entry_class, entry_sig) ++ Text.nl() ++ Text.nl()
+    }
+
+    mut out_path = entry_class ++ ".lua"
+    mut file = Sys.open(out_path, "w").unwrap()
+    file.write(meta_block ++ bundle)
+    file.close()
+}
+
+// Library compilation: analyse the entry module (and its imports for typechecking),
+// then emit ONLY the entry class block — no stdlib prelude, no entry-point call.
+// Output is <EntryClass>.lua with a LAZARUS_META header. The file can be imported
+// as a prebuilt library by other programs without recompilation.
+static build_lib(path: str, platform: str, pkg_path: str): unit {
+    mut linker = Linker(path, pkg_path)
+    mut modules = linker.link()
+
+    mut variant_owner = [:]
+    mut enums = [:]
+    mut variant_arity = [:]
+    mut variant_fields = [:]
+    mut enum_type_params = [:]
+    mut classes = [:]
+    mut traits = [:]
+    mut gated_externs = [:]
+
+    for m in modules {
+        if not m.is_prebuilt {
+            Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
+            Main.collect_traits(m.ast, traits, m.class_name)
+        }
+    }
+
+    mut handler_cache = [:]
+    for m in modules {
+        if not m.is_trait and not m.is_prebuilt {
+            Expander(m.class_name, handler_cache).expand(m.ast, modules)
+        }
+    }
+
+    for m in modules {
+        if m.is_prebuilt {
+            classes[m.class_name] = m.meta_sig
+        } else if not m.is_trait {
+            Main.collect_signatures(m.ast, m.class_name, classes, platform, gated_externs)
+        }
+    }
+
+    for m in modules {
+        if not m.is_trait and not m.is_prebuilt {
+            Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity, gated_externs)
+            Typecheck(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, traits).check(m.ast)
+            Optimizer().optimize(m.ast)
+        }
+    }
+
+    mut entry_class = linker.entry_class()
+    mut entry_module = modules.get(modules.len()).unwrap()
+    mut externs = [:]
+    for m in modules {
+        if not m.is_prebuilt {
+            mut binds = [:]
+            for node in m.ast.child("body") {
+                if node.kind == "ExternDecl" {
+                    mut rt = node.attr("return_type")
+                    mut wrap = true
+                    if rt.is_some() {
+                        mut rname = rt.unwrap().child("name")
+                        wrap = rname == "Option" or rname == "dynamic"
+                    }
+                    binds[node.child("name")] = ["target": node.child("target"), "wrap": wrap]
+                }
+            }
+            if binds.len() > 0 {
+                externs[m.class_name] = binds
+            }
+        }
+    }
+    mut cg = Codegen(entry_class, entry_module.imports, externs, variant_owner, platform)
+    mut class_block = cg.class_block(entry_module.ast)
+
+    mut entry_sig = classes.get(entry_class).unwrap_or(0)
+    mut meta_block = ""
+    if entry_sig != 0 {
+        meta_block = MetaEmitter.emit(entry_class, entry_sig) ++ Text.nl() ++ Text.nl()
+    }
+
+    mut out_path = entry_class ++ ".lua"
+    mut file = Sys.open(out_path, "w").unwrap()
+    file.write(meta_block ++ class_block)
     file.close()
 }
 
@@ -173,14 +307,14 @@ static collect_signatures(ast: Node, class_name: str, classes: Map<str, dynamic>
     classes[class_name] = ["fields": fields, "methods": methods, "ctor": ctor, "ctor_names": ctor_names, "type_params": type_params]
 }
 
-// Gather every interface declaration (inline or a \`#interface\` file, whose decl
-// carries an empty name filled here from the filename) into the program-wide
-// `interfaces` registry, so the checker can resolve interface annotations and run
-// structural conformance. Each entry holds `methods` (name -> {params, result,
-// type_params}), `properties` (name -> type node) and the interface's `type_params`.
-static collect_interfaces(ast: Node, interfaces: Map<str, dynamic>, class_name: str): unit {
+// Gather every trait declaration (inline or a `#trait` file, whose decl carries an
+// empty name filled here from the filename) into the program-wide `traits` registry,
+// so the checker can resolve trait annotations and run structural conformance. Each
+// entry holds `methods` (name -> {params, result, type_params}), `properties`
+// (name -> type node) and the trait's `type_params`.
+static collect_traits(ast: Node, traits: Map<str, dynamic>, class_name: str): unit {
     for stmt in ast.child("body") {
-        if stmt.kind == "InterfaceDecl" {
+        if stmt.kind == "TraitDecl" {
             mut name = stmt.child("name")
             if name == "" {
                 name = class_name
@@ -193,7 +327,7 @@ static collect_interfaces(ast: Node, interfaces: Map<str, dynamic>, class_name: 
             for p in stmt.child("properties") {
                 properties[p.child("name")] = p.child("type")
             }
-            interfaces[name] = ["methods": methods, "properties": properties, "type_params": stmt.child("type_params")]
+            traits[name] = ["methods": methods, "properties": properties, "type_params": stmt.child("type_params")]
         }
     }
 }
