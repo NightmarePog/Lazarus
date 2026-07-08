@@ -109,7 +109,10 @@ private is_emittable(stmt: Node): bool {
     if k == "ExternDecl" {
         return false
     }
-    if k == "InterfaceDecl" {
+    if k == "TraitDecl" {
+        return false
+    }
+    if k == "ImplementDecl" {
         return false
     }
     if k == "VariableDecl" and .is_property(stmt) {

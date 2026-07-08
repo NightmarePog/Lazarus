@@ -1,0 +1,116 @@
+private kind: str
+private items: dynamic
+
+// Factory — same rationale as List.new(): avoids a 0-param static method call
+// in a Lazarus constructor body that the old seed binary would mistype.
+static lua new(): Map<dynamic, dynamic> {
+    local self = {}
+    self.kind = 'map'
+    self.items = {}
+    self.get = Map.get
+    self.has = Map.has
+    self.len = Map.len
+    self.delete = Map.delete
+    return self
+}
+
+// Factory used by codegen for map literals ["k": v] and [:]
+static lua __lz_from(raw): Map<dynamic, dynamic> {
+    local self = Map.new()
+    self.items = raw
+    return self
+}
+
+// Bootstrap alias — old seed binary emits Map.__lz_map({}) for [:]
+static lua __lz_map(raw): Map<dynamic, dynamic> {
+    local self = Map.new()
+    self.items = raw
+    return self
+}
+
+private static lua __lz_each(c): dynamic {
+    if c.kind == 'list' then
+        local i = 0
+        return function()
+            i = i + 1
+            if i > #c.items then return nil end
+            return i - 1, c.items[i]
+        end
+    end
+    return pairs(c.items)
+}
+
+public lua get(k: K): Option<V> {
+    local v = self.items[k]
+    if v == nil then return 'None' end
+    return { kind = 'Some', _1 = v }
+}
+
+public lua has(k: K): bool {
+    return self.items[k] ~= nil
+}
+
+public lua len(): int {
+    local n = 0
+    for _ in pairs(self.items) do n = n + 1 end
+    return n
+}
+
+public lua delete(k: K): unit {
+    self.items[k] = nil
+}
+
+static map<K, V, U>(m: Map<K, V>, f: (K, V) -> U): Map<K, U> {
+    mut result = [:]
+    for k, v in m { result[k] = f(k, v) }
+    return result
+}
+
+static filter<K, V>(m: Map<K, V>, f: (K, V) -> bool): Map<K, V> {
+    mut result = [:]
+    for k, v in m { if f(k, v) { result[k] = v } }
+    return result
+}
+
+static fold<K, V, A>(m: Map<K, V>, init: A, f: (A, K, V) -> A): A {
+    mut acc = init
+    for k, v in m { acc = f(acc, k, v) }
+    return acc
+}
+
+static any<K, V>(m: Map<K, V>, f: (K, V) -> bool): bool {
+    for k, v in m { if f(k, v) { return true } }
+    return false
+}
+
+static all<K, V>(m: Map<K, V>, f: (K, V) -> bool): bool {
+    for k, v in m { if not f(k, v) { return false } }
+    return true
+}
+
+static find<K, V>(m: Map<K, V>, f: (K, V) -> bool): Option<V> {
+    for k, v in m { if f(k, v) { return Option.some(v) } }
+    return Option.none()
+}
+
+static copy<K, V>(m: Map<K, V>): Map<K, V> {
+    mut result = [:]
+    for k, v in m { result[k] = v }
+    return result
+}
+
+static set<K, V>(m: Map<K, V>, k: K, v: V): unit {
+    m[k] = v
+}
+
+static keys<K, V>(m: Map<K, V>): List<K> {
+    mut result = []
+    for k, val in m { result.push(k) }
+    return result
+}
+
+static values<K, V>(m: Map<K, V>): List<V> {
+    mut result = []
+    for k, val in m { result.push(val) }
+    return result
+}

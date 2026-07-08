@@ -1,0 +1,252 @@
+import std.Str
+
+private source: str
+private pos: int
+private curr: str
+
+constructor(source: str) {
+    .source = source
+    .pos = 1
+    .curr = .char_at(1)
+}
+
+// Parse a JSON string. Raises on malformed input.
+// null   -> nil (dropped when stored in Map/List)
+// bool   -> bool
+// number -> int or float
+// string -> str
+// array  -> List<dynamic>
+// object -> Map<str, dynamic>
+static lua parse(s: str): dynamic {
+    return Json.new(s):parse_value()
+}
+
+// Emit a Lazarus value as a compact JSON string.
+static lua emit(v: dynamic): str {
+    if v == nil then return 'null' end
+    local t = type(v)
+    if t == 'boolean' then
+        return v and 'true' or 'false'
+    end
+    if t == 'number' then
+        if v ~= v then return 'null' end
+        if math.floor(v) == v then return string.format('%d', v) end
+        return tostring(v)
+    end
+    if t == 'string' then
+        local parts = {}
+        local n = #v
+        for i = 1, n do
+            local c = string.sub(v, i, i)
+            local b = string.byte(c)
+            if     c == '"'  then parts[i] = '\\"'
+            elseif c == '\\' then parts[i] = '\\\\'
+            elseif c == '\n' then parts[i] = '\\n'
+            elseif c == '\r' then parts[i] = '\\r'
+            elseif c == '\t' then parts[i] = '\\t'
+            elseif b < 32   then parts[i] = string.format('\\u%04x', b)
+            else                  parts[i] = c
+            end
+        end
+        return '"' .. table.concat(parts) .. '"'
+    end
+    if t == 'table' then
+        if v.kind == 'list' then
+            local parts = {}
+            local items = v.items
+            for i = 1, #items do parts[i] = Json.emit(items[i]) end
+            return '[' .. table.concat(parts, ',') .. ']'
+        end
+        if v.kind == 'map' then
+            local parts = {}
+            local i = 1
+            for k, val in pairs(v.items) do
+                parts[i] = Json.emit(k) .. ':' .. Json.emit(val)
+                i = i + 1
+            end
+            return '{' .. table.concat(parts, ',') .. '}'
+        end
+        local parts = {}
+        local i = 1
+        for k, val in pairs(v) do
+            if type(k) == 'string' then
+                parts[i] = Json.emit(k) .. ':' .. Json.emit(val)
+                i = i + 1
+            end
+        end
+        return '{' .. table.concat(parts, ',') .. '}'
+    end
+    return 'null'
+}
+
+private lua fail(msg: str): unit {
+    error("JsonError: " .. msg, 2)
+}
+
+private lua char_at(i: int): str {
+    return string.sub(self.source, i, i)
+}
+
+private advance(): unit {
+    .pos = .pos + 1
+    .curr = .char_at(.pos)
+}
+
+private skip_ws(): unit {
+    while .curr == " " or .curr == "\t" or .curr == "\n" or .curr == "\r" {
+        .advance()
+    }
+}
+
+// Returns dynamic so it can return nil for JSON null.
+private lua parse_value(): dynamic {
+    self:skip_ws()
+    local c = self.curr
+    if c == '{' then return self:parse_object() end
+    if c == '[' then return self:parse_array() end
+    if c == '"' then return self:parse_string() end
+    if c == 't' then self:expect_literal('true');  return true  end
+    if c == 'f' then self:expect_literal('false'); return false end
+    if c == 'n' then self:expect_literal('null');  return nil   end
+    if c == '-' or (c >= '0' and c <= '9') then return self:parse_number() end
+    self:fail("unexpected character: '" .. c .. "'")
+}
+
+private expect_literal(s: str): unit {
+    mut n = Str.len(s).unwrap_or(0)
+    mut i = 1
+    while i <= n {
+        if .curr != Str.sub(s, i, i).unwrap_or("") {
+            .fail("expected '" ++ s ++ "'")
+        }
+        .advance()
+        i = i + 1
+    }
+}
+
+private parse_string(): str {
+    .advance()
+    mut result = ""
+    mut seg_start = .pos
+    loop {
+        if .curr == "" {
+            .fail("unterminated string")
+        }
+        if .curr == "\\" {
+            result = result ++ Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
+            result = result ++ .read_escape()
+            seg_start = .pos
+        } else if .curr == "\"" {
+            result = result ++ Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
+            .advance()
+            break
+        } else {
+            .advance()
+        }
+    }
+    return result
+}
+
+private read_escape(): str {
+    .advance()
+    mut ch = .curr
+    .advance()
+    if ch == "n"  { return "\n" }
+    if ch == "t"  { return "\t" }
+    if ch == "r"  { return "\r" }
+    if ch == "\\" { return "\\" }
+    if ch == "\"" { return "\"" }
+    if ch == "/"  { return "/" }
+    if ch == "b"  { return Str.char(8).unwrap_or("") }
+    if ch == "f"  { return Str.char(12).unwrap_or("") }
+    if ch == "u"  {
+        .advance()
+        .advance()
+        .advance()
+        .advance()
+        return "?"
+    }
+    .fail("unknown escape: \\" ++ ch)
+    return ""
+}
+
+private parse_number(): dynamic {
+    mut start = .pos
+    if .curr == "-" { .advance() }
+    while .curr >= "0" and .curr <= "9" { .advance() }
+    mut is_float = false
+    if .curr == "." {
+        is_float = true
+        .advance()
+        while .curr >= "0" and .curr <= "9" { .advance() }
+    }
+    if .curr == "e" or .curr == "E" {
+        is_float = true
+        .advance()
+        if .curr == "+" or .curr == "-" { .advance() }
+        while .curr >= "0" and .curr <= "9" { .advance() }
+    }
+    mut text = Str.sub(.source, start, .pos - 1).unwrap_or("")
+    if is_float {
+        return Str.to_float(text).unwrap_or(0.0)
+    }
+    return Str.to_int(text).unwrap_or(0)
+}
+
+private parse_array(): List<dynamic> {
+    .advance()
+    .skip_ws()
+    mut result = []
+    if .curr == "]" {
+        .advance()
+        return result
+    }
+    loop {
+        result.push(.parse_value())
+        .skip_ws()
+        if .curr == "]" {
+            .advance()
+            break
+        }
+        if .curr != "," {
+            .fail("expected ',' or ']' in array")
+        }
+        .advance()
+        .skip_ws()
+    }
+    return result
+}
+
+private parse_object(): Map<str, dynamic> {
+    .advance()
+    .skip_ws()
+    mut result = [:]
+    if .curr == "}" {
+        .advance()
+        return result
+    }
+    loop {
+        if .curr != "\"" {
+            .fail("expected string key in object")
+        }
+        mut key = .parse_string()
+        .skip_ws()
+        if .curr != ":" {
+            .fail("expected ':' in object")
+        }
+        .advance()
+        .skip_ws()
+        result[key] = .parse_value()
+        .skip_ws()
+        if .curr == "}" {
+            .advance()
+            break
+        }
+        if .curr != "," {
+            .fail("expected ',' or '}' in object")
+        }
+        .advance()
+        .skip_ws()
+    }
+    return result
+}

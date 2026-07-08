@@ -11631,7 +11631,7 @@ function Linker.preload_core(self)
     -- Linker:53
     for _, name in List.__lz_each(List.__lz_from({"Option", "Result", "List", "Map"})) do
         -- Linker:54
-        local path = Linker.resolve_rel(self, ("std/" .. name) .. ".laz")
+        local path = Linker.resolve_rel(self, ("std/" .. name) .. ".class.laz")
         -- Linker:55
         if Sys.__lz_exists(path) then
             -- Linker:56
@@ -11652,181 +11652,198 @@ end
 -- Linker:67
 function Linker.entry_class(self)
     -- Linker:68
-    return Path.stem(self.entry)
+    local stem = Path.stem(self.entry)
+    -- Linker:69
+    if Str.is_suffix(stem, ".class") then
+        -- Linker:70
+        return Option.unwrap_or(Option.__lz_wrap(string.sub(stem, 1, Option.unwrap_or(Option.__lz_wrap(string.len(stem)), 0) - 6)), stem)
+    end
+    -- Linker:72
+    return stem
 end
--- Linker:74
+-- Linker:78
 function Linker.load(self, path, origin_source, origin_line, origin_col, origin_span)
-    -- Linker:75
+    -- Linker:79
     if self.loaded:has(path) then
-        -- Linker:76
+        -- Linker:80
         return
     end
-    -- Linker:80
+    -- Linker:84
     if Option.unwrap_or(self.visiting:get(path), false) then
-        -- Linker:81
+        -- Linker:85
         return
     end
-    -- Linker:83
+    -- Linker:87
     List.__lz_idx_set(self.visiting, path, true)
-    -- Linker:85
+    -- Linker:89
     local source_opt = Option.__lz_wrap(Sys.__lz_readfile(path))
-    -- Linker:86
+    -- Linker:90
     if Option.is_none(source_opt) then
-        -- Linker:87
+        -- Linker:91
         Error.new("LinkError", ("cannot resolve import '" .. path) .. "'", origin_line, origin_col, origin_source, origin_span):raise()
     end
-    -- Linker:89
-    local source = Option.unwrap(source_opt)
-    -- Linker:91
-    local kind = Linker.file_kind(self, path)
-    -- Linker:92
-    local class_name = Path.stem(path)
     -- Linker:93
+    local source = Option.unwrap(source_opt)
+    -- Linker:95
+    local kind = Linker.file_kind(self, path)
+    -- Linker:96
+    local class_name = Path.stem(path)
+    -- Linker:97
     if kind == "object" then
-        -- Linker:94
+        -- Linker:98
         class_name = Option.unwrap_or(Option.__lz_wrap(string.sub(class_name, 1, Option.unwrap_or(Option.__lz_wrap(string.len(class_name)), 0) - 7)), class_name)
     elseif kind == "trait" then
-        -- Linker:96
+        -- Linker:100
+        class_name = Option.unwrap_or(Option.__lz_wrap(string.sub(class_name, 1, Option.unwrap_or(Option.__lz_wrap(string.len(class_name)), 0) - 6)), class_name)
+    elseif Str.is_suffix(class_name, ".class") then
+        -- Linker:102
         class_name = Option.unwrap_or(Option.__lz_wrap(string.sub(class_name, 1, Option.unwrap_or(Option.__lz_wrap(string.len(class_name)), 0) - 6)), class_name)
     end
-    -- Linker:98
+    -- Linker:104
     local tokens = Lexer.new(source):scan()
-    -- Linker:99
+    -- Linker:105
     local program = Parser.new(tokens, source, kind):parse()
-    -- Linker:101
+    -- Linker:107
     local imports = List.__lz_from({})
-    -- Linker:102
+    -- Linker:108
     local body = List.__lz_from({})
-    -- Linker:103
+    -- Linker:109
     for _, node in List.__lz_each(program:child("body")) do
-        -- Linker:104
+        -- Linker:110
         if node.kind == "ImportDecl" then
-            -- Linker:105
+            -- Linker:111
             local span = Option.unwrap_or(Option.__lz_wrap(string.len(node:child("name"))), 1)
-            -- Linker:106
+            -- Linker:112
             Linker.load_by_ext(self, Linker.resolve(self, node), source, node:line(), node:col(), span)
-            -- Linker:107
+            -- Linker:113
             imports:push(node:child("name"))
         else
-            -- Linker:109
+            -- Linker:115
             body:push(node)
         end
     end
-    -- Linker:112
+    -- Linker:118
     program:set("body", body)
-    -- Linker:114
+    -- Linker:120
     self.ordered:push(Module.new(path, class_name, source, program, imports, kind == "trait", false, "", 0))
-    -- Linker:115
+    -- Linker:121
     List.__lz_idx_set(self.loaded, path, true)
 end
--- Linker:120
+-- Linker:126
 function Linker.load_prebuilt(self, path, origin_source, origin_line, origin_col, origin_span)
-    -- Linker:121
+    -- Linker:127
     if self.loaded:has(path) then
-        -- Linker:122
+        -- Linker:128
         return
     end
-    -- Linker:124
+    -- Linker:130
     local source_opt = Option.__lz_wrap(Sys.__lz_readfile(path))
-    -- Linker:125
+    -- Linker:131
     if Option.is_none(source_opt) then
-        -- Linker:126
+        -- Linker:132
         Error.new("LinkError", ("cannot resolve import '" .. path) .. "'", origin_line, origin_col, origin_source, origin_span):raise()
     end
-    -- Linker:128
+    -- Linker:134
     local lua_source = Option.unwrap(source_opt)
-    -- Linker:129
+    -- Linker:135
     local sig_opt = MetaParser.parse_meta(lua_source)
-    -- Linker:130
+    -- Linker:136
     if Option.is_none(sig_opt) then
-        -- Linker:131
+        -- Linker:137
         Error.new("LinkError", ("prebuilt library '" .. path) .. "' has no LAZARUS_META block", origin_line, origin_col, origin_source, origin_span):raise()
     end
-    -- Linker:133
+    -- Linker:139
     local class_name = Path.stem(path)
-    -- Linker:134
+    -- Linker:140
     local dummy_ast = Node.new("Program", Map.__lz_from({["body"] = List.__lz_from({})}))
-    -- Linker:135
+    -- Linker:141
     self.ordered:push(Module.new(path, class_name, "", dummy_ast, List.__lz_from({}), false, true, lua_source, Option.unwrap(sig_opt)))
-    -- Linker:136
+    -- Linker:142
     List.__lz_idx_set(self.loaded, path, true)
 end
--- Linker:144
+-- Linker:149
 function Linker.resolve(self, node)
-    -- Linker:145
-    local base = Text.join(node:child("segments"), "/")
-    -- Linker:146
-    local laz_path = Linker.resolve_rel(self, base .. ".laz")
-    -- Linker:147
-    if Sys.__lz_exists(laz_path) then
-        -- Linker:148
-        return laz_path
-    end
     -- Linker:150
-    local object_path = Linker.resolve_rel(self, base .. ".object.laz")
+    local base = Text.join(node:child("segments"), "/")
     -- Linker:151
+    local class_path = Linker.resolve_rel(self, base .. ".class.laz")
+    -- Linker:152
+    if Sys.__lz_exists(class_path) then
+        -- Linker:153
+        return class_path
+    end
+    -- Linker:155
+    local object_path = Linker.resolve_rel(self, base .. ".object.laz")
+    -- Linker:156
     if Sys.__lz_exists(object_path) then
-        -- Linker:152
+        -- Linker:157
         return object_path
     end
-    -- Linker:154
+    -- Linker:159
     local trait_path = Linker.resolve_rel(self, base .. ".trait.laz")
-    -- Linker:155
+    -- Linker:160
     if Sys.__lz_exists(trait_path) then
-        -- Linker:156
+        -- Linker:161
         return trait_path
     end
-    -- Linker:158
+    -- Linker:163
     local lua_path = Linker.resolve_rel(self, base .. ".lua")
-    -- Linker:159
+    -- Linker:164
     if Sys.__lz_exists(lua_path) then
-        -- Linker:160
+        -- Linker:165
         return lua_path
     end
-    -- Linker:162
-    return laz_path
-end
--- Linker:166
-function Linker.load_by_ext(self, path, origin_source, origin_line, origin_col, origin_span)
     -- Linker:167
+    local laz_path = Linker.resolve_rel(self, base .. ".laz")
+    -- Linker:168
+    if Sys.__lz_exists(laz_path) then
+        -- Linker:169
+        return laz_path
+    end
+    -- Linker:171
+    return class_path
+end
+-- Linker:175
+function Linker.load_by_ext(self, path, origin_source, origin_line, origin_col, origin_span)
+    -- Linker:176
     if Str.is_suffix(path, ".lua") then
-        -- Linker:168
+        -- Linker:177
         Linker.load_prebuilt(self, path, origin_source, origin_line, origin_col, origin_span)
     else
-        -- Linker:170
+        -- Linker:179
         Linker.load(self, path, origin_source, origin_line, origin_col, origin_span)
     end
 end
--- Linker:176
+-- Linker:185
 function Linker.resolve_rel(self, rel)
-    -- Linker:177
+    -- Linker:186
     local local_path = Path.join(self.root, rel)
-    -- Linker:178
+    -- Linker:187
     if Sys.__lz_exists(local_path) then
-        -- Linker:179
+        -- Linker:188
         return local_path
     end
-    -- Linker:181
+    -- Linker:190
     if self.pkg_root ~= "" then
-        -- Linker:182
+        -- Linker:191
         return Path.join(self.pkg_root, rel)
     end
-    -- Linker:184
+    -- Linker:193
     return local_path
 end
--- Linker:190
+-- Linker:197
 function Linker.file_kind(self, path)
-    -- Linker:191
+    -- Linker:198
     if Str.is_suffix(path, ".object.laz") then
-        -- Linker:192
+        -- Linker:199
         return "object"
     end
-    -- Linker:194
+    -- Linker:201
     if Str.is_suffix(path, ".trait.laz") then
-        -- Linker:195
+        -- Linker:202
         return "trait"
     end
-    -- Linker:197
+    -- Linker:204
     return "class"
 end
 
@@ -11925,361 +11942,362 @@ function Main.check_file(path, pkg_path)
         local kind = 'class'
         if path:match('%.object%.laz$') then kind = 'object'
         elseif path:match('%.trait%.laz$') then kind = 'trait' end
+        -- .class.laz stays 'class'; plain .laz also falls through to 'class'
         local tokens = Lexer.new(source):scan()
         Parser.new(tokens, source, kind):parse()
         os.exit(0)
 
 end
--- Main:94
+-- Main:95
 function Main.build_file(path, platform, pkg_path)
-    -- Main:95
-    local linker = Linker.new(path, pkg_path)
     -- Main:96
+    local linker = Linker.new(path, pkg_path)
+    -- Main:97
     local modules = linker:link()
-    -- Main:98
-    local variant_owner = Map.__lz_from({})
     -- Main:99
-    local enums = Map.__lz_from({})
+    local variant_owner = Map.__lz_from({})
     -- Main:100
-    local variant_arity = Map.__lz_from({})
+    local enums = Map.__lz_from({})
     -- Main:101
-    local variant_fields = Map.__lz_from({})
+    local variant_arity = Map.__lz_from({})
     -- Main:102
-    local enum_type_params = Map.__lz_from({})
+    local variant_fields = Map.__lz_from({})
     -- Main:103
-    local classes = Map.__lz_from({})
+    local enum_type_params = Map.__lz_from({})
     -- Main:104
-    local traits = Map.__lz_from({})
+    local classes = Map.__lz_from({})
     -- Main:105
+    local traits = Map.__lz_from({})
+    -- Main:106
     local gated_externs = Map.__lz_from({})
-    -- Main:107
+    -- Main:108
     for _, m in List.__lz_each(modules) do
-        -- Main:108
+        -- Main:109
         if not m.is_prebuilt then
-            -- Main:109
-            Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
             -- Main:110
+            Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
+            -- Main:111
             Main.collect_traits(m.ast, traits, m.class_name)
         end
     end
-    -- Main:114
-    local handler_cache = Map.__lz_from({})
     -- Main:115
+    local handler_cache = Map.__lz_from({})
+    -- Main:116
     for _, m in List.__lz_each(modules) do
-        -- Main:116
+        -- Main:117
         if (not m.is_trait) and (not m.is_prebuilt) then
-            -- Main:117
+            -- Main:118
             Expander.new(m.class_name, handler_cache):expand(m.ast, modules)
         end
     end
-    -- Main:121
+    -- Main:122
     for _, m in List.__lz_each(modules) do
-        -- Main:122
+        -- Main:123
         if m.is_prebuilt then
-            -- Main:123
+            -- Main:124
             List.__lz_idx_set(classes, m.class_name, m.meta_sig)
         elseif not m.is_trait then
-            -- Main:125
+            -- Main:126
             Main.collect_signatures(m.ast, m.class_name, classes, platform, gated_externs)
         end
     end
-    -- Main:129
+    -- Main:130
     for _, m in List.__lz_each(modules) do
-        -- Main:130
+        -- Main:131
         if (not m.is_trait) and (not m.is_prebuilt) then
-            -- Main:131
-            Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity, gated_externs)
             -- Main:132
-            Typecheck.new(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, traits):check(m.ast)
+            Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity, gated_externs)
             -- Main:133
+            Typecheck.new(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, traits):check(m.ast)
+            -- Main:134
             Optimizer.new():optimize(m.ast)
         end
     end
-    -- Main:137
-    local entry_class = linker:entry_class()
     -- Main:138
+    local entry_class = linker:entry_class()
+    -- Main:139
     local bundle = Bundler.new(modules, entry_class, variant_owner, platform):bundle()
-    -- Main:140
-    local entry_sig = Option.unwrap_or(classes:get(entry_class), 0)
     -- Main:141
-    local meta_block = ""
+    local entry_sig = Option.unwrap_or(classes:get(entry_class), 0)
     -- Main:142
+    local meta_block = ""
+    -- Main:143
     if entry_sig ~= 0 then
-        -- Main:143
+        -- Main:144
         meta_block = (MetaEmitter.emit(entry_class, entry_sig) .. Text.nl()) .. Text.nl()
     end
-    -- Main:146
-    local out_path = entry_class .. ".lua"
     -- Main:147
-    local file = Option.__lz_unwrap(Option.__lz_wrap(io.open(out_path, "w")))
+    local out_path = entry_class .. ".lua"
     -- Main:148
-    file:write(meta_block .. bundle)
+    local file = Option.__lz_unwrap(Option.__lz_wrap(io.open(out_path, "w")))
     -- Main:149
+    file:write(meta_block .. bundle)
+    -- Main:150
     file:close()
 end
--- Main:156
+-- Main:157
 function Main.build_lib(path, platform, pkg_path)
-    -- Main:157
-    local linker = Linker.new(path, pkg_path)
     -- Main:158
+    local linker = Linker.new(path, pkg_path)
+    -- Main:159
     local modules = linker:link()
-    -- Main:160
-    local variant_owner = Map.__lz_from({})
     -- Main:161
-    local enums = Map.__lz_from({})
+    local variant_owner = Map.__lz_from({})
     -- Main:162
-    local variant_arity = Map.__lz_from({})
+    local enums = Map.__lz_from({})
     -- Main:163
-    local variant_fields = Map.__lz_from({})
+    local variant_arity = Map.__lz_from({})
     -- Main:164
-    local enum_type_params = Map.__lz_from({})
+    local variant_fields = Map.__lz_from({})
     -- Main:165
-    local classes = Map.__lz_from({})
+    local enum_type_params = Map.__lz_from({})
     -- Main:166
-    local traits = Map.__lz_from({})
+    local classes = Map.__lz_from({})
     -- Main:167
+    local traits = Map.__lz_from({})
+    -- Main:168
     local gated_externs = Map.__lz_from({})
-    -- Main:169
+    -- Main:170
     for _, m in List.__lz_each(modules) do
-        -- Main:170
+        -- Main:171
         if not m.is_prebuilt then
-            -- Main:171
-            Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
             -- Main:172
+            Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
+            -- Main:173
             Main.collect_traits(m.ast, traits, m.class_name)
         end
     end
-    -- Main:176
-    local handler_cache = Map.__lz_from({})
     -- Main:177
+    local handler_cache = Map.__lz_from({})
+    -- Main:178
     for _, m in List.__lz_each(modules) do
-        -- Main:178
+        -- Main:179
         if (not m.is_trait) and (not m.is_prebuilt) then
-            -- Main:179
+            -- Main:180
             Expander.new(m.class_name, handler_cache):expand(m.ast, modules)
         end
     end
-    -- Main:183
+    -- Main:184
     for _, m in List.__lz_each(modules) do
-        -- Main:184
+        -- Main:185
         if m.is_prebuilt then
-            -- Main:185
+            -- Main:186
             List.__lz_idx_set(classes, m.class_name, m.meta_sig)
         elseif not m.is_trait then
-            -- Main:187
+            -- Main:188
             Main.collect_signatures(m.ast, m.class_name, classes, platform, gated_externs)
         end
     end
-    -- Main:191
+    -- Main:192
     for _, m in List.__lz_each(modules) do
-        -- Main:192
+        -- Main:193
         if (not m.is_trait) and (not m.is_prebuilt) then
-            -- Main:193
-            Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity, gated_externs)
             -- Main:194
-            Typecheck.new(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, traits):check(m.ast)
+            Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity, gated_externs)
             -- Main:195
+            Typecheck.new(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, traits):check(m.ast)
+            -- Main:196
             Optimizer.new():optimize(m.ast)
         end
     end
-    -- Main:199
-    local entry_class = linker:entry_class()
     -- Main:200
-    local entry_module = Option.unwrap(modules:get(modules:len()))
+    local entry_class = linker:entry_class()
     -- Main:201
-    local externs = Map.__lz_from({})
+    local entry_module = Option.unwrap(modules:get(modules:len()))
     -- Main:202
+    local externs = Map.__lz_from({})
+    -- Main:203
     for _, m in List.__lz_each(modules) do
-        -- Main:203
+        -- Main:204
         if not m.is_prebuilt then
-            -- Main:204
-            local binds = Map.__lz_from({})
             -- Main:205
+            local binds = Map.__lz_from({})
+            -- Main:206
             for _, node in List.__lz_each(m.ast:child("body")) do
-                -- Main:206
+                -- Main:207
                 if node.kind == "ExternDecl" then
-                    -- Main:207
-                    local rt = node:attr("return_type")
                     -- Main:208
-                    local wrap = true
+                    local rt = node:attr("return_type")
                     -- Main:209
+                    local wrap = true
+                    -- Main:210
                     if Option.__lz_is_some(rt) then
-                        -- Main:210
-                        local rname = Option.__lz_unwrap(rt):child("name")
                         -- Main:211
+                        local rname = Option.__lz_unwrap(rt):child("name")
+                        -- Main:212
                         wrap = (rname == "Option") or (rname == "dynamic")
                     end
-                    -- Main:213
+                    -- Main:214
                     List.__lz_idx_set(binds, node:child("name"), Map.__lz_from({["target"] = node:child("target"), ["wrap"] = wrap}))
                 end
             end
-            -- Main:216
+            -- Main:217
             if binds:len() > 0 then
-                -- Main:217
+                -- Main:218
                 List.__lz_idx_set(externs, m.class_name, binds)
             end
         end
     end
-    -- Main:221
-    local cg = Codegen.new(entry_class, entry_module.imports, externs, variant_owner, platform)
     -- Main:222
+    local cg = Codegen.new(entry_class, entry_module.imports, externs, variant_owner, platform)
+    -- Main:223
     local class_block = cg:class_block(entry_module.ast)
-    -- Main:224
-    local entry_sig = Option.unwrap_or(classes:get(entry_class), 0)
     -- Main:225
-    local meta_block = ""
+    local entry_sig = Option.unwrap_or(classes:get(entry_class), 0)
     -- Main:226
+    local meta_block = ""
+    -- Main:227
     if entry_sig ~= 0 then
-        -- Main:227
+        -- Main:228
         meta_block = (MetaEmitter.emit(entry_class, entry_sig) .. Text.nl()) .. Text.nl()
     end
-    -- Main:230
-    local out_path = entry_class .. ".lua"
     -- Main:231
-    local file = Option.__lz_unwrap(Option.__lz_wrap(io.open(out_path, "w")))
+    local out_path = entry_class .. ".lua"
     -- Main:232
-    file:write(meta_block .. class_block)
+    local file = Option.__lz_unwrap(Option.__lz_wrap(io.open(out_path, "w")))
     -- Main:233
+    file:write(meta_block .. class_block)
+    -- Main:234
     file:close()
 end
--- Main:240
+-- Main:241
 function Main.collect_enums(ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
-    -- Main:241
+    -- Main:242
     for _, stmt in List.__lz_each(ast:child("body")) do
-        -- Main:242
+        -- Main:243
         if stmt.kind == "EnumDecl" then
-            -- Main:243
-            local name = stmt:child("name")
             -- Main:244
-            List.__lz_idx_set(enum_type_params, name, Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_from({})))
+            local name = stmt:child("name")
             -- Main:245
-            local names = List.__lz_from({})
+            List.__lz_idx_set(enum_type_params, name, Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_from({})))
             -- Main:246
+            local names = List.__lz_from({})
+            -- Main:247
             for _, v in List.__lz_each(stmt:child("variants")) do
-                -- Main:247
-                local vn = v:child("name")
                 -- Main:248
-                names:push(vn)
+                local vn = v:child("name")
                 -- Main:249
-                List.__lz_idx_set(variant_owner, vn, name)
+                names:push(vn)
                 -- Main:250
-                List.__lz_idx_set(variant_arity, vn, v:child("fields"):len())
+                List.__lz_idx_set(variant_owner, vn, name)
                 -- Main:251
+                List.__lz_idx_set(variant_arity, vn, v:child("fields"):len())
+                -- Main:252
                 List.__lz_idx_set(variant_fields, vn, v:child("fields"))
             end
-            -- Main:253
+            -- Main:254
             List.__lz_idx_set(enums, name, names)
         end
     end
 end
--- Main:263
+-- Main:264
 function Main.collect_signatures(ast, class_name, classes, platform, gated_externs)
-    -- Main:264
-    local fields = Map.__lz_from({})
     -- Main:265
-    local methods = Map.__lz_from({})
+    local fields = Map.__lz_from({})
     -- Main:266
-    local ctor = 0
+    local methods = Map.__lz_from({})
     -- Main:267
-    local ctor_names = List.__lz_from({})
+    local ctor = 0
     -- Main:268
-    local type_params = List.__lz_from({})
+    local ctor_names = List.__lz_from({})
     -- Main:269
+    local type_params = List.__lz_from({})
+    -- Main:270
     for _, stmt in List.__lz_each(ast:child("body")) do
-        -- Main:270
-        local k = stmt.kind
         -- Main:271
+        local k = stmt.kind
+        -- Main:272
         if k == "VariableDecl" then
-            -- Main:272
-            local visibility = Option.__lz_unwrap_or(stmt:attr("visibility"), "")
             -- Main:273
-            local is_static = Option.__lz_unwrap_or(stmt:attr("is_static"), false)
+            local visibility = Option.__lz_unwrap_or(stmt:attr("visibility"), "")
             -- Main:274
+            local is_static = Option.__lz_unwrap_or(stmt:attr("is_static"), false)
+            -- Main:275
             if (visibility ~= "") and (not is_static) then
-                -- Main:275
+                -- Main:276
                 List.__lz_idx_set(fields, stmt:child("name"), stmt:attr("type"))
             end
         elseif k == "FunctionDecl" then
-            -- Main:278
-            local params = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_from({}))
             -- Main:279
-            local param_names = stmt:child("params")
+            local params = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_from({}))
             -- Main:280
-            local result = Option.__lz_unwrap_or(stmt:attr("return_type"), 0)
+            local param_names = stmt:child("params")
             -- Main:281
-            local is_static = Option.__lz_unwrap_or(stmt:attr("is_static"), false)
+            local result = Option.__lz_unwrap_or(stmt:attr("return_type"), 0)
             -- Main:282
-            local mtype_params = Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_from({}))
+            local is_static = Option.__lz_unwrap_or(stmt:attr("is_static"), false)
             -- Main:283
+            local mtype_params = Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_from({}))
+            -- Main:284
             List.__lz_idx_set(methods, stmt:child("name"), Map.__lz_from({["params"] = params, ["param_names"] = param_names, ["result"] = result, ["is_static"] = is_static, ["type_params"] = mtype_params}))
         elseif k == "ConstructorDecl" then
-            -- Main:285
-            ctor = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_from({}))
             -- Main:286
-            ctor_names = stmt:child("params")
+            ctor = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_from({}))
             -- Main:287
+            ctor_names = stmt:child("params")
+            -- Main:288
             type_params = Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_from({}))
         elseif k == "ExternDecl" then
-            -- Main:289
-            local params = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_from({}))
             -- Main:290
-            local all_typed = true
+            local params = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_from({}))
             -- Main:291
+            local all_typed = true
+            -- Main:292
             for _, pt in List.__lz_each(params) do
-                -- Main:292
+                -- Main:293
                 if Option.__lz_unwrap_or(pt:attr("inferred"), false) or (pt:child("name") == "dynamic") then
-                    -- Main:293
+                    -- Main:294
                     all_typed = false
                 end
             end
-            -- Main:296
+            -- Main:297
             if all_typed and (params:len() > 0) then
-                -- Main:297
-                local extern_platform = Option.__lz_unwrap_or(stmt:attr("platform"), "")
                 -- Main:298
+                local extern_platform = Option.__lz_unwrap_or(stmt:attr("platform"), "")
+                -- Main:299
                 if (extern_platform == "") or (extern_platform == platform) then
-                    -- Main:299
-                    local extern_result = Option.__lz_unwrap_or(stmt:attr("return_type"), 0)
                     -- Main:300
+                    local extern_result = Option.__lz_unwrap_or(stmt:attr("return_type"), 0)
+                    -- Main:301
                     List.__lz_idx_set(methods, stmt:child("name"), Map.__lz_from({["params"] = params, ["result"] = extern_result, ["is_static"] = true, ["type_params"] = List.__lz_from({})}))
                 else
-                    -- Main:302
+                    -- Main:303
                     List.__lz_idx_set(gated_externs, stmt:child("name"), extern_platform)
                 end
             end
         end
     end
-    -- Main:307
+    -- Main:308
     List.__lz_idx_set(classes, class_name, Map.__lz_from({["fields"] = fields, ["methods"] = methods, ["ctor"] = ctor, ["ctor_names"] = ctor_names, ["type_params"] = type_params}))
 end
--- Main:315
+-- Main:316
 function Main.collect_traits(ast, traits, class_name)
-    -- Main:316
+    -- Main:317
     for _, stmt in List.__lz_each(ast:child("body")) do
-        -- Main:317
+        -- Main:318
         if stmt.kind == "TraitDecl" then
-            -- Main:318
-            local name = stmt:child("name")
             -- Main:319
+            local name = stmt:child("name")
+            -- Main:320
             if name == "" then
-                -- Main:320
+                -- Main:321
                 name = class_name
             end
-            -- Main:322
-            local methods = Map.__lz_from({})
             -- Main:323
+            local methods = Map.__lz_from({})
+            -- Main:324
             for _, m in List.__lz_each(stmt:child("methods")) do
-                -- Main:324
+                -- Main:325
                 List.__lz_idx_set(methods, m:child("name"), Map.__lz_from({["params"] = m:child("param_types"), ["result"] = m:child("return_type"), ["type_params"] = m:child("type_params")}))
             end
-            -- Main:326
-            local properties = Map.__lz_from({})
             -- Main:327
+            local properties = Map.__lz_from({})
+            -- Main:328
             for _, p in List.__lz_each(stmt:child("properties")) do
-                -- Main:328
+                -- Main:329
                 List.__lz_idx_set(properties, p:child("name"), p:child("type"))
             end
-            -- Main:330
+            -- Main:331
             List.__lz_idx_set(traits, name, Map.__lz_from({["methods"] = methods, ["properties"] = properties, ["type_params"] = stmt:child("type_params")}))
         end
     end

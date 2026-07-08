@@ -18,9 +18,23 @@ public to_string(): str {
     return .format()
 }
 
-public raise(): unit {
-    Sys.print(.format())
-    Sys.exit(1)
+public lua raise(): unit {
+    local function json_str(s)
+        return '"' .. tostring(s):gsub('\\', '\\\\'):gsub('"', '\\"'):gsub('\n', '\\n'):gsub('\r', '\\r'):gsub('\t', '\\t') .. '"'
+    end
+    if _G._lz_check_mode then
+        print('{"kind":' .. json_str(self.kind) .. ',"line":' .. (self.line or 0) .. ',"col":' .. (self.column or 0) .. ',"message":' .. json_str(self.message) .. '}')
+        os.exit(0)
+    else
+        print(self:format())
+        os.exit(1)
+    end
+}
+
+public lua print(): unit {
+    if not _G._lz_check_mode then
+        print(self:format())
+    end
 }
 
 public format(): str {

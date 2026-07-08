@@ -5,6 +5,7 @@
 // declarations emits no class — its bindings are gathered into the externs map and
 // threaded into every real module's codegen. Pass two generates each non-extern
 // class block with that map and the module's imports as its known classes.
+// Prebuilt modules (loaded from .lua with LAZARUS_META) are emitted verbatim.
 
 import backend.Codegen
 import backend.Text
@@ -25,22 +26,26 @@ public bundle(): str {
     mut blocks = []
     mut entry_has_ctor = false
     mut entry_source = ""
-    mut entry_is_interface = false
+    mut entry_is_trait = false
     for m in .modules {
         if m.class_name == .entry_class {
-            entry_is_interface = m.is_interface
+            entry_is_trait = m.is_trait
             entry_source = m.source
         }
-        if not .is_extern_module(m) and not m.is_interface {
-            mut cg = Codegen(m.class_name, m.imports, externs, .variant_owner, .platform)
-            blocks.push(cg.class_block(m.ast))
-            if m.class_name == .entry_class {
-                entry_has_ctor = cg.has_constructor(m.ast.child("body"))
+        if not .is_extern_module(m) and not m.is_trait {
+            if m.is_prebuilt {
+                blocks.push(m.prebuilt_lua)
+            } else {
+                mut cg = Codegen(m.class_name, m.imports, externs, .variant_owner, .platform)
+                blocks.push(cg.class_block(m.ast))
+                if m.class_name == .entry_class {
+                    entry_has_ctor = cg.has_constructor(m.ast.child("body"))
+                }
             }
         }
     }
 
-    if not entry_is_interface and not entry_has_ctor {
+    if not entry_is_trait and not entry_has_ctor {
         Error("LinkError", "entry class '" ++ .entry_class ++ "' must define a constructor", 1, 1, entry_source, 1).raise()
     }
 
@@ -48,7 +53,7 @@ public bundle(): str {
     for block in blocks {
         sections.push(block)
     }
-    if entry_is_interface {
+    if entry_is_trait {
         sections.push("return nil")
     } else {
         sections.push("return " ++ .entry_class ++ ".new(...)")
@@ -61,17 +66,20 @@ public bundle(): str {
 // contribute their externs alongside their class table. A binding wraps at the
 // Option boundary unless its declared return type names a concrete type
 // (bool/int/str/…), which lowers to the bare call.
+// Prebuilt modules handle their own extern bindings and are skipped here.
 private collect_externs(): Map<str, Map<str, dynamic>> {
     mut externs = [:]
     for m in .modules {
-        mut binds = [:]
-        for node in m.ast.child("body") {
-            if node.kind == "ExternDecl" {
-                binds[node.child("name")] = ["target": node.child("target"), "wrap": .extern_wraps(node)]
+        if not m.is_prebuilt {
+            mut binds = [:]
+            for node in m.ast.child("body") {
+                if node.kind == "ExternDecl" {
+                    binds[node.child("name")] = ["target": node.child("target"), "wrap": .extern_wraps(node)]
+                }
             }
-        }
-        if binds.len() > 0 {
-            externs[m.class_name] = binds
+            if binds.len() > 0 {
+                externs[m.class_name] = binds
+            }
         }
     }
     return externs
@@ -89,6 +97,9 @@ private extern_wraps(node: Node): bool {
 // A module is an extern namespace when its body holds extern declarations and
 // nothing else — it contributes bindings but no class table.
 private is_extern_module(m: Module): bool {
+    if m.is_prebuilt {
+        return false
+    }
     mut has_extern = false
     mut has_other = false
     for node in m.ast.child("body") {

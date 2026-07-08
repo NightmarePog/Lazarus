@@ -63,7 +63,7 @@ private get_handler(handler_class: str, modules: List<Module>): dynamic {
 static compile_handler(handler_class: str, modules: List<Module>): dynamic {
     mut blocks = []
     for m in modules {
-        if not m.is_interface {
+        if not m.is_trait {
             // externs and variant_owner left empty — handler modules must not use match on enums or extern bindings
             mut cg = Codegen(m.class_name, m.imports, [:], [:], "")
             blocks.push(cg.class_block(m.ast))

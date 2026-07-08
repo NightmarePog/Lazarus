@@ -19,14 +19,25 @@ private exprs: ExprEmitter
 constructor(ctx: CgContext, exprs: ExprEmitter)
 
 public emit_member(node: Node): str {
+    mut hint = .source_hint(node)
+    mut body = ""
     match node.kind {
-        "FunctionDecl" => { return .emit_method(node) }
-        "VariableDecl" => { return .emit_static_field(node) }
-        "ConstructorDecl" => { return .emit_constructor(node) }
-        "EnumDecl" => { return .emit_enum(node) }
-        _ => {}
+        "FunctionDecl" => {
+            if node.attr("raw_body").is_some() {
+                body = .emit_lua_method(node)
+            } else {
+                body = .emit_method(node)
+            }
+        }
+        "VariableDecl" => { body = .emit_static_field(node) }
+        "ConstructorDecl" => { body = .emit_constructor(node) }
+        "EnumDecl" => { body = .emit_enum(node) }
+        _ => { return .emit_stmt(node) }
     }
-    return .emit_stmt(node)
+    if hint == "" {
+        return body
+    }
+    return hint ++ Text.nl() ++ body
 }
 
 // A nullary variant lowers to `E.V = 'V'`; a payload variant to a constructor
@@ -59,15 +70,32 @@ private emit_variant_ctor(name: str, fields: List<Node>): str {
 }
 
 // Statement boundary: emit the node, then prepend any pending `?`-propagation
-// lines accumulated during expression emission.
+// lines accumulated during expression emission. A source-location comment is
+// prepended so runtime Lua errors can be mapped back to the Lazarus source.
 public emit_stmt(node: Node): str {
     mut result = .emit_stmt_inner(node)
     mut prefix = .exprs.take_pending()
+    mut hint = .source_hint(node)
     if prefix.len() == 0 {
-        return result
+        if hint == "" {
+            return result
+        }
+        return hint ++ Text.nl() ++ result
     }
     prefix.push(result)
-    return Text.lines(prefix)
+    mut body = Text.lines(prefix)
+    if hint == "" {
+        return body
+    }
+    return hint ++ Text.nl() ++ body
+}
+
+private source_hint(node: Node): str {
+    mut ln = node.line()
+    if ln == 0 {
+        return ""
+    }
+    return "-- " ++ .ctx.name() ++ ":" ++ Num.to_text(ln).unwrap_or("?")
 }
 
 private emit_stmt_inner(node: Node): str {
@@ -283,9 +311,8 @@ private emit_variable(node: Node): str {
 }
 
 private emit_index_assign(node: Node): str {
-    .ctx.mark_collections()
     mut target = node.child("target")
-    return "__lz_idx_set(" ++ .exprs.emit(target.child("object")) ++ ", " ++ .exprs.emit(target.child("index")) ++ ", " ++ .exprs.emit(node.child("value")) ++ ")"
+    return "List.__lz_idx_set(" ++ .exprs.emit(target.child("object")) ++ ", " ++ .exprs.emit(target.child("index")) ++ ", " ++ .exprs.emit(node.child("value")) ++ ")"
 }
 
 private emit_local_function(node: Node): str {
@@ -370,7 +397,6 @@ private emit_for(node: Node): str {
 // which yields (0-based index, value) for a list and (key, value) for a map; a
 // single loop variable takes the value, so a throwaway `_` holds the index/key.
 private emit_for_in(node: Node): str {
-    .ctx.mark_collections()
     mut iter = .exprs.emit(node.child("iter"))
     .ctx.push_scope()
     mut vars = node.child("vars")
@@ -379,9 +405,9 @@ private emit_for_in(node: Node): str {
     }
     mut header = ""
     if vars.len() == 1 {
-        header = "for _, " ++ vars.get(1).unwrap() ++ " in __lz_each(" ++ iter ++ ") do"
+        header = "for _, " ++ vars.get(1).unwrap() ++ " in List.__lz_each(" ++ iter ++ ") do"
     } else {
-        header = "for " ++ Text.join(vars, ", ") ++ " in __lz_each(" ++ iter ++ ") do"
+        header = "for " ++ Text.join(vars, ", ") ++ " in List.__lz_each(" ++ iter ++ ") do"
     }
     mut parts = [header]
     .push_block(parts, node.child("body"))
@@ -398,6 +424,16 @@ private emit_method(node: Node): str {
     }
     mut header = "function " ++ .ctx.name() ++ "." ++ node.child("name") ++ "(" ++ Text.join(lua_params, ", ") ++ ")"
     return .wrap_body(header, .emit_fn_body(lua_params, node.child("param_types"), node.child("body")))
+}
+
+private emit_lua_method(node: Node): str {
+    mut params = node.child("params")
+    mut lua_params = params
+    if not node.attr("is_static").unwrap_or(false) {
+        lua_params = .with_self(params)
+    }
+    mut header = "function " ++ .ctx.name() ++ "." ++ node.child("name") ++ "(" ++ Text.join(lua_params, ", ") ++ ")"
+    return Text.lines([header, Text.indent(node.child("raw_body")), "end"])
 }
 
 private emit_static_field(node: Node): str {

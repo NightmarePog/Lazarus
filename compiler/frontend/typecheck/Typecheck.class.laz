@@ -22,12 +22,12 @@ private classes: Map<str, dynamic>
 private variant_fields: Map<str, List<Node>>
 private variant_owner: Map<str, str>
 private enum_type_params: Map<str, List<str>>
-private interfaces: Map<str, dynamic>
+private traits: Map<str, dynamic>
 private type_vars: Map<str, bool>
 private checking: Map<str, bool>
 private iface_reason: str
 
-constructor(source: str, class_name: str, imports: List<str>, enums: Map<str, List<str>>, classes: Map<str, dynamic>, variant_fields: Map<str, List<Node>>, variant_owner: Map<str, str>, enum_type_params: Map<str, List<str>>, interfaces: Map<str, dynamic>) {
+constructor(source: str, class_name: str, imports: List<str>, enums: Map<str, List<str>>, classes: Map<str, dynamic>, variant_fields: Map<str, List<Node>>, variant_owner: Map<str, str>, enum_type_params: Map<str, List<str>>, traits: Map<str, dynamic>) {
     .source = source
     .class_name = class_name
     .known_classes = [:]
@@ -40,7 +40,7 @@ constructor(source: str, class_name: str, imports: List<str>, enums: Map<str, Li
     .variant_fields = variant_fields
     .variant_owner = variant_owner
     .enum_type_params = enum_type_params
-    .interfaces = interfaces
+    .traits = traits
     .type_vars = [:]
     .checking = [:]
     .iface_reason = ""
@@ -102,7 +102,23 @@ private type_stmt(stmt: Node, scope: Scope, ret: Type): unit {
         "ForStmt" => { .type_for(stmt, scope, ret) }
         "ForInStmt" => { .type_for_in(stmt, scope, ret) }
         "MatchStmt" => { .type_match(stmt, scope, ret) }
+        "ImplementDecl" => { .type_implement(stmt) }
         _ => {}
+    }
+}
+
+// Verify that the current class satisfies every method and property the named
+// trait requires. Checked at class declaration time, not at use site.
+private type_implement(stmt: Node): unit {
+    mut tname = stmt.child("name")
+    if not .traits.has(tname) {
+        .fail(stmt, "unknown trait '" ++ tname ++ "'")
+        return
+    }
+    mut iface = Type.iface_of(tname, [])
+    mut cls = Type.class_of(.class_name, .self_args())
+    if not .satisfies(iface, cls) {
+        .fail(stmt, .class_name ++ " does not implement trait '" ++ tname ++ "': " ++ .iface_reason)
     }
 }
 
@@ -163,7 +179,9 @@ private type_callable(stmt: Node, scope: Scope): unit {
     }
     mut inner = scope.child()
     .bind_params(stmt, inner)
-    .type_block(stmt.child("body"), inner, ret)
+    if stmt.attr("raw_body").is_none() {
+        .type_block(stmt.child("body"), inner, ret)
+    }
     .type_vars = saved
 }
 
@@ -317,6 +335,12 @@ private type_match(stmt: Node, scope: Scope, ret: Type): unit {
 // ---- expressions ----
 
 private type_expr(node: Node, scope: Scope): Type {
+    mut t = .type_expr_inner(node, scope)
+    node.set("inferred_type", t)
+    return t
+}
+
+private type_expr_inner(node: Node, scope: Scope): Type {
     match node.kind {
         "LiteralExpr" => { return .literal_type(node) }
         "IdentifierExpr" => { return .identifier_type(node.child("name"), scope) }
@@ -398,7 +422,7 @@ private comp_scope(node: Node, scope: Scope): Scope {
 // ---- built-in collections / Option / Result ----
 
 private is_builtin_name(name: str): bool {
-    return name == "Option" or name == "Result" or name == "List" or name == "Map"
+    return name == "Option" or name == "Result"
 }
 
 // A built-in generic instance (List<int>, Option<str>, …). Accepts both `class`
@@ -491,30 +515,6 @@ private builtin_method(recv: Type, method: str, args: List<Node>, scope: Scope):
         .type_expr(arg, scope)
     }
     mut a = .type_arg(recv, 1)
-    if recv.name == "List" {
-        if method == "get" or method == "pop" {
-            return .opt_of(a)
-        }
-        if method == "len" {
-            return Type.int()
-        }
-        if method == "has" {
-            return Type.bool()
-        }
-        return Type.unit()
-    }
-    if recv.name == "Map" {
-        if method == "get" {
-            return .opt_of(.type_arg(recv, 2))
-        }
-        if method == "has" {
-            return Type.bool()
-        }
-        if method == "len" {
-            return Type.int()
-        }
-        return Type.unit()
-    }
     if recv.name == "Option" {
         if method == "unwrap" or method == "unwrap_or" {
             return a
@@ -663,8 +663,8 @@ private type_call(node: Node, scope: Scope): Type {
         if .variant_owner.has(name) {
             return .type_variant(name, args, scope, node)
         }
-        if not scope.lookup(name).is_some() and .interfaces.has(name) {
-            .fail(callee, "cannot construct interface '" ++ name ++ "'")
+        if not scope.lookup(name).is_some() and .traits.has(name) {
+            .fail(callee, "cannot construct trait '" ++ name ++ "'")
         }
         if not scope.lookup(name).is_some() and .classes.has(name) {
             return .type_construction(name, args, scope, node)
@@ -746,7 +746,9 @@ private type_method_call(member: Node, args: List<Node>, scope: Scope, call: Nod
         return .builtin_method(recv, method, args, scope)
     }
     if recv.kind == "iface" {
-        return .iface_method(recv, method, args, scope, call)
+        mut t = .iface_method(recv, method, args, scope, call)
+        call.set("known_method", true)
+        return t
     }
     mut cls = .class_name_of(recv)
     if cls == "" {
@@ -755,6 +757,7 @@ private type_method_call(member: Node, args: List<Node>, scope: Scope, call: Nod
         }
         return Type.dynamic()
     }
+    call.set("known_method", true)
     mut sig = .classes.get(cls).unwrap().get("methods").unwrap().get(method)
     if not sig.is_some() {
         mut fields = .classes.get(cls).unwrap().get("fields").unwrap()
@@ -775,6 +778,12 @@ private type_method_call(member: Node, args: List<Node>, scope: Scope, call: Nod
             return Type.dynamic()
         }
         .fail(member, "no method '" ++ method ++ "' on " ++ cls)
+    }
+    if sig.unwrap().get("is_static").unwrap_or(false) and not .static_receiver(object, scope) {
+        call.set("dispatch_class", cls)
+        mut full_args = [object]
+        for arg in args { full_args.push(arg) }
+        return .type_method_sig(cls, recv, sig.unwrap(), full_args, scope, call)
     }
     return .type_method_sig(cls, recv, sig.unwrap(), args, scope, call)
 }
@@ -1116,7 +1125,7 @@ private resolve(t: Node): Type {
     if .enums.has(name) {
         return Type.enum_of(name, .resolve_args(t, name))
     }
-    if .interfaces.has(name) {
+    if .traits.has(name) {
         return Type.iface_of(name, .resolve_args(t, name))
     }
     if .known_classes.has(name) or .classes.has(name) {
@@ -1149,8 +1158,8 @@ private declared_arity(name: str): int {
     if .enum_type_params.has(name) {
         return .enum_type_params.get(name).unwrap().len()
     }
-    if .interfaces.has(name) {
-        return .interfaces.get(name).unwrap().get("type_params").unwrap_or([]).len()
+    if .traits.has(name) {
+        return .traits.get(name).unwrap().get("type_params").unwrap_or([]).len()
     }
     mut centry = .classes.get(name)
     if centry.is_some() {
@@ -1250,11 +1259,11 @@ private args_compatible(a: List<Type>, b: List<Type>): bool {
     return true
 }
 
-// ---- interface conformance (interface-directed structural subtyping) ----
+// ---- trait conformance (trait-directed structural subtyping) ----
 
-// Does `actual` satisfy interface `iface`? A `dynamic`/`var`/unknown actual defers
-// (true); the same interface compares args; a class is checked structurally. A
-// coinductive visited-pair guard makes mutually-referential interfaces terminate.
+// Does `actual` satisfy trait `iface`? A `dynamic`/`var`/unknown actual defers
+// (true); the same trait compares args; a class is checked structurally. A
+// coinductive visited-pair guard makes mutually-referential traits terminate.
 private satisfies(iface: Type, actual: Type): bool {
     if actual.is_dynamic() or actual.kind == "var" {
         return true
@@ -1262,7 +1271,7 @@ private satisfies(iface: Type, actual: Type): bool {
     if actual.kind == "iface" and actual.name == iface.name {
         return .args_compatible(iface.params, actual.params)
     }
-    if not .interfaces.has(iface.name) {
+    if not .traits.has(iface.name) {
         return true
     }
     mut key = iface.name ++ "<:" ++ actual.name
@@ -1276,8 +1285,8 @@ private satisfies(iface: Type, actual: Type): bool {
 }
 
 // Structural check: `actual` (a known class) must have every method and property
-// the interface requires, with compatible signatures once both sides' type
-// parameters are substituted (interface args, then the class's instantiation).
+// the trait requires, with compatible signatures once both sides' type
+// parameters are substituted (trait args, then the class's instantiation).
 private conforms(iface: Type, actual: Type): bool {
     mut centry = .classes.get(actual.name)
     if not centry.is_some() {
@@ -1286,7 +1295,7 @@ private conforms(iface: Type, actual: Type): bool {
     mut cls = centry.unwrap()
     mut cmethods = cls.get("methods").unwrap()
     mut cfields = cls.get("fields").unwrap()
-    mut def = .interfaces.get(iface.name).unwrap()
+    mut def = .traits.get(iface.name).unwrap()
 
     mut ivars = .name_set(def.get("type_params").unwrap_or([]))
     mut isubst = .pair_subst(def.get("type_params").unwrap_or([]), iface.params)
@@ -1399,10 +1408,10 @@ private merge_vars(base: Map<str, bool>, names: List<str>): Map<str, bool> {
 // contract, check the args against its declared params (with the receiver's type
 // args bound), and return the declared result type substituted through.
 private iface_method(recv: Type, method: str, args: List<Node>, scope: Scope, call: Node): Type {
-    mut def = .interfaces.get(recv.name).unwrap()
+    mut def = .traits.get(recv.name).unwrap()
     mut msig_opt = def.get("methods").unwrap().get(method)
     if not msig_opt.is_some() {
-        .fail(call, "no method '" ++ method ++ "' on interface " ++ recv.name)
+        .fail(call, "no method '" ++ method ++ "' on trait " ++ recv.name)
     }
     mut msig = msig_opt.unwrap()
     mut vars = .merge_vars(.name_set(def.get("type_params").unwrap_or([])), msig.get("type_params").unwrap_or([]))

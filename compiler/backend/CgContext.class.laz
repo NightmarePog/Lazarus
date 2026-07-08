@@ -17,7 +17,6 @@ private variant_owner: Map<str, str>
 @auto
 constructor(cls: str, members: Map<str, bool>, instance_methods: Map<str, bool>, instance_order: List<str>, properties: List<Node>, known_classes: Map<str, bool>, externs: Map<str, Map<str, dynamic>>, variant_owner: Map<str, str>)
 private scopes: List<Map<str, bool>> = [[:]]
-private collections: bool = false
 private temp_seq: int = 0
 
 // A fresh, collision-free local name for a generated temporary (e.g. a `match`
@@ -66,14 +65,6 @@ public extern_target(ns: str, member: str): Option<dynamic> {
         return table
     }
     return table.unwrap().get(member)
-}
-
-public mark_collections(): unit {
-    .collections = true
-}
-
-public used_collections(): bool {
-    return .collections
 }
 
 public push_scope(): unit {

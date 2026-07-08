@@ -5,6 +5,13 @@ enum Result<T> {
     Err(str)
 }
 
+private static lua __lz_is_ok(o): bool {
+    return type(o) == 'table' and o.kind == 'Ok'
+}
+private static lua __lz_is_err(o): bool {
+    return type(o) == 'table' and o.kind == 'Err'
+}
+
 static ok<T>(value: T): Result<T> {
     return Ok(value)
 }

@@ -173,7 +173,7 @@ private parse_primary(): Node {
         "EOF" => { .cursor.fail("Unexpected end of input") }
         _ => { .cursor.fail("Unexpected token '" ++ tok.value ++ "'") }
     }
-    return Ast.literal("string", "", 0, 0)
+    return Ast.error_node()
 }
 
 // A list `[a, b]` or map `["k": v]` literal, the opening `[` current. Empty forms

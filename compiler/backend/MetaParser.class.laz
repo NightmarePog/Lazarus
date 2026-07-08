@@ -1,0 +1,230 @@
+// MetaParser — extracts and parses the LAZARUS_META block from a compiled .lua
+// file, reconstructing the class signature that Main.collect_signatures would
+// have produced from source. Used by the linker when importing a prebuilt .lua
+// library in place of a missing .laz source file.
+
+import std.Str
+import frontend.parser.Node
+
+private src: str
+private pos: int
+
+constructor(src: str) {
+    .src = src
+    .pos = 1
+}
+
+// Extract the single JSON line from a --[[LAZARUS_META\n<json>\n]] block.
+static extract_json(lua_source: str): Option<str> {
+    mut marker = "--[[LAZARUS_META"
+    mut mp = Str.find(lua_source, marker)
+    if mp.is_none() {
+        return None
+    }
+    mut json_start = mp.unwrap() + Str.len(marker).unwrap_or(0) + 1
+    mut src_len = Str.len(lua_source).unwrap_or(0)
+    mut json_end = src_len
+    mut i = json_start
+    loop {
+        if i > src_len { break }
+        if Str.sub(lua_source, i, i).unwrap_or("") == "\n" {
+            json_end = i - 1
+            break
+        }
+        i = i + 1
+    }
+    return Some(Str.sub(lua_source, json_start, json_end).unwrap_or(""))
+}
+
+// Parse the LAZARUS_META block and return a collect_signatures-compatible sig,
+// or None if the file has no LAZARUS_META block.
+static parse_meta(lua_source: str): Option<dynamic> {
+    mut json_opt = MetaParser.extract_json(lua_source)
+    if json_opt.is_none() {
+        return None
+    }
+    mut p = MetaParser(json_opt.unwrap())
+    mut meta = p.parse_obj()
+    return Some(MetaParser.build_sig(meta))
+}
+
+// Convert the raw parsed JSON object to the shape Main.collect_signatures emits:
+// { fields, methods, ctor, ctor_names, type_params }
+static build_sig(meta: dynamic): dynamic {
+    mut fields = [:]
+    for key, type_raw in meta.get("fields").unwrap() {
+        if type_raw == 0 {
+            fields[key] = None
+        } else {
+            fields[key] = Some(MetaParser.build_type_node(type_raw))
+        }
+    }
+
+    mut methods = [:]
+    for name, sig_raw in meta.get("methods").unwrap() {
+        methods[name] = MetaParser.build_method_sig(sig_raw)
+    }
+
+    mut ctor: dynamic = 0
+    mut raw_ctor = meta.get("ctor").unwrap()
+    if raw_ctor.len() > 0 {
+        mut ctor_nodes = []
+        for t in raw_ctor {
+            ctor_nodes.push(MetaParser.build_type_node(t))
+        }
+        ctor = ctor_nodes
+    }
+
+    mut cnames = meta.get("cnames").unwrap_or([])
+    mut tvars = meta.get("tvars").unwrap_or([])
+    return ["fields": fields, "methods": methods, "ctor": ctor, "ctor_names": cnames, "type_params": tvars]
+}
+
+// Reconstruct a method signature map using the key names the typechecker expects.
+static build_method_sig(sig_raw: dynamic): dynamic {
+    mut params = []
+    for t in sig_raw.get("params").unwrap_or([]) {
+        params.push(MetaParser.build_type_node(t))
+    }
+    mut pnames = sig_raw.get("pnames").unwrap_or([])
+    mut result: dynamic = 0
+    mut result_raw = sig_raw.get("result").unwrap()
+    if result_raw != 0 {
+        result = MetaParser.build_type_node(result_raw)
+    }
+    mut is_static = sig_raw.get("static").unwrap_or(false)
+    mut tvars = sig_raw.get("tvars").unwrap_or([])
+    return ["params": params, "param_names": pnames, "result": result, "is_static": is_static, "type_params": tvars]
+}
+
+// Reconstruct a TypeName Node from a parsed {"name":..., "args":[...]} object.
+static build_type_node(raw: dynamic): Node {
+    mut name = raw.get("name").unwrap()
+    mut args = []
+    for a in raw.get("args").unwrap_or([]) {
+        args.push(MetaParser.build_type_node(a))
+    }
+    return Node("TypeName", ["name": name, "args": args, "line": 0, "col": 0])
+}
+
+// ---- recursive descent JSON parser ----
+
+private peek(): str {
+    return Str.sub(.src, .pos, .pos).unwrap_or("")
+}
+
+private skip_ws(): unit {
+    loop {
+        mut ch = .peek()
+        if ch == "" { break }
+        if ch == " " or ch == "\n" or ch == "\r" or ch == "\t" {
+            .pos = .pos + 1
+        } else {
+            break
+        }
+    }
+}
+
+public parse_val(): dynamic {
+    .skip_ws()
+    mut ch = .peek()
+    if ch == "{" {
+        return .parse_obj()
+    }
+    if ch == "[" {
+        return .parse_arr()
+    }
+    if ch == "\"" {
+        return .parse_str()
+    }
+    if ch == "t" {
+        .pos = .pos + 4
+        return true
+    }
+    if ch == "f" {
+        .pos = .pos + 5
+        return false
+    }
+    // null or unknown -> sentinel 0 (matches the typecheck convention)
+    .pos = .pos + 4
+    return 0
+}
+
+public parse_obj(): dynamic {
+    .skip_ws()
+    .pos = .pos + 1
+    mut obj = [:]
+    .skip_ws()
+    if .peek() == "}" {
+        .pos = .pos + 1
+        return obj
+    }
+    loop {
+        .skip_ws()
+        mut key = .parse_str()
+        .skip_ws()
+        .pos = .pos + 1
+        mut val = .parse_val()
+        obj[key] = val
+        .skip_ws()
+        if .peek() == "}" {
+            .pos = .pos + 1
+            break
+        }
+        .pos = .pos + 1
+    }
+    return obj
+}
+
+public parse_arr(): dynamic {
+    .skip_ws()
+    .pos = .pos + 1
+    mut items = []
+    .skip_ws()
+    if .peek() == "]" {
+        .pos = .pos + 1
+        return items
+    }
+    loop {
+        mut val = .parse_val()
+        items.push(val)
+        .skip_ws()
+        if .peek() == "]" {
+            .pos = .pos + 1
+            break
+        }
+        .pos = .pos + 1
+    }
+    return items
+}
+
+private parse_str(): str {
+    .pos = .pos + 1
+    mut out = ""
+    loop {
+        mut ch = .peek()
+        if ch == "" { break }
+        if ch == "\"" {
+            .pos = .pos + 1
+            break
+        }
+        if ch == "\\" {
+            .pos = .pos + 1
+            mut esc = .peek()
+            .pos = .pos + 1
+            if esc == "\"" {
+                out = out ++ "\""
+            } else if esc == "\\" {
+                out = out ++ "\\"
+            } else if esc == "n" {
+                out = out ++ "\n"
+            } else {
+                out = out ++ esc
+            }
+        } else {
+            out = out ++ ch
+            .pos = .pos + 1
+        }
+    }
+    return out
+}

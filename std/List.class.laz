@@ -1,0 +1,197 @@
+private kind: str
+private items: dynamic
+
+// Factory — builds a full List instance. Defined as a static lua method so the
+// constructor body never touches a 0-param static List method (which confuses the
+// old seed binary's builtin dispatch that unconditionally prepends the receiver).
+static lua new(): List<dynamic> {
+    local self = {}
+    self.kind = 'list'
+    self.items = {}
+    self.push = List.push
+    self.pop = List.pop
+    self.get = List.get
+    self.has = List.has
+    self.len = List.len
+    self.delete = List.delete
+    return self
+}
+
+// Factory used by codegen for list literals [1,2,3] — creates a full instance
+// with the raw items table already in place, skipping the redundant empty alloc.
+static lua __lz_from(raw): List<dynamic> {
+    local self = List.new()
+    self.items = raw
+    return self
+}
+
+// Bootstrap aliases — old seed binary emits List.__lz_*(...)  for primitives and []
+static lua __lz_list(raw): List<dynamic> {
+    local self = List.new()
+    self.items = raw
+    return self
+}
+static lua __lz_push(c, v): unit {
+    c.items[#c.items + 1] = v
+}
+static lua __lz_pop(c): dynamic {
+    local n = #c.items
+    if n == 0 then return 'None' end
+    local v = c.items[n]
+    c.items[n] = nil
+    return { kind = 'Some', _1 = v }
+}
+static lua __lz_get(c, k): dynamic {
+    local v = c.items[k]
+    if v == nil then return 'None' end
+    return { kind = 'Some', _1 = v }
+}
+static lua __lz_has(c, k): bool {
+    return c.items[k] ~= nil
+}
+static lua __lz_len(c): int {
+    if c.kind == 'list' then return #c.items end
+    local n = 0
+    for _ in pairs(c.items) do n = n + 1 end
+    return n
+}
+static lua __lz_delete(c, k): unit {
+    c.items[k] = nil
+}
+
+// Codegen uses these directly for for-in loops and index expressions.
+private static lua __lz_each(c): dynamic {
+    if c.kind == 'list' then
+        local i = 0
+        return function()
+            i = i + 1
+            if i > #c.items then return nil end
+            return i - 1, c.items[i]
+        end
+    end
+    return pairs(c.items)
+}
+
+private static lua __lz_idx_get(c, i): dynamic {
+    if c.kind == 'list' then return c.items[i + 1] end
+    return c.items[i]
+}
+
+private static lua __lz_idx_set(c, i, v): unit {
+    if c.kind == 'list' then
+        c.items[i + 1] = v
+    else
+        c.items[i] = v
+    end
+}
+
+public lua push(v: T): unit {
+    self.items[#self.items + 1] = v
+}
+
+public lua pop(): Option<T> {
+    local n = #self.items
+    if n == 0 then return 'None' end
+    local v = self.items[n]
+    self.items[n] = nil
+    return { kind = 'Some', _1 = v }
+}
+
+public lua get(k: int): Option<T> {
+    local v = self.items[k]
+    if v == nil then return 'None' end
+    return { kind = 'Some', _1 = v }
+}
+
+public lua has(k: int): bool {
+    return self.items[k] ~= nil
+}
+
+public lua len(): int {
+    return #self.items
+}
+
+public lua delete(k: int): unit {
+    self.items[k] = nil
+}
+
+static map<T, U>(xs: List<T>, f: (T) -> U): List<U> {
+    mut result = []
+    for x in xs { result.push(f(x)) }
+    return result
+}
+
+static filter<T>(xs: List<T>, f: (T) -> bool): List<T> {
+    mut result = []
+    for x in xs { if f(x) { result.push(x) } }
+    return result
+}
+
+static fold<T, A>(xs: List<T>, init: A, f: (A, T) -> A): A {
+    mut acc = init
+    for x in xs { acc = f(acc, x) }
+    return acc
+}
+
+static any<T>(xs: List<T>, f: (T) -> bool): bool {
+    for x in xs { if f(x) { return true } }
+    return false
+}
+
+static all<T>(xs: List<T>, f: (T) -> bool): bool {
+    for x in xs { if not f(x) { return false } }
+    return true
+}
+
+static find<T>(xs: List<T>, f: (T) -> bool): Option<T> {
+    for x in xs { if f(x) { return Option.some(x) } }
+    return Option.none()
+}
+
+static copy<T>(xs: List<T>): List<T> {
+    mut result = []
+    for x in xs { result.push(x) }
+    return result
+}
+
+static is_empty<T>(xs: List<T>): bool {
+    return xs.len() == 0
+}
+
+static contains<T>(xs: List<T>, v: T): bool {
+    for x in xs {
+        if x == v { return true }
+    }
+    return false
+}
+
+static first<T>(xs: List<T>): Option<T> {
+    return xs.get(1)
+}
+
+static last<T>(xs: List<T>): Option<T> {
+    return xs.get(xs.len())
+}
+
+static slice<T>(xs: List<T>, lo: int, hi: int): List<T> {
+    mut result = []
+    for i, x in xs {
+        mut j = i + 1
+        if j >= lo and j <= hi { result.push(x) }
+    }
+    return result
+}
+
+static join(xs: List<str>, sep: str): str {
+    mut result = ""
+    mut head = true
+    for x in xs {
+        if head {
+            result = x
+            head = false
+        } else {
+            result = result ++ sep ++ x
+        }
+    }
+    return result
+}

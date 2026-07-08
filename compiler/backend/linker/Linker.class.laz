@@ -51,7 +51,7 @@ public link(): List<Module> {
 private preload_core(): unit {
     mut list_loaded = false
     for name in ["Option", "Result", "List", "Map"] {
-        mut path = .resolve_rel("std/" ++ name ++ ".laz")
+        mut path = .resolve_rel("std/" ++ name ++ ".class.laz")
         if Sys.file_exists(path) {
             .load(path, "", 0, 0, 1)
             if name == "List" {
@@ -65,7 +65,11 @@ private preload_core(): unit {
 }
 
 public entry_class(): str {
-    return Path.stem(.entry)
+    mut stem = Path.stem(.entry)
+    if Str.is_suffix(stem, ".class") {
+        return Str.sub(stem, 1, Str.len(stem).unwrap_or(0) - 6).unwrap_or(stem) // len(".class")
+    }
+    return stem
 }
 
 // Load `path` and everything it imports, appending each dependency before its
@@ -94,6 +98,8 @@ private load(path: str, origin_source: str, origin_line: int, origin_col: int, o
         class_name = Str.sub(class_name, 1, Str.len(class_name).unwrap_or(0) - 7).unwrap_or(class_name) // len(".object")
     } else if kind == "trait" {
         class_name = Str.sub(class_name, 1, Str.len(class_name).unwrap_or(0) - 6).unwrap_or(class_name) // len(".trait")
+    } else if Str.is_suffix(class_name, ".class") {
+        class_name = Str.sub(class_name, 1, Str.len(class_name).unwrap_or(0) - 6).unwrap_or(class_name) // len(".class")
     }
     mut tokens = Lexer(source).scan()
     mut program = Parser(tokens, source, kind).parse()
@@ -137,15 +143,14 @@ private load_prebuilt(path: str, origin_source: str, origin_line: int, origin_co
 }
 
 // Resolve one import node to a source path: `import a.b.Name` -> `<root>/a/b/Name.laz`.
-// Extensions are tried in order: .laz, .object.laz, .trait.laz, .lua. The first
-// existing path is returned. If none exist, .laz is returned so load() raises the
-// precise error. The .lua path is returned so load_by_ext() can delegate to
-// load_prebuilt() when a prebuilt module is found.
+// Extensions are tried in order: .class.laz, .object.laz, .trait.laz, .lua,
+// then .laz as a legacy fallback. The first existing path is returned. If none
+// exist, .class.laz is returned so load() raises the precise error.
 private resolve(node: Node): str {
     mut base = Text.join(node.child("segments"), "/")
-    mut laz_path = .resolve_rel(base ++ ".laz")
-    if Sys.file_exists(laz_path) {
-        return laz_path
+    mut class_path = .resolve_rel(base ++ ".class.laz")
+    if Sys.file_exists(class_path) {
+        return class_path
     }
     mut object_path = .resolve_rel(base ++ ".object.laz")
     if Sys.file_exists(object_path) {
@@ -159,7 +164,11 @@ private resolve(node: Node): str {
     if Sys.file_exists(lua_path) {
         return lua_path
     }
-    return laz_path
+    mut laz_path = .resolve_rel(base ++ ".laz")
+    if Sys.file_exists(laz_path) {
+        return laz_path
+    }
+    return class_path
 }
 
 // Dispatch to load() or load_prebuilt() based on file extension.
@@ -185,8 +194,6 @@ private resolve_rel(rel: str): str {
 }
 
 // Derive parse kind from the file extension.
-// Files ending in ".object.laz" are static modules; ".trait.laz" are trait-only
-// modules; everything else (plain ".laz" or ".lua") is treated as a class.
 private file_kind(path: str): str {
     if Str.is_suffix(path, ".object.laz") {
         return "object"

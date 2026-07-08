@@ -83,6 +83,7 @@ private static lua check_file(path: str, pkg_path: str): unit {
     local kind = 'class'
     if path:match('%.object%.laz$') then kind = 'object'
     elseif path:match('%.trait%.laz$') then kind = 'trait' end
+    -- .class.laz stays 'class'; plain .laz also falls through to 'class'
     local tokens = Lexer.new(source):scan()
     Parser.new(tokens, source, kind):parse()
     os.exit(0)

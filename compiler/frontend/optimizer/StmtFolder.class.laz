@@ -19,10 +19,14 @@ public fold_block(stmts: List<Node>, constants: Constants): unit {
 }
 
 private fold_statement(stmt: Node, constants: Constants): unit {
-    // ImportDecl / ExternDecl / InterfaceDecl / BreakStmt carry nothing to fold.
+    // ImportDecl / ExternDecl / TraitDecl / ImplementDecl / BreakStmt carry nothing to fold.
     match stmt.kind {
         "VariableDecl" => { .fold_variable(stmt, constants) }
-        "FunctionDecl" => { .fold_block(stmt.child("body"), constants.child(stmt.child("params"))) }
+        "FunctionDecl" => {
+            if stmt.attr("raw_body").is_none() {
+                .fold_block(stmt.child("body"), constants.child(stmt.child("params")))
+            }
+        }
         "ConstructorDecl" => { .fold_block(stmt.child("body"), constants.child(stmt.child("params"))) }
         "ReturnStmt" => { .fold_optional(stmt, "value", constants) }
         "ExpressionStmt" => { stmt.set("expression", .exprs.fold(stmt.child("expression"), constants)) }

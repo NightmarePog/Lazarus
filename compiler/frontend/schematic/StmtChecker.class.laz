@@ -35,7 +35,7 @@ public check_closure_body(stmts: List<Node>, scope: Scope): unit {
 }
 
 private check_statement(stmt: Node, scope: Scope, frame: Frame, is_last: bool): unit {
-    // ImportDecl / ExternDecl / InterfaceDecl are metadata — nothing to check.
+    // ImportDecl / ExternDecl / TraitDecl / ImplementDecl are metadata — nothing to check.
     match stmt.kind {
         "VariableDecl" => { .check_variable(stmt, scope, frame) }
         "FunctionDecl" => { .check_function(stmt, scope, frame) }
@@ -155,8 +155,11 @@ private check_constructor(stmt: Node, scope: Scope, frame: Frame): unit {
 }
 
 // Bind params in a child scope, then walk the body with the receiver flag set for
-// an instance context.
+// an instance context. Lua functions have no AST body to walk — skip them.
 private check_callable_body(stmt: Node, scope: Scope, frame: Frame, is_instance: bool): unit {
+    if stmt.attr("raw_body").is_some() {
+        return
+    }
     mut inner = scope.child()
     .bind_params(stmt, inner)
     mut outer = .exprs.instance_flag()

@@ -15,7 +15,7 @@ set -e
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SEED="$ROOT/bin/lazarusc.lua"
-ENTRY="$ROOT/compiler/Main.laz"
+ENTRY="$ROOT/compiler/Main.class.laz"
 
 if [ ! -f "$SEED" ]; then
     echo "build-compiler: missing seed $SEED" >&2

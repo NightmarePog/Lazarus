@@ -1,0 +1,20 @@
+// Module — one loaded compilation unit from the Linker: its resolved file `path`,
+// `class_name` (the file stem), raw `source` (for error snippets), parsed `ast`
+// (a Program node with imports stripped), `imports` (the visible class names), and
+// `is_trait` (the body is only trait declarations — no class is emitted).
+// `is_prebuilt` marks a .lua library loaded by metadata; `prebuilt_lua` holds its
+// raw Lua source and `meta_sig` holds the parsed class signature.
+
+import frontend.parser.Node
+
+public path: str
+public class_name: str
+public source: str
+public ast: Node
+public imports: List<str>
+public is_trait: bool
+public is_prebuilt: bool
+public prebuilt_lua: str
+public meta_sig: dynamic
+@auto
+constructor(path: str, class_name: str, source: str, ast: Node, imports: List<str>, is_trait: bool, is_prebuilt: bool, prebuilt_lua: str, meta_sig: dynamic)

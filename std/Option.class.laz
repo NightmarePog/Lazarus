@@ -1,5 +1,25 @@
 import std.Sys
 
+private static lua __lz_wrap(v): dynamic {
+    if v == nil then return 'None' end
+    return { kind = 'Some', _1 = v }
+}
+private static lua __lz_unwrap(o): dynamic {
+    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end
+    if type(o) == 'table' and o.kind == 'Err' then error(o._1) end
+    error('unwrap of a None value')
+}
+private static lua __lz_unwrap_or(o, d): dynamic {
+    if type(o) == 'table' and (o.kind == 'Some' or o.kind == 'Ok') then return o._1 end
+    return d
+}
+private static lua __lz_is_some(o): bool {
+    return type(o) == 'table' and o.kind == 'Some'
+}
+private static lua __lz_is_none(o): bool {
+    return o == 'None' or type(o) ~= 'table'
+}
+
 enum Option<T> {
     Some(T),
     None
