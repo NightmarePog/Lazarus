@@ -1,0 +1,78 @@
+// TypeParser — parses type expressions over a shared TokenCursor.
+// Handles named/generic types `Name<...>` and function types `(T,...) -> R`.
+// The cursor is its only dependency; no upstream parser reference is needed.
+
+import frontend.lexer.Token
+import frontend.parser.Ast
+import frontend.parser.Node
+import frontend.parser.TokenCursor
+
+constructor(.cursor: TokenCursor)
+
+// A type expression: `(T,...) -> R` or `Name<...>`.
+public parse(): Node {
+    if .cursor.check("LEFT_BRACKET") {
+        return .parse_fn()
+    }
+    mut name = .cursor.consume("IDENTIFIER", "Expected a type name")
+    mut args = []
+    if .cursor.match("LESS") {
+        loop {
+            args.push(.parse())
+            if not .cursor.match("COMMA") {
+                break
+            }
+        }
+        .cursor.consume("GREATER", "Expected '>' to close type arguments")
+    }
+    return Ast.type_name(name.value, args, name.line, name.column)
+}
+
+// A return type annotation `: T`, defaulting to inferred when absent.
+public parse_return(): Node {
+    if .cursor.match("COLON") {
+        return .parse()
+    }
+    return Ast.type_name("dynamic", [], 0, 0)
+}
+
+// A parameter type annotation `: T` after the param name, defaulting to inferred.
+public parse_param(name_tok: Token): Node {
+    if .cursor.match("COLON") {
+        return .parse()
+    }
+    return Ast.type_name("dynamic", [], name_tok.line, name_tok.column)
+}
+
+// Optional generic parameters `<T, U>` after an identifier.
+public parse_type_params(): List<str> {
+    mut params = []
+    if .cursor.match("LESS") {
+        loop {
+            mut t = .cursor.consume("IDENTIFIER", "Expected a type parameter name")
+            params.push(t.value)
+            if not .cursor.match("COMMA") {
+                break
+            }
+        }
+        .cursor.consume("GREATER", "Expected '>' to close type parameters")
+    }
+    return params
+}
+
+private parse_fn(): Node {
+    mut open = .cursor.consume("LEFT_BRACKET", "Expected '(' to open a function type")
+    mut params = []
+    if not .cursor.check("RIGHT_BRACKET") {
+        loop {
+            params.push(.parse())
+            if not .cursor.match("COMMA") {
+                break
+            }
+        }
+    }
+    .cursor.consume("RIGHT_BRACKET", "Expected ')' in the function type")
+    .cursor.consume("ARROW", "Expected '->' in the function type")
+    mut result = .parse()
+    return Ast.type_fn(params, result, open.line, open.column)
+}

@@ -14,6 +14,7 @@ import frontend.parser.Parser
 import frontend.schematic.Schematic
 import frontend.typecheck.Typecheck
 import frontend.optimizer.Optimizer
+import frontend.Collector
 import Expander
 import backend.Codegen
 import backend.Bundler
@@ -109,7 +110,7 @@ private static lua check_file(path: str, pkg_path: str): unit {
     local variant_fields = Map.__lz_from({})
     local enum_type_params = Map.__lz_from({})
     local gated_externs = Map.__lz_from({})
-    Main.collect_enums(program, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
+    Collector.collect_enums(program, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
     local imports = List.new()
     for _, node in List.__lz_each(program:child('body')) do
         if node.kind == 'ImportDecl' then
@@ -138,8 +139,8 @@ static build_file(path: str, plat: str, pkg_path: str, opt_level: int): unit {
 
     for m in modules {
         if not m.is_prebuilt {
-            Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
-            Main.collect_traits(m.ast, traits, m.class_name)
+            Collector.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
+            Collector.collect_traits(m.ast, traits, m.class_name)
         }
     }
 
@@ -154,7 +155,7 @@ static build_file(path: str, plat: str, pkg_path: str, opt_level: int): unit {
         if m.is_prebuilt {
             classes[m.class_name] = m.meta_sig
         } else if not m.is_trait {
-            Main.collect_signatures(m.ast, m.class_name, classes, plat, gated_externs)
+            Collector.collect_signatures(m.ast, m.class_name, classes, plat, gated_externs)
         }
     }
 
@@ -200,8 +201,8 @@ static build_lib(path: str, plat: str, pkg_path: str, opt_level: int): unit {
 
     for m in modules {
         if not m.is_prebuilt {
-            Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
-            Main.collect_traits(m.ast, traits, m.class_name)
+            Collector.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
+            Collector.collect_traits(m.ast, traits, m.class_name)
         }
     }
 
@@ -216,7 +217,7 @@ static build_lib(path: str, plat: str, pkg_path: str, opt_level: int): unit {
         if m.is_prebuilt {
             classes[m.class_name] = m.meta_sig
         } else if not m.is_trait {
-            Main.collect_signatures(m.ast, m.class_name, classes, plat, gated_externs)
+            Collector.collect_signatures(m.ast, m.class_name, classes, plat, gated_externs)
         }
     }
 
@@ -266,105 +267,4 @@ static build_lib(path: str, plat: str, pkg_path: str, opt_level: int): unit {
     mut file = Sys.open(out_path, "w").unwrap()
     file.write(meta_block ++ class_block)
     file.close()
-}
-
-// Gather every module's enum declarations into a program-wide registry, so a
-// `match` is checked for exhaustiveness against an enum imported from any file:
-// `enums[name]` is the variant list, `variant_owner[variant]` its enum, and
-// `variant_fields[variant]` its payload type nodes (to type pattern bindings).
-static collect_enums(ast: Node, variant_owner: Map<str, str>, enums: Map<str, List<str>>, variant_arity: Map<str, int>, variant_fields: Map<str, List<Node>>, enum_type_params: Map<str, List<str>>): unit {
-    for stmt in ast.child("body") {
-        if stmt.kind == "EnumDecl" {
-            mut name = stmt.child("name")
-            enum_type_params[name] = stmt.attr("type_params").unwrap_or([])
-            mut names = []
-            for v in stmt.child("variants") {
-                mut vn = v.child("name")
-                names.push(vn)
-                variant_owner[vn] = name
-                variant_arity[vn] = v.child("fields").len()
-                variant_fields[vn] = v.child("fields")
-            }
-            enums[name] = names
-        }
-    }
-}
-
-// Gather one module's class signature into the program-wide `classes` registry,
-// so the checker can type construction, calls and member access across files.
-// Each entry carries `fields` (property name -> Option of its type node), `methods`
-// (name -> {params, result, is_static, type_params}), `ctor` (the constructor's
-// param-type nodes, or 0 when the class declares none) and `type_params`.
-static collect_signatures(ast: Node, class_name: str, classes: Map<str, dynamic>, plat: str, gated_externs: Map<str, str>): unit {
-    mut fields = [:]
-    mut methods = [:]
-    mut ctor = 0
-    mut ctor_names = []
-    mut type_params = []
-    for stmt in ast.child("body") {
-        mut k = stmt.kind
-        if k == "VariableDecl" {
-            mut visibility = stmt.attr("visibility").unwrap_or("")
-            mut is_static = stmt.attr("is_static").unwrap_or(false)
-            if visibility != "" and not is_static {
-                fields[stmt.child("name")] = stmt.attr("type")
-            }
-        } else if k == "FunctionDecl" {
-            mut params = stmt.attr("param_types").unwrap_or([])
-            mut param_names = stmt.child("params")
-            mut result = stmt.attr("return_type").unwrap_or(0)
-            mut is_static = stmt.attr("is_static").unwrap_or(false)
-            mut mtype_params = stmt.attr("type_params").unwrap_or([])
-            methods[stmt.child("name")] = ["params": params, "param_names": param_names, "result": result, "is_static": is_static, "type_params": mtype_params]
-        } else if k == "ConstructorDecl" {
-            ctor = stmt.attr("param_types").unwrap_or([])
-            ctor_names = stmt.child("params")
-            type_params = stmt.attr("type_params").unwrap_or([])
-        } else if k == "ExternDecl" {
-            mut params = stmt.attr("param_types").unwrap_or([])
-            mut all_typed = true
-            for pt in params {
-                if pt.attr("inferred").unwrap_or(false) or pt.child("name") == "dynamic" {
-                    all_typed = false
-                }
-            }
-            if all_typed and params.len() > 0 {
-                mut extern_platform = stmt.attr("platform").unwrap_or("")
-                mut ename = stmt.child("name")
-                if extern_platform == "" or extern_platform == plat {
-                    mut extern_result = stmt.attr("return_type").unwrap_or(0)
-                    methods[ename] = ["params": params, "result": extern_result, "is_static": true, "type_params": []]
-                    gated_externs.delete(ename)
-                } else if not methods.has(ename) {
-                    gated_externs[ename] = extern_platform
-                }
-            }
-        }
-    }
-    classes[class_name] = ["fields": fields, "methods": methods, "ctor": ctor, "ctor_names": ctor_names, "type_params": type_params]
-}
-
-// Gather every trait declaration (inline or a `#trait` file, whose decl carries an
-// empty name filled here from the filename) into the program-wide `traits` registry,
-// so the checker can resolve trait annotations and run structural conformance. Each
-// entry holds `methods` (name -> {params, result, type_params}), `properties`
-// (name -> type node) and the trait's `type_params`.
-static collect_traits(ast: Node, traits: Map<str, dynamic>, class_name: str): unit {
-    for stmt in ast.child("body") {
-        if stmt.kind == "TraitDecl" {
-            mut name = stmt.child("name")
-            if name == "" {
-                name = class_name
-            }
-            mut methods = [:]
-            for m in stmt.child("methods") {
-                methods[m.child("name")] = ["params": m.child("param_types"), "result": m.child("return_type"), "type_params": m.child("type_params")]
-            }
-            mut properties = [:]
-            for p in stmt.child("properties") {
-                properties[p.child("name")] = p.child("type")
-            }
-            traits[name] = ["methods": methods, "properties": properties, "type_params": stmt.child("type_params")]
-        }
-    }
 }

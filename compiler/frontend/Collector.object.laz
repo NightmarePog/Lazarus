@@ -1,0 +1,99 @@
+// Collector — program-wide registry builders. Each method walks the AST of one
+// module and accumulates its declarations into the shared maps that the later
+// analysis passes (Schematic, Typecheck) consume.
+
+import frontend.parser.Node
+
+// Gather every enum declaration into a program-wide registry:
+// `enums[name]` = variant list, `variant_owner[variant]` = its enum,
+// `variant_fields[variant]` = payload type nodes, `variant_arity[variant]` = count.
+collect_enums(ast: Node, variant_owner: Map<str, str>, enums: Map<str, List<str>>, variant_arity: Map<str, int>, variant_fields: Map<str, List<Node>>, enum_type_params: Map<str, List<str>>): unit {
+    for stmt in ast.child("body") {
+        if stmt.kind == "EnumDecl" {
+            mut name = stmt.child("name")
+            enum_type_params[name] = stmt.attr("type_params").unwrap_or([])
+            mut names = []
+            for v in stmt.child("variants") {
+                mut vn = v.child("name")
+                names.push(vn)
+                variant_owner[vn] = name
+                variant_arity[vn] = v.child("fields").len()
+                variant_fields[vn] = v.child("fields")
+            }
+            enums[name] = names
+        }
+    }
+}
+
+// Gather one module's class signature into `classes`:
+// `classes[class_name]` = {fields, methods, ctor, ctor_names, type_params}.
+collect_signatures(ast: Node, class_name: str, classes: Map<str, dynamic>, plat: str, gated_externs: Map<str, str>): unit {
+    mut fields = [:]
+    mut methods = [:]
+    mut ctor = 0
+    mut ctor_names = []
+    mut type_params = []
+    for stmt in ast.child("body") {
+        mut k = stmt.kind
+        if k == "VariableDecl" {
+            mut visibility = stmt.attr("visibility").unwrap_or("")
+            mut is_static = stmt.attr("is_static").unwrap_or(false)
+            if visibility != "" and not is_static {
+                fields[stmt.child("name")] = stmt.attr("type")
+            }
+        } else if k == "FunctionDecl" {
+            mut params = stmt.attr("param_types").unwrap_or([])
+            mut param_names = stmt.child("params")
+            mut result = stmt.attr("return_type").unwrap_or(0)
+            mut is_static = stmt.attr("is_static").unwrap_or(false)
+            mut mtype_params = stmt.attr("type_params").unwrap_or([])
+            methods[stmt.child("name")] = ["params": params, "param_names": param_names, "result": result, "is_static": is_static, "type_params": mtype_params]
+        } else if k == "ConstructorDecl" {
+            ctor = stmt.attr("param_types").unwrap_or([])
+            ctor_names = stmt.child("params")
+            type_params = stmt.attr("type_params").unwrap_or([])
+        } else if k == "ExternDecl" {
+            mut params = stmt.attr("param_types").unwrap_or([])
+            mut all_typed = true
+            for pt in params {
+                if pt.attr("inferred").unwrap_or(false) or pt.child("name") == "dynamic" {
+                    all_typed = false
+                }
+            }
+            if all_typed and params.len() > 0 {
+                mut extern_platform = stmt.attr("platform").unwrap_or("")
+                mut ename = stmt.child("name")
+                if extern_platform == "" or extern_platform == plat {
+                    mut extern_result = stmt.attr("return_type").unwrap_or(0)
+                    methods[ename] = ["params": params, "result": extern_result, "is_static": true, "type_params": []]
+                    gated_externs.delete(ename)
+                } else if not methods.has(ename) {
+                    gated_externs[ename] = extern_platform
+                }
+            }
+        }
+    }
+    classes[class_name] = ["fields": fields, "methods": methods, "ctor": ctor, "ctor_names": ctor_names, "type_params": type_params]
+}
+
+// Gather every trait declaration into `traits`:
+// `traits[name]` = {methods, properties, type_params}.
+collect_traits(ast: Node, traits: Map<str, dynamic>, class_name: str): unit {
+    for stmt in ast.child("body") {
+        if stmt.kind == "TraitDecl" {
+            mut name = stmt.child("name")
+            if name == "" {
+                name = class_name
+            }
+            mut methods = [:]
+            for m in stmt.child("methods") {
+                methods[m.child("name")] = ["params": m.child("param_types"), "result": m.child("return_type"), "type_params": m.child("type_params")]
+            }
+            mut properties = [:]
+            for p in stmt.child("properties") {
+                properties[p.child("name")] = p.child("type")
+            }
+            traits[name] = ["methods": methods, "properties": properties, "type_params": stmt.child("type_params")]
+        }
+    }
+}

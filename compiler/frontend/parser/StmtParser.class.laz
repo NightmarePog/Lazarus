@@ -12,6 +12,7 @@ import frontend.parser.Ast
 import frontend.parser.ExprParser
 import frontend.parser.Node
 import frontend.parser.TokenCursor
+import frontend.parser.TypeParser
 import std.Str
 
 private static compounds = [
@@ -21,11 +22,11 @@ private static compounds = [
     "SLASH_ASSIGN": "DIVIDE"
 ]
 
-private cursor: TokenCursor
-private exprs: ExprParser
-private kind: str
-@auto
-constructor(cursor: TokenCursor, exprs: ExprParser, kind: str)
+private types: TypeParser
+
+constructor(.cursor: TokenCursor, .exprs: ExprParser, .kind: str) {
+    .types = TypeParser(.cursor)
+}
 
 public parse_program(): Node {
     if .kind == "object" {
@@ -52,13 +53,23 @@ public parse_program(): Node {
 // A `.`-prefixed constructor param (`constructor(.cursor, .exprs)`) declares the
 // field too: inject a private instance-property for each, so the rest of the
 // pipeline sees an ordinary class. The `.f = f` assignments are added in
-// `parse_constructor`.
+// `parse_constructor`. If a field with the same name is already declared above
+// (e.g. `public x: int`) the injection is skipped — the `.x` just generates the
+// assignment without redeclaring.
 private expand_field_params(body: List<Node>): List<Node> {
+    mut declared = [:]
+    for stmt in body {
+        if stmt.kind == "VariableDecl" {
+            declared[stmt.child("name")] = true
+        }
+    }
     mut props = []
     for stmt in body {
         if stmt.kind == "ConstructorDecl" {
             for fp in stmt.attr("field_params").unwrap_or([]) {
-                props.push(.field_property(fp))
+                if not declared.has(fp.get("name").unwrap()) {
+                    props.push(.field_property(fp))
+                }
             }
         }
     }
@@ -84,7 +95,7 @@ private field_property<A>(fp: A): Node {
 private parse_trait_body(): Node {
     mut type_params = []
     if .cursor.check("LESS") {
-        type_params = .parse_type_params()
+        type_params = .types.parse_type_params()
     }
     mut body = []
     mut methods = []
@@ -160,6 +171,15 @@ private parse_object_member(): Node {
         .cursor.fail("an #object file has no instances; remove the constructor")
         return Ast.error_node()
     }
+    mut macros = .parse_macros()
+    mut node = .parse_object_member_decl(visibility)
+    if macros.len() > 0 {
+        node.set("macro_modifiers", macros)
+    }
+    return node
+}
+
+private parse_object_member_decl(visibility: str): Node {
     if .cursor.match("LUA") {
         return .parse_lua_decl(visibility, true)
     }
@@ -183,7 +203,6 @@ private parse_statement(): Node {
         "PUBLIC" => { .cursor.advance() return .parse_member("public") }
         "MUTABLE" => { .cursor.advance() return .parse_binding("", true, "Expected variable name after 'mut'", false) }
         "STATIC" => { .cursor.advance() return .parse_static() }
-        "AT" => { return .parse_annotation() }
         "PLATFORM" => { return .parse_platform_stmt() }
         "CONSTRUCTOR" => { .cursor.advance() return .parse_constructor(tok) }
         "RETURN" => { .cursor.advance() return .parse_return(tok) }
@@ -192,7 +211,21 @@ private parse_statement(): Node {
         "LOOP" => { .cursor.advance() return .parse_loop(tok) }
         "FOR" => { .cursor.advance() return .parse_for(tok) }
         "BREAK" => { .cursor.advance() return .parse_break(tok) }
-        "IDENTIFIER" => { return .parse_identifier_statement(tok) }
+        "IDENTIFIER" => {
+            if tok.value == "match" and .starts_match() {
+                .cursor.advance()
+                return .parse_match(tok)
+            }
+            if .is_macro_ahead() {
+                mut macros = .parse_macros()
+                mut node = .parse_statement()
+                if macros.len() > 0 {
+                    node.set("macro_modifiers", macros)
+                }
+                return node
+            }
+            return .parse_identifier_statement(tok)
+        }
         _ => {}
     }
     return .parse_expr_statement(tok)
@@ -256,7 +289,7 @@ private parse_import(tok: Token): Node {
 // payload types, separated by a newline or an optional comma.
 private parse_enum(tok: Token): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected an enum name after 'enum'")
-    mut type_params = .parse_type_params()
+    mut type_params = .types.parse_type_params()
     mut open = .cursor.consume("BODY_START", "Expected '{' to open enum body")
     mut variants = []
     loop {
@@ -280,7 +313,7 @@ private parse_enum_variant(): Node {
     if .cursor.match("LEFT_BRACKET") {
         if not .cursor.check("RIGHT_BRACKET") {
             loop {
-                fields.push(.parse_type())
+                fields.push(.types.parse())
                 if not .cursor.match("COMMA") {
                     break
                 }
@@ -296,7 +329,7 @@ private parse_enum_variant(): Node {
 // grammar with the `#trait` file form.
 private parse_trait(tok: Token): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected a trait name after 'trait'")
-    mut type_params = .parse_type_params()
+    mut type_params = .types.parse_type_params()
     mut open = .cursor.consume("BODY_START", "Expected '{' to open trait body")
     mut methods = []
     mut properties = []
@@ -319,16 +352,16 @@ private parse_trait(tok: Token): Node {
 private parse_trait_member(methods: List<Node>, properties: List<Node>): unit {
     mut name = .cursor.consume("IDENTIFIER", "Expected a member name in the trait body")
     if .cursor.check("LESS") or .cursor.check("LEFT_BRACKET") {
-        mut type_params = .parse_type_params()
+        mut type_params = .types.parse_type_params()
         .cursor.consume("LEFT_BRACKET", "Expected '(' in a trait method signature")
         mut param_types = []
         .parse_params(param_types)
         .cursor.consume("RIGHT_BRACKET", "Expected ')' in a trait method signature")
-        mut return_type = .parse_return_type()
+        mut return_type = .types.parse_return()
         methods.push(Ast.trait_method(name.value, param_types, return_type, type_params))
     } else {
         .cursor.consume("COLON", "Expected ':' for a trait property requirement")
-        properties.push(Ast.trait_property(name.value, .parse_type()))
+        properties.push(Ast.trait_property(name.value, .types.parse()))
     }
 }
 
@@ -342,12 +375,12 @@ private parse_implement(tok: Token): Node {
 // The LUA keyword has already been consumed by the caller.
 private parse_lua_decl(visibility: str, is_static: bool): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected function name after 'lua'")
-    mut type_params = .parse_type_params()
+    mut type_params = .types.parse_type_params()
     .cursor.consume("LEFT_BRACKET", "Expected '(' after lua function name")
     mut param_types = []
     mut params = .parse_params(param_types)
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after lua function parameters")
-    mut return_type = .parse_return_type()
+    mut return_type = .types.parse_return()
     mut body_tok = .cursor.consume("LUA_BODY", "Expected '{' to open lua function body")
     return Ast.lua_decl(name.value, params, param_types, return_type, body_tok.value, is_static, visibility, name.line, name.column, type_params)
 }
@@ -358,14 +391,25 @@ private parse_extern(tok: Token): Node {
     mut param_types = []
     mut params = .parse_params(param_types)
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after extern parameters")
-    mut return_type = .parse_return_type()
+    mut return_type = .types.parse_return()
     .cursor.consume("ASSIGN", "Expected '=' after extern parameters")
     mut target = .cursor.consume("STRING", "Expected a quoted Lua target after '='")
     return Ast.extern_decl(name.value, params, param_types, return_type, target.value, tok.line, tok.column)
 }
 
 // A `private`/`public` declaration: a property, a class member, or a method.
+// Any leading macro modifiers (e.g. `Debug Serialize`) are consumed first and
+// stored on the resulting node as `macro_modifiers`.
 private parse_member(visibility: str): Node {
+    mut macros = .parse_macros()
+    mut node = .parse_member_decl(visibility)
+    if macros.len() > 0 {
+        node.set("macro_modifiers", macros)
+    }
+    return node
+}
+
+private parse_member_decl(visibility: str): Node {
     if .cursor.match("STATIC") {
         if .cursor.match("LUA") {
             return .parse_lua_decl(visibility, true)
@@ -387,6 +431,15 @@ private parse_member(visibility: str): Node {
 }
 
 private parse_static(): Node {
+    mut macros = .parse_macros()
+    mut node = .parse_static_decl()
+    if macros.len() > 0 {
+        node.set("macro_modifiers", macros)
+    }
+    return node
+}
+
+private parse_static_decl(): Node {
     if .cursor.match("LUA") {
         return .parse_lua_decl("", true)
     }
@@ -404,7 +457,7 @@ private parse_binding(visibility: str, mutable: bool, name_err: str, is_static: 
     mut is_property = visibility != "" and not is_static
     mut attrs = ["name": name.value, "visibility": visibility, "mutable": mutable, "is_static": is_static, "line": name.line, "col": name.column]
     if .cursor.match("COLON") {
-        attrs["type"] = .parse_type()
+        attrs["type"] = .types.parse()
     }
     if .cursor.match("ASSIGN") {
         attrs["value"] = .exprs.expression()
@@ -438,12 +491,12 @@ private local_binding(name: Token, value: Node): Node {
 
 private parse_method(visibility: str, is_static: bool): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected method name")
-    mut type_params = .parse_type_params()
+    mut type_params = .types.parse_type_params()
     .cursor.consume("LEFT_BRACKET", "Expected '(' after method name")
     mut param_types = []
     mut params = .parse_params(param_types)
     .cursor.consume("RIGHT_BRACKET", "Expected ')' after parameters")
-    mut return_type = .parse_return_type()
+    mut return_type = .types.parse_return()
     mut body = []
     if .cursor.match("ASSIGN") {
         mut expr = .exprs.expression()
@@ -454,33 +507,50 @@ private parse_method(visibility: str, is_static: bool): Node {
     return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column, param_types, return_type, type_params)
 }
 
-// A `.`-prefixed param declares + assigns its field (parameter properties); the
-// body braces are optional, so `constructor(.a, .b)` is a complete constructor.
-// `@auto constructor(a, b)` makes every parameter a parameter-property; otherwise
-// only `.`-prefixed params are. Each field param declares + assigns its field.
-private parse_annotation(): Node {
-    .cursor.consume("AT", "Expected '@'")
-    mut name = .cursor.consume("IDENTIFIER", "Expected an annotation name after '@'")
-    if name.value == "auto" {
-        mut next_node = .parse_statement()
-        next_node.set("annotation_class", "Auto")
-        next_node.set("annotation_args", ["auto"])
-        return next_node
-    }
-    mut args = []
-    if .cursor.match("LEFT_BRACKET") {
+// True when the current IDENTIFIER is a macro modifier rather than the declaration
+// name. Peeks past the identifier (and its optional `(bare-ids)` args); if what
+// follows is another IDENTIFIER or a declaration-starting keyword, it's a macro.
+private is_macro_ahead(): bool {
+    mut i = .cursor.position() + 1
+    if .cursor.token_at(i).kind == "LEFT_BRACKET" {
+        i = i + 1
         loop {
-            if .cursor.check("RIGHT_BRACKET") { break }
-            mut arg = .cursor.consume("IDENTIFIER", "Expected annotation argument (identifier)")
-            args.push(arg.value)
-            if not .cursor.match("COMMA") { break }
+            mut k = .cursor.token_at(i).kind
+            if k == "EOF" { return false }
+            if k == "RIGHT_BRACKET" {
+                i = i + 1
+                break
+            }
+            if k == "IDENTIFIER" or k == "COMMA" { i = i + 1 }
+            else { return false }
         }
-        .cursor.consume("RIGHT_BRACKET", "Expected ')' after annotation arguments")
     }
-    mut next_node = .parse_statement()
-    next_node.set("annotation_class", name.value)
-    next_node.set("annotation_args", args)
-    return next_node
+    mut after = .cursor.token_at(i).kind
+    return after == "IDENTIFIER" or after == "CONSTRUCTOR" or after == "PLATFORM" or after == "STATIC" or after == "LUA"
+}
+
+// Consume zero or more `Name` or `Name(arg, …)` macro modifier tokens and return
+// them as a list. Each entry has `name` (the handler class) and `args` (method
+// names to invoke; empty means call the default `apply` method).
+private parse_macros(): List<Map<str, dynamic>> {
+    mut macros = []
+    loop {
+        if not .cursor.check("IDENTIFIER") { break }
+        if not .is_macro_ahead() { break }
+        mut name_tok = .cursor.advance()
+        mut args = []
+        if .cursor.match("LEFT_BRACKET") {
+            loop {
+                if .cursor.check("RIGHT_BRACKET") { break }
+                mut arg = .cursor.consume("IDENTIFIER", "Expected macro argument")
+                args.push(arg.value)
+                if not .cursor.match("COMMA") { break }
+            }
+            .cursor.consume("RIGHT_BRACKET", "Expected ')' after macro arguments")
+        }
+        macros.push(["name": name_tok.value, "args": args, "line": name_tok.line, "col": name_tok.column])
+    }
+    return macros
 }
 
 private parse_platform_stmt(): Node {
@@ -494,7 +564,7 @@ private parse_platform_stmt(): Node {
 }
 
 private parse_constructor(tok: Token): Node {
-    mut type_params = .parse_type_params()
+    mut type_params = .types.parse_type_params()
     .cursor.consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
     mut param_types = []
     mut field_params = []
@@ -523,7 +593,7 @@ private parse_ctor_params(out_types: List<Node>, field_params: List<Map<str, dyn
             mut is_field = .cursor.match("DOT")
             mut p = .cursor.consume("IDENTIFIER", "Expected parameter name")
             params.push(p.value)
-            mut ty = .param_type(p)
+            mut ty = .types.parse_param(p)
             out_types.push(ty)
             if is_field {
                 field_params.push(["name": p.value, "type": ty, "line": p.line, "col": p.column])
@@ -552,89 +622,22 @@ private parse_params(out_types: List<Node>): List<str> {
         loop {
             mut p = .cursor.consume("IDENTIFIER", "Expected parameter name")
             params.push(p.value)
-            out_types.push(.param_type(p))
+            out_types.push(.types.parse_param(p))
             if not .cursor.match("COMMA") {
                 break
             }
         }
     }
     return params
-}
-
-private param_type(name_tok: Token): Node {
-    if .cursor.match("COLON") {
-        return .parse_type()
-    }
-    return Ast.type_name("dynamic", [], name_tok.line, name_tok.column)
-}
-
-private parse_return_type(): Node {
-    if .cursor.match("COLON") {
-        return .parse_type()
-    }
-    return Ast.type_name("dynamic", [], 0, 0)
 }
 
 private parse_typed_local(tok: Token): Node {
     mut name = .cursor.consume("IDENTIFIER", "Expected variable name")
     .cursor.consume("COLON", "Expected ':' before the type")
-    mut ty = .parse_type()
+    mut ty = .types.parse()
     .cursor.consume("ASSIGN", "Expected '=' after the type annotation")
     mut value = .exprs.expression()
     return Ast.node("VariableDecl", ["name": name.value, "value": value, "type": ty, "visibility": "", "mutable": false, "is_static": false, "line": name.line, "col": name.column])
-}
-
-// Optional generic parameters `<T, U>` after an enum (or class) name.
-private parse_type_params(): List<str> {
-    mut params = []
-    if .cursor.match("LESS") {
-        loop {
-            mut t = .cursor.consume("IDENTIFIER", "Expected a type parameter name")
-            params.push(t.value)
-            if not .cursor.match("COMMA") {
-                break
-            }
-        }
-        .cursor.consume("GREATER", "Expected '>' to close type parameters")
-    }
-    return params
-}
-
-// A type expression: a named/generic type `Name<...>`, or a function type
-// `(T, ...) -> R`.
-private parse_type(): Node {
-    if .cursor.check("LEFT_BRACKET") {
-        return .parse_type_fn()
-    }
-    mut name = .cursor.consume("IDENTIFIER", "Expected a type name")
-    mut args = []
-    if .cursor.match("LESS") {
-        loop {
-            args.push(.parse_type())
-            if not .cursor.match("COMMA") {
-                break
-            }
-        }
-        .cursor.consume("GREATER", "Expected '>' to close type arguments")
-    }
-    return Ast.type_name(name.value, args, name.line, name.column)
-}
-
-private parse_type_fn(): Node {
-    mut open = .cursor.consume("LEFT_BRACKET", "Expected '(' to open a function type")
-    mut params = []
-    if not .cursor.check("RIGHT_BRACKET") {
-        loop {
-            params.push(.parse_type())
-            if not .cursor.match("COMMA") {
-                break
-            }
-        }
-    }
-    .cursor.consume("RIGHT_BRACKET", "Expected ')' in the function type")
-    .cursor.consume("ARROW", "Expected '->' in the function type")
-    mut result = .parse_type()
-    return Ast.type_fn(params, result, open.line, open.column)
 }
 
 // Lookahead: does the current `IDENTIFIER` begin a declaration `name(params) {`?
