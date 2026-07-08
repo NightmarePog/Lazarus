@@ -21,6 +21,7 @@ import backend.MetaEmitter
 import backend.linker.Linker
 import Error
 
+
 constructor() {
     mut path = Sys.argv(1)
     if path.is_some() {
@@ -68,9 +69,9 @@ constructor() {
     }
 }
 
-// Syntax-check mode: lex + parse the file, output errors as JSON lines on stdout
-// (one object per error), then exit 0. Used by the LSP to get diagnostics.
-// Schematic and Typecheck are not run; imports are not followed.
+// Syntax-check + semantic-analysis mode: lex, parse, and run Schematic on the
+// file without following imports. Outputs errors as JSON lines on stdout (one
+// object per error), then exits 0. Used by the LSP to get diagnostics.
 private static lua check_file(path: str, pkg_path: str): unit {
     _G._lz_check_mode = true
     local f = io.open(path, 'r')
@@ -83,9 +84,30 @@ private static lua check_file(path: str, pkg_path: str): unit {
     local kind = 'class'
     if path:match('%.object%.laz$') then kind = 'object'
     elseif path:match('%.trait%.laz$') then kind = 'trait' end
-    -- .class.laz stays 'class'; plain .laz also falls through to 'class'
     local tokens = Lexer.new(source):scan()
-    Parser.new(tokens, source, kind):parse()
+    local program = Parser.new(tokens, source, kind):parse()
+    -- Semantic pass: collect enums/imports from this file, then run Schematic.
+    -- Cross-module registries (variant_owner etc.) are empty — we do not follow
+    -- imports, so imported enums are unknown, but per-file errors are still caught.
+    local stem = path:match('([^/%.]+)%.class%.laz$')
+              or path:match('([^/%.]+)%.object%.laz$')
+              or path:match('([^/%.]+)%.trait%.laz$')
+              or path:match('([^/%.]+)%.laz$')
+              or 'Check'
+    local variant_owner = Map.__lz_from({})
+    local enums        = Map.__lz_from({})
+    local variant_arity = Map.__lz_from({})
+    local variant_fields = Map.__lz_from({})
+    local enum_type_params = Map.__lz_from({})
+    local gated_externs = Map.__lz_from({})
+    Main.collect_enums(program, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
+    local imports = List.new()
+    for _, node in List.__lz_each(program:child('body')) do
+        if node.kind == 'ImportDecl' then
+            List.push(imports, node:child('name'))
+        end
+    end
+    Schematic.analyze(program, source, stem, imports, variant_owner, enums, variant_arity, gated_externs)
     os.exit(0)
 }
 
