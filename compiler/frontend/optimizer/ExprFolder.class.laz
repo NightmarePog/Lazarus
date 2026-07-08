@@ -164,10 +164,11 @@ private apply(op: str, a: dynamic, b: dynamic): dynamic {
 }
 
 // O2 inlining candidates: zero-arg method calls that become Lua comparisons.
-// Values: "nil_neq" | "nil_eq" | "kind_ok" | "kind_err"
+// Option.None is the string "None" at runtime, so is_some/is_none compare against "None".
+// Values: "none_neq" | "none_eq" | "kind_ok" | "kind_err"
 private static inline_builtins = [
-    "is_some": "nil_neq",
-    "is_none": "nil_eq",
+    "is_some": "none_neq",
+    "is_none": "none_eq",
     "is_ok": "kind_ok",
     "is_err": "kind_err"
 ]
@@ -206,11 +207,11 @@ private try_inline_builtin(node: Node): Option<Node> {
     mut ln = node.line()
     mut col = node.col()
     mut kind = repl.unwrap()
-    if kind == "nil_neq" {
-        return Option.some(Ast.binary("NEQ", obj, Ast.literal("nil", false, ln, col), ln, col))
+    if kind == "none_neq" {
+        return Option.some(Ast.binary("NEQ", obj, Ast.literal("string", "None", ln, col), ln, col))
     }
-    if kind == "nil_eq" {
-        return Option.some(Ast.binary("EQ", obj, Ast.literal("nil", false, ln, col), ln, col))
+    if kind == "none_eq" {
+        return Option.some(Ast.binary("EQ", obj, Ast.literal("string", "None", ln, col), ln, col))
     }
     mut kind_member = Ast.member(obj, "kind", ln, col)
     if kind == "kind_ok" {

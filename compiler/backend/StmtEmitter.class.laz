@@ -13,10 +13,7 @@ import backend.ExprEmitter
 import backend.Text
 import frontend.parser.Node
 
-private ctx: CgContext
-private exprs: ExprEmitter
-@auto
-constructor(ctx: CgContext, exprs: ExprEmitter)
+constructor(.ctx: CgContext, .exprs: ExprEmitter)
 
 public emit_member(node: Node): str {
     mut hint = .source_hint(node)
@@ -146,7 +143,7 @@ private emit_match(node: Node): str {
             mut bname = arm.child("pattern").child("name")
             if not .ctx.is_local(bname) {
                 .ctx.declare_local(bname)
-                parts.push("local " ++ bname ++ " = " ++ temp)
+                parts.push("local " ++ .ctx.mangle_local(bname) ++ " = " ++ temp)
             }
         }
     }
@@ -248,7 +245,7 @@ private push_payload_body(parts: List<str>, temp: str, arm: Node): unit {
     for name in arm.child("bindings") {
         if name != "_" {
             .ctx.declare_local(name)
-            lines.push("local " ++ name ++ " = " ++ temp ++ "._" ++ Num.to_text(i).unwrap_or("0"))
+            lines.push("local " ++ .ctx.mangle_local(name) ++ " = " ++ temp ++ "._" ++ Num.to_text(i).unwrap_or("0"))
         }
         i = i + 1
     }

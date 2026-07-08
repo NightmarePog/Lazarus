@@ -59,11 +59,9 @@ private static constructors = [
     "Result.err": "Result.err"
 ]
 
-private ctx: CgContext
 private stmt_emitter: dynamic
 private pending: List<str> = []
-@auto
-constructor(ctx: CgContext)
+constructor(.ctx: CgContext)
 
 public inject_stmts(s: dynamic): unit {
     .stmt_emitter = s
@@ -165,10 +163,11 @@ private comp_body(node: Node, add: str): str {
 // a single variable takes the value (index discarded); two take key and value.
 private each_header(vars: List<str>, iter: str): str {
     mut each = .lz_fn("List", "__lz_each")
+    mut mangled = [.ctx.mangle_local(v) for v in vars]
     if vars.len() == 1 {
-        return "for _, " ++ vars.get(1).unwrap() ++ " in " ++ each ++ "(" ++ iter ++ ") do"
+        return "for _, " ++ mangled.get(1).unwrap() ++ " in " ++ each ++ "(" ++ iter ++ ") do"
     }
-    return "for " ++ Text.join(vars, ", ") ++ " in " ++ each ++ "(" ++ iter ++ ") do"
+    return "for " ++ Text.join(mangled, ", ") ++ " in " ++ each ++ "(" ++ iter ++ ") do"
 }
 
 // A bare name: a nullary enum variant lowers to its owner-qualified form, anything

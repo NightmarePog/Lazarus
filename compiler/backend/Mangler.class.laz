@@ -1,6 +1,7 @@
 // Mangler — maps original names to short identifiers for -Os minification.
 // Class names and their member names share one counter; local variables use another.
 // Enum variant string tags are NOT mangled (they are runtime values checked with ==).
+// Reserved Lua keywords are skipped so generated names are always valid identifiers.
 
 import std.Num
 import std.Str
@@ -11,6 +12,15 @@ private class_counter: int = 0
 private local_counter: int = 0
 constructor()
 
+private static lua_reserved: Map<str, str> = [
+    "and": "1", "break": "1", "do": "1", "else": "1",
+    "elseif": "1", "end": "1", "false": "1", "for": "1",
+    "function": "1", "goto": "1", "if": "1", "in": "1",
+    "local": "1", "nil": "1", "not": "1", "or": "1",
+    "repeat": "1", "return": "1", "then": "1", "true": "1",
+    "until": "1", "while": "1"
+]
+
 // Integer division helper (Lazarus / is float division in Lua <5.4 targets).
 private static idiv(a: int, b: int): int {
     mut af = Num.to_float(a).unwrap_or(0.0)
@@ -18,9 +28,9 @@ private static idiv(a: int, b: int): int {
     return Num.floor(af / bf).unwrap_or(0)
 }
 
-// Generate the Nth short identifier (0-based): a, b, ..., z, aa, ab, ..., az, ba, ...
-private static short(n: int): str {
-    mut letters = "abcdefghijklmnopqrstuvwxyz"
+// Generate the Nth short identifier (0-based) from the given letter set.
+// lowercase: a, b, ..., z, aa, ab, ...  uppercase: A, B, ..., Z, AA, AB, ...
+private static short_from(n: int, letters: str): str {
     mut base = 26
     mut out = ""
     mut idx = n
@@ -35,6 +45,18 @@ private static short(n: int): str {
     return out
 }
 
+// Locals use lowercase (a..z, aa..); Lua reserved keywords are all lowercase so
+// the reserved-word check is only needed here, never for uppercase class names.
+private static short(n: int): str {
+    return Mangler.short_from(n, "abcdefghijklmnopqrstuvwxyz")
+}
+
+// Class table names use uppercase (A..Z, AA..) — disjoint from locals and from
+// all Lua reserved keywords, so no reserved-word check needed.
+private static upper_short(n: int): str {
+    return Mangler.short_from(n, "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+}
+
 // Register an identity mapping so `name` always resolves to itself (used for prebuilt stdlib classes).
 public pin(name: str): unit {
     .class_map[name] = name
@@ -46,7 +68,7 @@ public mangle_class(name: str): str {
     if hit.is_some() {
         return hit.unwrap()
     }
-    mut s = Mangler.short(.class_counter)
+    mut s = Mangler.upper_short(.class_counter)
     .class_counter = .class_counter + 1
     .class_map[name] = s
     return s
@@ -60,6 +82,13 @@ public mangle_local(name: str): str {
     }
     mut s = Mangler.short(.local_counter)
     .local_counter = .local_counter + 1
+    loop {
+        if not Mangler.lua_reserved.has(s) {
+            break
+        }
+        s = Mangler.short(.local_counter)
+        .local_counter = .local_counter + 1
+    }
     .local_map[name] = s
     return s
 }
