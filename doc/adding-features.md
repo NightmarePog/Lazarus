@@ -1,195 +1,173 @@
 # Lazarus – Adding a Language Feature
 
 This is the standard recipe for implementing a new feature. Lazarus is a
-five-stage pipeline (see [`pipeline.md`](pipeline.md)); a feature is added by
+six-stage pipeline (see [`pipeline.md`](pipeline.md)); a feature is added by
 walking it **front to back**, touching only the stages the feature needs. Each
 stage has a single, well-defined registration point so new code is *added*, not
-threaded through existing functions.
+threaded through existing `if/elseif` chains.
 
 ```
-Lexer ──▶ Parser ──▶ Schematic ──▶ Optimizer ──▶ Codegen
- token     AST node    rule          (optional)    Lua text
+Lexer → Parser → Schematic → Typecheck → Optimizer → Codegen
+token    node     rule         type rule   (optional)  Lua text
 ```
 
 ## The golden rules
 
 1. **One concept, one file.** A new token, AST node, parse handler, check, or
-   emitter lives in its own module. You register it in a `HANDLERS`/`TOKENS`
-   table; you do not edit a giant `if/elseif` chain.
-2. **Front to back.** Implement and test each stage before starting the next.
-   A token the parser can't see is untestable; an AST node nothing emits is dead.
+   emitter lives in its own module. Register it in a `HANDLERS`/`TOKENS` table;
+   never add to a giant `if/elseif` chain.
+2. **Front to back.** Implement and test each stage before the next. A token
+   the parser can't see is untestable; an AST node nothing emits is dead.
 3. **Fail loud, fail early.** The earliest stage that *can* reject bad input
-   *should*. Lexer rejects bad characters, parser rejects bad syntax, schematic
-   rejects bad meaning. Never let an invalid program reach codegen.
-4. **Positions everywhere.** Every token and every AST node carries `line`/`col`
-   (or `column`). Thread them through so errors can point at the source.
-5. **Test the stage you just wrote** before moving on (see [Testing](#testing)).
+   *should*. Lexer rejects bad characters, parser rejects bad syntax, Schematic
+   rejects bad semantics, Typecheck rejects type mismatches.
+4. **Positions everywhere.** Every token and AST node carries `line`/`col`.
+   Thread them through so errors can point at the source.
+5. **Verify with `make selfhost`** after each stage. A broken stage surfaces
+   immediately; a fixpoint failure means the new code changes its own
+   compilation.
 
 ---
 
-## Decide which stages your feature touches
+## Which stages does your feature touch?
 
-| Feature kind | Lexer | Parser | Schematic | Optimizer | Codegen |
-|---|:---:|:---:|:---:|:---:|:---:|
-| New operator (e.g. `/`) | ● | ● | – | ○ | ● |
-| New statement keyword (e.g. `while`) | ● | ● | ● | ○ | ● |
-| New literal (e.g. floats) | ● | ● | – | ○ | ● |
-| New semantic rule only | – | – | ● | – | – |
-| New optimization only | – | – | – | ● | – |
+| Feature kind | Lexer | Parser | Schematic | Typecheck | Optimizer | Codegen |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| New operator | ● | ● | – | – | ○ | ● |
+| New statement keyword | ● | ● | ● | ○ | ○ | ● |
+| New literal type | ● | ● | – | ○ | ○ | ● |
+| New semantic rule only | – | – | ● | – | – | – |
+| New type rule | – | – | – | ● | – | – |
+| New optimization pass | – | – | – | – | ● | – |
 
-● required ○ optional/recommended – not needed
-
----
-
-## Stage 1 — Lexer  (`src/frontend/lexer/`)
-
-Add the surface syntax so the scanner can produce a token for it.
-
-1. **Add the `TokenType`** to the `---@alias TokenType` union in
-   `keywords.lua`. This is the source of truth every other stage's annotations
-   refer to.
-2. **Map the source text → type** in the `TOKENS_DATA` table in `keywords.lua`
-   (keywords like `["while"] = "WHILE"`, operators like `["/"] = "DIVIDE"`).
-3. If the token may appear **inside an expression** (an operator or value), add
-   it to `VALID_TYPES` in `keywords.lua`. Keyword-only tokens are deliberately
-   left out so they can never fall through to expression-statement parsing.
-4. For anything the byte-scanner doesn't already handle (multi-char operators,
-   new literal shapes), extend the scanner in `lexer/init.lua`. Single
-   characters and `[a-zA-Z_]` words are already covered.
-5. Emit a lexer error (`UNEXPECTED_CHAR`, `INVALID_NUMBER`, …) for malformed
-   input rather than producing a garbage token.
-
-**Test:** add cases to `spec/lexer_spec.lua` asserting the token stream.
+● required ○ optional – not needed
 
 ---
 
-## Stage 2 — Parser  (`src/frontend/parser/`)
+## Stage 1 — Lexer (`compiler/frontend/lexer/`)
 
-Turn tokens into a typed AST node.
+1. **Add the keyword or token kind** to the map in `Keywords.object.laz`
+   (e.g. `"while": "WHILE"`). This is the source of truth for every stage.
+2. For operators not already handled by the byte scanner, extend `Lexer.class.laz`.
+   Single characters and `[a-zA-Z_]` words are already covered.
+3. If the token can appear inside an expression, make sure the parser's
+   precedence table (in `ExprParser`) knows about it.
+4. Emit an error with a clear message for malformed input rather than
+   producing a garbage token.
 
-### a. Define the AST node — `parser/nodes/<name>.lua`
+---
 
-Copy the shape of an existing node (`nodes/return.lua` is the minimal example):
+## Stage 2 — Parser (`compiler/frontend/parser/`)
 
-- A `---@class XStmt: Stmt` (or `: Expr`) block listing every field, including
-  `line`/`col`.
-- `X.new(...)` returns a `setmetatable({ type = "XStmt", … }, X)`. The `type`
-  string is the dispatch key for every later stage — keep it unique.
-- A `__tostring` for readable test failures and `ast` dumps.
+### a. Define the AST node in `Ast.object.laz`
 
-### b. Write the handler
+Add one named constructor that builds a `Node` with the right `kind` tag and
+attribute map. Every node must carry `line`/`col`. Use an existing factory
+method as a template (`Ast.while_stmt` is the minimal example).
 
-**Statement keyword** → `parser/statements/<keyword>.lua`:
+### b. Write the parse handler in `StmtParser.class.laz` or `ExprParser.class.laz`
 
-```lua
-local StatementParser = require("frontend.parser.statements.statement_parser")
-return StatementParser.new("WHILE", function(parser)
-    -- the keyword token is already consumed; parser:_previous() is it
-end)
+Statement keywords — add a branch to the `match tok.kind` block in
+`parse_statement()` that advances past the keyword and calls a `private
+parse_<name>()` method.
+
+Operators — add the token to the `precedences` map in `ExprParser.class.laz`.
+The precedence-climbing loop picks it up automatically; you only need an
+`Ast` node and a codegen rule if the operator produces a new node kind.
+
+Type syntax — extend `TypeParser.class.laz`.
+
+Use `TokenCursor` helpers (`cursor.consume`, `cursor.match`, `cursor.check`,
+`cursor.fail`) for token handling. Never advance the cursor directly except
+through these methods.
+
+### c. Register
+
+If the new node needs special Schematic or Codegen handling, both are
+dispatched through `match node.kind` tables — add the case there.
+
+---
+
+## Stage 3 — Schematic (`compiler/frontend/schematic/`)
+
+Only needed if the node has semantic rules (scope, duplicates, position checks,
+new declaration forms).
+
+- **Statement node** → add a case to `StmtChecker.check_statement`.
+- **Expression node** → add a case to `ExprChecker.check_expr`.
+- Use `Scope` helpers for name binding and `Frame` for control-flow context.
+  Don't reimplement scoping.
+- If the rule records a verdict that codegen needs (e.g. `reassign`), set it on
+  the node here with `node.set("reassign", true)`.
+- Reject violations with `.fail(node, message, span)`.
+
+---
+
+## Stage 4 — Typecheck (`compiler/frontend/typecheck/`)
+
+Only needed for new type rules (new generic forms, new built-in types, call
+signature changes). Most feature additions don't require Typecheck changes.
+
+Typecheck receives the program-wide class signatures and enum registries built
+by `Collector` and checks each expression bottom-up, inferring and verifying
+`Type` values.
+
+---
+
+## Stage 5 — Optimizer (`compiler/frontend/optimizer/`)
+
+Only needed for compile-time rewrites. Add a case to `ExprFolder` or
+`StmtFolder`. Optimizations must be meaning-preserving. Skip mutable bindings
+and reassignment targets.
+
+Inlining (O2) and constant folding are applied bottom-up; propagation
+(constants table) is top-down. Don't add to the optimizer unless the rewrite
+is semantically safe in all cases.
+
+---
+
+## Stage 6 — Codegen (`compiler/backend/`)
+
+Serialize the node to Lua text. No transformation — the AST is final.
+
+- Statement node → add a case to `StmtEmitter.emit_member` / `emit_stmt`.
+- Expression node → add a case to `ExprEmitter.emit_expr`.
+
+Match on `node.kind`, read attributes with `node.attr(...)` / `node.child(...)`,
+and return the Lua string. Use `Text.indent` for nested bodies. The default
+`else` branch errors loudly, so a forgotten case surfaces in selfhost.
+
+---
+
+## Verification
+
+After each stage addition, run:
+
+```sh
+make selfhost     # recompile the compiler with itself; verifies the fixpoint
 ```
 
-Then register it in the `HANDLERS` list in `parser/statements/init.lua`. The
-dispatcher builds the keyword→handler registry automatically — no other edit.
-
-**Operator** → add it to the precedence table in
-`parser/expressions/operators.lua` (and a node + emit rule). The
-precedence-climbing parser in `expressions/binary.lua` picks it up.
-
-**Expression form** (new primary, postfix, etc.) → extend the matching module
-under `parser/expressions/` (`primary.lua`, `call.lua`).
-
-Use `parser:_match`, `_check`, `_consume`, `_advance` for token handling, and
-throw `SYNTAX_ERROR` / `UNEXPECTED_TOKEN` / `UNEXPECTED_EOF` via `Error.throw`
-with the offending token's position.
-
-**Test:** `spec/parser_spec.lua` — assert the AST structure (`tostring` or field
-checks).
+A broken parse/semantic/codegen rule will surface immediately because the
+compiler compiles itself. If selfhost produces a fixpoint failure (stage2 ≠
+stage3), the new code changed how its own output is lowered — usually a codegen
+rule that affects a construct the compiler uses.
 
 ---
 
-## Stage 3 — Schematic  (`src/frontend/schematic/`)
+## Worked example — adding a new `unless` keyword
 
-Validate meaning. Only needed if the node has rules (scope, duplicates,
-position, type). Pure syntactic sugar can skip this stage.
+1. **Lexer:** add `"unless": "UNLESS"` to `Keywords.object.laz`.
+2. **Parser:** in `StmtParser.parse_statement`, add:
+   ```
+   "UNLESS" => { .cursor.advance() return .parse_unless(tok) }
+   ```
+   Then `parse_unless` consumes the condition and body, returns
+   `Ast.if_stmt([{condition: Ast.unary("NOT", cond, …), body}], [], …)` — an
+   `IfStmt` with a negated condition (reuse the existing node; no new AST node
+   needed).
+3. **Schematic:** no new rule — `IfStmt` is already checked.
+4. **Optimizer:** no change — `IfStmt` folding already handles negation.
+5. **Codegen:** no change — `IfStmt` emits correctly.
+6. **Selfhost:** `make selfhost` — fixpoint must hold.
 
-1. Create a check module — `schematic/statements/<name>.lua` or
-   `schematic/expressions/<name>.lua` — implementing the
-   `StatementCheck` / `ExpressionCheck` interface (`type` = your node's `type`
-   string, plus a `check` function).
-2. Register it in the relevant `HANDLERS` list
-   (`schematic/statements/init.lua` or `schematic/expressions/init.lua`).
-3. Use the `SemContext` helpers from `schematic/init.lua` for scope, name
-   binding, duplicate detection, and recursing into child blocks. Don't
-   reimplement scoping.
-4. Reject violations with `SEMANTIC_ERROR` at the node's position. If the rule
-   records a verdict codegen needs (like `reassign`), set it on the node here.
-
-**Test:** `spec/schematic_spec.lua` / `spec/error_spec.lua` — assert both that
-valid programs pass and that invalid ones throw the right error.
-
----
-
-## Stage 4 — Optimizer  (`src/frontend/optimizer/`)  *(optional)*
-
-Only if your feature enables a compile-time rewrite (folding, propagation,
-algebraic simplification). Optimizations must be **meaning-preserving** and are
-applied bottom-up in `optimizer/expr.lua` (`fold_expr`); statement-level walking
-lives in `optimizer/init.lua`. Skip mutable bindings and reassignments. If you
-don't add anything, existing nodes pass through untouched — that's fine.
-
-**Test:** `spec/optimizer_spec.lua`.
-
----
-
-## Stage 5 — Codegen  (`src/backend/lua50/`)
-
-Serialise the node to Lua text. No transformation happens here — the AST is
-already final.
-
-- Statement node → add a branch in `emit_stmt` (`backend/lua50/stmt.lua`).
-- Expression node → add a branch in `emit_expr` (`backend/lua50/expr.lua`).
-
-Match on `node.type`, `---@cast` it, and return the Lua string. Reuse `indent`
-for nested bodies and parenthesise sub-expressions where Lua precedence
-requires it (see how `BinaryExpr` is handled). The final `error(... unknown
-node type ...)` guard means a forgotten branch fails loudly in tests.
-
-**Test:** `spec/codegen_spec.lua` — assert the exact emitted Lua. End-to-end
-behaviour goes in `spec/integration_spec.lua`.
-
----
-
-## Testing
-
-Specs live in `spec/` and run with `make test` (busted). One spec file per
-stage, mirroring the pipeline. The convention (see `spec/codegen_spec.lua`) is a
-small `build`/`compile` helper that runs the pipeline up to the stage under
-test, then `assert.equal` on the result.
-
-A complete feature should land with, at minimum:
-
-- the token in `lexer_spec`,
-- the AST shape in `parser_spec`,
-- any rule (pass **and** fail) in `schematic_spec` / `error_spec`,
-- the emitted Lua in `codegen_spec`,
-- one real program in `integration_spec`.
-
-Run `make test`, `make lint` (selene), and `make format` (stylua) before
-considering the feature done.
-
----
-
-## Worked example — adding the `/` (divide) operator
-
-1. **Lexer:** add `"DIVIDE"` to the `TokenType` alias, `["/"] = "DIVIDE"` to
-   `TOKENS_DATA`, and `DIVIDE = true` to `VALID_TYPES` (all in `keywords.lua`).
-   → `lexer_spec`.
-2. **Parser:** add `DIVIDE` to `expressions/operators.lua` at multiplicative
-   precedence. Reuses the existing `BinaryExpr` node. → `parser_spec`.
-3. **Schematic:** nothing — division has no new semantic rule.
-4. **Optimizer:** add `x / 1 → x` to the simplification table and constant
-   folding for two numeric literals in `optimizer/expr.lua`. → `optimizer_spec`.
-5. **Codegen:** the `BinaryExpr` branch in `expr.lua` already emits
-   `left op right`; just make sure `op` maps to `/`. → `codegen_spec`.
-
-Each stage is one small, registered addition — that is the standard to aim for.
+Each stage is one small, registered addition.
