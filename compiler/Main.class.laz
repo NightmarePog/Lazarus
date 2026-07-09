@@ -318,11 +318,13 @@ static collect_signatures(ast: Node, class_name: str, classes: Map<str, dynamic>
             }
             if all_typed and params.len() > 0 {
                 mut extern_platform = stmt.attr("platform").unwrap_or("")
+                mut ename = stmt.child("name")
                 if extern_platform == "" or extern_platform == platform {
                     mut extern_result = stmt.attr("return_type").unwrap_or(0)
-                    methods[stmt.child("name")] = ["params": params, "result": extern_result, "is_static": true, "type_params": []]
-                } else {
-                    gated_externs[stmt.child("name")] = extern_platform
+                    methods[ename] = ["params": params, "result": extern_result, "is_static": true, "type_params": []]
+                    gated_externs.delete(ename)
+                } else if not methods.has(ename) {
+                    gated_externs[ename] = extern_platform
                 }
             }
         }
