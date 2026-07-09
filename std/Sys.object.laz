@@ -2,43 +2,43 @@
 // forward their args and wrap their result at the Option boundary (a Lua nil
 // becomes `Option.none()`). `panic` binds to Lua's `error`, which never returns.
 
-private static lua __lz_argv(i): str {
+private lua __lz_argv(i): str {
     if arg == nil then return nil end
     return arg[i]
 }
-private static lua __lz_readfile(path): str {
+private lua __lz_readfile(path): str {
     local f = io.open(path, 'r')
     if f == nil then return nil end
     local data = f:read('*a')
     f:close()
     return data
 }
-private static lua __lz_exec(cmd): int {
+private lua __lz_exec(cmd): int {
     local ok = os.execute(cmd)
     if ok == true or ok == 0 then return 0 end
     return 1
 }
-private static lua __lz_popen(cmd): str {
+private lua __lz_popen(cmd): str {
     local h = io.popen(cmd .. ' 2>&1')
     if h == nil then return nil end
     local s = h:read('*a')
     h:close()
     return s
 }
-private static lua __lz_write_file(path, content): bool {
+private lua __lz_write_file(path, content): bool {
     local f = io.open(path, 'w')
     if f == nil then return false end
     local ok = f:write(content)
     f:close()
     return ok ~= nil
 }
-private static lua __lz_exists(path): bool {
+private lua __lz_exists(path): bool {
     local f = io.open(path, 'r')
     if f then f:close(); return true end
     local ok = os.rename(path, path)
     return ok == true
 }
-private static lua __lz_mkdir(path): bool {
+private lua __lz_mkdir(path): bool {
     local ok = os.execute('mkdir -p ' .. path)
     return ok == true or ok == 0
 }
