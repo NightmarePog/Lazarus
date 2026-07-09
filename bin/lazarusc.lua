@@ -3574,1179 +3574,1205 @@ end
 -- StmtParser:132
 function StmtParser.parse_object_member(self)
     -- StmtParser:133
-    if self.cursor:check("EXTERN") then
+    if self.cursor:check("AT") then
         -- StmtParser:134
-        local etok = self.cursor:current()
+        self.cursor:consume("AT", "Expected '@'")
         -- StmtParser:135
-        self.cursor:advance()
+        local ann = self.cursor:consume("IDENTIFIER", "Expected an annotation name after '@'")
         -- StmtParser:136
+        if ann.value == "platform" then
+            -- StmtParser:137
+            self.cursor:consume("LEFT_BRACKET", "Expected '(' after '@platform'")
+            -- StmtParser:138
+            local plat_tok = self.cursor:consume("IDENTIFIER", "Expected platform name after '@platform('")
+            -- StmtParser:139
+            self.cursor:consume("RIGHT_BRACKET", "Expected ')' after platform name")
+            -- StmtParser:140
+            local next_node = StmtParser.parse_object_member(self)
+            -- StmtParser:141
+            next_node:set("platform", plat_tok.value)
+            -- StmtParser:142
+            return next_node
+        end
+        -- StmtParser:144
+        self.cursor:fail(("Unknown annotation '@" .. ann.value) .. "' in an #object file")
+        -- StmtParser:145
+        return Ast.error_node()
+    end
+    -- StmtParser:147
+    if self.cursor:check("EXTERN") then
+        -- StmtParser:148
+        local etok = self.cursor:current()
+        -- StmtParser:149
+        self.cursor:advance()
+        -- StmtParser:150
         return StmtParser.parse_extern(self, etok)
     end
-    -- StmtParser:138
+    -- StmtParser:152
     local visibility = ""
-    -- StmtParser:139
+    -- StmtParser:153
     if self.cursor:match("PRIVATE") then
-        -- StmtParser:140
+        -- StmtParser:154
         visibility = "private"
     elseif self.cursor:match("PUBLIC") then
-        -- StmtParser:142
+        -- StmtParser:156
         visibility = "public"
     end
-    -- StmtParser:144
+    -- StmtParser:158
     if self.cursor:check("STATIC") then
-        -- StmtParser:145
+        -- StmtParser:159
         self.cursor:advance()
-        -- StmtParser:146
+        -- StmtParser:160
         self.cursor:fail("'static' is implied in an #object file; remove it")
-        -- StmtParser:147
+        -- StmtParser:161
         return Ast.error_node()
     end
-    -- StmtParser:149
+    -- StmtParser:163
     if self.cursor:check("CONSTRUCTOR") then
-        -- StmtParser:150
+        -- StmtParser:164
         self.cursor:advance()
-        -- StmtParser:151
+        -- StmtParser:165
         self.cursor:fail("an #object file has no instances; remove the constructor")
-        -- StmtParser:152
+        -- StmtParser:166
         return Ast.error_node()
     end
-    -- StmtParser:154
+    -- StmtParser:168
     if self.cursor:match("LUA") then
-        -- StmtParser:155
+        -- StmtParser:169
         return StmtParser.parse_lua_decl(self, visibility, true)
     end
-    -- StmtParser:157
+    -- StmtParser:171
     if self.cursor:check("IDENTIFIER") and StmtParser.looks_like_decl(self) then
-        -- StmtParser:158
+        -- StmtParser:172
         return StmtParser.parse_method(self, visibility, true)
     end
-    -- StmtParser:160
+    -- StmtParser:174
     local mutable = self.cursor:match("MUTABLE")
-    -- StmtParser:161
+    -- StmtParser:175
     return StmtParser.parse_binding(self, visibility, mutable, "Expected a member name in the #object file", true)
 end
--- StmtParser:164
+-- StmtParser:178
 function StmtParser.parse_statement(self)
-    -- StmtParser:165
+    -- StmtParser:179
     local tok = self.cursor:current()
-    -- StmtParser:166
+    -- StmtParser:180
     local __lz_m4 = tok.kind
     if __lz_m4 == "IMPORT" then
-        -- StmtParser:167
+        -- StmtParser:181
         self.cursor:advance()
-        -- StmtParser:167
+        -- StmtParser:181
         return StmtParser.parse_import(self, tok)
     elseif __lz_m4 == "EXTERN" then
-        -- StmtParser:168
+        -- StmtParser:182
         self.cursor:advance()
-        -- StmtParser:168
+        -- StmtParser:182
         return StmtParser.parse_extern(self, tok)
     elseif __lz_m4 == "LUA" then
-        -- StmtParser:169
+        -- StmtParser:183
         self.cursor:advance()
-        -- StmtParser:169
+        -- StmtParser:183
         return StmtParser.parse_lua_decl(self, "", false)
     elseif __lz_m4 == "ENUM" then
-        -- StmtParser:170
+        -- StmtParser:184
         self.cursor:advance()
-        -- StmtParser:170
+        -- StmtParser:184
         return StmtParser.parse_enum(self, tok)
     elseif __lz_m4 == "TRAIT" then
-        -- StmtParser:171
+        -- StmtParser:185
         self.cursor:advance()
-        -- StmtParser:171
+        -- StmtParser:185
         return StmtParser.parse_trait(self, tok)
     elseif __lz_m4 == "IMPLEMENT" then
-        -- StmtParser:172
+        -- StmtParser:186
         self.cursor:advance()
-        -- StmtParser:172
+        -- StmtParser:186
         return StmtParser.parse_implement(self, tok)
     elseif __lz_m4 == "PRIVATE" then
-        -- StmtParser:173
+        -- StmtParser:187
         self.cursor:advance()
-        -- StmtParser:173
+        -- StmtParser:187
         return StmtParser.parse_member(self, "private")
     elseif __lz_m4 == "PUBLIC" then
-        -- StmtParser:174
+        -- StmtParser:188
         self.cursor:advance()
-        -- StmtParser:174
+        -- StmtParser:188
         return StmtParser.parse_member(self, "public")
     elseif __lz_m4 == "MUTABLE" then
-        -- StmtParser:175
+        -- StmtParser:189
         self.cursor:advance()
-        -- StmtParser:175
+        -- StmtParser:189
         return StmtParser.parse_binding(self, "", true, "Expected variable name after 'mut'", false)
     elseif __lz_m4 == "STATIC" then
-        -- StmtParser:176
+        -- StmtParser:190
         self.cursor:advance()
-        -- StmtParser:176
+        -- StmtParser:190
         return StmtParser.parse_static(self)
     elseif __lz_m4 == "AT" then
-        -- StmtParser:177
+        -- StmtParser:191
         return StmtParser.parse_annotation(self)
     elseif __lz_m4 == "CONSTRUCTOR" then
-        -- StmtParser:178
+        -- StmtParser:192
         self.cursor:advance()
-        -- StmtParser:178
+        -- StmtParser:192
         return StmtParser.parse_constructor(self, tok)
     elseif __lz_m4 == "RETURN" then
-        -- StmtParser:179
+        -- StmtParser:193
         self.cursor:advance()
-        -- StmtParser:179
+        -- StmtParser:193
         return StmtParser.parse_return(self, tok)
     elseif __lz_m4 == "IF" then
-        -- StmtParser:180
+        -- StmtParser:194
         self.cursor:advance()
-        -- StmtParser:180
+        -- StmtParser:194
         return StmtParser.parse_if(self, tok)
     elseif __lz_m4 == "WHILE" then
-        -- StmtParser:181
+        -- StmtParser:195
         self.cursor:advance()
-        -- StmtParser:181
+        -- StmtParser:195
         return StmtParser.parse_while(self, tok)
     elseif __lz_m4 == "LOOP" then
-        -- StmtParser:182
+        -- StmtParser:196
         self.cursor:advance()
-        -- StmtParser:182
+        -- StmtParser:196
         return StmtParser.parse_loop(self, tok)
     elseif __lz_m4 == "FOR" then
-        -- StmtParser:183
+        -- StmtParser:197
         self.cursor:advance()
-        -- StmtParser:183
+        -- StmtParser:197
         return StmtParser.parse_for(self, tok)
     elseif __lz_m4 == "BREAK" then
-        -- StmtParser:184
+        -- StmtParser:198
         self.cursor:advance()
-        -- StmtParser:184
+        -- StmtParser:198
         return StmtParser.parse_break(self, tok)
     elseif __lz_m4 == "IDENTIFIER" then
-        -- StmtParser:185
+        -- StmtParser:199
         return StmtParser.parse_identifier_statement(self, tok)
     else
     end
-    -- StmtParser:188
+    -- StmtParser:202
     return StmtParser.parse_expr_statement(self, tok)
 end
--- StmtParser:194
+-- StmtParser:208
 function StmtParser.parse_identifier_statement(self, tok)
-    -- StmtParser:195
+    -- StmtParser:209
     if (tok.value == "match") and StmtParser.starts_match(self) then
-        -- StmtParser:196
+        -- StmtParser:210
         self.cursor:advance()
-        -- StmtParser:197
+        -- StmtParser:211
         return StmtParser.parse_match(self, tok)
     end
-    -- StmtParser:199
+    -- StmtParser:213
     if self.cursor:peek_next().kind == "COLON" then
-        -- StmtParser:200
+        -- StmtParser:214
         return StmtParser.parse_typed_local(self, tok)
     end
-    -- StmtParser:202
+    -- StmtParser:216
     if StmtParser.looks_like_decl(self) then
-        -- StmtParser:203
+        -- StmtParser:217
         return StmtParser.parse_method(self, "", false)
     end
-    -- StmtParser:205
+    -- StmtParser:219
     local nk = self.cursor:peek_next().kind
-    -- StmtParser:206
+    -- StmtParser:220
     if (nk == "ASSIGN") or Option.is_some(StmtParser.compound(self, nk)) then
-        -- StmtParser:207
+        -- StmtParser:221
         return StmtParser.parse_assignment(self, "Expected variable name")
     end
-    -- StmtParser:209
+    -- StmtParser:223
     return StmtParser.parse_expr_statement(self, tok)
 end
--- StmtParser:213
+-- StmtParser:227
 function StmtParser.parse_block(self, context)
-    -- StmtParser:214
+    -- StmtParser:228
     local open = self.cursor:consume("BODY_START", "Expected '{' to open " .. context)
-    -- StmtParser:215
+    -- StmtParser:229
     local body = List.__lz_from({})
-    -- StmtParser:216
+    -- StmtParser:230
     while true do
-        -- StmtParser:217
+        -- StmtParser:231
         if self.cursor:at_end() then
-            -- StmtParser:218
+            -- StmtParser:232
             self.cursor:fail_at("Expected '}' to close " .. context, open.line, open.column, 1)
-            -- StmtParser:219
+            -- StmtParser:233
             break
         end
-        -- StmtParser:221
-        if self.cursor:check("BODY_END") then
-            -- StmtParser:222
-            break
-        end
-        -- StmtParser:224
-        body:push(StmtParser.parse_statement(self))
-    end
-    -- StmtParser:226
-    self.cursor:consume("BODY_END", "Expected '}' to close " .. context)
-    -- StmtParser:227
-    return body
-end
--- StmtParser:230
-function StmtParser.parse_import(self, tok)
-    -- StmtParser:231
-    local first = self.cursor:consume("IDENTIFIER", "Expected a name after 'import'")
-    -- StmtParser:232
-    local segments = List.__lz_from({first.value})
-    -- StmtParser:233
-    local last = first.value
-    -- StmtParser:234
-    while true do
         -- StmtParser:235
-        if not self.cursor:match("DOT") then
+        if self.cursor:check("BODY_END") then
             -- StmtParser:236
             break
         end
         -- StmtParser:238
+        body:push(StmtParser.parse_statement(self))
+    end
+    -- StmtParser:240
+    self.cursor:consume("BODY_END", "Expected '}' to close " .. context)
+    -- StmtParser:241
+    return body
+end
+-- StmtParser:244
+function StmtParser.parse_import(self, tok)
+    -- StmtParser:245
+    local first = self.cursor:consume("IDENTIFIER", "Expected a name after 'import'")
+    -- StmtParser:246
+    local segments = List.__lz_from({first.value})
+    -- StmtParser:247
+    local last = first.value
+    -- StmtParser:248
+    while true do
+        -- StmtParser:249
+        if not self.cursor:match("DOT") then
+            -- StmtParser:250
+            break
+        end
+        -- StmtParser:252
         local seg = self.cursor:consume("IDENTIFIER", "Expected a name after '.' in an import path")
-        -- StmtParser:239
+        -- StmtParser:253
         segments:push(seg.value)
-        -- StmtParser:240
+        -- StmtParser:254
         last = seg.value
     end
-    -- StmtParser:242
+    -- StmtParser:256
     return Ast.import_decl(segments, last, tok.line, tok.column)
 end
--- StmtParser:247
+-- StmtParser:261
 function StmtParser.parse_enum(self, tok)
-    -- StmtParser:248
+    -- StmtParser:262
     local name = self.cursor:consume("IDENTIFIER", "Expected an enum name after 'enum'")
-    -- StmtParser:249
+    -- StmtParser:263
     local type_params = StmtParser.parse_type_params(self)
-    -- StmtParser:250
+    -- StmtParser:264
     local open = self.cursor:consume("BODY_START", "Expected '{' to open enum body")
-    -- StmtParser:251
+    -- StmtParser:265
     local variants = List.__lz_from({})
-    -- StmtParser:252
+    -- StmtParser:266
     while true do
-        -- StmtParser:253
+        -- StmtParser:267
         if self.cursor:at_end() then
-            -- StmtParser:254
+            -- StmtParser:268
             self.cursor:fail_at("Expected '}' to close enum body", open.line, open.column, 1)
-            -- StmtParser:255
+            -- StmtParser:269
             break
         end
-        -- StmtParser:257
+        -- StmtParser:271
         if self.cursor:check("BODY_END") then
-            -- StmtParser:258
+            -- StmtParser:272
             break
         end
-        -- StmtParser:260
+        -- StmtParser:274
         variants:push(StmtParser.parse_enum_variant(self))
-        -- StmtParser:261
+        -- StmtParser:275
         self.cursor:match("COMMA")
     end
-    -- StmtParser:263
+    -- StmtParser:277
     self.cursor:consume("BODY_END", "Expected '}' to close enum body")
-    -- StmtParser:264
+    -- StmtParser:278
     return Ast.enum_decl(name.value, variants, tok.line, tok.column, type_params)
 end
--- StmtParser:267
+-- StmtParser:281
 function StmtParser.parse_enum_variant(self)
-    -- StmtParser:268
+    -- StmtParser:282
     local v = self.cursor:consume("IDENTIFIER", "Expected a variant name in the enum body")
-    -- StmtParser:269
+    -- StmtParser:283
     local fields = List.__lz_from({})
-    -- StmtParser:270
+    -- StmtParser:284
     if self.cursor:match("LEFT_BRACKET") then
-        -- StmtParser:271
+        -- StmtParser:285
         if not self.cursor:check("RIGHT_BRACKET") then
-            -- StmtParser:272
+            -- StmtParser:286
             while true do
-                -- StmtParser:273
+                -- StmtParser:287
                 fields:push(StmtParser.parse_type(self))
-                -- StmtParser:274
+                -- StmtParser:288
                 if not self.cursor:match("COMMA") then
-                    -- StmtParser:275
+                    -- StmtParser:289
                     break
                 end
             end
         end
-        -- StmtParser:279
+        -- StmtParser:293
         self.cursor:consume("RIGHT_BRACKET", "Expected ')' after the variant payload types")
     end
-    -- StmtParser:281
+    -- StmtParser:295
     return Ast.enum_variant(v.value, fields, v.line, v.column)
 end
--- StmtParser:287
+-- StmtParser:301
 function StmtParser.parse_trait(self, tok)
-    -- StmtParser:288
+    -- StmtParser:302
     local name = self.cursor:consume("IDENTIFIER", "Expected a trait name after 'trait'")
-    -- StmtParser:289
+    -- StmtParser:303
     local type_params = StmtParser.parse_type_params(self)
-    -- StmtParser:290
+    -- StmtParser:304
     local open = self.cursor:consume("BODY_START", "Expected '{' to open trait body")
-    -- StmtParser:291
+    -- StmtParser:305
     local methods = List.__lz_from({})
-    -- StmtParser:292
+    -- StmtParser:306
     local properties = List.__lz_from({})
-    -- StmtParser:293
+    -- StmtParser:307
     while true do
-        -- StmtParser:294
+        -- StmtParser:308
         if self.cursor:at_end() then
-            -- StmtParser:295
+            -- StmtParser:309
             self.cursor:fail_at("Expected '}' to close trait body", open.line, open.column, 1)
-            -- StmtParser:296
+            -- StmtParser:310
             break
         end
-        -- StmtParser:298
+        -- StmtParser:312
         if self.cursor:check("BODY_END") then
-            -- StmtParser:299
+            -- StmtParser:313
             break
         end
-        -- StmtParser:301
+        -- StmtParser:315
         StmtParser.parse_trait_member(self, methods, properties)
     end
-    -- StmtParser:303
+    -- StmtParser:317
     self.cursor:consume("BODY_END", "Expected '}' to close trait body")
-    -- StmtParser:304
+    -- StmtParser:318
     return Ast.trait_decl(name.value, methods, properties, type_params, tok.line, tok.column)
 end
--- StmtParser:309
+-- StmtParser:323
 function StmtParser.parse_trait_member(self, methods, properties)
-    -- StmtParser:310
+    -- StmtParser:324
     local name = self.cursor:consume("IDENTIFIER", "Expected a member name in the trait body")
-    -- StmtParser:311
+    -- StmtParser:325
     if self.cursor:check("LESS") or self.cursor:check("LEFT_BRACKET") then
-        -- StmtParser:312
+        -- StmtParser:326
         local type_params = StmtParser.parse_type_params(self)
-        -- StmtParser:313
+        -- StmtParser:327
         self.cursor:consume("LEFT_BRACKET", "Expected '(' in a trait method signature")
-        -- StmtParser:314
+        -- StmtParser:328
         local param_types = List.__lz_from({})
-        -- StmtParser:315
+        -- StmtParser:329
         StmtParser.parse_params(self, param_types)
-        -- StmtParser:316
+        -- StmtParser:330
         self.cursor:consume("RIGHT_BRACKET", "Expected ')' in a trait method signature")
-        -- StmtParser:317
+        -- StmtParser:331
         local return_type = StmtParser.parse_return_type(self)
-        -- StmtParser:318
+        -- StmtParser:332
         methods:push(Ast.trait_method(name.value, param_types, return_type, type_params))
     else
-        -- StmtParser:320
+        -- StmtParser:334
         self.cursor:consume("COLON", "Expected ':' for a trait property requirement")
-        -- StmtParser:321
+        -- StmtParser:335
         properties:push(Ast.trait_property(name.value, StmtParser.parse_type(self)))
     end
 end
--- StmtParser:326
+-- StmtParser:340
 function StmtParser.parse_implement(self, tok)
-    -- StmtParser:327
+    -- StmtParser:341
     local name = self.cursor:consume("IDENTIFIER", "Expected a trait name after 'implement'")
-    -- StmtParser:328
+    -- StmtParser:342
     return Ast.implement_decl(name.value, tok.line, tok.column)
 end
--- StmtParser:333
+-- StmtParser:347
 function StmtParser.parse_lua_decl(self, visibility, is_static)
-    -- StmtParser:334
+    -- StmtParser:348
     local name = self.cursor:consume("IDENTIFIER", "Expected function name after 'lua'")
-    -- StmtParser:335
+    -- StmtParser:349
     local type_params = StmtParser.parse_type_params(self)
-    -- StmtParser:336
+    -- StmtParser:350
     self.cursor:consume("LEFT_BRACKET", "Expected '(' after lua function name")
-    -- StmtParser:337
+    -- StmtParser:351
     local param_types = List.__lz_from({})
-    -- StmtParser:338
+    -- StmtParser:352
     local params = StmtParser.parse_params(self, param_types)
-    -- StmtParser:339
+    -- StmtParser:353
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after lua function parameters")
-    -- StmtParser:340
+    -- StmtParser:354
     local return_type = StmtParser.parse_return_type(self)
-    -- StmtParser:341
+    -- StmtParser:355
     local body_tok = self.cursor:consume("LUA_BODY", "Expected '{' to open lua function body")
-    -- StmtParser:342
+    -- StmtParser:356
     return Ast.lua_decl(name.value, params, param_types, return_type, body_tok.value, is_static, visibility, name.line, name.column, type_params)
 end
--- StmtParser:345
+-- StmtParser:359
 function StmtParser.parse_extern(self, tok)
-    -- StmtParser:346
+    -- StmtParser:360
     local name = self.cursor:consume("IDENTIFIER", "Expected a name after 'extern'")
-    -- StmtParser:347
+    -- StmtParser:361
     self.cursor:consume("LEFT_BRACKET", "Expected '(' after extern name")
-    -- StmtParser:348
+    -- StmtParser:362
     local param_types = List.__lz_from({})
-    -- StmtParser:349
+    -- StmtParser:363
     local params = StmtParser.parse_params(self, param_types)
-    -- StmtParser:350
+    -- StmtParser:364
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after extern parameters")
-    -- StmtParser:351
+    -- StmtParser:365
     local return_type = StmtParser.parse_return_type(self)
-    -- StmtParser:352
+    -- StmtParser:366
     self.cursor:consume("ASSIGN", "Expected '=' after extern parameters")
-    -- StmtParser:353
+    -- StmtParser:367
     local target = self.cursor:consume("STRING", "Expected a quoted Lua target after '='")
-    -- StmtParser:354
+    -- StmtParser:368
     return Ast.extern_decl(name.value, params, param_types, return_type, target.value, tok.line, tok.column)
 end
--- StmtParser:358
+-- StmtParser:372
 function StmtParser.parse_member(self, visibility)
-    -- StmtParser:359
+    -- StmtParser:373
     if self.cursor:match("STATIC") then
-        -- StmtParser:360
+        -- StmtParser:374
         if self.cursor:match("LUA") then
-            -- StmtParser:361
+            -- StmtParser:375
             return StmtParser.parse_lua_decl(self, visibility, true)
         end
-        -- StmtParser:363
+        -- StmtParser:377
         if self.cursor:check("IDENTIFIER") and StmtParser.looks_like_decl(self) then
-            -- StmtParser:364
+            -- StmtParser:378
             return StmtParser.parse_method(self, visibility, true)
         end
-        -- StmtParser:366
+        -- StmtParser:380
         local static_mut = self.cursor:match("MUTABLE")
-        -- StmtParser:367
+        -- StmtParser:381
         return StmtParser.parse_binding(self, visibility, static_mut, "Expected member name", true)
     end
-    -- StmtParser:369
+    -- StmtParser:383
     if self.cursor:match("LUA") then
-        -- StmtParser:370
+        -- StmtParser:384
         return StmtParser.parse_lua_decl(self, visibility, false)
     end
-    -- StmtParser:372
+    -- StmtParser:386
     if self.cursor:check("IDENTIFIER") and StmtParser.looks_like_decl(self) then
-        -- StmtParser:373
+        -- StmtParser:387
         return StmtParser.parse_method(self, visibility, false)
     end
-    -- StmtParser:375
+    -- StmtParser:389
     local mutable = self.cursor:match("MUTABLE")
-    -- StmtParser:376
+    -- StmtParser:390
     return StmtParser.parse_binding(self, visibility, mutable, "Expected property name", false)
 end
--- StmtParser:379
+-- StmtParser:393
 function StmtParser.parse_static(self)
-    -- StmtParser:380
+    -- StmtParser:394
     if self.cursor:match("LUA") then
-        -- StmtParser:381
+        -- StmtParser:395
         return StmtParser.parse_lua_decl(self, "", true)
     end
-    -- StmtParser:383
+    -- StmtParser:397
     if self.cursor:check("IDENTIFIER") and StmtParser.looks_like_decl(self) then
-        -- StmtParser:384
+        -- StmtParser:398
         return StmtParser.parse_method(self, "", true)
     end
-    -- StmtParser:386
+    -- StmtParser:400
     local static_mut = self.cursor:match("MUTABLE")
-    -- StmtParser:387
+    -- StmtParser:401
     return StmtParser.parse_binding(self, "", static_mut, "Expected member name after 'static'", true)
 end
--- StmtParser:392
+-- StmtParser:406
 function StmtParser.parse_binding(self, visibility, mutable, name_err, is_static)
-    -- StmtParser:393
+    -- StmtParser:407
     local name = self.cursor:consume("IDENTIFIER", name_err)
-    -- StmtParser:394
+    -- StmtParser:408
     local is_property = (visibility ~= "") and (not is_static)
-    -- StmtParser:395
+    -- StmtParser:409
     local attrs = Map.__lz_from({["name"] = name.value, ["visibility"] = visibility, ["mutable"] = mutable, ["is_static"] = is_static, ["line"] = name.line, ["col"] = name.column})
-    -- StmtParser:396
+    -- StmtParser:410
     if self.cursor:match("COLON") then
-        -- StmtParser:397
+        -- StmtParser:411
         List.__lz_idx_set(attrs, "type", StmtParser.parse_type(self))
     end
-    -- StmtParser:399
+    -- StmtParser:413
     if self.cursor:match("ASSIGN") then
-        -- StmtParser:400
+        -- StmtParser:414
         List.__lz_idx_set(attrs, "value", self.exprs:expression())
     elseif (not mutable) and (not is_property) then
-        -- StmtParser:402
+        -- StmtParser:416
         self.cursor:fail(("Immutable binding '" .. name.value) .. "' must be initialised: expected '='")
     end
-    -- StmtParser:404
+    -- StmtParser:418
     return Ast.node("VariableDecl", attrs)
 end
--- StmtParser:409
+-- StmtParser:423
 function StmtParser.parse_assignment(self, name_err)
-    -- StmtParser:410
+    -- StmtParser:424
     local name = self.cursor:consume("IDENTIFIER", name_err)
-    -- StmtParser:411
+    -- StmtParser:425
     if self.cursor:match("ASSIGN") then
-        -- StmtParser:412
+        -- StmtParser:426
         return StmtParser.local_binding(self, name, self.exprs:expression())
     end
-    -- StmtParser:414
+    -- StmtParser:428
     local binop = StmtParser.compound(self, self.cursor:current_kind())
-    -- StmtParser:415
+    -- StmtParser:429
     if Option.is_some(binop) then
-        -- StmtParser:416
+        -- StmtParser:430
         self.cursor:advance()
-        -- StmtParser:417
+        -- StmtParser:431
         local target = Ast.identifier(name.value, name.line, name.column)
-        -- StmtParser:418
+        -- StmtParser:432
         local value = Ast.binary(Option.unwrap(binop), target, self.exprs:expression(), name.line, name.column)
-        -- StmtParser:419
+        -- StmtParser:433
         return StmtParser.local_binding(self, name, value)
     end
-    -- StmtParser:421
+    -- StmtParser:435
     self.cursor:fail(("Expected '=' or a compound assignment after '" .. name.value) .. "'")
-    -- StmtParser:422
+    -- StmtParser:436
     return Ast.error_node()
 end
--- StmtParser:425
+-- StmtParser:439
 function StmtParser.local_binding(self, name, value)
-    -- StmtParser:426
+    -- StmtParser:440
     return Ast.node("VariableDecl", Map.__lz_from({["name"] = name.value, ["value"] = value, ["visibility"] = "", ["mutable"] = false, ["is_static"] = false, ["line"] = name.line, ["col"] = name.column}))
 end
--- StmtParser:429
+-- StmtParser:443
 function StmtParser.parse_method(self, visibility, is_static)
-    -- StmtParser:430
+    -- StmtParser:444
     local name = self.cursor:consume("IDENTIFIER", "Expected method name")
-    -- StmtParser:431
+    -- StmtParser:445
     local type_params = StmtParser.parse_type_params(self)
-    -- StmtParser:432
+    -- StmtParser:446
     self.cursor:consume("LEFT_BRACKET", "Expected '(' after method name")
-    -- StmtParser:433
+    -- StmtParser:447
     local param_types = List.__lz_from({})
-    -- StmtParser:434
+    -- StmtParser:448
     local params = StmtParser.parse_params(self, param_types)
-    -- StmtParser:435
+    -- StmtParser:449
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after parameters")
-    -- StmtParser:436
+    -- StmtParser:450
     local return_type = StmtParser.parse_return_type(self)
-    -- StmtParser:437
+    -- StmtParser:451
     local body = List.__lz_from({})
-    -- StmtParser:438
+    -- StmtParser:452
     if self.cursor:match("ASSIGN") then
-        -- StmtParser:439
+        -- StmtParser:453
         local expr = self.exprs:expression()
-        -- StmtParser:440
+        -- StmtParser:454
         body = List.__lz_from({Ast.node("ReturnStmt", Map.__lz_from({["value"] = expr, ["line"] = expr:line(), ["col"] = expr:col()}))})
     else
-        -- StmtParser:442
+        -- StmtParser:456
         body = StmtParser.parse_block(self, "method body")
     end
-    -- StmtParser:444
+    -- StmtParser:458
     return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column, param_types, return_type, type_params)
 end
--- StmtParser:451
+-- StmtParser:465
 function StmtParser.parse_annotation(self)
-    -- StmtParser:452
+    -- StmtParser:466
     self.cursor:consume("AT", "Expected '@'")
-    -- StmtParser:453
+    -- StmtParser:467
     local name = self.cursor:consume("IDENTIFIER", "Expected an annotation name after '@'")
-    -- StmtParser:454
-    if name.value == "auto" then
-        -- StmtParser:455
-        local next_node = StmtParser.parse_statement(self)
-        -- StmtParser:456
-        next_node:set("annotation_class", "Auto")
-        -- StmtParser:457
-        next_node:set("annotation_args", List.__lz_from({"auto"}))
-        -- StmtParser:458
-        return next_node
-    end
-    -- StmtParser:460
-    if name.value == "platform" then
-        -- StmtParser:461
-        self.cursor:consume("LEFT_BRACKET", "Expected '(' after '@platform'")
-        -- StmtParser:462
-        local plat_tok = self.cursor:consume("IDENTIFIER", "Expected platform name after '@platform('")
-        -- StmtParser:463
-        self.cursor:consume("RIGHT_BRACKET", "Expected ')' after platform name")
-        -- StmtParser:464
-        local next_node = StmtParser.parse_statement(self)
-        -- StmtParser:465
-        next_node:set("platform", plat_tok.value)
-        -- StmtParser:466
-        return next_node
-    end
     -- StmtParser:468
-    local args = List.__lz_from({})
-    -- StmtParser:469
-    if self.cursor:match("LEFT_BRACKET") then
+    if name.value == "auto" then
+        -- StmtParser:469
+        local next_node = StmtParser.parse_statement(self)
         -- StmtParser:470
+        next_node:set("annotation_class", "Auto")
+        -- StmtParser:471
+        next_node:set("annotation_args", List.__lz_from({"auto"}))
+        -- StmtParser:472
+        return next_node
+    end
+    -- StmtParser:474
+    if name.value == "platform" then
+        -- StmtParser:475
+        self.cursor:consume("LEFT_BRACKET", "Expected '(' after '@platform'")
+        -- StmtParser:476
+        local plat_tok = self.cursor:consume("IDENTIFIER", "Expected platform name after '@platform('")
+        -- StmtParser:477
+        self.cursor:consume("RIGHT_BRACKET", "Expected ')' after platform name")
+        -- StmtParser:478
+        local next_node = StmtParser.parse_statement(self)
+        -- StmtParser:479
+        next_node:set("platform", plat_tok.value)
+        -- StmtParser:480
+        return next_node
+    end
+    -- StmtParser:482
+    local args = List.__lz_from({})
+    -- StmtParser:483
+    if self.cursor:match("LEFT_BRACKET") then
+        -- StmtParser:484
         while true do
-            -- StmtParser:471
+            -- StmtParser:485
             if self.cursor:check("RIGHT_BRACKET") then
-                -- StmtParser:471
+                -- StmtParser:485
                 break
             end
-            -- StmtParser:472
+            -- StmtParser:486
             local arg = self.cursor:consume("IDENTIFIER", "Expected annotation argument (identifier)")
-            -- StmtParser:473
+            -- StmtParser:487
             args:push(arg.value)
-            -- StmtParser:474
+            -- StmtParser:488
             if not self.cursor:match("COMMA") then
-                -- StmtParser:474
+                -- StmtParser:488
                 break
             end
         end
-        -- StmtParser:476
+        -- StmtParser:490
         self.cursor:consume("RIGHT_BRACKET", "Expected ')' after annotation arguments")
     end
-    -- StmtParser:478
+    -- StmtParser:492
     local next_node = StmtParser.parse_statement(self)
-    -- StmtParser:479
+    -- StmtParser:493
     next_node:set("annotation_class", name.value)
-    -- StmtParser:480
+    -- StmtParser:494
     next_node:set("annotation_args", args)
-    -- StmtParser:481
+    -- StmtParser:495
     return next_node
 end
--- StmtParser:484
+-- StmtParser:498
 function StmtParser.parse_constructor(self, tok)
-    -- StmtParser:485
+    -- StmtParser:499
     local type_params = StmtParser.parse_type_params(self)
-    -- StmtParser:486
+    -- StmtParser:500
     self.cursor:consume("LEFT_BRACKET", "Expected '(' after 'constructor'")
-    -- StmtParser:487
+    -- StmtParser:501
     local param_types = List.__lz_from({})
-    -- StmtParser:488
+    -- StmtParser:502
     local field_params = List.__lz_from({})
-    -- StmtParser:489
+    -- StmtParser:503
     local params = StmtParser.parse_ctor_params(self, param_types, field_params)
-    -- StmtParser:490
+    -- StmtParser:504
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' after parameters")
-    -- StmtParser:491
+    -- StmtParser:505
     local body = List.__lz_from({})
-    -- StmtParser:492
+    -- StmtParser:506
     for _, fp in List.__lz_each(field_params) do
-        -- StmtParser:493
+        -- StmtParser:507
         body:push(StmtParser.field_param_assign(self, fp))
     end
-    -- StmtParser:495
+    -- StmtParser:509
     if self.cursor:check("BODY_START") then
-        -- StmtParser:496
+        -- StmtParser:510
         for _, stmt in List.__lz_each(StmtParser.parse_block(self, "constructor body")) do
-            -- StmtParser:497
+            -- StmtParser:511
             body:push(stmt)
         end
     end
-    -- StmtParser:500
+    -- StmtParser:514
     local node = Ast.constructor_decl(params, body, tok.line, tok.column, param_types, type_params)
-    -- StmtParser:501
+    -- StmtParser:515
     node:set("field_params", field_params)
-    -- StmtParser:502
+    -- StmtParser:516
     return node
 end
--- StmtParser:507
+-- StmtParser:521
 function StmtParser.parse_ctor_params(self, out_types, field_params)
-    -- StmtParser:508
+    -- StmtParser:522
     local params = List.__lz_from({})
-    -- StmtParser:509
+    -- StmtParser:523
     if not self.cursor:check("RIGHT_BRACKET") then
-        -- StmtParser:510
+        -- StmtParser:524
         while true do
-            -- StmtParser:511
+            -- StmtParser:525
             local is_field = self.cursor:match("DOT")
-            -- StmtParser:512
+            -- StmtParser:526
             local p = self.cursor:consume("IDENTIFIER", "Expected parameter name")
-            -- StmtParser:513
+            -- StmtParser:527
             params:push(p.value)
-            -- StmtParser:514
+            -- StmtParser:528
             local ty = StmtParser.param_type(self, p)
-            -- StmtParser:515
+            -- StmtParser:529
             out_types:push(ty)
-            -- StmtParser:516
+            -- StmtParser:530
             if is_field then
-                -- StmtParser:517
+                -- StmtParser:531
                 field_params:push(Map.__lz_from({["name"] = p.value, ["type"] = ty, ["line"] = p.line, ["col"] = p.column}))
             end
-            -- StmtParser:519
+            -- StmtParser:533
             if not self.cursor:match("COMMA") then
-                -- StmtParser:520
+                -- StmtParser:534
                 break
             end
         end
     end
-    -- StmtParser:524
+    -- StmtParser:538
     return params
 end
--- StmtParser:527
+-- StmtParser:541
 function StmtParser.field_param_assign(self, fp)
-    -- StmtParser:528
+    -- StmtParser:542
     local name = Option.__lz_unwrap(fp:get("name"))
-    -- StmtParser:529
+    -- StmtParser:543
     local l = Option.__lz_unwrap(fp:get("line"))
-    -- StmtParser:530
+    -- StmtParser:544
     local c = Option.__lz_unwrap(fp:get("col"))
-    -- StmtParser:531
+    -- StmtParser:545
     return Ast.field_assign(Ast.member(Ast.self_expr(l, c), name, l, c), Ast.identifier(name, l, c), l, c)
 end
--- StmtParser:537
+-- StmtParser:551
 function StmtParser.parse_params(self, out_types)
-    -- StmtParser:538
+    -- StmtParser:552
     local params = List.__lz_from({})
-    -- StmtParser:539
+    -- StmtParser:553
     if not self.cursor:check("RIGHT_BRACKET") then
-        -- StmtParser:540
+        -- StmtParser:554
         while true do
-            -- StmtParser:541
+            -- StmtParser:555
             local p = self.cursor:consume("IDENTIFIER", "Expected parameter name")
-            -- StmtParser:542
+            -- StmtParser:556
             params:push(p.value)
-            -- StmtParser:543
+            -- StmtParser:557
             out_types:push(StmtParser.param_type(self, p))
-            -- StmtParser:544
+            -- StmtParser:558
             if not self.cursor:match("COMMA") then
-                -- StmtParser:545
+                -- StmtParser:559
                 break
             end
         end
-    end
-    -- StmtParser:549
-    return params
-end
--- StmtParser:552
-function StmtParser.param_type(self, name_tok)
-    -- StmtParser:553
-    if self.cursor:match("COLON") then
-        -- StmtParser:554
-        return StmtParser.parse_type(self)
-    end
-    -- StmtParser:556
-    return Ast.type_name("dynamic", List.__lz_from({}), name_tok.line, name_tok.column)
-end
--- StmtParser:559
-function StmtParser.parse_return_type(self)
-    -- StmtParser:560
-    if self.cursor:match("COLON") then
-        -- StmtParser:561
-        return StmtParser.parse_type(self)
     end
     -- StmtParser:563
-    return Ast.type_name("dynamic", List.__lz_from({}), 0, 0)
-end
--- StmtParser:566
-function StmtParser.parse_typed_local(self, tok)
-    -- StmtParser:567
-    local name = self.cursor:consume("IDENTIFIER", "Expected variable name")
-    -- StmtParser:568
-    self.cursor:consume("COLON", "Expected ':' before the type")
-    -- StmtParser:569
-    local ty = StmtParser.parse_type(self)
-    -- StmtParser:570
-    self.cursor:consume("ASSIGN", "Expected '=' after the type annotation")
-    -- StmtParser:571
-    local value = self.exprs:expression()
-    -- StmtParser:572
-    return Ast.node("VariableDecl", Map.__lz_from({["name"] = name.value, ["value"] = value, ["type"] = ty, ["visibility"] = "", ["mutable"] = false, ["is_static"] = false, ["line"] = name.line, ["col"] = name.column}))
-end
--- StmtParser:576
-function StmtParser.parse_type_params(self)
-    -- StmtParser:577
-    local params = List.__lz_from({})
-    -- StmtParser:578
-    if self.cursor:match("LESS") then
-        -- StmtParser:579
-        while true do
-            -- StmtParser:580
-            local t = self.cursor:consume("IDENTIFIER", "Expected a type parameter name")
-            -- StmtParser:581
-            params:push(t.value)
-            -- StmtParser:582
-            if not self.cursor:match("COMMA") then
-                -- StmtParser:583
-                break
-            end
-        end
-        -- StmtParser:586
-        self.cursor:consume("GREATER", "Expected '>' to close type parameters")
-    end
-    -- StmtParser:588
     return params
 end
--- StmtParser:593
+-- StmtParser:566
+function StmtParser.param_type(self, name_tok)
+    -- StmtParser:567
+    if self.cursor:match("COLON") then
+        -- StmtParser:568
+        return StmtParser.parse_type(self)
+    end
+    -- StmtParser:570
+    return Ast.type_name("dynamic", List.__lz_from({}), name_tok.line, name_tok.column)
+end
+-- StmtParser:573
+function StmtParser.parse_return_type(self)
+    -- StmtParser:574
+    if self.cursor:match("COLON") then
+        -- StmtParser:575
+        return StmtParser.parse_type(self)
+    end
+    -- StmtParser:577
+    return Ast.type_name("dynamic", List.__lz_from({}), 0, 0)
+end
+-- StmtParser:580
+function StmtParser.parse_typed_local(self, tok)
+    -- StmtParser:581
+    local name = self.cursor:consume("IDENTIFIER", "Expected variable name")
+    -- StmtParser:582
+    self.cursor:consume("COLON", "Expected ':' before the type")
+    -- StmtParser:583
+    local ty = StmtParser.parse_type(self)
+    -- StmtParser:584
+    self.cursor:consume("ASSIGN", "Expected '=' after the type annotation")
+    -- StmtParser:585
+    local value = self.exprs:expression()
+    -- StmtParser:586
+    return Ast.node("VariableDecl", Map.__lz_from({["name"] = name.value, ["value"] = value, ["type"] = ty, ["visibility"] = "", ["mutable"] = false, ["is_static"] = false, ["line"] = name.line, ["col"] = name.column}))
+end
+-- StmtParser:590
+function StmtParser.parse_type_params(self)
+    -- StmtParser:591
+    local params = List.__lz_from({})
+    -- StmtParser:592
+    if self.cursor:match("LESS") then
+        -- StmtParser:593
+        while true do
+            -- StmtParser:594
+            local t = self.cursor:consume("IDENTIFIER", "Expected a type parameter name")
+            -- StmtParser:595
+            params:push(t.value)
+            -- StmtParser:596
+            if not self.cursor:match("COMMA") then
+                -- StmtParser:597
+                break
+            end
+        end
+        -- StmtParser:600
+        self.cursor:consume("GREATER", "Expected '>' to close type parameters")
+    end
+    -- StmtParser:602
+    return params
+end
+-- StmtParser:607
 function StmtParser.parse_type(self)
-    -- StmtParser:594
+    -- StmtParser:608
     if self.cursor:check("LEFT_BRACKET") then
-        -- StmtParser:595
+        -- StmtParser:609
         return StmtParser.parse_type_fn(self)
     end
-    -- StmtParser:597
+    -- StmtParser:611
     local name = self.cursor:consume("IDENTIFIER", "Expected a type name")
-    -- StmtParser:598
+    -- StmtParser:612
     local args = List.__lz_from({})
-    -- StmtParser:599
+    -- StmtParser:613
     if self.cursor:match("LESS") then
-        -- StmtParser:600
+        -- StmtParser:614
         while true do
-            -- StmtParser:601
+            -- StmtParser:615
             args:push(StmtParser.parse_type(self))
-            -- StmtParser:602
+            -- StmtParser:616
             if not self.cursor:match("COMMA") then
-                -- StmtParser:603
+                -- StmtParser:617
                 break
             end
         end
-        -- StmtParser:606
+        -- StmtParser:620
         self.cursor:consume("GREATER", "Expected '>' to close type arguments")
     end
-    -- StmtParser:608
+    -- StmtParser:622
     return Ast.type_name(name.value, args, name.line, name.column)
 end
--- StmtParser:611
+-- StmtParser:625
 function StmtParser.parse_type_fn(self)
-    -- StmtParser:612
+    -- StmtParser:626
     local open = self.cursor:consume("LEFT_BRACKET", "Expected '(' to open a function type")
-    -- StmtParser:613
+    -- StmtParser:627
     local params = List.__lz_from({})
-    -- StmtParser:614
+    -- StmtParser:628
     if not self.cursor:check("RIGHT_BRACKET") then
-        -- StmtParser:615
+        -- StmtParser:629
         while true do
-            -- StmtParser:616
+            -- StmtParser:630
             params:push(StmtParser.parse_type(self))
-            -- StmtParser:617
+            -- StmtParser:631
             if not self.cursor:match("COMMA") then
-                -- StmtParser:618
+                -- StmtParser:632
                 break
             end
         end
     end
-    -- StmtParser:622
+    -- StmtParser:636
     self.cursor:consume("RIGHT_BRACKET", "Expected ')' in the function type")
-    -- StmtParser:623
+    -- StmtParser:637
     self.cursor:consume("ARROW", "Expected '->' in the function type")
-    -- StmtParser:624
+    -- StmtParser:638
     local result = StmtParser.parse_type(self)
-    -- StmtParser:625
+    -- StmtParser:639
     return Ast.type_fn(params, result, open.line, open.column)
 end
--- StmtParser:631
+-- StmtParser:645
 function StmtParser.looks_like_decl(self)
-    -- StmtParser:632
+    -- StmtParser:646
     local i = self.cursor:position() + 1
-    -- StmtParser:633
+    -- StmtParser:647
     if self.cursor:token_at(i).kind == "LESS" then
-        -- StmtParser:634
+        -- StmtParser:648
         while true do
-            -- StmtParser:635
+            -- StmtParser:649
             local k = self.cursor:token_at(i).kind
-            -- StmtParser:636
+            -- StmtParser:650
             if k == "EOF" then
-                -- StmtParser:637
+                -- StmtParser:651
                 return false
             end
-            -- StmtParser:639
+            -- StmtParser:653
             i = i + 1
-            -- StmtParser:640
+            -- StmtParser:654
             if k == "GREATER" then
-                -- StmtParser:641
+                -- StmtParser:655
                 break
             end
         end
     end
-    -- StmtParser:645
+    -- StmtParser:659
     if self.cursor:token_at(i).kind ~= "LEFT_BRACKET" then
-        -- StmtParser:646
+        -- StmtParser:660
         return false
     end
-    -- StmtParser:648
+    -- StmtParser:662
     local depth = 0
-    -- StmtParser:649
+    -- StmtParser:663
     while true do
-        -- StmtParser:650
+        -- StmtParser:664
         local kind = self.cursor:token_at(i).kind
-        -- StmtParser:651
+        -- StmtParser:665
         if kind == "EOF" then
-            -- StmtParser:652
+            -- StmtParser:666
             return false
         elseif kind == "LEFT_BRACKET" then
-            -- StmtParser:654
+            -- StmtParser:668
             depth = depth + 1
         elseif kind == "RIGHT_BRACKET" then
-            -- StmtParser:656
+            -- StmtParser:670
             depth = depth - 1
-            -- StmtParser:657
+            -- StmtParser:671
             if depth == 0 then
-                -- StmtParser:658
+                -- StmtParser:672
                 local after = self.cursor:token_at(i + 1).kind
-                -- StmtParser:659
+                -- StmtParser:673
                 return (after == "BODY_START") or (after == "COLON")
             end
         end
-        -- StmtParser:662
+        -- StmtParser:676
         i = i + 1
     end
 end
--- StmtParser:666
+-- StmtParser:680
 function StmtParser.parse_return(self, tok)
-    -- StmtParser:667
+    -- StmtParser:681
     local attrs = Map.__lz_from({["line"] = tok.line, ["col"] = tok.column})
-    -- StmtParser:668
+    -- StmtParser:682
     if (not self.cursor:check("BODY_END")) and (not self.cursor:at_end()) then
-        -- StmtParser:669
+        -- StmtParser:683
         List.__lz_idx_set(attrs, "value", self.exprs:expression())
     end
-    -- StmtParser:671
+    -- StmtParser:685
     return Ast.node("ReturnStmt", attrs)
 end
--- StmtParser:674
+-- StmtParser:688
 function StmtParser.parse_if(self, tok)
-    -- StmtParser:675
+    -- StmtParser:689
     local clauses = List.__lz_from({Ast.if_clause(self.exprs:expression(), StmtParser.parse_block(self, "if body"))})
-    -- StmtParser:676
+    -- StmtParser:690
     local attrs = Map.__lz_from({["clauses"] = clauses, ["line"] = tok.line, ["col"] = tok.column})
-    -- StmtParser:677
+    -- StmtParser:691
     while true do
-        -- StmtParser:678
+        -- StmtParser:692
         if not self.cursor:match("ELSE") then
-            -- StmtParser:679
+            -- StmtParser:693
             break
         end
-        -- StmtParser:681
+        -- StmtParser:695
         if self.cursor:match("IF") then
-            -- StmtParser:682
+            -- StmtParser:696
             clauses:push(Ast.if_clause(self.exprs:expression(), StmtParser.parse_block(self, "else if body")))
         else
-            -- StmtParser:684
+            -- StmtParser:698
             List.__lz_idx_set(attrs, "else_body", StmtParser.parse_block(self, "else body"))
-            -- StmtParser:685
+            -- StmtParser:699
             break
         end
     end
-    -- StmtParser:688
+    -- StmtParser:702
     return Ast.node("IfStmt", attrs)
 end
--- StmtParser:691
+-- StmtParser:705
 function StmtParser.parse_while(self, tok)
-    -- StmtParser:692
+    -- StmtParser:706
     local condition = self.exprs:expression()
-    -- StmtParser:693
+    -- StmtParser:707
     local body = StmtParser.parse_block(self, "while body")
-    -- StmtParser:694
+    -- StmtParser:708
     return Ast.while_stmt(condition, body, tok.line, tok.column)
 end
--- StmtParser:697
+-- StmtParser:711
 function StmtParser.parse_loop(self, tok)
-    -- StmtParser:698
+    -- StmtParser:712
     return Ast.loop_stmt(StmtParser.parse_block(self, "loop body"), tok.line, tok.column)
 end
--- StmtParser:701
+-- StmtParser:715
 function StmtParser.parse_break(self, tok)
-    -- StmtParser:702
+    -- StmtParser:716
     return Ast.break_stmt(tok.line, tok.column)
 end
--- StmtParser:708
+-- StmtParser:722
 function StmtParser.starts_match(self)
-    -- StmtParser:709
+    -- StmtParser:723
     local nk = self.cursor:peek_next().kind
-    -- StmtParser:710
+    -- StmtParser:724
     if (((nk == "LEFT_BRACKET") or (nk == "ASSIGN")) or (nk == "DOT")) or (nk == "LSQUARE") then
-        -- StmtParser:711
+        -- StmtParser:725
         return false
     end
-    -- StmtParser:713
+    -- StmtParser:727
     return Option.is_none(StmtParser.compound(self, nk))
 end
--- StmtParser:716
+-- StmtParser:730
 function StmtParser.parse_match(self, tok)
-    -- StmtParser:717
+    -- StmtParser:731
     local scrutinee = self.exprs:expression()
-    -- StmtParser:718
+    -- StmtParser:732
     local open = self.cursor:consume("BODY_START", "Expected '{' to open match body")
-    -- StmtParser:719
+    -- StmtParser:733
     local arms = List.__lz_from({})
-    -- StmtParser:720
+    -- StmtParser:734
     while true do
-        -- StmtParser:721
+        -- StmtParser:735
         if self.cursor:at_end() then
-            -- StmtParser:722
+            -- StmtParser:736
             self.cursor:fail_at("Expected '}' to close match body", open.line, open.column, 1)
-            -- StmtParser:723
+            -- StmtParser:737
             break
         end
-        -- StmtParser:725
+        -- StmtParser:739
         if self.cursor:check("BODY_END") then
-            -- StmtParser:726
+            -- StmtParser:740
             break
         end
-        -- StmtParser:728
+        -- StmtParser:742
         arms:push(StmtParser.parse_match_arm(self))
     end
-    -- StmtParser:730
+    -- StmtParser:744
     self.cursor:consume("BODY_END", "Expected '}' to close match body")
-    -- StmtParser:731
+    -- StmtParser:745
     return Ast.match_stmt(scrutinee, arms, tok.line, tok.column)
 end
--- StmtParser:736
+-- StmtParser:750
 function StmtParser.parse_match_arm(self)
-    -- StmtParser:737
+    -- StmtParser:751
     local tok = self.cursor:current()
-    -- StmtParser:738
+    -- StmtParser:752
     if (tok.kind == "IDENTIFIER") and (tok.value == "_") then
-        -- StmtParser:739
+        -- StmtParser:753
         self.cursor:advance()
-        -- StmtParser:740
+        -- StmtParser:754
         self.cursor:consume("FAT_ARROW", "Expected '=>' after match pattern")
-        -- StmtParser:741
+        -- StmtParser:755
         return Ast.match_default(StmtParser.parse_block(self, "match arm body"))
     end
-    -- StmtParser:743
+    -- StmtParser:757
     if ((tok.kind == "IDENTIFIER") and StmtParser.is_variant_name(self, tok.value)) and StmtParser.variant_pattern_ahead(self) then
-        -- StmtParser:744
+        -- StmtParser:758
         self.cursor:advance()
-        -- StmtParser:745
+        -- StmtParser:759
         local bindings = StmtParser.parse_variant_bindings(self)
-        -- StmtParser:746
+        -- StmtParser:760
         self.cursor:consume("FAT_ARROW", "Expected '=>' after match pattern")
-        -- StmtParser:747
+        -- StmtParser:761
         return Ast.match_variant(tok.value, bindings, StmtParser.parse_block(self, "match arm body"))
     end
-    -- StmtParser:749
+    -- StmtParser:763
     local pattern = self.exprs:expression()
-    -- StmtParser:750
+    -- StmtParser:764
     self.cursor:consume("FAT_ARROW", "Expected '=>' after match pattern")
-    -- StmtParser:751
+    -- StmtParser:765
     return Ast.match_arm(pattern, StmtParser.parse_block(self, "match arm body"))
 end
--- StmtParser:754
+-- StmtParser:768
 function StmtParser.variant_pattern_ahead(self)
-    -- StmtParser:755
+    -- StmtParser:769
     local nk = self.cursor:peek_next().kind
-    -- StmtParser:756
+    -- StmtParser:770
     return (nk == "FAT_ARROW") or (nk == "LEFT_BRACKET")
 end
--- StmtParser:760
+-- StmtParser:774
 function StmtParser.parse_variant_bindings(self)
-    -- StmtParser:761
+    -- StmtParser:775
     local bindings = List.__lz_from({})
-    -- StmtParser:762
+    -- StmtParser:776
     if self.cursor:match("LEFT_BRACKET") then
-        -- StmtParser:763
+        -- StmtParser:777
         if not self.cursor:check("RIGHT_BRACKET") then
-            -- StmtParser:764
+            -- StmtParser:778
             while true do
-                -- StmtParser:765
+                -- StmtParser:779
                 local b = self.cursor:consume("IDENTIFIER", "Expected a binding name in the variant pattern")
-                -- StmtParser:766
+                -- StmtParser:780
                 bindings:push(b.value)
-                -- StmtParser:767
+                -- StmtParser:781
                 if not self.cursor:match("COMMA") then
-                    -- StmtParser:768
+                    -- StmtParser:782
                     break
                 end
             end
         end
-        -- StmtParser:772
+        -- StmtParser:786
         self.cursor:consume("RIGHT_BRACKET", "Expected ')' after the variant pattern bindings")
     end
-    -- StmtParser:774
+    -- StmtParser:788
     return bindings
 end
--- StmtParser:779
+-- StmtParser:793
 function StmtParser.is_variant_name(self, name)
-    -- StmtParser:780
+    -- StmtParser:794
     local first = Option.unwrap_or(Option.__lz_wrap(string.sub(name, 1, 1)), "")
-    -- StmtParser:781
+    -- StmtParser:795
     return (first >= "A") and (first <= "Z")
 end
--- StmtParser:786
+-- StmtParser:800
 function StmtParser.parse_for(self, tok)
-    -- StmtParser:787
+    -- StmtParser:801
     if StmtParser.looks_like_for_in(self) then
-        -- StmtParser:788
+        -- StmtParser:802
         return StmtParser.parse_for_in(self, tok)
     end
-    -- StmtParser:790
+    -- StmtParser:804
     return StmtParser.parse_for_c(self, tok)
 end
--- StmtParser:793
+-- StmtParser:807
 function StmtParser.parse_for_in(self, tok)
-    -- StmtParser:794
+    -- StmtParser:808
     local first = self.cursor:consume("IDENTIFIER", "Expected a loop variable after 'for'")
-    -- StmtParser:795
+    -- StmtParser:809
     local vars = List.__lz_from({first.value})
-    -- StmtParser:796
+    -- StmtParser:810
     if self.cursor:match("COMMA") then
-        -- StmtParser:797
+        -- StmtParser:811
         local second = self.cursor:consume("IDENTIFIER", "Expected a second loop variable after ','")
-        -- StmtParser:798
+        -- StmtParser:812
         vars:push(second.value)
     end
-    -- StmtParser:800
+    -- StmtParser:814
     self.cursor:consume("IN", "Expected 'in' after the for-in loop variable(s)")
-    -- StmtParser:801
+    -- StmtParser:815
     local iter = self.exprs:expression()
-    -- StmtParser:802
+    -- StmtParser:816
     local body = StmtParser.parse_block(self, "for body")
-    -- StmtParser:803
+    -- StmtParser:817
     return Ast.for_in(vars, iter, body, tok.line, tok.column)
 end
--- StmtParser:806
+-- StmtParser:820
 function StmtParser.parse_for_c(self, tok)
-    -- StmtParser:807
+    -- StmtParser:821
     local attrs = Map.__lz_from({["line"] = tok.line, ["col"] = tok.column})
-    -- StmtParser:808
+    -- StmtParser:822
     if not self.cursor:check("SEMICOLON") then
-        -- StmtParser:809
+        -- StmtParser:823
         List.__lz_idx_set(attrs, "init", StmtParser.parse_assignment(self, "Expected loop variable in for-init"))
     end
-    -- StmtParser:811
+    -- StmtParser:825
     self.cursor:consume("SEMICOLON", "Expected ';' after for-init")
-    -- StmtParser:812
+    -- StmtParser:826
     if not self.cursor:check("SEMICOLON") then
-        -- StmtParser:813
+        -- StmtParser:827
         List.__lz_idx_set(attrs, "condition", self.exprs:expression())
     end
-    -- StmtParser:815
+    -- StmtParser:829
     self.cursor:consume("SEMICOLON", "Expected ';' after for-condition")
-    -- StmtParser:816
+    -- StmtParser:830
     if not self.cursor:check("BODY_START") then
-        -- StmtParser:817
+        -- StmtParser:831
         List.__lz_idx_set(attrs, "step", StmtParser.parse_assignment(self, "Expected statement in for-step"))
     end
-    -- StmtParser:819
+    -- StmtParser:833
     List.__lz_idx_set(attrs, "body", StmtParser.parse_block(self, "for body"))
-    -- StmtParser:820
+    -- StmtParser:834
     return Ast.node("ForStmt", attrs)
 end
--- StmtParser:823
+-- StmtParser:837
 function StmtParser.looks_like_for_in(self)
-    -- StmtParser:824
+    -- StmtParser:838
     if not self.cursor:check("IDENTIFIER") then
-        -- StmtParser:825
+        -- StmtParser:839
         return false
     end
-    -- StmtParser:827
+    -- StmtParser:841
     local k = self.cursor:peek_next().kind
-    -- StmtParser:828
+    -- StmtParser:842
     return (k == "IN") or (k == "COMMA")
 end
--- StmtParser:833
+-- StmtParser:847
 function StmtParser.parse_expr_statement(self, tok)
-    -- StmtParser:834
+    -- StmtParser:848
     local expr = self.exprs:expression()
-    -- StmtParser:835
+    -- StmtParser:849
     local assignable = (expr.kind == "MemberExpr") or (expr.kind == "IndexExpr")
-    -- StmtParser:836
+    -- StmtParser:850
     if not assignable then
-        -- StmtParser:837
+        -- StmtParser:851
         return Ast.expression_stmt(expr, tok.line, tok.column)
     end
-    -- StmtParser:839
+    -- StmtParser:853
     if self.cursor:match("ASSIGN") then
-        -- StmtParser:840
+        -- StmtParser:854
         return StmtParser.make_assign(self, expr, self.exprs:expression(), tok)
     end
-    -- StmtParser:842
+    -- StmtParser:856
     local binop = StmtParser.compound(self, self.cursor:current_kind())
-    -- StmtParser:843
+    -- StmtParser:857
     if Option.is_some(binop) then
-        -- StmtParser:844
+        -- StmtParser:858
         self.cursor:advance()
-        -- StmtParser:845
+        -- StmtParser:859
         local value = Ast.binary(Option.unwrap(binop), expr, self.exprs:expression(), tok.line, tok.column)
-        -- StmtParser:846
+        -- StmtParser:860
         return StmtParser.make_assign(self, expr, value, tok)
     end
-    -- StmtParser:848
+    -- StmtParser:862
     return Ast.expression_stmt(expr, tok.line, tok.column)
 end
--- StmtParser:851
+-- StmtParser:865
 function StmtParser.make_assign(self, target, value, tok)
-    -- StmtParser:852
+    -- StmtParser:866
     if target.kind == "MemberExpr" then
-        -- StmtParser:853
+        -- StmtParser:867
         return Ast.field_assign(target, value, tok.line, tok.column)
     end
-    -- StmtParser:855
+    -- StmtParser:869
     return Ast.index_assign(target, value, tok.line, tok.column)
 end
--- StmtParser:858
+-- StmtParser:872
 function StmtParser.compound(self, kind)
-    -- StmtParser:859
+    -- StmtParser:873
     return StmtParser.compounds:get(kind)
 end
 

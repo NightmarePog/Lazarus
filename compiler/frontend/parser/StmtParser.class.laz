@@ -130,6 +130,20 @@ private parse_object_body(): Node {
 }
 
 private parse_object_member(): Node {
+    if .cursor.check("AT") {
+        .cursor.consume("AT", "Expected '@'")
+        mut ann = .cursor.consume("IDENTIFIER", "Expected an annotation name after '@'")
+        if ann.value == "platform" {
+            .cursor.consume("LEFT_BRACKET", "Expected '(' after '@platform'")
+            mut plat_tok = .cursor.consume("IDENTIFIER", "Expected platform name after '@platform('")
+            .cursor.consume("RIGHT_BRACKET", "Expected ')' after platform name")
+            mut next_node = .parse_object_member()
+            next_node.set("platform", plat_tok.value)
+            return next_node
+        }
+        .cursor.fail("Unknown annotation '@" ++ ann.value ++ "' in an #object file")
+        return Ast.error_node()
+    }
     if .cursor.check("EXTERN") {
         mut etok = .cursor.current()
         .cursor.advance()
