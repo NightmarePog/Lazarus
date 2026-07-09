@@ -1,0 +1,3 @@
+platform(roblox)  extern now(): float = "os.clock"
+platform(cc)      extern now(): int   = "os.time"
+platform(lua54)   extern now(): float = "os.clock"

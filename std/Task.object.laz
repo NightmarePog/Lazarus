@@ -1,0 +1,3 @@
+platform(roblox)  extern sleep(n: float): unit = "task.wait"
+platform(cc)      extern sleep(n: float): unit = "os.sleep"
+platform(lua54)   extern sleep(n: float): unit = "os.sleep"
