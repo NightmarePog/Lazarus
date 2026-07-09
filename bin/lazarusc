@@ -1,0 +1,2 @@
+#!/bin/sh
+exec lua "$(dirname "$0")/lazarusc.lua" "$@"
