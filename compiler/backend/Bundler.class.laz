@@ -16,9 +16,9 @@ import Error
 private modules: List<Module>
 private entry_class: str
 private variant_owner: Map<str, str>
-private platform: str
+private plat: str
 @auto
-constructor(modules: List<Module>, entry_class: str, variant_owner: Map<str, str>, platform: str)
+constructor(modules: List<Module>, entry_class: str, variant_owner: Map<str, str>, plat: str)
 
 public bundle(): str {
     mut externs = .collect_externs()
@@ -36,7 +36,7 @@ public bundle(): str {
             if m.is_prebuilt {
                 blocks.push(m.prebuilt_lua)
             } else {
-                mut cg = Codegen(m.class_name, m.imports, externs, .variant_owner, .platform)
+                mut cg = Codegen(m.class_name, m.imports, externs, .variant_owner, .plat)
                 blocks.push(cg.class_block(m.ast))
                 if m.class_name == .entry_class {
                     entry_has_ctor = cg.has_constructor(m.ast.child("body"))

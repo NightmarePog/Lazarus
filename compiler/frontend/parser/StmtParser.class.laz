@@ -130,19 +130,14 @@ private parse_object_body(): Node {
 }
 
 private parse_object_member(): Node {
-    if .cursor.check("AT") {
-        .cursor.consume("AT", "Expected '@'")
-        mut ann = .cursor.consume("IDENTIFIER", "Expected an annotation name after '@'")
-        if ann.value == "platform" {
-            .cursor.consume("LEFT_BRACKET", "Expected '(' after '@platform'")
-            mut plat_tok = .cursor.consume("IDENTIFIER", "Expected platform name after '@platform('")
-            .cursor.consume("RIGHT_BRACKET", "Expected ')' after platform name")
-            mut next_node = .parse_object_member()
-            next_node.set("platform", plat_tok.value)
-            return next_node
-        }
-        .cursor.fail("Unknown annotation '@" ++ ann.value ++ "' in an #object file")
-        return Ast.error_node()
+    if .cursor.check("PLATFORM") {
+        .cursor.consume("PLATFORM", "Expected 'platform'")
+        .cursor.consume("LEFT_BRACKET", "Expected '(' after 'platform'")
+        mut plat_tok = .cursor.consume("IDENTIFIER", "Expected platform name after 'platform('")
+        .cursor.consume("RIGHT_BRACKET", "Expected ')' after platform name")
+        mut next_node = .parse_object_member()
+        next_node.set("platform", plat_tok.value)
+        return next_node
     }
     if .cursor.check("EXTERN") {
         mut etok = .cursor.current()
@@ -189,6 +184,7 @@ private parse_statement(): Node {
         "MUTABLE" => { .cursor.advance() return .parse_binding("", true, "Expected variable name after 'mut'", false) }
         "STATIC" => { .cursor.advance() return .parse_static() }
         "AT" => { return .parse_annotation() }
+        "PLATFORM" => { return .parse_platform_stmt() }
         "CONSTRUCTOR" => { .cursor.advance() return .parse_constructor(tok) }
         "RETURN" => { .cursor.advance() return .parse_return(tok) }
         "IF" => { .cursor.advance() return .parse_if(tok) }
@@ -471,14 +467,6 @@ private parse_annotation(): Node {
         next_node.set("annotation_args", ["auto"])
         return next_node
     }
-    if name.value == "platform" {
-        .cursor.consume("LEFT_BRACKET", "Expected '(' after '@platform'")
-        mut plat_tok = .cursor.consume("IDENTIFIER", "Expected platform name after '@platform('")
-        .cursor.consume("RIGHT_BRACKET", "Expected ')' after platform name")
-        mut next_node = .parse_statement()
-        next_node.set("platform", plat_tok.value)
-        return next_node
-    }
     mut args = []
     if .cursor.match("LEFT_BRACKET") {
         loop {
@@ -492,6 +480,16 @@ private parse_annotation(): Node {
     mut next_node = .parse_statement()
     next_node.set("annotation_class", name.value)
     next_node.set("annotation_args", args)
+    return next_node
+}
+
+private parse_platform_stmt(): Node {
+    .cursor.consume("PLATFORM", "Expected 'platform'")
+    .cursor.consume("LEFT_BRACKET", "Expected '(' after 'platform'")
+    mut plat_tok = .cursor.consume("IDENTIFIER", "Expected platform name after 'platform('")
+    .cursor.consume("RIGHT_BRACKET", "Expected ')' after platform name")
+    mut next_node = .parse_statement()
+    next_node.set("platform", plat_tok.value)
     return next_node
 }
 

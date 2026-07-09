@@ -28,7 +28,8 @@ private words = [
     "false": "FALSE",
     "and": "AND",
     "or": "OR",
-    "not": "NOT"
+    "not": "NOT",
+    "platform": "PLATFORM"
 ]
 
 private ops2 = [

@@ -25,7 +25,7 @@ import Error
 constructor() {
     mut path = Sys.argv(1)
     if path.is_some() {
-        mut platform = ""
+        mut plat = ""
         mut pkg_path = ""
         mut is_lib = false
         mut is_check = false
@@ -40,7 +40,7 @@ constructor() {
                 i = i + 1
                 mut val = Sys.argv(i)
                 if val.is_some() {
-                    platform = val.unwrap()
+                    plat = val.unwrap()
                 }
             } else if f == "--pkg-path" {
                 i = i + 1
@@ -60,9 +60,9 @@ constructor() {
         if is_check {
             Main.check_file(path.unwrap(), pkg_path)
         } else if is_lib {
-            Main.build_lib(path.unwrap(), platform, pkg_path)
+            Main.build_lib(path.unwrap(), plat, pkg_path)
         } else {
-            Main.build_file(path.unwrap(), platform, pkg_path)
+            Main.build_file(path.unwrap(), plat, pkg_path)
         }
     } else {
         Error("NoFileAppended", "No file appended, use 'lazarus <FILE.laz>'", 0, 0, "", 2).raise()
@@ -114,7 +114,7 @@ private static lua check_file(path: str, pkg_path: str): unit {
 // A file entry point: follow its imports and bundle the whole program. Each
 // module is analysed and optimised on its own before the bundler composes them.
 // Output is written to <EntryClass>.lua with a LAZARUS_META header.
-static build_file(path: str, platform: str, pkg_path: str): unit {
+static build_file(path: str, plat: str, pkg_path: str): unit {
     mut linker = Linker(path, pkg_path)
     mut modules = linker.link()
 
@@ -145,7 +145,7 @@ static build_file(path: str, platform: str, pkg_path: str): unit {
         if m.is_prebuilt {
             classes[m.class_name] = m.meta_sig
         } else if not m.is_trait {
-            Main.collect_signatures(m.ast, m.class_name, classes, platform, gated_externs)
+            Main.collect_signatures(m.ast, m.class_name, classes, plat, gated_externs)
         }
     }
 
@@ -158,7 +158,7 @@ static build_file(path: str, platform: str, pkg_path: str): unit {
     }
 
     mut entry_class = linker.entry_class()
-    mut bundle = Bundler(modules, entry_class, variant_owner, platform).bundle()
+    mut bundle = Bundler(modules, entry_class, variant_owner, plat).bundle()
 
     mut entry_sig = classes.get(entry_class).unwrap_or(0)
     mut meta_block = ""
@@ -176,7 +176,7 @@ static build_file(path: str, platform: str, pkg_path: str): unit {
 // then emit ONLY the entry class block — no stdlib prelude, no entry-point call.
 // Output is <EntryClass>.lua with a LAZARUS_META header. The file can be imported
 // as a prebuilt library by other programs without recompilation.
-static build_lib(path: str, platform: str, pkg_path: str): unit {
+static build_lib(path: str, plat: str, pkg_path: str): unit {
     mut linker = Linker(path, pkg_path)
     mut modules = linker.link()
 
@@ -207,7 +207,7 @@ static build_lib(path: str, platform: str, pkg_path: str): unit {
         if m.is_prebuilt {
             classes[m.class_name] = m.meta_sig
         } else if not m.is_trait {
-            Main.collect_signatures(m.ast, m.class_name, classes, platform, gated_externs)
+            Main.collect_signatures(m.ast, m.class_name, classes, plat, gated_externs)
         }
     }
 
@@ -241,7 +241,7 @@ static build_lib(path: str, platform: str, pkg_path: str): unit {
             }
         }
     }
-    mut cg = Codegen(entry_class, entry_module.imports, externs, variant_owner, platform)
+    mut cg = Codegen(entry_class, entry_module.imports, externs, variant_owner, plat)
     mut class_block = cg.class_block(entry_module.ast)
 
     mut entry_sig = classes.get(entry_class).unwrap_or(0)
@@ -283,7 +283,7 @@ static collect_enums(ast: Node, variant_owner: Map<str, str>, enums: Map<str, Li
 // Each entry carries `fields` (property name -> Option of its type node), `methods`
 // (name -> {params, result, is_static, type_params}), `ctor` (the constructor's
 // param-type nodes, or 0 when the class declares none) and `type_params`.
-static collect_signatures(ast: Node, class_name: str, classes: Map<str, dynamic>, platform: str, gated_externs: Map<str, str>): unit {
+static collect_signatures(ast: Node, class_name: str, classes: Map<str, dynamic>, plat: str, gated_externs: Map<str, str>): unit {
     mut fields = [:]
     mut methods = [:]
     mut ctor = 0
@@ -319,7 +319,7 @@ static collect_signatures(ast: Node, class_name: str, classes: Map<str, dynamic>
             if all_typed and params.len() > 0 {
                 mut extern_platform = stmt.attr("platform").unwrap_or("")
                 mut ename = stmt.child("name")
-                if extern_platform == "" or extern_platform == platform {
+                if extern_platform == "" or extern_platform == plat {
                     mut extern_result = stmt.attr("return_type").unwrap_or(0)
                     methods[ename] = ["params": params, "result": extern_result, "is_static": true, "type_params": []]
                     gated_externs.delete(ename)

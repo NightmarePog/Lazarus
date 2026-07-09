@@ -16,9 +16,9 @@ private class_name: str
 private known_classes: Map<str, bool>
 private externs: Map<str, Map<str, str>>
 private variant_owner: Map<str, str>
-private platform: str
+private plat: str
 
-constructor(class_name: str, imports: List<str>, externs: Map<str, Map<str, str>>, variant_owner: Map<str, str>, platform: str) {
+constructor(class_name: str, imports: List<str>, externs: Map<str, Map<str, str>>, variant_owner: Map<str, str>, plat: str) {
     .class_name = class_name
     .known_classes = [:]
     for name in imports {
@@ -26,7 +26,7 @@ constructor(class_name: str, imports: List<str>, externs: Map<str, Map<str, str>
     }
     .externs = externs
     .variant_owner = variant_owner
-    .platform = platform
+    .plat = plat
 }
 
 // A whole single-file program as a self-contained Lua chunk: header, the class
@@ -70,7 +70,7 @@ private build_context(body: List<Node>): CgContext {
     mut properties = []
     for stmt in body {
         mut stmt_platform = stmt.attr("platform").unwrap_or("")
-        if stmt_platform != "" and stmt_platform != .platform {
+        if stmt_platform != "" and stmt_platform != .plat {
             // Skip platform-gated declarations that don't match the target platform.
             // Without this, the constructor would still emit `self.m = C.m` for absent methods.
         } else {
@@ -119,7 +119,7 @@ private is_emittable(stmt: Node): bool {
         return false
     }
     mut stmt_platform = stmt.attr("platform").unwrap_or("")
-    if stmt_platform != "" and stmt_platform != .platform {
+    if stmt_platform != "" and stmt_platform != .plat {
         return false
     }
     return true
