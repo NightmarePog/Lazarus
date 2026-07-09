@@ -17,8 +17,11 @@ private known_classes: Map<str, bool>
 private externs: Map<str, Map<str, str>>
 private variant_owner: Map<str, str>
 private plat: str
+private opt_level: int = 0
+private mangler: dynamic = 0
+private prebuilt_classes: dynamic = 0
 
-constructor(class_name: str, imports: List<str>, externs: Map<str, Map<str, str>>, variant_owner: Map<str, str>, plat: str) {
+constructor(class_name: str, imports: List<str>, externs: Map<str, Map<str, str>>, variant_owner: Map<str, str>, plat: str, opt_level: int, mangler: dynamic, prebuilt_classes: dynamic) {
     .class_name = class_name
     .known_classes = [:]
     for name in imports {
@@ -27,6 +30,9 @@ constructor(class_name: str, imports: List<str>, externs: Map<str, Map<str, str>
     .externs = externs
     .variant_owner = variant_owner
     .plat = plat
+    .opt_level = opt_level
+    .mangler = mangler
+    .prebuilt_classes = prebuilt_classes
 }
 
 // A whole single-file program as a self-contained Lua chunk: header, the class
@@ -54,9 +60,13 @@ public class_block(program: Node): str {
 
     mut member_lines = [stmts.emit_member(stmt) for stmt in body if .is_emittable(stmt)]
 
-    mut block = "local " ++ .class_name ++ " = {}"
+    mut sep = Text.nl() ++ Text.nl()
+    if .opt_level >= 1 {
+        sep = Text.nl()
+    }
+    mut block = "local " ++ ctx.name() ++ " = {}"
     if member_lines.len() > 0 {
-        block = block ++ Text.nl() ++ Text.nl() ++ Text.join(member_lines, Text.nl())
+        block = block ++ sep ++ Text.join(member_lines, Text.nl())
     }
     return block
 }
@@ -90,7 +100,7 @@ private build_context(body: List<Node>): CgContext {
             }
         }
     }
-    return CgContext(.class_name, members, instance_methods, instance_order, properties, .known_classes, .externs, .variant_owner)
+    return CgContext(.class_name, members, instance_methods, instance_order, properties, .known_classes, .externs, .variant_owner, .opt_level, .mangler, .prebuilt_classes)
 }
 
 private is_property(stmt: Node): bool {

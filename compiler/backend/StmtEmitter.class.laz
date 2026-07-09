@@ -46,17 +46,20 @@ private emit_enum(node: Node): str {
     mut lines = []
     for variant in node.child("variants") {
         mut name = variant.child("name")
+        mut mangled_name = .ctx.mangle_self_member(name)
         if variant.child("fields").len() == 0 {
-            lines.push(.ctx.name() ++ "." ++ name ++ " = '" ++ name ++ "'")
+            // String tag uses original name — it's a runtime value matched with ==
+            lines.push(.ctx.name() ++ "." ++ mangled_name ++ " = '" ++ name ++ "'")
         } else {
-            lines.push(.emit_variant_ctor(name, variant.child("fields")))
+            lines.push(.emit_variant_ctor(name, mangled_name, variant.child("fields")))
         }
     }
     return Text.lines(lines)
 }
 
-private emit_variant_ctor(name: str, fields: List<Node>): str {
+private emit_variant_ctor(name: str, mangled_name: str, fields: List<Node>): str {
     mut params = []
+    // kind tag uses original name — matched by match arms as string
     mut assigns = ["kind = '" ++ name ++ "'"]
     mut i = 1
     for field in fields {
@@ -65,7 +68,7 @@ private emit_variant_ctor(name: str, fields: List<Node>): str {
         assigns.push("_" ++ s ++ " = _" ++ s)
         i = i + 1
     }
-    mut header = "function " ++ .ctx.name() ++ "." ++ name ++ "(" ++ Text.join(params, ", ") ++ ")"
+    mut header = "function " ++ .ctx.name() ++ "." ++ mangled_name ++ "(" ++ Text.join(params, ", ") ++ ")"
     return Text.lines([header, Text.indent("return { " ++ Text.join(assigns, ", ") ++ " }"), "end"])
 }
 
@@ -91,6 +94,9 @@ public emit_stmt(node: Node): str {
 }
 
 private source_hint(node: Node): str {
+    if .ctx.opt_level() >= 1 {
+        return ""
+    }
     mut ln = node.line()
     if ln == 0 {
         return ""
@@ -123,8 +129,16 @@ private emit_stmt_inner(node: Node): str {
 // the `_` arm becomes the `else` (or a bare `do ... end` when it is the only arm).
 // Binding arms (`n if cond =>` or `n =>`) hoist `local n = temp` before the chain.
 private emit_match(node: Node): str {
-    mut temp = .ctx.fresh_temp()
-    mut parts = ["local " ++ temp ++ " = " ++ .exprs.emit(node.child("scrutinee"))]
+    mut scrutinee_node = node.child("scrutinee")
+    mut scrutinee_str = .exprs.emit(scrutinee_node)
+    mut temp = ""
+    mut parts = []
+    if .ctx.opt_level() >= 2 and scrutinee_node.kind == "IdentifierExpr" and .ctx.is_local(scrutinee_node.child("name")) {
+        temp = scrutinee_str
+    } else {
+        temp = .ctx.fresh_temp()
+        parts.push("local " ++ temp ++ " = " ++ scrutinee_str)
+    }
     // Hoist binding names so the guard condition and body both see them.
     .ctx.push_scope()
     for arm in node.child("arms") {
@@ -304,20 +318,24 @@ private emit_variable(node: Node): str {
         return .ctx.emit_name(name) ++ " = " ++ rhs
     }
     .ctx.declare_local(name)
+    mut mangled = .ctx.mangle_local(name)
     if value.is_some() {
-        return "local " ++ name ++ " = " ++ .exprs.emit(value.unwrap())
+        return "local " ++ mangled ++ " = " ++ .exprs.emit(value.unwrap())
     }
-    return "local " ++ name
+    return "local " ++ mangled
 }
 
 private emit_index_assign(node: Node): str {
     mut target = node.child("target")
-    return "List.__lz_idx_set(" ++ .exprs.emit(target.child("object")) ++ ", " ++ .exprs.emit(target.child("index")) ++ ", " ++ .exprs.emit(node.child("value")) ++ ")"
+    mut idx_set = .ctx.mangle_class("List") ++ "." ++ .ctx.mangle_member("List", "__lz_idx_set")
+    return idx_set ++ "(" ++ .exprs.emit(target.child("object")) ++ ", " ++ .exprs.emit(target.child("index")) ++ ", " ++ .exprs.emit(node.child("value")) ++ ")"
 }
 
 private emit_local_function(node: Node): str {
-    .ctx.declare_local(node.child("name"))
-    mut header = "local function " ++ node.child("name") ++ "(" ++ Text.join(node.child("params"), ", ") ++ ")"
+    mut orig_name = node.child("name")
+    .ctx.declare_local(orig_name)
+    mut mangled = .ctx.mangle_local(orig_name)
+    mut header = "local function " ++ mangled ++ "(" ++ Text.join(.mangle_params(node.child("params")), ", ") ++ ")"
     return .wrap_body(header, .emit_fn_body(node.child("params"), node.child("param_types"), node.child("body")))
 }
 
@@ -330,6 +348,16 @@ private emit_return(node: Node): str {
 }
 
 private emit_if(node: Node): str {
+    // O1: dead-branch markers set by StmtFolder.elim_dead_branches
+    mut dead_true = node.attr("dead_true")
+    if dead_true.is_some() {
+        mut lines = [.emit_stmt(s) for s in dead_true.unwrap()]
+        return Text.lines(lines)
+    }
+    if node.attr("dead_empty").unwrap_or(false) {
+        return ""
+    }
+
     mut parts = []
     for i, clause in node.child("clauses") {
         mut keyword = "elseif "
@@ -403,11 +431,13 @@ private emit_for_in(node: Node): str {
     for name in vars {
         .ctx.declare_local(name)
     }
+    mut vars_mangled = [.ctx.mangle_local(v) for v in vars]
+    mut each = .ctx.mangle_class("List") ++ "." ++ .ctx.mangle_member("List", "__lz_each")
     mut header = ""
     if vars.len() == 1 {
-        header = "for _, " ++ vars.get(1).unwrap() ++ " in List.__lz_each(" ++ iter ++ ") do"
+        header = "for _, " ++ vars_mangled.get(1).unwrap() ++ " in " ++ each ++ "(" ++ iter ++ ") do"
     } else {
-        header = "for " ++ Text.join(vars, ", ") ++ " in List.__lz_each(" ++ iter ++ ") do"
+        header = "for " ++ Text.join(vars_mangled, ", ") ++ " in " ++ each ++ "(" ++ iter ++ ") do"
     }
     mut parts = [header]
     .push_block(parts, node.child("body"))
@@ -422,7 +452,7 @@ private emit_method(node: Node): str {
     if not node.attr("is_static").unwrap_or(false) {
         lua_params = .with_self(params)
     }
-    mut header = "function " ++ .ctx.name() ++ "." ++ node.child("name") ++ "(" ++ Text.join(lua_params, ", ") ++ ")"
+    mut header = "function " ++ .ctx.name() ++ "." ++ .ctx.mangle_self_member(node.child("name")) ++ "(" ++ Text.join(.mangle_params(lua_params), ", ") ++ ")"
     return .wrap_body(header, .emit_fn_body(lua_params, node.child("param_types"), node.child("body")))
 }
 
@@ -432,7 +462,8 @@ private emit_lua_method(node: Node): str {
     if not node.attr("is_static").unwrap_or(false) {
         lua_params = .with_self(params)
     }
-    mut header = "function " ++ .ctx.name() ++ "." ++ node.child("name") ++ "(" ++ Text.join(lua_params, ", ") ++ ")"
+    // Raw body references params by original name — never mangle the param list here.
+    mut header = "function " ++ .ctx.name() ++ "." ++ .ctx.mangle_self_member(node.child("name")) ++ "(" ++ Text.join(lua_params, ", ") ++ ")"
     return Text.lines([header, Text.indent(node.child("raw_body")), "end"])
 }
 
@@ -442,7 +473,7 @@ private emit_static_field(node: Node): str {
     if value.is_some() {
         rhs = .exprs.emit(value.unwrap())
     }
-    return .ctx.name() ++ "." ++ node.child("name") ++ " = " ++ rhs
+    return .ctx.name() ++ "." ++ .ctx.mangle_self_member(node.child("name")) ++ " = " ++ rhs
 }
 
 private emit_constructor(node: Node): str {
@@ -452,32 +483,38 @@ private emit_constructor(node: Node): str {
     }
     .ctx.declare_local("self")
 
-    mut lines = ["local self = {}"]
+    mut self_name = .ctx.mangle_local("self")
+    mut lines = ["local " ++ self_name ++ " = {}"]
     for guard in .default_guards(node.child("params"), node.child("param_types")) {
         lines.push(guard)
     }
     for method in .ctx.instance_method_names() {
-        lines.push("self." ++ method ++ " = " ++ .ctx.name() ++ "." ++ method)
+        mut mangled = .ctx.mangle_self_member(method)
+        lines.push(self_name ++ "." ++ mangled ++ " = " ++ .ctx.name() ++ "." ++ mangled)
     }
     for prop in .ctx.property_decls() {
         mut value = prop.attr("value")
         if value.is_some() {
-            lines.push("self." ++ prop.child("name") ++ " = " ++ .exprs.emit(value.unwrap()))
+            lines.push(self_name ++ "." ++ .ctx.mangle_self_member(prop.child("name")) ++ " = " ++ .exprs.emit(value.unwrap()))
         }
     }
     for stmt in node.child("body") {
         lines.push(.emit_stmt(stmt))
     }
-    lines.push("return self")
+    lines.push("return " ++ self_name)
     .ctx.pop_scope()
 
-    mut header = "function " ++ .ctx.name() ++ ".new(" ++ Text.join(node.child("params"), ", ") ++ ")"
+    mut header = "function " ++ .ctx.name() ++ ".new(" ++ Text.join(.mangle_params(node.child("params")), ", ") ++ ")"
     return Text.lines([header, Text.indent(Text.lines(lines)), "end"])
 }
 
 public emit_closure(params: List<str>, param_types: List<Node>, body: List<Node>): str {
-    mut header = "function(" ++ Text.join(params, ", ") ++ ")"
+    mut header = "function(" ++ Text.join(.mangle_params(params), ", ") ++ ")"
     return .wrap_body(header, .emit_fn_body(params, param_types, body))
+}
+
+private mangle_params(params: List<str>): List<str> {
+    return [.ctx.mangle_local(p) for p in params]
 }
 
 // A header plus a (possibly empty) indented body, closed with `end`.

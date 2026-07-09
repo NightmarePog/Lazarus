@@ -9,8 +9,11 @@ import frontend.optimizer.Constants
 import frontend.optimizer.ExprFolder
 
 private exprs: ExprFolder
-@auto
-constructor(exprs: ExprFolder)
+private opt_level: int = 0
+constructor(exprs: ExprFolder, opt_level: int) {
+    .exprs = exprs
+    .opt_level = opt_level
+}
 
 public fold_block(stmts: List<Node>, constants: Constants): unit {
     for stmt in stmts {
@@ -78,6 +81,34 @@ private fold_if(stmt: Node, constants: Constants): unit {
     mut else_body = stmt.attr("else_body")
     if else_body.is_some() {
         .fold_block(else_body.unwrap(), constants.child([]))
+    }
+    if .opt_level >= 1 {
+        .elim_dead_branches(stmt)
+    }
+}
+
+// O1: if the sole clause's condition is a boolean literal, mark the if-stmt for
+// transparent hoisting. `dead_true` carries the body to inline; `dead_empty` marks
+// it as a no-op. Only triggers when there is exactly one clause (no elseif chain).
+private elim_dead_branches(stmt: Node): unit {
+    mut clauses = stmt.child("clauses")
+    if clauses.len() != 1 {
+        return
+    }
+    mut clause = clauses.get(1).unwrap()
+    mut cond = clause.child("condition")
+    if cond.kind != "LiteralExpr" or cond.child("lit_kind") != "boolean" {
+        return
+    }
+    if cond.child("value") {
+        stmt.set("dead_true", clause.child("body"))
+    } else {
+        mut else_body = stmt.attr("else_body")
+        if else_body.is_some() {
+            stmt.set("dead_true", else_body.unwrap())
+        } else {
+            stmt.set("dead_empty", true)
+        }
     }
 }
 

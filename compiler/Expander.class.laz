@@ -65,7 +65,7 @@ static compile_handler(handler_class: str, modules: List<Module>): dynamic {
     for m in modules {
         if not m.is_trait {
             // externs and variant_owner left empty — handler modules must not use match on enums or extern bindings
-            mut cg = Codegen(m.class_name, m.imports, [:], [:], "")
+            mut cg = Codegen(m.class_name, m.imports, [:], [:], "", 0, 0, 0)
             blocks.push(cg.class_block(m.ast))
         }
     }

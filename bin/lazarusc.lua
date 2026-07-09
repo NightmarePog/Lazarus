@@ -1,5 +1,5 @@
 --[[LAZARUS_META
-{"class":"Main","fields":{},"methods":{"build_file":{"params":[{"name":"str","args":[]},{"name":"str","args":[]},{"name":"str","args":[]}],"pnames":["path","plat","pkg_path"],"result":{"name":"unit","args":[]},"static":true,"tvars":[]},"build_lib":{"params":[{"name":"str","args":[]},{"name":"str","args":[]},{"name":"str","args":[]}],"pnames":["path","plat","pkg_path"],"result":{"name":"unit","args":[]},"static":true,"tvars":[]},"check_file":{"params":[{"name":"str","args":[]},{"name":"str","args":[]}],"pnames":["path","pkg_path"],"result":{"name":"unit","args":[]},"static":true,"tvars":[]},"collect_enums":{"params":[{"name":"Node","args":[]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"str","args":[]}]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"List","args":[{"name":"str","args":[]}]}]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"int","args":[]}]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"List","args":[{"name":"Node","args":[]}]}]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"List","args":[{"name":"str","args":[]}]}]}],"pnames":["ast","variant_owner","enums","variant_arity","variant_fields","enum_type_params"],"result":{"name":"unit","args":[]},"static":true,"tvars":[]},"collect_signatures":{"params":[{"name":"Node","args":[]},{"name":"str","args":[]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"dynamic","args":[]}]},{"name":"str","args":[]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"str","args":[]}]}],"pnames":["ast","class_name","classes","plat","gated_externs"],"result":{"name":"unit","args":[]},"static":true,"tvars":[]},"collect_traits":{"params":[{"name":"Node","args":[]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"dynamic","args":[]}]},{"name":"str","args":[]}],"pnames":["ast","traits","class_name"],"result":{"name":"unit","args":[]},"static":true,"tvars":[]}},"ctor":[],"cnames":[],"tvars":[]}
+{"class":"Main","fields":{},"methods":{"build_file":{"params":[{"name":"str","args":[]},{"name":"str","args":[]},{"name":"str","args":[]},{"name":"int","args":[]}],"pnames":["path","plat","pkg_path","opt_level"],"result":{"name":"unit","args":[]},"static":true,"tvars":[]},"build_lib":{"params":[{"name":"str","args":[]},{"name":"str","args":[]},{"name":"str","args":[]},{"name":"int","args":[]}],"pnames":["path","plat","pkg_path","opt_level"],"result":{"name":"unit","args":[]},"static":true,"tvars":[]},"check_file":{"params":[{"name":"str","args":[]},{"name":"str","args":[]}],"pnames":["path","pkg_path"],"result":{"name":"unit","args":[]},"static":true,"tvars":[]},"collect_enums":{"params":[{"name":"Node","args":[]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"str","args":[]}]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"List","args":[{"name":"str","args":[]}]}]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"int","args":[]}]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"List","args":[{"name":"Node","args":[]}]}]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"List","args":[{"name":"str","args":[]}]}]}],"pnames":["ast","variant_owner","enums","variant_arity","variant_fields","enum_type_params"],"result":{"name":"unit","args":[]},"static":true,"tvars":[]},"collect_signatures":{"params":[{"name":"Node","args":[]},{"name":"str","args":[]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"dynamic","args":[]}]},{"name":"str","args":[]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"str","args":[]}]}],"pnames":["ast","class_name","classes","plat","gated_externs"],"result":{"name":"unit","args":[]},"static":true,"tvars":[]},"collect_traits":{"params":[{"name":"Node","args":[]},{"name":"Map","args":[{"name":"str","args":[]},{"name":"dynamic","args":[]}]},{"name":"str","args":[]}],"pnames":["ast","traits","class_name"],"result":{"name":"unit","args":[]},"static":true,"tvars":[]}},"ctor":[],"cnames":[],"tvars":[]}
 ]]
 
 --------------------------------------------------------------------
@@ -8371,10 +8371,11 @@ end
 
 local ExprFolder = {}
 
--- ExprFolder:13
-function ExprFolder.new()
+-- ExprFolder:14
+function ExprFolder.new(opt_level)
     local self = {}
     self.fold_count = ExprFolder.fold_count
+    self.register_inlineables = ExprFolder.register_inlineables
     self.fold = ExprFolder.fold
     self.fold_comp_cond = ExprFolder.fold_comp_cond
     self.fold_identifier = ExprFolder.fold_identifier
@@ -8385,224 +8386,440 @@ function ExprFolder.new()
     self.result_kind = ExprFolder.result_kind
     self.apply = ExprFolder.apply
     self.fold_call = ExprFolder.fold_call
+    self.try_inline_builtin = ExprFolder.try_inline_builtin
+    self.try_inline_call = ExprFolder.try_inline_call
+    self.subst = ExprFolder.subst
     self.fold_list = ExprFolder.fold_list
     self.fold_map = ExprFolder.fold_map
     self.folds = 0
+    self.opt_level = 0
+    self.inlineable = Map.__lz_from({})
+    -- ExprFolder:15
+    self.opt_level = opt_level
     return self
 end
--- ExprFolder:15
+-- ExprFolder:18
 function ExprFolder.fold_count(self)
-    -- ExprFolder:16
+    -- ExprFolder:19
     return self.folds
 end
--- ExprFolder:19
+-- ExprFolder:26
+function ExprFolder.register_inlineables(self, class_name, body)
+    -- ExprFolder:27
+    if self.opt_level < 2 then
+        -- ExprFolder:28
+        return
+    end
+    -- ExprFolder:30
+    for _, stmt in List.__lz_each(body) do
+        -- ExprFolder:31
+        if stmt.kind ~= "FunctionDecl" then
+        elseif not Option.unwrap_or(stmt:attr("is_static"), false) then
+        elseif Option.is_some(stmt:attr("raw_body")) then
+        else
+            -- ExprFolder:35
+            local params = stmt:child("params")
+            -- ExprFolder:36
+            if params:len() <= 3 then
+                -- ExprFolder:37
+                local fn_body = stmt:child("body")
+                -- ExprFolder:38
+                if fn_body:len() == 1 then
+                    -- ExprFolder:39
+                    local only = Option.__lz_unwrap(fn_body:get(1))
+                    -- ExprFolder:40
+                    if only.kind == "ReturnStmt" then
+                        -- ExprFolder:41
+                        local val = only:attr("value")
+                        -- ExprFolder:42
+                        if Option.__lz_is_some(val) then
+                            -- ExprFolder:43
+                            local key = (class_name .. ".") .. stmt:child("name")
+                            -- ExprFolder:44
+                            List.__lz_idx_set(self.inlineable, key, Map.__lz_from({["params"] = params, ["expr"] = Option.__lz_unwrap(val)}))
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+-- ExprFolder:53
 function ExprFolder.fold(self, node, constants)
-    -- ExprFolder:20
+    -- ExprFolder:54
     local __lz_m1 = node.kind
     if __lz_m1 == "IdentifierExpr" then
-        -- ExprFolder:21
+        -- ExprFolder:55
         return ExprFolder.fold_identifier(self, node, constants)
     elseif __lz_m1 == "BinaryExpr" then
-        -- ExprFolder:22
+        -- ExprFolder:56
         return ExprFolder.fold_binary(self, node, constants)
     elseif __lz_m1 == "CallExpr" then
-        -- ExprFolder:23
+        -- ExprFolder:57
         return ExprFolder.fold_call(self, node, constants)
     elseif __lz_m1 == "ListExpr" then
-        -- ExprFolder:24
+        -- ExprFolder:58
         return ExprFolder.fold_list(self, node, constants)
     elseif __lz_m1 == "MapExpr" then
-        -- ExprFolder:25
+        -- ExprFolder:59
         return ExprFolder.fold_map(self, node, constants)
     elseif __lz_m1 == "UnaryExpr" then
-        -- ExprFolder:27
+        -- ExprFolder:61
         node:set("operand", ExprFolder.fold(self, node:child("operand"), constants))
-        -- ExprFolder:28
+        -- ExprFolder:62
         return node
     elseif __lz_m1 == "MemberExpr" then
-        -- ExprFolder:31
+        -- ExprFolder:65
         node:set("object", ExprFolder.fold(self, node:child("object"), constants))
-        -- ExprFolder:32
+        -- ExprFolder:66
         return node
     elseif __lz_m1 == "IndexExpr" then
-        -- ExprFolder:35
+        -- ExprFolder:69
         node:set("object", ExprFolder.fold(self, node:child("object"), constants))
-        -- ExprFolder:36
+        -- ExprFolder:70
         node:set("index", ExprFolder.fold(self, node:child("index"), constants))
-        -- ExprFolder:37
+        -- ExprFolder:71
         return node
     elseif __lz_m1 == "ListComp" then
-        -- ExprFolder:40
+        -- ExprFolder:74
         node:set("iter", ExprFolder.fold(self, node:child("iter"), constants))
-        -- ExprFolder:41
+        -- ExprFolder:75
         local inner = constants:child(node:child("vars"))
-        -- ExprFolder:42
+        -- ExprFolder:76
         node:set("element", ExprFolder.fold(self, node:child("element"), inner))
-        -- ExprFolder:43
+        -- ExprFolder:77
         ExprFolder.fold_comp_cond(self, node, inner)
-        -- ExprFolder:44
+        -- ExprFolder:78
         return node
     elseif __lz_m1 == "MapComp" then
-        -- ExprFolder:47
+        -- ExprFolder:81
         node:set("iter", ExprFolder.fold(self, node:child("iter"), constants))
-        -- ExprFolder:48
+        -- ExprFolder:82
         local inner = constants:child(node:child("vars"))
-        -- ExprFolder:49
+        -- ExprFolder:83
         node:set("key", ExprFolder.fold(self, node:child("key"), inner))
-        -- ExprFolder:50
+        -- ExprFolder:84
         node:set("value", ExprFolder.fold(self, node:child("value"), inner))
-        -- ExprFolder:51
+        -- ExprFolder:85
         ExprFolder.fold_comp_cond(self, node, inner)
-        -- ExprFolder:52
+        -- ExprFolder:86
         return node
     else
     end
-    -- ExprFolder:56
-    return node
-end
--- ExprFolder:60
-function ExprFolder.fold_comp_cond(self, node, constants)
-    -- ExprFolder:61
-    local cond = node:attr("cond")
-    -- ExprFolder:62
-    if Option.is_some(cond) then
-        -- ExprFolder:63
-        node:set("cond", ExprFolder.fold(self, Option.unwrap(cond), constants))
-    end
-end
--- ExprFolder:67
-function ExprFolder.fold_identifier(self, node, constants)
-    -- ExprFolder:68
-    local hit = constants:lookup(node:child("name"))
-    -- ExprFolder:69
-    if Option.is_some(hit) then
-        -- ExprFolder:70
-        self.folds = self.folds + 1
-        -- ExprFolder:71
-        return Option.unwrap(hit)
-    end
-    -- ExprFolder:73
-    return node
-end
--- ExprFolder:76
-function ExprFolder.fold_binary(self, node, constants)
-    -- ExprFolder:77
-    local left = ExprFolder.fold(self, node:child("left"), constants)
-    -- ExprFolder:78
-    local right = ExprFolder.fold(self, node:child("right"), constants)
-    -- ExprFolder:79
-    local op = node:child("op")
-    -- ExprFolder:80
-    if ExprFolder.foldable(self, op, left, right) then
-        -- ExprFolder:81
-        local lv = Option.unwrap_or(Option.__lz_wrap(tonumber(left:child("value"))), 0.0)
-        -- ExprFolder:82
-        local rv = Option.unwrap_or(Option.__lz_wrap(tonumber(right:child("value"))), 0.0)
-        -- ExprFolder:83
-        if (op ~= "DIVIDE") or (rv ~= 0.0) then
-            -- ExprFolder:84
-            local result = ExprFolder.apply(self, op, lv, rv)
-            -- ExprFolder:85
-            self.folds = self.folds + 1
-            -- ExprFolder:86
-            return Ast.literal(ExprFolder.result_kind(self, op, left, right), Option.__lz_unwrap_or(Option.__lz_wrap(tostring(result)), "0"), node:line(), node:col())
-        end
-    end
-    -- ExprFolder:89
-    node:set("left", left)
     -- ExprFolder:90
-    node:set("right", right)
-    -- ExprFolder:91
     return node
 end
 -- ExprFolder:94
-function ExprFolder.foldable(self, op, left, right)
+function ExprFolder.fold_comp_cond(self, node, constants)
     -- ExprFolder:95
+    local cond = node:attr("cond")
+    -- ExprFolder:96
+    if Option.is_some(cond) then
+        -- ExprFolder:97
+        node:set("cond", ExprFolder.fold(self, Option.unwrap(cond), constants))
+    end
+end
+-- ExprFolder:101
+function ExprFolder.fold_identifier(self, node, constants)
+    -- ExprFolder:102
+    local hit = constants:lookup(node:child("name"))
+    -- ExprFolder:103
+    if Option.is_some(hit) then
+        -- ExprFolder:104
+        self.folds = self.folds + 1
+        -- ExprFolder:105
+        return Option.unwrap(hit)
+    end
+    -- ExprFolder:107
+    return node
+end
+-- ExprFolder:110
+function ExprFolder.fold_binary(self, node, constants)
+    -- ExprFolder:111
+    local left = ExprFolder.fold(self, node:child("left"), constants)
+    -- ExprFolder:112
+    local right = ExprFolder.fold(self, node:child("right"), constants)
+    -- ExprFolder:113
+    local op = node:child("op")
+    -- ExprFolder:114
+    if ExprFolder.foldable(self, op, left, right) then
+        -- ExprFolder:115
+        local lv = Option.unwrap_or(Option.__lz_wrap(tonumber(left:child("value"))), 0.0)
+        -- ExprFolder:116
+        local rv = Option.unwrap_or(Option.__lz_wrap(tonumber(right:child("value"))), 0.0)
+        -- ExprFolder:117
+        if (op ~= "DIVIDE") or (rv ~= 0.0) then
+            -- ExprFolder:118
+            local result = ExprFolder.apply(self, op, lv, rv)
+            -- ExprFolder:119
+            self.folds = self.folds + 1
+            -- ExprFolder:120
+            return Ast.literal(ExprFolder.result_kind(self, op, left, right), Option.__lz_unwrap_or(Option.__lz_wrap(tostring(result)), "0"), node:line(), node:col())
+        end
+    end
+    -- ExprFolder:123
+    node:set("left", left)
+    -- ExprFolder:124
+    node:set("right", right)
+    -- ExprFolder:125
+    return node
+end
+-- ExprFolder:128
+function ExprFolder.foldable(self, op, left, right)
+    -- ExprFolder:129
     return (ExprFolder.can_fold(self, op) and ExprFolder.is_number(self, left)) and ExprFolder.is_number(self, right)
 end
--- ExprFolder:98
+-- ExprFolder:132
 function ExprFolder.can_fold(self, op)
-    -- ExprFolder:99
+    -- ExprFolder:133
     return (((op == "PLUS") or (op == "MINUS")) or (op == "MULTIPLY")) or (op == "DIVIDE")
 end
--- ExprFolder:102
+-- ExprFolder:136
 function ExprFolder.is_number(self, node)
-    -- ExprFolder:103
+    -- ExprFolder:137
     if node.kind ~= "LiteralExpr" then
-        -- ExprFolder:104
+        -- ExprFolder:138
         return false
     end
-    -- ExprFolder:106
+    -- ExprFolder:140
     local lk = node:child("lit_kind")
-    -- ExprFolder:107
+    -- ExprFolder:141
     return (lk == "number") or (lk == "float")
 end
--- ExprFolder:112
+-- ExprFolder:146
 function ExprFolder.result_kind(self, op, left, right)
-    -- ExprFolder:113
+    -- ExprFolder:147
     if op == "DIVIDE" then
-        -- ExprFolder:114
+        -- ExprFolder:148
         return "float"
     end
-    -- ExprFolder:116
+    -- ExprFolder:150
     if (left:child("lit_kind") == "float") or (right:child("lit_kind") == "float") then
-        -- ExprFolder:117
+        -- ExprFolder:151
         return "float"
     end
-    -- ExprFolder:119
+    -- ExprFolder:153
     return "number"
 end
--- ExprFolder:122
+-- ExprFolder:156
 function ExprFolder.apply(self, op, a, b)
-    -- ExprFolder:123
+    -- ExprFolder:157
     local __lz_m2 = op
     if __lz_m2 == "PLUS" then
-        -- ExprFolder:124
+        -- ExprFolder:158
         return a + b
     elseif __lz_m2 == "MINUS" then
-        -- ExprFolder:125
+        -- ExprFolder:159
         return a - b
     elseif __lz_m2 == "MULTIPLY" then
-        -- ExprFolder:126
+        -- ExprFolder:160
         return a * b
     else
     end
-    -- ExprFolder:129
+    -- ExprFolder:163
     return a / b
 end
--- ExprFolder:132
+-- ExprFolder:168
+ExprFolder.inline_builtins = Map.__lz_from({["is_some"] = "nil_neq", ["is_none"] = "nil_eq", ["is_ok"] = "kind_ok", ["is_err"] = "kind_err"})
+-- ExprFolder:175
 function ExprFolder.fold_call(self, node, constants)
-    -- ExprFolder:133
+    -- ExprFolder:176
     node:set("callee", ExprFolder.fold(self, node:child("callee"), constants))
-    -- ExprFolder:134
+    -- ExprFolder:177
     node:set("args", (function() local __lz_m3 = List.new() for _, arg in List.__lz_each(node:child("args")) do List.push(__lz_m3, ExprFolder.fold(self, arg, constants)) end return __lz_m3 end)())
-    -- ExprFolder:135
+    -- ExprFolder:178
+    if self.opt_level >= 2 then
+        -- ExprFolder:179
+        local inlined = ExprFolder.try_inline_builtin(self, node)
+        -- ExprFolder:180
+        if Option.is_some(inlined) then
+            -- ExprFolder:181
+            self.folds = self.folds + 1
+            -- ExprFolder:182
+            return Option.unwrap(inlined)
+        end
+        -- ExprFolder:184
+        local inlined2 = ExprFolder.try_inline_call(self, node)
+        -- ExprFolder:185
+        if Option.is_some(inlined2) then
+            -- ExprFolder:186
+            return Option.unwrap(inlined2)
+        end
+    end
+    -- ExprFolder:189
     return node
 end
--- ExprFolder:138
+-- ExprFolder:192
+function ExprFolder.try_inline_builtin(self, node)
+    -- ExprFolder:193
+    if node:child("args"):len() ~= 0 then
+        -- ExprFolder:194
+        return Option.none()
+    end
+    -- ExprFolder:196
+    local callee = node:child("callee")
+    -- ExprFolder:197
+    if callee.kind ~= "MemberExpr" then
+        -- ExprFolder:198
+        return Option.none()
+    end
+    -- ExprFolder:200
+    local field = callee:child("field")
+    -- ExprFolder:201
+    local repl = ExprFolder.inline_builtins:get(field)
+    -- ExprFolder:202
+    if Option.__lz_is_none(repl) then
+        -- ExprFolder:203
+        return Option.none()
+    end
+    -- ExprFolder:205
+    local obj = callee:child("object")
+    -- ExprFolder:206
+    local ln = node:line()
+    -- ExprFolder:207
+    local col = node:col()
+    -- ExprFolder:208
+    local kind = Option.__lz_unwrap(repl)
+    -- ExprFolder:209
+    if kind == "nil_neq" then
+        -- ExprFolder:210
+        return Option.some(Ast.binary("NEQ", obj, Ast.literal("nil", false, ln, col), ln, col))
+    end
+    -- ExprFolder:212
+    if kind == "nil_eq" then
+        -- ExprFolder:213
+        return Option.some(Ast.binary("EQ", obj, Ast.literal("nil", false, ln, col), ln, col))
+    end
+    -- ExprFolder:215
+    local kind_member = Ast.member(obj, "kind", ln, col)
+    -- ExprFolder:216
+    if kind == "kind_ok" then
+        -- ExprFolder:217
+        return Option.some(Ast.binary("EQ", kind_member, Ast.literal("string", "ok", ln, col), ln, col))
+    end
+    -- ExprFolder:219
+    return Option.some(Ast.binary("EQ", kind_member, Ast.literal("string", "err", ln, col), ln, col))
+end
+-- ExprFolder:222
+function ExprFolder.try_inline_call(self, node)
+    -- ExprFolder:223
+    local callee = node:child("callee")
+    -- ExprFolder:224
+    if callee.kind ~= "MemberExpr" then
+        -- ExprFolder:225
+        return Option.none()
+    end
+    -- ExprFolder:227
+    local obj = callee:child("object")
+    -- ExprFolder:228
+    if obj.kind ~= "IdentifierExpr" then
+        -- ExprFolder:229
+        return Option.none()
+    end
+    -- ExprFolder:231
+    local key = (obj:child("name") .. ".") .. callee:child("field")
+    -- ExprFolder:232
+    local entry = self.inlineable:get(key)
+    -- ExprFolder:233
+    if Option.is_none(entry) then
+        -- ExprFolder:234
+        return Option.none()
+    end
+    -- ExprFolder:236
+    local info = Option.unwrap(entry)
+    -- ExprFolder:237
+    local params = List.__lz_idx_get(info, "params")
+    -- ExprFolder:238
+    local args = node:child("args")
+    -- ExprFolder:239
+    if params:len() ~= args:len() then
+        -- ExprFolder:240
+        return Option.none()
+    end
+    -- ExprFolder:242
+    local mapping = Map.__lz_from({})
+    -- ExprFolder:243
+    local i = 1
+    -- ExprFolder:244
+    for _, param in List.__lz_each(params) do
+        -- ExprFolder:245
+        List.__lz_idx_set(mapping, param, Option.__lz_unwrap(args:get(i)))
+        -- ExprFolder:246
+        i = i + 1
+    end
+    -- ExprFolder:248
+    self.folds = self.folds + 1
+    -- ExprFolder:249
+    return Option.some(ExprFolder.subst(self, List.__lz_idx_get(info, "expr"), mapping))
+end
+-- ExprFolder:252
+function ExprFolder.subst(self, expr, mapping)
+    -- ExprFolder:253
+    if expr.kind == "IdentifierExpr" then
+        -- ExprFolder:254
+        local hit = mapping:get(expr:child("name"))
+        -- ExprFolder:255
+        if Option.is_some(hit) then
+            -- ExprFolder:256
+            return Option.unwrap(hit)
+        end
+        -- ExprFolder:258
+        return expr
+    end
+    -- ExprFolder:260
+    if expr.kind == "LiteralExpr" then
+        -- ExprFolder:261
+        return expr
+    end
+    -- ExprFolder:263
+    if expr.kind == "BinaryExpr" then
+        -- ExprFolder:264
+        return Ast.binary(expr:child("op"), ExprFolder.subst(self, expr:child("left"), mapping), ExprFolder.subst(self, expr:child("right"), mapping), expr:line(), expr:col())
+    end
+    -- ExprFolder:266
+    if expr.kind == "UnaryExpr" then
+        -- ExprFolder:267
+        return Ast.unary(expr:child("op"), ExprFolder.subst(self, expr:child("operand"), mapping), expr:line(), expr:col())
+    end
+    -- ExprFolder:269
+    if expr.kind == "MemberExpr" then
+        -- ExprFolder:270
+        return Ast.member(ExprFolder.subst(self, expr:child("object"), mapping), expr:child("field"), expr:line(), expr:col())
+    end
+    -- ExprFolder:272
+    if expr.kind == "CallExpr" then
+        -- ExprFolder:273
+        local new_args = (function() local __lz_m4 = List.new() for _, a in List.__lz_each(expr:child("args")) do List.push(__lz_m4, ExprFolder.subst(self, a, mapping)) end return __lz_m4 end)()
+        -- ExprFolder:274
+        return Ast.call(ExprFolder.subst(self, expr:child("callee"), mapping), new_args, expr:line(), expr:col())
+    end
+    -- ExprFolder:276
+    return expr
+end
+-- ExprFolder:279
 function ExprFolder.fold_list(self, node, constants)
-    -- ExprFolder:139
-    node:set("elements", (function() local __lz_m4 = List.new() for _, element in List.__lz_each(node:child("elements")) do List.push(__lz_m4, ExprFolder.fold(self, element, constants)) end return __lz_m4 end)())
-    -- ExprFolder:140
+    -- ExprFolder:280
+    node:set("elements", (function() local __lz_m5 = List.new() for _, element in List.__lz_each(node:child("elements")) do List.push(__lz_m5, ExprFolder.fold(self, element, constants)) end return __lz_m5 end)())
+    -- ExprFolder:281
     return node
 end
--- ExprFolder:143
+-- ExprFolder:284
 function ExprFolder.fold_map(self, node, constants)
-    -- ExprFolder:144
+    -- ExprFolder:285
     for _, entry in List.__lz_each(node:child("entries")) do
-        -- ExprFolder:145
+        -- ExprFolder:286
         entry:set("key", ExprFolder.fold(self, entry:child("key"), constants))
-        -- ExprFolder:146
+        -- ExprFolder:287
         entry:set("value", ExprFolder.fold(self, entry:child("value"), constants))
     end
-    -- ExprFolder:148
+    -- ExprFolder:289
     return node
 end
 
 local StmtFolder = {}
 
 -- StmtFolder:13
-function StmtFolder.new(exprs)
+function StmtFolder.new(exprs, opt_level)
     local self = {}
     self.fold_block = StmtFolder.fold_block
     self.fold_statement = StmtFolder.fold_statement
@@ -8610,213 +8827,263 @@ function StmtFolder.new(exprs)
     self.fold_optional = StmtFolder.fold_optional
     self.fold_assign = StmtFolder.fold_assign
     self.fold_if = StmtFolder.fold_if
+    self.elim_dead_branches = StmtFolder.elim_dead_branches
     self.fold_for = StmtFolder.fold_for
     self.fold_for_in = StmtFolder.fold_for_in
     self.fold_match = StmtFolder.fold_match
     self.is_value_arm = StmtFolder.is_value_arm
+    self.opt_level = 0
+    -- StmtFolder:14
     self.exprs = exprs
+    -- StmtFolder:15
+    self.opt_level = opt_level
     return self
 end
--- StmtFolder:15
+-- StmtFolder:18
 function StmtFolder.fold_block(self, stmts, constants)
-    -- StmtFolder:16
+    -- StmtFolder:19
     for _, stmt in List.__lz_each(stmts) do
-        -- StmtFolder:17
+        -- StmtFolder:20
         StmtFolder.fold_statement(self, stmt, constants)
     end
 end
--- StmtFolder:21
+-- StmtFolder:24
 function StmtFolder.fold_statement(self, stmt, constants)
-    -- StmtFolder:23
+    -- StmtFolder:26
     local __lz_m1 = stmt.kind
     if __lz_m1 == "VariableDecl" then
-        -- StmtFolder:24
+        -- StmtFolder:27
         StmtFolder.fold_variable(self, stmt, constants)
     elseif __lz_m1 == "FunctionDecl" then
-        -- StmtFolder:26
+        -- StmtFolder:29
         if Option.is_none(stmt:attr("raw_body")) then
-            -- StmtFolder:27
+            -- StmtFolder:30
             StmtFolder.fold_block(self, stmt:child("body"), constants:child(stmt:child("params")))
         end
     elseif __lz_m1 == "ConstructorDecl" then
-        -- StmtFolder:30
+        -- StmtFolder:33
         StmtFolder.fold_block(self, stmt:child("body"), constants:child(stmt:child("params")))
     elseif __lz_m1 == "ReturnStmt" then
-        -- StmtFolder:31
+        -- StmtFolder:34
         StmtFolder.fold_optional(self, stmt, "value", constants)
     elseif __lz_m1 == "ExpressionStmt" then
-        -- StmtFolder:32
+        -- StmtFolder:35
         stmt:set("expression", self.exprs:fold(stmt:child("expression"), constants))
     elseif __lz_m1 == "FieldAssign" then
-        -- StmtFolder:33
+        -- StmtFolder:36
         StmtFolder.fold_assign(self, stmt, constants)
     elseif __lz_m1 == "IndexAssign" then
-        -- StmtFolder:34
+        -- StmtFolder:37
         StmtFolder.fold_assign(self, stmt, constants)
     elseif __lz_m1 == "IfStmt" then
-        -- StmtFolder:35
+        -- StmtFolder:38
         StmtFolder.fold_if(self, stmt, constants)
     elseif __lz_m1 == "WhileStmt" then
-        -- StmtFolder:37
+        -- StmtFolder:40
         stmt:set("condition", self.exprs:fold(stmt:child("condition"), constants))
-        -- StmtFolder:38
+        -- StmtFolder:41
         StmtFolder.fold_block(self, stmt:child("body"), constants:child(List.__lz_from({})))
     elseif __lz_m1 == "LoopStmt" then
-        -- StmtFolder:40
+        -- StmtFolder:43
         StmtFolder.fold_block(self, stmt:child("body"), constants:child(List.__lz_from({})))
     elseif __lz_m1 == "ForStmt" then
-        -- StmtFolder:41
+        -- StmtFolder:44
         StmtFolder.fold_for(self, stmt, constants)
     elseif __lz_m1 == "ForInStmt" then
-        -- StmtFolder:42
+        -- StmtFolder:45
         StmtFolder.fold_for_in(self, stmt, constants)
     elseif __lz_m1 == "MatchStmt" then
-        -- StmtFolder:43
+        -- StmtFolder:46
         StmtFolder.fold_match(self, stmt, constants)
     else
     end
 end
--- StmtFolder:48
+-- StmtFolder:51
 function StmtFolder.fold_variable(self, stmt, constants)
-    -- StmtFolder:49
-    StmtFolder.fold_optional(self, stmt, "value", constants)
-    -- StmtFolder:50
-    local mutable = Option.unwrap_or(stmt:attr("mutable"), false)
-    -- StmtFolder:51
-    local reassign = Option.unwrap_or(stmt:attr("reassign"), false)
     -- StmtFolder:52
+    StmtFolder.fold_optional(self, stmt, "value", constants)
+    -- StmtFolder:53
+    local mutable = Option.unwrap_or(stmt:attr("mutable"), false)
+    -- StmtFolder:54
+    local reassign = Option.unwrap_or(stmt:attr("reassign"), false)
+    -- StmtFolder:55
     if (not mutable) and (not reassign) then
-        -- StmtFolder:53
+        -- StmtFolder:56
         local value = stmt:attr("value")
-        -- StmtFolder:54
+        -- StmtFolder:57
         if Option.is_some(value) and (Option.unwrap(value).kind == "LiteralExpr") then
-            -- StmtFolder:55
+            -- StmtFolder:58
             constants:record(stmt:child("name"), Option.unwrap(value))
         end
     end
 end
--- StmtFolder:61
+-- StmtFolder:64
 function StmtFolder.fold_optional(self, stmt, key, constants)
-    -- StmtFolder:62
+    -- StmtFolder:65
     local value = stmt:attr(key)
-    -- StmtFolder:63
+    -- StmtFolder:66
     if Option.is_some(value) then
-        -- StmtFolder:64
+        -- StmtFolder:67
         stmt:set(key, self.exprs:fold(Option.unwrap(value), constants))
     end
 end
--- StmtFolder:68
+-- StmtFolder:71
 function StmtFolder.fold_assign(self, stmt, constants)
-    -- StmtFolder:69
+    -- StmtFolder:72
     stmt:set("target", self.exprs:fold(stmt:child("target"), constants))
-    -- StmtFolder:70
+    -- StmtFolder:73
     stmt:set("value", self.exprs:fold(stmt:child("value"), constants))
 end
--- StmtFolder:73
+-- StmtFolder:76
 function StmtFolder.fold_if(self, stmt, constants)
-    -- StmtFolder:74
+    -- StmtFolder:77
     for _, clause in List.__lz_each(stmt:child("clauses")) do
-        -- StmtFolder:75
+        -- StmtFolder:78
         clause:set("condition", self.exprs:fold(clause:child("condition"), constants))
-        -- StmtFolder:76
+        -- StmtFolder:79
         StmtFolder.fold_block(self, clause:child("body"), constants:child(List.__lz_from({})))
     end
-    -- StmtFolder:78
+    -- StmtFolder:81
     local else_body = stmt:attr("else_body")
-    -- StmtFolder:79
+    -- StmtFolder:82
     if Option.is_some(else_body) then
-        -- StmtFolder:80
+        -- StmtFolder:83
         StmtFolder.fold_block(self, Option.unwrap(else_body), constants:child(List.__lz_from({})))
     end
+    -- StmtFolder:85
+    if self.opt_level >= 1 then
+        -- StmtFolder:86
+        StmtFolder.elim_dead_branches(self, stmt)
+    end
 end
--- StmtFolder:87
+-- StmtFolder:93
+function StmtFolder.elim_dead_branches(self, stmt)
+    -- StmtFolder:94
+    local clauses = stmt:child("clauses")
+    -- StmtFolder:95
+    if clauses:len() ~= 1 then
+        -- StmtFolder:96
+        return
+    end
+    -- StmtFolder:98
+    local clause = Option.__lz_unwrap(clauses:get(1))
+    -- StmtFolder:99
+    local cond = clause:child("condition")
+    -- StmtFolder:100
+    if (cond.kind ~= "LiteralExpr") or (cond:child("lit_kind") ~= "boolean") then
+        -- StmtFolder:101
+        return
+    end
+    -- StmtFolder:103
+    if cond:child("value") then
+        -- StmtFolder:104
+        stmt:set("dead_true", clause:child("body"))
+    else
+        -- StmtFolder:106
+        local else_body = stmt:attr("else_body")
+        -- StmtFolder:107
+        if Option.is_some(else_body) then
+            -- StmtFolder:108
+            stmt:set("dead_true", Option.unwrap(else_body))
+        else
+            -- StmtFolder:110
+            stmt:set("dead_empty", true)
+        end
+    end
+end
+-- StmtFolder:118
 function StmtFolder.fold_for(self, stmt, constants)
-    -- StmtFolder:88
+    -- StmtFolder:119
     local shadowed = List.__lz_from({})
-    -- StmtFolder:89
+    -- StmtFolder:120
     local init = stmt:attr("init")
-    -- StmtFolder:90
+    -- StmtFolder:121
     if Option.is_some(init) then
-        -- StmtFolder:91
+        -- StmtFolder:122
         local init_node = Option.unwrap(init)
-        -- StmtFolder:92
+        -- StmtFolder:123
         shadowed:push(init_node:child("name"))
-        -- StmtFolder:93
+        -- StmtFolder:124
         StmtFolder.fold_optional(self, init_node, "value", constants)
     end
-    -- StmtFolder:95
+    -- StmtFolder:126
     local inner = constants:child(shadowed)
-    -- StmtFolder:96
+    -- StmtFolder:127
     local condition = stmt:attr("condition")
-    -- StmtFolder:97
+    -- StmtFolder:128
     if Option.is_some(condition) then
-        -- StmtFolder:98
+        -- StmtFolder:129
         stmt:set("condition", self.exprs:fold(Option.unwrap(condition), inner))
     end
-    -- StmtFolder:100
+    -- StmtFolder:131
     local step = stmt:attr("step")
-    -- StmtFolder:101
+    -- StmtFolder:132
     if Option.is_some(step) then
-        -- StmtFolder:102
+        -- StmtFolder:133
         StmtFolder.fold_statement(self, Option.unwrap(step), inner)
     end
-    -- StmtFolder:104
+    -- StmtFolder:135
     StmtFolder.fold_block(self, stmt:child("body"), inner)
 end
--- StmtFolder:107
+-- StmtFolder:138
 function StmtFolder.fold_for_in(self, stmt, constants)
-    -- StmtFolder:108
+    -- StmtFolder:139
     stmt:set("iter", self.exprs:fold(stmt:child("iter"), constants))
-    -- StmtFolder:109
+    -- StmtFolder:140
     StmtFolder.fold_block(self, stmt:child("body"), constants:child(stmt:child("vars")))
 end
--- StmtFolder:114
+-- StmtFolder:145
 function StmtFolder.fold_match(self, stmt, constants)
-    -- StmtFolder:115
+    -- StmtFolder:146
     stmt:set("scrutinee", self.exprs:fold(stmt:child("scrutinee"), constants))
-    -- StmtFolder:116
+    -- StmtFolder:147
     for _, arm in List.__lz_each(stmt:child("arms")) do
-        -- StmtFolder:117
+        -- StmtFolder:148
         if StmtFolder.is_value_arm(self, arm) then
-            -- StmtFolder:118
+            -- StmtFolder:149
             arm:set("pattern", self.exprs:fold(arm:child("pattern"), constants))
         end
-        -- StmtFolder:120
+        -- StmtFolder:151
         StmtFolder.fold_block(self, arm:child("body"), constants:child(List.__lz_from({})))
     end
 end
--- StmtFolder:125
+-- StmtFolder:156
 function StmtFolder.is_value_arm(self, arm)
-    -- StmtFolder:126
+    -- StmtFolder:157
     return (not Option.unwrap_or(arm:attr("is_wildcard"), false)) and (not Option.unwrap_or(arm:attr("is_variant"), false))
 end
 
 local Optimizer = {}
 
--- Optimizer:11
-function Optimizer.new()
+-- Optimizer:12
+function Optimizer.new(opt_level)
     local self = {}
     self.optimize = Optimizer.optimize
     self.fold_count = Optimizer.fold_count
     self.folds = 0
+    self.opt_level = 0
+    -- Optimizer:13
+    self.opt_level = opt_level
     return self
 end
--- Optimizer:13
-function Optimizer.optimize(self, program)
-    -- Optimizer:14
-    local exprs = ExprFolder.new()
-    -- Optimizer:15
-    local stmts = StmtFolder.new(exprs)
-    -- Optimizer:16
-    stmts:fold_block(program:child("body"), Constants.empty())
+-- Optimizer:16
+function Optimizer.optimize(self, program, class_name)
     -- Optimizer:17
-    self.folds = exprs:fold_count()
+    local exprs = ExprFolder.new(self.opt_level)
     -- Optimizer:18
+    exprs:register_inlineables(class_name, program:child("body"))
+    -- Optimizer:19
+    local stmts = StmtFolder.new(exprs, self.opt_level)
+    -- Optimizer:20
+    stmts:fold_block(program:child("body"), Constants.empty())
+    -- Optimizer:21
+    self.folds = exprs:fold_count()
+    -- Optimizer:22
     return program
 end
--- Optimizer:21
+-- Optimizer:25
 function Optimizer.fold_count(self)
-    -- Optimizer:22
+    -- Optimizer:26
     return self.folds
 end
 
@@ -8839,10 +9106,15 @@ end
 
 local CgContext = {}
 
--- CgContext:18
-function CgContext.new(cls, members, instance_methods, instance_order, properties, known_classes, externs, variant_owner)
+-- CgContext:20
+function CgContext.new(cls, members, instance_methods, instance_order, properties, known_classes, externs, variant_owner, opt_level, mangler, prebuilt_classes)
     local self = {}
     self.fresh_temp = CgContext.fresh_temp
+    self.opt_level = CgContext.opt_level
+    self.mangle_class = CgContext.mangle_class
+    self.mangle_local = CgContext.mangle_local
+    self.mangle_member = CgContext.mangle_member
+    self.mangle_self_member = CgContext.mangle_self_member
     self.name = CgContext.name
     self.instance_method_names = CgContext.instance_method_names
     self.property_decls = CgContext.property_decls
@@ -8857,139 +9129,208 @@ function CgContext.new(cls, members, instance_methods, instance_order, propertie
     self.is_variant = CgContext.is_variant
     self.variant_qualified = CgContext.variant_qualified
     self.emit_name = CgContext.emit_name
+    self.opt_level_val = 0
+    self.mangler_val = 0
+    self.prebuilt_classes_val = 0
     self.scopes = List.__lz_from({Map.__lz_from({})})
     self.temp_seq = 0
+    -- CgContext:21
     self.cls = cls
+    -- CgContext:22
     self.members = members
+    -- CgContext:23
     self.instance_methods = instance_methods
+    -- CgContext:24
     self.instance_order = instance_order
+    -- CgContext:25
     self.properties = properties
+    -- CgContext:26
     self.known_classes = known_classes
+    -- CgContext:27
     self.externs = externs
+    -- CgContext:28
     self.variant_owner = variant_owner
+    -- CgContext:29
+    self.opt_level_val = opt_level
+    -- CgContext:30
+    self.mangler_val = mangler
+    -- CgContext:31
+    self.prebuilt_classes_val = prebuilt_classes
     return self
 end
--- CgContext:24
+-- CgContext:38
 function CgContext.fresh_temp(self)
-    -- CgContext:25
+    -- CgContext:39
     self.temp_seq = self.temp_seq + 1
-    -- CgContext:26
+    -- CgContext:40
     return ("__lz_m" .. tostring(self.temp_seq))
 end
--- CgContext:29
-function CgContext.name(self)
-    -- CgContext:30
-    return self.cls
-end
--- CgContext:34
-function CgContext.instance_method_names(self)
-    -- CgContext:35
-    return self.instance_order
-end
--- CgContext:39
-function CgContext.property_decls(self)
-    -- CgContext:40
-    return self.properties
-end
 -- CgContext:43
-function CgContext.is_member(self, name)
+function CgContext.opt_level(self)
     -- CgContext:44
-    return self.members:has(name)
+    return self.opt_level_val
 end
 -- CgContext:47
-function CgContext.is_instance_method(self, name)
+function CgContext.mangle_class(self, n)
     -- CgContext:48
-    return self.instance_methods:has(name)
-end
--- CgContext:53
-function CgContext.is_construction(self, name)
-    -- CgContext:54
-    if name == self.cls then
-        -- CgContext:55
-        return true
+    if (self.opt_level_val < 3) or (self.mangler_val == 0) then
+        -- CgContext:49
+        return n
     end
-    -- CgContext:57
-    return self.known_classes:has(name)
+    -- CgContext:51
+    return self.mangler_val:mangle_class(n)
 end
--- CgContext:62
-function CgContext.extern_target(self, ns, member)
-    -- CgContext:63
-    local table = self.externs:get(ns)
-    -- CgContext:64
-    if Option.is_none(table) then
-        -- CgContext:65
-        return table
+-- CgContext:54
+function CgContext.mangle_local(self, n)
+    -- CgContext:55
+    if (self.opt_level_val < 3) or (self.mangler_val == 0) then
+        -- CgContext:56
+        return n
     end
-    -- CgContext:67
-    return Option.unwrap(table):get(member)
+    -- CgContext:58
+    return self.mangler_val:mangle_local(n)
 end
--- CgContext:70
-function CgContext.push_scope(self)
-    -- CgContext:71
-    self.scopes:push(Map.__lz_from({}))
+-- CgContext:64
+function CgContext.mangle_member(self, cls, member)
+    -- CgContext:65
+    return member
 end
--- CgContext:74
-function CgContext.pop_scope(self)
-    -- CgContext:75
-    self.scopes:pop()
+-- CgContext:69
+function CgContext.mangle_self_member(self, member)
+    -- CgContext:70
+    return member
+end
+-- CgContext:73
+function CgContext.name(self)
+    -- CgContext:74
+    return CgContext.mangle_class(self, self.cls)
 end
 -- CgContext:78
-function CgContext.declare_local(self, name)
+function CgContext.instance_method_names(self)
     -- CgContext:79
-    local top = Option.unwrap(self.scopes:get(self.scopes:len()))
-    -- CgContext:80
-    List.__lz_idx_set(top, name, true)
+    return self.instance_order
 end
 -- CgContext:83
-function CgContext.is_local(self, name)
+function CgContext.property_decls(self)
     -- CgContext:84
+    return self.properties
+end
+-- CgContext:87
+function CgContext.is_member(self, name)
+    -- CgContext:88
+    return self.members:has(name)
+end
+-- CgContext:91
+function CgContext.is_instance_method(self, name)
+    -- CgContext:92
+    return self.instance_methods:has(name)
+end
+-- CgContext:97
+function CgContext.is_construction(self, name)
+    -- CgContext:98
+    if name == self.cls then
+        -- CgContext:99
+        return true
+    end
+    -- CgContext:101
+    return self.known_classes:has(name)
+end
+-- CgContext:106
+function CgContext.extern_target(self, ns, member)
+    -- CgContext:107
+    local table = self.externs:get(ns)
+    -- CgContext:108
+    if Option.is_none(table) then
+        -- CgContext:109
+        return table
+    end
+    -- CgContext:111
+    return Option.unwrap(table):get(member)
+end
+-- CgContext:114
+function CgContext.push_scope(self)
+    -- CgContext:115
+    self.scopes:push(Map.__lz_from({}))
+end
+-- CgContext:118
+function CgContext.pop_scope(self)
+    -- CgContext:119
+    self.scopes:pop()
+end
+-- CgContext:122
+function CgContext.declare_local(self, name)
+    -- CgContext:123
+    local top = Option.unwrap(self.scopes:get(self.scopes:len()))
+    -- CgContext:124
+    List.__lz_idx_set(top, name, true)
+end
+-- CgContext:127
+function CgContext.is_local(self, name)
+    -- CgContext:128
     for _, scope in List.__lz_each(self.scopes) do
-        -- CgContext:85
+        -- CgContext:129
         if scope:has(name) then
-            -- CgContext:86
+            -- CgContext:130
             return true
         end
     end
-    -- CgContext:89
+    -- CgContext:133
     return false
 end
--- CgContext:94
+-- CgContext:138
 function CgContext.is_variant(self, name)
-    -- CgContext:95
+    -- CgContext:139
     return self.variant_owner:has(name)
 end
--- CgContext:98
+-- CgContext:142
 function CgContext.variant_qualified(self, name)
-    -- CgContext:99
-    return (Option.unwrap(self.variant_owner:get(name)) .. ".") .. name
+    -- CgContext:143
+    local owner = Option.unwrap(self.variant_owner:get(name))
+    -- CgContext:144
+    return (CgContext.mangle_class(self, owner) .. ".") .. CgContext.mangle_member(self, owner, name)
 end
--- CgContext:103
+-- CgContext:148
 function CgContext.emit_name(self, name)
-    -- CgContext:104
+    -- CgContext:149
     if CgContext.is_local(self, name) then
-        -- CgContext:105
-        return name
+        -- CgContext:150
+        return CgContext.mangle_local(self, name)
     end
-    -- CgContext:107
+    -- CgContext:152
     if CgContext.is_member(self, name) then
-        -- CgContext:108
-        return (self.cls .. ".") .. name
+        -- CgContext:153
+        return (CgContext.mangle_class(self, self.cls) .. ".") .. CgContext.mangle_self_member(self, name)
     end
-    -- CgContext:110
-    return name
+    -- CgContext:155
+    return CgContext.mangle_class(self, name)
 end
 
 local ExprEmitter = {}
 
 -- ExprEmitter:13
 ExprEmitter.op_map = Map.__lz_from({["PLUS"] = "+", ["MINUS"] = "-", ["MULTIPLY"] = "*", ["DIVIDE"] = "/", ["POWER"] = "^", ["CONCAT"] = "..", ["EQ"] = "==", ["NEQ"] = "~=", ["LESS"] = "<", ["LESS_EQUAL"] = "<=", ["GREATER"] = ">", ["GREATER_EQUAL"] = ">=", ["AND"] = "and", ["OR"] = "or"})
--- ExprEmitter:33
-ExprEmitter.builtins = Map.__lz_from({["is_some"] = "Option.__lz_is_some", ["is_none"] = "Option.__lz_is_none", ["is_ok"] = "Result.__lz_is_ok", ["is_err"] = "Result.__lz_is_err", ["unwrap"] = "Option.__lz_unwrap", ["unwrap_or"] = "Option.__lz_unwrap_or", ["error"] = "Result.error"})
--- ExprEmitter:46
+-- ExprEmitter:31
+ExprEmitter.builtin_meta = Map.__lz_from({["is_some"] = Map.__lz_from({["cls"] = "Option", ["fn"] = "__lz_is_some"}), ["is_none"] = Map.__lz_from({["cls"] = "Option", ["fn"] = "__lz_is_none"}), ["is_ok"] = Map.__lz_from({["cls"] = "Result", ["fn"] = "__lz_is_ok"}), ["is_err"] = Map.__lz_from({["cls"] = "Result", ["fn"] = "__lz_is_err"}), ["unwrap"] = Map.__lz_from({["cls"] = "Option", ["fn"] = "__lz_unwrap"}), ["unwrap_or"] = Map.__lz_from({["cls"] = "Option", ["fn"] = "__lz_unwrap_or"}), ["error"] = Map.__lz_from({["cls"] = "Result", ["fn"] = "error"})})
+-- ExprEmitter:43
+function ExprEmitter.builtin_target(self, field)
+    -- ExprEmitter:44
+    local entry = ExprEmitter.builtin_meta:get(field)
+    -- ExprEmitter:45
+    if Option.__lz_is_none(entry) then
+        -- ExprEmitter:46
+        return Option.none()
+    end
+    -- ExprEmitter:48
+    local e = Option.__lz_unwrap(entry)
+    -- ExprEmitter:49
+    return Option.some((self.ctx:mangle_class(List.__lz_idx_get(e, "cls")) .. ".") .. self.ctx:mangle_member(List.__lz_idx_get(e, "cls"), List.__lz_idx_get(e, "fn")))
+end
+-- ExprEmitter:55
 ExprEmitter.constructors = Map.__lz_from({["Option.some"] = "Option.some", ["Option.none"] = "Option.none", ["Result.ok"] = "Result.ok", ["Result.err"] = "Result.err"})
--- ExprEmitter:57
+-- ExprEmitter:66
 function ExprEmitter.new(ctx)
     local self = {}
+    self.builtin_target = ExprEmitter.builtin_target
     self.inject_stmts = ExprEmitter.inject_stmts
     self.take_pending = ExprEmitter.take_pending
     self.emit = ExprEmitter.emit
@@ -8997,6 +9338,7 @@ function ExprEmitter.new(ctx)
     self.emit_fn_expr = ExprEmitter.emit_fn_expr
     self.emit_list_comp = ExprEmitter.emit_list_comp
     self.emit_map_comp = ExprEmitter.emit_map_comp
+    self.lz_fn = ExprEmitter.lz_fn
     self.declare_loop_vars = ExprEmitter.declare_loop_vars
     self.comp_body = ExprEmitter.comp_body
     self.each_header = ExprEmitter.each_header
@@ -9020,461 +9362,472 @@ function ExprEmitter.new(ctx)
     self.ctx = ctx
     return self
 end
--- ExprEmitter:59
+-- ExprEmitter:68
 function ExprEmitter.inject_stmts(self, s)
-    -- ExprEmitter:60
+    -- ExprEmitter:69
     self.stmt_emitter = s
 end
--- ExprEmitter:65
+-- ExprEmitter:74
 function ExprEmitter.take_pending(self)
-    -- ExprEmitter:66
+    -- ExprEmitter:75
     local out = self.pending
-    -- ExprEmitter:67
+    -- ExprEmitter:76
     self.pending = List.__lz_from({})
-    -- ExprEmitter:68
+    -- ExprEmitter:77
     return out
 end
--- ExprEmitter:71
+-- ExprEmitter:80
 function ExprEmitter.emit(self, node)
-    -- ExprEmitter:72
+    -- ExprEmitter:81
     local __lz_m1 = node.kind
     if __lz_m1 == "LiteralExpr" then
-        -- ExprEmitter:73
+        -- ExprEmitter:82
         return ExprEmitter.emit_literal(self, node)
     elseif __lz_m1 == "IdentifierExpr" then
-        -- ExprEmitter:74
+        -- ExprEmitter:83
         return ExprEmitter.emit_identifier(self, node)
     elseif __lz_m1 == "SelfExpr" then
-        -- ExprEmitter:75
-        return "self"
+        -- ExprEmitter:84
+        return self.ctx:mangle_local("self")
     elseif __lz_m1 == "MemberExpr" then
-        -- ExprEmitter:76
+        -- ExprEmitter:85
         return ExprEmitter.emit_field(self, node)
     elseif __lz_m1 == "ListExpr" then
-        -- ExprEmitter:77
+        -- ExprEmitter:86
         return ExprEmitter.emit_list(self, node)
     elseif __lz_m1 == "MapExpr" then
-        -- ExprEmitter:78
+        -- ExprEmitter:87
         return ExprEmitter.emit_map(self, node)
     elseif __lz_m1 == "IndexExpr" then
-        -- ExprEmitter:79
+        -- ExprEmitter:88
         return ExprEmitter.emit_index(self, node)
     elseif __lz_m1 == "CallExpr" then
-        -- ExprEmitter:80
+        -- ExprEmitter:89
         return ExprEmitter.emit_call(self, node)
     elseif __lz_m1 == "UnaryExpr" then
-        -- ExprEmitter:81
+        -- ExprEmitter:90
         return ExprEmitter.emit_unary(self, node)
     elseif __lz_m1 == "BinaryExpr" then
-        -- ExprEmitter:82
+        -- ExprEmitter:91
         return ExprEmitter.emit_binary(self, node)
     elseif __lz_m1 == "ListComp" then
-        -- ExprEmitter:83
+        -- ExprEmitter:92
         return ExprEmitter.emit_list_comp(self, node)
     elseif __lz_m1 == "MapComp" then
-        -- ExprEmitter:84
+        -- ExprEmitter:93
         return ExprEmitter.emit_map_comp(self, node)
     elseif __lz_m1 == "InterpolatedString" then
-        -- ExprEmitter:85
+        -- ExprEmitter:94
         return ExprEmitter.emit_interp(self, node)
     elseif __lz_m1 == "FnExpr" then
-        -- ExprEmitter:86
+        -- ExprEmitter:95
         return ExprEmitter.emit_fn_expr(self, node)
     elseif __lz_m1 == "PropagateExpr" then
-        -- ExprEmitter:87
+        -- ExprEmitter:96
         return ExprEmitter.emit_propagate(self, node)
     else
     end
-    -- ExprEmitter:90
+    -- ExprEmitter:99
     return ""
 end
--- ExprEmitter:96
+-- ExprEmitter:105
 function ExprEmitter.emit_propagate(self, node)
-    -- ExprEmitter:97
+    -- ExprEmitter:106
     local temp = self.ctx:fresh_temp()
-    -- ExprEmitter:98
+    -- ExprEmitter:107
     self.pending:push((("local " .. temp) .. " = ") .. ExprEmitter.emit(self, node:child("inner")))
-    -- ExprEmitter:99
+    -- ExprEmitter:108
     self.pending:push(((("if " .. temp) .. ".kind == 'err' then return ") .. temp) .. " end")
-    -- ExprEmitter:100
+    -- ExprEmitter:109
     return temp .. ".value"
 end
--- ExprEmitter:103
+-- ExprEmitter:112
 function ExprEmitter.emit_fn_expr(self, node)
-    -- ExprEmitter:104
+    -- ExprEmitter:113
     return self.stmt_emitter:emit_closure(node:child("params"), node:child("param_types"), node:child("body"))
 end
--- ExprEmitter:111
+-- ExprEmitter:120
 function ExprEmitter.emit_list_comp(self, node)
-    -- ExprEmitter:112
+    -- ExprEmitter:121
     local iter = ExprEmitter.emit(self, node:child("iter"))
-    -- ExprEmitter:113
+    -- ExprEmitter:122
     local temp = self.ctx:fresh_temp()
-    -- ExprEmitter:114
-    self.ctx:push_scope()
-    -- ExprEmitter:115
-    ExprEmitter.declare_loop_vars(self, node:child("vars"))
-    -- ExprEmitter:116
-    local header = ExprEmitter.each_header(self, node:child("vars"), iter)
-    -- ExprEmitter:117
-    local body = ExprEmitter.comp_body(self, node, ((("List.push(" .. temp) .. ", ") .. ExprEmitter.emit(self, node:child("element"))) .. ")")
-    -- ExprEmitter:118
-    self.ctx:pop_scope()
-    -- ExprEmitter:119
-    return ((((((("(function() local " .. temp) .. " = List.new() ") .. header) .. " ") .. body) .. " end return ") .. temp) .. " end)()"
-end
--- ExprEmitter:122
-function ExprEmitter.emit_map_comp(self, node)
     -- ExprEmitter:123
-    local iter = ExprEmitter.emit(self, node:child("iter"))
-    -- ExprEmitter:124
-    local temp = self.ctx:fresh_temp()
-    -- ExprEmitter:125
     self.ctx:push_scope()
-    -- ExprEmitter:126
+    -- ExprEmitter:124
     ExprEmitter.declare_loop_vars(self, node:child("vars"))
-    -- ExprEmitter:127
+    -- ExprEmitter:125
     local header = ExprEmitter.each_header(self, node:child("vars"), iter)
-    -- ExprEmitter:128
-    local body = ExprEmitter.comp_body(self, node, ((((("List.__lz_idx_set(" .. temp) .. ", ") .. ExprEmitter.emit(self, node:child("key"))) .. ", ") .. ExprEmitter.emit(self, node:child("value"))) .. ")")
-    -- ExprEmitter:129
+    -- ExprEmitter:126
+    local body = ExprEmitter.comp_body(self, node, ((((ExprEmitter.lz_fn(self, "List", "push") .. "(") .. temp) .. ", ") .. ExprEmitter.emit(self, node:child("element"))) .. ")")
+    -- ExprEmitter:127
     self.ctx:pop_scope()
-    -- ExprEmitter:130
-    return ((((((("(function() local " .. temp) .. " = Map.new() ") .. header) .. " ") .. body) .. " end return ") .. temp) .. " end)()"
+    -- ExprEmitter:128
+    return ((((((((("(function() local " .. temp) .. " = ") .. ExprEmitter.lz_fn(self, "List", "new")) .. "() ") .. header) .. " ") .. body) .. " end return ") .. temp) .. " end)()"
 end
--- ExprEmitter:133
-function ExprEmitter.declare_loop_vars(self, vars)
+-- ExprEmitter:131
+function ExprEmitter.emit_map_comp(self, node)
+    -- ExprEmitter:132
+    local iter = ExprEmitter.emit(self, node:child("iter"))
+    -- ExprEmitter:133
+    local temp = self.ctx:fresh_temp()
     -- ExprEmitter:134
+    self.ctx:push_scope()
+    -- ExprEmitter:135
+    ExprEmitter.declare_loop_vars(self, node:child("vars"))
+    -- ExprEmitter:136
+    local header = ExprEmitter.each_header(self, node:child("vars"), iter)
+    -- ExprEmitter:137
+    local body = ExprEmitter.comp_body(self, node, ((((((ExprEmitter.lz_fn(self, "List", "__lz_idx_set") .. "(") .. temp) .. ", ") .. ExprEmitter.emit(self, node:child("key"))) .. ", ") .. ExprEmitter.emit(self, node:child("value"))) .. ")")
+    -- ExprEmitter:138
+    self.ctx:pop_scope()
+    -- ExprEmitter:139
+    return ((((((((("(function() local " .. temp) .. " = ") .. ExprEmitter.lz_fn(self, "Map", "new")) .. "() ") .. header) .. " ") .. body) .. " end return ") .. temp) .. " end)()"
+end
+-- ExprEmitter:144
+function ExprEmitter.lz_fn(self, cls, fn_name)
+    -- ExprEmitter:145
+    return (self.ctx:mangle_class(cls) .. ".") .. self.ctx:mangle_member(cls, fn_name)
+end
+-- ExprEmitter:148
+function ExprEmitter.declare_loop_vars(self, vars)
+    -- ExprEmitter:149
     for _, name in List.__lz_each(vars) do
-        -- ExprEmitter:135
+        -- ExprEmitter:150
         self.ctx:declare_local(name)
     end
 end
--- ExprEmitter:141
+-- ExprEmitter:156
 function ExprEmitter.comp_body(self, node, add)
-    -- ExprEmitter:142
+    -- ExprEmitter:157
     local cond = node:attr("cond")
-    -- ExprEmitter:143
+    -- ExprEmitter:158
     if Option.is_some(cond) then
-        -- ExprEmitter:144
+        -- ExprEmitter:159
         return ((("if " .. ExprEmitter.emit(self, Option.unwrap(cond))) .. " then ") .. add) .. " end"
     end
-    -- ExprEmitter:146
+    -- ExprEmitter:161
     return add
 end
--- ExprEmitter:151
+-- ExprEmitter:166
 function ExprEmitter.each_header(self, vars, iter)
-    -- ExprEmitter:152
+    -- ExprEmitter:167
+    local each = ExprEmitter.lz_fn(self, "List", "__lz_each")
+    -- ExprEmitter:168
     if vars:len() == 1 then
-        -- ExprEmitter:153
-        return ((("for _, " .. Option.unwrap(vars:get(1))) .. " in List.__lz_each(") .. iter) .. ") do"
+        -- ExprEmitter:169
+        return ((((("for _, " .. Option.unwrap(vars:get(1))) .. " in ") .. each) .. "(") .. iter) .. ") do"
     end
-    -- ExprEmitter:155
-    return ((("for " .. Text.join(vars, ", ")) .. " in List.__lz_each(") .. iter) .. ") do"
+    -- ExprEmitter:171
+    return ((((("for " .. Text.join(vars, ", ")) .. " in ") .. each) .. "(") .. iter) .. ") do"
 end
--- ExprEmitter:160
+-- ExprEmitter:176
 function ExprEmitter.emit_identifier(self, node)
-    -- ExprEmitter:161
+    -- ExprEmitter:177
     local id = node:child("name")
-    -- ExprEmitter:162
+    -- ExprEmitter:178
     if self.ctx:is_variant(id) then
-        -- ExprEmitter:163
+        -- ExprEmitter:179
         return self.ctx:variant_qualified(id)
     end
-    -- ExprEmitter:165
+    -- ExprEmitter:181
     return self.ctx:emit_name(id)
 end
--- ExprEmitter:168
+-- ExprEmitter:184
 function ExprEmitter.emit_literal(self, node)
-    -- ExprEmitter:169
+    -- ExprEmitter:185
     local lit_kind = node:child("lit_kind")
-    -- ExprEmitter:170
+    -- ExprEmitter:186
     local value = node:child("value")
-    -- ExprEmitter:171
+    -- ExprEmitter:187
     if lit_kind == "string" then
-        -- ExprEmitter:172
+        -- ExprEmitter:188
         return ExprEmitter.lua_quote_str(self, value)
     end
-    -- ExprEmitter:174
+    -- ExprEmitter:190
     if lit_kind == "boolean" then
-        -- ExprEmitter:175
+        -- ExprEmitter:191
         if value then
-            -- ExprEmitter:176
+            -- ExprEmitter:192
             return "true"
         end
-        -- ExprEmitter:178
+        -- ExprEmitter:194
         return "false"
     end
-    -- ExprEmitter:180
+    -- ExprEmitter:196
     if lit_kind == "nil" then
-        -- ExprEmitter:181
+        -- ExprEmitter:197
         return "nil"
     end
-    -- ExprEmitter:183
+    -- ExprEmitter:199
     return value
 end
--- ExprEmitter:186
+-- ExprEmitter:202
 function ExprEmitter.emit_field(self, node)
-    -- ExprEmitter:187
+    -- ExprEmitter:205
     return (ExprEmitter.emit_operand(self, node:child("object")) .. ".") .. node:child("field")
 end
--- ExprEmitter:190
+-- ExprEmitter:208
 function ExprEmitter.emit_list(self, node)
-    -- ExprEmitter:191
-    return ("List.__lz_from({" .. Text.join(ExprEmitter.emit_args(self, node:child("elements")), ", ")) .. "})"
-end
--- ExprEmitter:194
-function ExprEmitter.emit_map(self, node)
-    -- ExprEmitter:195
-    local parts = (function() local __lz_m2 = List.new() for _, entry in List.__lz_each(node:child("entries")) do List.push(__lz_m2, (("[" .. ExprEmitter.emit(self, entry:child("key"))) .. "] = ") .. ExprEmitter.emit(self, entry:child("value"))) end return __lz_m2 end)()
-    -- ExprEmitter:196
-    return ("Map.__lz_from({" .. Text.join(parts, ", ")) .. "})"
-end
--- ExprEmitter:199
-function ExprEmitter.emit_index(self, node)
-    -- ExprEmitter:200
-    return ((("List.__lz_idx_get(" .. ExprEmitter.emit(self, node:child("object"))) .. ", ") .. ExprEmitter.emit(self, node:child("index"))) .. ")"
-end
--- ExprEmitter:203
-function ExprEmitter.emit_unary(self, node)
-    -- ExprEmitter:204
-    return "not " .. ExprEmitter.emit_operand(self, node:child("operand"))
-end
--- ExprEmitter:207
-function ExprEmitter.emit_binary(self, node)
-    -- ExprEmitter:208
-    local left = ExprEmitter.emit_operand(self, node:child("left"))
     -- ExprEmitter:209
-    local right = ExprEmitter.emit_operand(self, node:child("right"))
-    -- ExprEmitter:210
-    local op = node:child("op")
-    -- ExprEmitter:211
-    if op == "MODULO" then
-        -- ExprEmitter:212
-        return ((((((("(" .. left) .. " - math.floor(") .. left) .. " / ") .. right) .. ") * ") .. right) .. ")"
-    end
+    return ((ExprEmitter.lz_fn(self, "List", "__lz_from") .. "({") .. Text.join(ExprEmitter.emit_args(self, node:child("elements")), ", ")) .. "})"
+end
+-- ExprEmitter:212
+function ExprEmitter.emit_map(self, node)
+    -- ExprEmitter:213
+    local parts = (function() local __lz_m2 = List.new() for _, entry in List.__lz_each(node:child("entries")) do List.push(__lz_m2, (("[" .. ExprEmitter.emit(self, entry:child("key"))) .. "] = ") .. ExprEmitter.emit(self, entry:child("value"))) end return __lz_m2 end)()
     -- ExprEmitter:214
-    return (((left .. " ") .. Option.__lz_unwrap_or(ExprEmitter.op_map:get(op), op)) .. " ") .. right
+    return ((ExprEmitter.lz_fn(self, "Map", "__lz_from") .. "({") .. Text.join(parts, ", ")) .. "})"
 end
 -- ExprEmitter:217
-function ExprEmitter.emit_call(self, node)
+function ExprEmitter.emit_index(self, node)
     -- ExprEmitter:218
+    return ((((ExprEmitter.lz_fn(self, "List", "__lz_idx_get") .. "(") .. ExprEmitter.emit(self, node:child("object"))) .. ", ") .. ExprEmitter.emit(self, node:child("index"))) .. ")"
+end
+-- ExprEmitter:221
+function ExprEmitter.emit_unary(self, node)
+    -- ExprEmitter:222
+    return "not " .. ExprEmitter.emit_operand(self, node:child("operand"))
+end
+-- ExprEmitter:225
+function ExprEmitter.emit_binary(self, node)
+    -- ExprEmitter:226
+    local left = ExprEmitter.emit_operand(self, node:child("left"))
+    -- ExprEmitter:227
+    local right = ExprEmitter.emit_operand(self, node:child("right"))
+    -- ExprEmitter:228
+    local op = node:child("op")
+    -- ExprEmitter:229
+    if op == "MODULO" then
+        -- ExprEmitter:230
+        return ((((((("(" .. left) .. " - math.floor(") .. left) .. " / ") .. right) .. ") * ") .. right) .. ")"
+    end
+    -- ExprEmitter:232
+    return (((left .. " ") .. Option.__lz_unwrap_or(ExprEmitter.op_map:get(op), op)) .. " ") .. right
+end
+-- ExprEmitter:235
+function ExprEmitter.emit_call(self, node)
+    -- ExprEmitter:236
     local callee = node:child("callee")
-    -- ExprEmitter:219
+    -- ExprEmitter:237
     local args = ExprEmitter.emit_args(self, node:child("args"))
-    -- ExprEmitter:221
+    -- ExprEmitter:239
     if callee.kind == "MemberExpr" then
-        -- ExprEmitter:222
+        -- ExprEmitter:240
         local object = callee:child("object")
-        -- ExprEmitter:223
+        -- ExprEmitter:241
         local field = callee:child("field")
-        -- ExprEmitter:225
+        -- ExprEmitter:243
         if object.kind == "IdentifierExpr" then
-            -- ExprEmitter:226
+            -- ExprEmitter:244
             local target = self.ctx:extern_target(object:child("name"), field)
-            -- ExprEmitter:227
+            -- ExprEmitter:245
             if Option.is_some(target) then
-                -- ExprEmitter:228
+                -- ExprEmitter:246
                 local ext = Option.unwrap(target)
-                -- ExprEmitter:229
+                -- ExprEmitter:247
                 local call = ((List.__lz_idx_get(ext, "target") .. "(") .. Text.join(args, ", ")) .. ")"
-                -- ExprEmitter:230
+                -- ExprEmitter:248
                 if List.__lz_idx_get(ext, "wrap") then
-                    -- ExprEmitter:231
-                    return ("Option.__lz_wrap(" .. call) .. ")"
+                    -- ExprEmitter:249
+                    return ((((self.ctx:mangle_class("Option") .. ".") .. self.ctx:mangle_member("Option", "__lz_wrap")) .. "(") .. call) .. ")"
                 end
-                -- ExprEmitter:233
+                -- ExprEmitter:251
                 return call
             end
-            -- ExprEmitter:235
-            local ctor = ExprEmitter.constructors:get((object:child("name") .. ".") .. field)
-            -- ExprEmitter:236
-            if Option.__lz_is_some(ctor) then
-                -- ExprEmitter:237
-                return ((Option.__lz_unwrap(ctor) .. "(") .. Text.join(args, ", ")) .. ")"
+            -- ExprEmitter:253
+            local ctor_key = (object:child("name") .. ".") .. field
+            -- ExprEmitter:254
+            if ExprEmitter.constructors:has(ctor_key) then
+                -- ExprEmitter:255
+                local cls_name = object:child("name")
+                -- ExprEmitter:256
+                return ((((self.ctx:mangle_class(cls_name) .. ".") .. self.ctx:mangle_member(cls_name, field)) .. "(") .. Text.join(args, ", ")) .. ")"
             end
         end
-        -- ExprEmitter:241
+        -- ExprEmitter:260
         local dispatch_cls = node:attr("dispatch_class")
-        -- ExprEmitter:242
+        -- ExprEmitter:261
         if Option.is_some(dispatch_cls) then
-            -- ExprEmitter:243
-            return ((((Option.unwrap(dispatch_cls) .. ".") .. field) .. "(") .. Text.join(ExprEmitter.with_receiver(self, object, args), ", ")) .. ")"
+            -- ExprEmitter:262
+            local dc = Option.unwrap(dispatch_cls)
+            -- ExprEmitter:263
+            return ((((self.ctx:mangle_class(dc) .. ".") .. self.ctx:mangle_member(dc, field)) .. "(") .. Text.join(ExprEmitter.with_receiver(self, object, args), ", ")) .. ")"
         end
-        -- ExprEmitter:245
+        -- ExprEmitter:265
         if not Option.unwrap_or(node:attr("known_method"), false) then
-            -- ExprEmitter:246
-            local helper = ExprEmitter.builtins:get(field)
-            -- ExprEmitter:247
-            if Option.__lz_is_some(helper) then
-                -- ExprEmitter:248
-                return ((Option.__lz_unwrap(helper) .. "(") .. Text.join(ExprEmitter.with_receiver(self, object, args), ", ")) .. ")"
+            -- ExprEmitter:266
+            local helper = ExprEmitter.builtin_target(self, field)
+            -- ExprEmitter:267
+            if Option.is_some(helper) then
+                -- ExprEmitter:268
+                return ((Option.unwrap(helper) .. "(") .. Text.join(ExprEmitter.with_receiver(self, object, args), ", ")) .. ")"
             end
         end
     end
-    -- ExprEmitter:253
+    -- ExprEmitter:273
     if callee.kind == "IdentifierExpr" then
-        -- ExprEmitter:254
+        -- ExprEmitter:274
         local name = callee:child("name")
-        -- ExprEmitter:255
+        -- ExprEmitter:275
         if self.ctx:is_construction(name) then
-            -- ExprEmitter:256
-            return ((name .. ".new(") .. Text.join(args, ", ")) .. ")"
+            -- ExprEmitter:276
+            return ((self.ctx:emit_name(name) .. ".new(") .. Text.join(args, ", ")) .. ")"
         end
     end
-    -- ExprEmitter:260
+    -- ExprEmitter:280
     if callee.kind == "MemberExpr" then
-        -- ExprEmitter:261
+        -- ExprEmitter:281
         local object = callee:child("object")
-        -- ExprEmitter:262
+        -- ExprEmitter:282
         local field = callee:child("field")
-        -- ExprEmitter:263
+        -- ExprEmitter:283
         if (object.kind == "SelfExpr") and self.ctx:is_instance_method(field) then
-            -- ExprEmitter:264
+            -- ExprEmitter:284
             return ((((self.ctx:name() .. ".") .. field) .. "(") .. Text.join(ExprEmitter.with_receiver(self, object, args), ", ")) .. ")"
         end
-        -- ExprEmitter:266
+        -- ExprEmitter:286
         if not ExprEmitter.receiver_is_class(self, object) then
-            -- ExprEmitter:267
+            -- ExprEmitter:287
             return ((((ExprEmitter.emit_operand(self, object) .. ":") .. field) .. "(") .. Text.join(args, ", ")) .. ")"
         end
     end
-    -- ExprEmitter:271
+    -- ExprEmitter:291
     local callee_src = ExprEmitter.emit(self, callee)
-    -- ExprEmitter:272
+    -- ExprEmitter:292
     if callee.kind == "BinaryExpr" then
-        -- ExprEmitter:273
+        -- ExprEmitter:293
         callee_src = ("(" .. callee_src) .. ")"
     end
-    -- ExprEmitter:275
+    -- ExprEmitter:295
     return ((callee_src .. "(") .. Text.join(args, ", ")) .. ")"
 end
--- ExprEmitter:280
+-- ExprEmitter:300
 function ExprEmitter.emit_operand(self, node)
-    -- ExprEmitter:281
+    -- ExprEmitter:301
     local src = ExprEmitter.emit(self, node)
-    -- ExprEmitter:282
+    -- ExprEmitter:302
     if ExprEmitter.needs_parens(self, node) then
-        -- ExprEmitter:283
+        -- ExprEmitter:303
         return ("(" .. src) .. ")"
     end
-    -- ExprEmitter:285
+    -- ExprEmitter:305
     return src
 end
--- ExprEmitter:288
+-- ExprEmitter:308
 function ExprEmitter.needs_parens(self, node)
-    -- ExprEmitter:289
+    -- ExprEmitter:309
     return (node.kind == "BinaryExpr") or (node.kind == "UnaryExpr")
 end
--- ExprEmitter:292
+-- ExprEmitter:312
 function ExprEmitter.receiver_is_class(self, object)
-    -- ExprEmitter:293
+    -- ExprEmitter:313
     if object.kind ~= "IdentifierExpr" then
-        -- ExprEmitter:294
+        -- ExprEmitter:314
         return false
     end
-    -- ExprEmitter:296
+    -- ExprEmitter:316
     return self.ctx:is_construction(object:child("name"))
 end
--- ExprEmitter:301
+-- ExprEmitter:321
 function ExprEmitter.with_receiver(self, object, args)
-    -- ExprEmitter:302
+    -- ExprEmitter:322
     local out = List.__lz_from({ExprEmitter.emit_operand(self, object)})
-    -- ExprEmitter:303
+    -- ExprEmitter:323
     for _, arg in List.__lz_each(args) do
-        -- ExprEmitter:304
+        -- ExprEmitter:324
         out:push(arg)
     end
-    -- ExprEmitter:306
+    -- ExprEmitter:326
     return out
 end
--- ExprEmitter:309
+-- ExprEmitter:329
 function ExprEmitter.emit_args(self, nodes)
-    -- ExprEmitter:310
+    -- ExprEmitter:330
     return (function() local __lz_m3 = List.new() for _, node in List.__lz_each(nodes) do List.push(__lz_m3, ExprEmitter.emit(self, node)) end return __lz_m3 end)()
 end
--- ExprEmitter:316
+-- ExprEmitter:336
 function ExprEmitter.lua_quote_str(self, value)
-    -- ExprEmitter:317
+    -- ExprEmitter:337
     local n = Option.unwrap_or(Option.__lz_wrap(string.len(value)), 0)
-    -- ExprEmitter:318
+    -- ExprEmitter:338
     local dq = Option.unwrap_or(Option.__lz_wrap(string.char(34)), "")
-    -- ExprEmitter:319
+    -- ExprEmitter:339
     local bs = Option.unwrap_or(Option.__lz_wrap(string.char(92)), "")
-    -- ExprEmitter:320
+    -- ExprEmitter:340
     local lf = Option.unwrap_or(Option.__lz_wrap(string.char(10)), "")
-    -- ExprEmitter:321
+    -- ExprEmitter:341
     local cr = Option.unwrap_or(Option.__lz_wrap(string.char(13)), "")
-    -- ExprEmitter:322
+    -- ExprEmitter:342
     local result = ""
-    -- ExprEmitter:323
+    -- ExprEmitter:343
     local i = 1
-    -- ExprEmitter:324
+    -- ExprEmitter:344
     while i <= n do
-        -- ExprEmitter:325
+        -- ExprEmitter:345
         local c = Option.unwrap_or(Option.__lz_wrap(string.sub(value, i, i)), "")
-        -- ExprEmitter:326
+        -- ExprEmitter:346
         if c == dq then
-            -- ExprEmitter:327
+            -- ExprEmitter:347
             result = (result .. bs) .. dq
         elseif c == lf then
-            -- ExprEmitter:329
+            -- ExprEmitter:349
             result = (result .. bs) .. "n"
         elseif c == cr then
-            -- ExprEmitter:331
+            -- ExprEmitter:351
             result = (result .. bs) .. "r"
         elseif c == bs then
-            -- ExprEmitter:333
+            -- ExprEmitter:353
             result = (result .. bs) .. bs
         else
-            -- ExprEmitter:335
+            -- ExprEmitter:355
             result = result .. c
         end
-        -- ExprEmitter:337
+        -- ExprEmitter:357
         i = i + 1
     end
-    -- ExprEmitter:339
+    -- ExprEmitter:359
     return (dq .. result) .. dq
 end
--- ExprEmitter:345
+-- ExprEmitter:365
 function ExprEmitter.emit_interp(self, node)
-    -- ExprEmitter:346
+    -- ExprEmitter:366
     local parts = node:child("parts")
-    -- ExprEmitter:347
+    -- ExprEmitter:367
     local pieces = List.__lz_from({})
-    -- ExprEmitter:348
+    -- ExprEmitter:368
     local i = 1
-    -- ExprEmitter:349
+    -- ExprEmitter:369
     while i <= parts:len() do
-        -- ExprEmitter:350
+        -- ExprEmitter:370
         local part = Option.__lz_unwrap(parts:get(i))
-        -- ExprEmitter:351
+        -- ExprEmitter:371
         if (part.kind == "LiteralExpr") and (part:child("lit_kind") == "string") then
-            -- ExprEmitter:352
+            -- ExprEmitter:372
             local v = part:child("value")
-            -- ExprEmitter:353
+            -- ExprEmitter:373
             if v ~= "" then
-                -- ExprEmitter:354
+                -- ExprEmitter:374
                 pieces:push(ExprEmitter.lua_quote_str(self, v))
             end
         else
-            -- ExprEmitter:357
+            -- ExprEmitter:377
             pieces:push(("tostring(" .. ExprEmitter.emit(self, part)) .. ")")
         end
-        -- ExprEmitter:359
+        -- ExprEmitter:379
         i = i + 1
     end
-    -- ExprEmitter:361
+    -- ExprEmitter:381
     if pieces:len() == 0 then
-        -- ExprEmitter:362
+        -- ExprEmitter:382
         return "''"
     end
-    -- ExprEmitter:364
+    -- ExprEmitter:384
     if pieces:len() == 1 then
-        -- ExprEmitter:365
+        -- ExprEmitter:385
         return Option.unwrap(pieces:get(1))
     end
-    -- ExprEmitter:367
+    -- ExprEmitter:387
     return ("(" .. Text.join(pieces, " .. ")) .. ")"
 end
 
@@ -9510,6 +9863,7 @@ function StmtEmitter.new(ctx, exprs)
     self.emit_static_field = StmtEmitter.emit_static_field
     self.emit_constructor = StmtEmitter.emit_constructor
     self.emit_closure = StmtEmitter.emit_closure
+    self.mangle_params = StmtEmitter.mangle_params
     self.wrap_body = StmtEmitter.wrap_body
     self.push_block = StmtEmitter.push_block
     self.with_self = StmtEmitter.with_self
@@ -9564,192 +9918,189 @@ function StmtEmitter.emit_enum(self, node)
         -- StmtEmitter:48
         local name = variant:child("name")
         -- StmtEmitter:49
+        local mangled_name = self.ctx:mangle_self_member(name)
+        -- StmtEmitter:50
         if variant:child("fields"):len() == 0 then
-            -- StmtEmitter:50
-            lines:push(((((self.ctx:name() .. ".") .. name) .. " = '") .. name) .. "'")
-        else
             -- StmtEmitter:52
-            lines:push(StmtEmitter.emit_variant_ctor(self, name, variant:child("fields")))
+            lines:push(((((self.ctx:name() .. ".") .. mangled_name) .. " = '") .. name) .. "'")
+        else
+            -- StmtEmitter:54
+            lines:push(StmtEmitter.emit_variant_ctor(self, name, mangled_name, variant:child("fields")))
         end
     end
-    -- StmtEmitter:55
+    -- StmtEmitter:57
     return Text.lines(lines)
 end
--- StmtEmitter:58
-function StmtEmitter.emit_variant_ctor(self, name, fields)
-    -- StmtEmitter:59
-    local params = List.__lz_from({})
-    -- StmtEmitter:60
-    local assigns = List.__lz_from({("kind = '" .. name) .. "'"})
+-- StmtEmitter:60
+function StmtEmitter.emit_variant_ctor(self, name, mangled_name, fields)
     -- StmtEmitter:61
+    local params = List.__lz_from({})
+    -- StmtEmitter:63
+    local assigns = List.__lz_from({("kind = '" .. name) .. "'"})
+    -- StmtEmitter:64
     local i = 1
-    -- StmtEmitter:62
+    -- StmtEmitter:65
     for _, field in List.__lz_each(fields) do
-        -- StmtEmitter:63
-        local s = Option.__lz_unwrap_or(Option.__lz_wrap(tostring(i)), "0")
-        -- StmtEmitter:64
-        params:push("_" .. s)
-        -- StmtEmitter:65
-        assigns:push((("_" .. s) .. " = _") .. s)
         -- StmtEmitter:66
+        local s = Option.__lz_unwrap_or(Option.__lz_wrap(tostring(i)), "0")
+        -- StmtEmitter:67
+        params:push("_" .. s)
+        -- StmtEmitter:68
+        assigns:push((("_" .. s) .. " = _") .. s)
+        -- StmtEmitter:69
         i = i + 1
     end
-    -- StmtEmitter:68
-    local header = ((((("function " .. self.ctx:name()) .. ".") .. name) .. "(") .. Text.join(params, ", ")) .. ")"
-    -- StmtEmitter:69
+    -- StmtEmitter:71
+    local header = ((((("function " .. self.ctx:name()) .. ".") .. mangled_name) .. "(") .. Text.join(params, ", ")) .. ")"
+    -- StmtEmitter:72
     return Text.lines(List.__lz_from({header, Text.indent(("return { " .. Text.join(assigns, ", ")) .. " }"), "end"}))
 end
--- StmtEmitter:75
+-- StmtEmitter:78
 function StmtEmitter.emit_stmt(self, node)
-    -- StmtEmitter:76
-    local result = StmtEmitter.emit_stmt_inner(self, node)
-    -- StmtEmitter:77
-    local prefix = self.exprs:take_pending()
-    -- StmtEmitter:78
-    local hint = StmtEmitter.source_hint(self, node)
     -- StmtEmitter:79
+    local result = StmtEmitter.emit_stmt_inner(self, node)
+    -- StmtEmitter:80
+    local prefix = self.exprs:take_pending()
+    -- StmtEmitter:81
+    local hint = StmtEmitter.source_hint(self, node)
+    -- StmtEmitter:82
     if prefix:len() == 0 then
-        -- StmtEmitter:80
+        -- StmtEmitter:83
         if hint == "" then
-            -- StmtEmitter:81
+            -- StmtEmitter:84
             return result
         end
-        -- StmtEmitter:83
+        -- StmtEmitter:86
         return (hint .. Text.nl()) .. result
     end
-    -- StmtEmitter:85
+    -- StmtEmitter:88
     prefix:push(result)
-    -- StmtEmitter:86
+    -- StmtEmitter:89
     local body = Text.lines(prefix)
-    -- StmtEmitter:87
+    -- StmtEmitter:90
     if hint == "" then
-        -- StmtEmitter:88
+        -- StmtEmitter:91
         return body
     end
-    -- StmtEmitter:90
+    -- StmtEmitter:93
     return (hint .. Text.nl()) .. body
 end
--- StmtEmitter:93
+-- StmtEmitter:96
 function StmtEmitter.source_hint(self, node)
-    -- StmtEmitter:94
-    local ln = node:line()
-    -- StmtEmitter:95
-    if ln == 0 then
-        -- StmtEmitter:96
+    -- StmtEmitter:97
+    if self.ctx:opt_level() >= 1 then
+        -- StmtEmitter:98
         return ""
     end
-    -- StmtEmitter:98
+    -- StmtEmitter:100
+    local ln = node:line()
+    -- StmtEmitter:101
+    if ln == 0 then
+        -- StmtEmitter:102
+        return ""
+    end
+    -- StmtEmitter:104
     return (("-- " .. self.ctx:name()) .. ":") .. Option.__lz_unwrap_or(Option.__lz_wrap(tostring(ln)), "?")
 end
--- StmtEmitter:101
+-- StmtEmitter:107
 function StmtEmitter.emit_stmt_inner(self, node)
-    -- StmtEmitter:102
+    -- StmtEmitter:108
     local __lz_m2 = node.kind
     if __lz_m2 == "VariableDecl" then
-        -- StmtEmitter:103
+        -- StmtEmitter:109
         return StmtEmitter.emit_variable(self, node)
     elseif __lz_m2 == "FieldAssign" then
-        -- StmtEmitter:104
+        -- StmtEmitter:110
         return (self.exprs:emit(node:child("target")) .. " = ") .. self.exprs:emit(node:child("value"))
     elseif __lz_m2 == "IndexAssign" then
-        -- StmtEmitter:105
+        -- StmtEmitter:111
         return StmtEmitter.emit_index_assign(self, node)
     elseif __lz_m2 == "ExpressionStmt" then
-        -- StmtEmitter:106
+        -- StmtEmitter:112
         return self.exprs:emit(node:child("expression"))
     elseif __lz_m2 == "FunctionDecl" then
-        -- StmtEmitter:107
+        -- StmtEmitter:113
         return StmtEmitter.emit_local_function(self, node)
     elseif __lz_m2 == "ReturnStmt" then
-        -- StmtEmitter:108
+        -- StmtEmitter:114
         return StmtEmitter.emit_return(self, node)
     elseif __lz_m2 == "IfStmt" then
-        -- StmtEmitter:109
+        -- StmtEmitter:115
         return StmtEmitter.emit_if(self, node)
     elseif __lz_m2 == "WhileStmt" then
-        -- StmtEmitter:110
+        -- StmtEmitter:116
         return StmtEmitter.emit_while(self, node)
     elseif __lz_m2 == "LoopStmt" then
-        -- StmtEmitter:111
+        -- StmtEmitter:117
         return StmtEmitter.emit_loop(self, node)
     elseif __lz_m2 == "BreakStmt" then
-        -- StmtEmitter:112
+        -- StmtEmitter:118
         return "break"
     elseif __lz_m2 == "ForStmt" then
-        -- StmtEmitter:113
+        -- StmtEmitter:119
         return StmtEmitter.emit_for(self, node)
     elseif __lz_m2 == "ForInStmt" then
-        -- StmtEmitter:114
+        -- StmtEmitter:120
         return StmtEmitter.emit_for_in(self, node)
     elseif __lz_m2 == "MatchStmt" then
-        -- StmtEmitter:115
+        -- StmtEmitter:121
         return StmtEmitter.emit_match(self, node)
     else
     end
-    -- StmtEmitter:118
+    -- StmtEmitter:124
     return ""
 end
--- StmtEmitter:125
+-- StmtEmitter:131
 function StmtEmitter.emit_match(self, node)
-    -- StmtEmitter:126
-    local temp = self.ctx:fresh_temp()
-    -- StmtEmitter:127
-    local parts = List.__lz_from({(("local " .. temp) .. " = ") .. self.exprs:emit(node:child("scrutinee"))})
-    -- StmtEmitter:129
+    -- StmtEmitter:132
+    local scrutinee_node = node:child("scrutinee")
+    -- StmtEmitter:133
+    local scrutinee_str = self.exprs:emit(scrutinee_node)
+    -- StmtEmitter:134
+    local temp = ""
+    -- StmtEmitter:135
+    local parts = List.__lz_from({})
+    -- StmtEmitter:136
+    if ((self.ctx:opt_level() >= 2) and (scrutinee_node.kind == "IdentifierExpr")) and self.ctx:is_local(scrutinee_node:child("name")) then
+        -- StmtEmitter:137
+        temp = scrutinee_str
+    else
+        -- StmtEmitter:139
+        temp = self.ctx:fresh_temp()
+        -- StmtEmitter:140
+        parts:push((("local " .. temp) .. " = ") .. scrutinee_str)
+    end
+    -- StmtEmitter:143
     self.ctx:push_scope()
-    -- StmtEmitter:130
+    -- StmtEmitter:144
     for _, arm in List.__lz_each(node:child("arms")) do
-        -- StmtEmitter:131
+        -- StmtEmitter:145
         if Option.__lz_unwrap_or(arm:attr("is_binding"), false) then
-            -- StmtEmitter:132
+            -- StmtEmitter:146
             local bname = arm:child("pattern"):child("name")
-            -- StmtEmitter:133
+            -- StmtEmitter:147
             if not self.ctx:is_local(bname) then
-                -- StmtEmitter:134
+                -- StmtEmitter:148
                 self.ctx:declare_local(bname)
-                -- StmtEmitter:135
+                -- StmtEmitter:149
                 parts:push((("local " .. bname) .. " = ") .. temp)
             end
         end
     end
-    -- StmtEmitter:139
+    -- StmtEmitter:153
     local first = true
-    -- StmtEmitter:140
+    -- StmtEmitter:154
     local has_default = false
-    -- StmtEmitter:141
+    -- StmtEmitter:155
     local default_body = List.__lz_from({})
-    -- StmtEmitter:142
+    -- StmtEmitter:156
     for _, arm in List.__lz_each(node:child("arms")) do
-        -- StmtEmitter:143
+        -- StmtEmitter:157
         if Option.__lz_unwrap_or(arm:attr("is_binding"), false) then
-            -- StmtEmitter:144
-            local bguard = arm:attr("guard")
-            -- StmtEmitter:145
-            if Option.__lz_is_some(bguard) then
-                -- StmtEmitter:146
-                local keyword = "elseif "
-                -- StmtEmitter:147
-                if first then
-                    -- StmtEmitter:148
-                    keyword = "if "
-                end
-                -- StmtEmitter:150
-                first = false
-                -- StmtEmitter:151
-                parts:push((keyword .. self.exprs:emit(Option.__lz_unwrap(bguard))) .. " then")
-                -- StmtEmitter:152
-                StmtEmitter.push_block(self, parts, arm:child("body"))
-            else
-                -- StmtEmitter:154
-                has_default = true
-                -- StmtEmitter:155
-                default_body = arm:child("body")
-            end
-        elseif Option.__lz_unwrap_or(arm:attr("is_wildcard"), false) then
             -- StmtEmitter:158
-            local wguard = arm:attr("guard")
+            local bguard = arm:attr("guard")
             -- StmtEmitter:159
-            if Option.__lz_is_some(wguard) then
+            if Option.__lz_is_some(bguard) then
                 -- StmtEmitter:160
                 local keyword = "elseif "
                 -- StmtEmitter:161
@@ -9760,7 +10111,7 @@ function StmtEmitter.emit_match(self, node)
                 -- StmtEmitter:164
                 first = false
                 -- StmtEmitter:165
-                parts:push((keyword .. self.exprs:emit(Option.__lz_unwrap(wguard))) .. " then")
+                parts:push((keyword .. self.exprs:emit(Option.__lz_unwrap(bguard))) .. " then")
                 -- StmtEmitter:166
                 StmtEmitter.push_block(self, parts, arm:child("body"))
             else
@@ -9769,508 +10120,567 @@ function StmtEmitter.emit_match(self, node)
                 -- StmtEmitter:169
                 default_body = arm:child("body")
             end
-        else
+        elseif Option.__lz_unwrap_or(arm:attr("is_wildcard"), false) then
             -- StmtEmitter:172
-            local keyword = "elseif "
+            local wguard = arm:attr("guard")
             -- StmtEmitter:173
-            if first then
+            if Option.__lz_is_some(wguard) then
                 -- StmtEmitter:174
+                local keyword = "elseif "
+                -- StmtEmitter:175
+                if first then
+                    -- StmtEmitter:176
+                    keyword = "if "
+                end
+                -- StmtEmitter:178
+                first = false
+                -- StmtEmitter:179
+                parts:push((keyword .. self.exprs:emit(Option.__lz_unwrap(wguard))) .. " then")
+                -- StmtEmitter:180
+                StmtEmitter.push_block(self, parts, arm:child("body"))
+            else
+                -- StmtEmitter:182
+                has_default = true
+                -- StmtEmitter:183
+                default_body = arm:child("body")
+            end
+        else
+            -- StmtEmitter:186
+            local keyword = "elseif "
+            -- StmtEmitter:187
+            if first then
+                -- StmtEmitter:188
                 keyword = "if "
             end
-            -- StmtEmitter:176
+            -- StmtEmitter:190
             first = false
-            -- StmtEmitter:177
+            -- StmtEmitter:191
             parts:push((keyword .. StmtEmitter.match_condition(self, temp, arm)) .. " then")
-            -- StmtEmitter:178
+            -- StmtEmitter:192
             if StmtEmitter.has_bindings(self, arm) then
-                -- StmtEmitter:179
+                -- StmtEmitter:193
                 StmtEmitter.push_payload_body(self, parts, temp, arm)
             else
-                -- StmtEmitter:181
+                -- StmtEmitter:195
                 StmtEmitter.push_block(self, parts, arm:child("body"))
             end
         end
     end
-    -- StmtEmitter:185
+    -- StmtEmitter:199
     if first then
-        -- StmtEmitter:186
+        -- StmtEmitter:200
         if has_default then
-            -- StmtEmitter:187
+            -- StmtEmitter:201
             parts:push("do")
-            -- StmtEmitter:188
+            -- StmtEmitter:202
             StmtEmitter.push_block(self, parts, default_body)
-            -- StmtEmitter:189
+            -- StmtEmitter:203
             parts:push("end")
         end
-        -- StmtEmitter:191
+        -- StmtEmitter:205
         self.ctx:pop_scope()
-        -- StmtEmitter:192
+        -- StmtEmitter:206
         return Text.lines(parts)
     end
-    -- StmtEmitter:194
+    -- StmtEmitter:208
     if has_default then
-        -- StmtEmitter:195
+        -- StmtEmitter:209
         parts:push("else")
-        -- StmtEmitter:196
+        -- StmtEmitter:210
         StmtEmitter.push_block(self, parts, default_body)
     end
-    -- StmtEmitter:198
+    -- StmtEmitter:212
     parts:push("end")
-    -- StmtEmitter:199
+    -- StmtEmitter:213
     self.ctx:pop_scope()
-    -- StmtEmitter:200
+    -- StmtEmitter:214
     return Text.lines(parts)
 end
--- StmtEmitter:206
+-- StmtEmitter:220
 function StmtEmitter.match_condition(self, temp, arm)
-    -- StmtEmitter:207
+    -- StmtEmitter:221
     local base = ""
-    -- StmtEmitter:208
+    -- StmtEmitter:222
     if Option.unwrap_or(arm:attr("is_variant"), false) then
-        -- StmtEmitter:209
+        -- StmtEmitter:223
         if StmtEmitter.has_bindings(self, arm) then
-            -- StmtEmitter:210
+            -- StmtEmitter:224
             base = ((temp .. ".kind == '") .. arm:child("variant")) .. "'"
         else
-            -- StmtEmitter:212
+            -- StmtEmitter:226
             base = ((temp .. " == '") .. arm:child("variant")) .. "'"
         end
     else
-        -- StmtEmitter:215
+        -- StmtEmitter:229
         base = (temp .. " == ") .. self.exprs:emit(arm:child("pattern"))
     end
-    -- StmtEmitter:217
+    -- StmtEmitter:231
     local guard = arm:attr("guard")
-    -- StmtEmitter:218
+    -- StmtEmitter:232
     if Option.is_some(guard) then
-        -- StmtEmitter:219
+        -- StmtEmitter:233
         return (base .. " and ") .. self.exprs:emit(Option.unwrap(guard))
     end
-    -- StmtEmitter:221
+    -- StmtEmitter:235
     return base
 end
--- StmtEmitter:224
+-- StmtEmitter:238
 function StmtEmitter.has_bindings(self, arm)
-    -- StmtEmitter:225
+    -- StmtEmitter:239
     return Option.unwrap_or(arm:attr("is_variant"), false) and (arm:child("bindings"):len() > 0)
 end
--- StmtEmitter:230
+-- StmtEmitter:244
 function StmtEmitter.push_payload_body(self, parts, temp, arm)
-    -- StmtEmitter:231
+    -- StmtEmitter:245
     self.ctx:push_scope()
-    -- StmtEmitter:232
+    -- StmtEmitter:246
     local lines = List.__lz_from({})
-    -- StmtEmitter:233
+    -- StmtEmitter:247
     local i = 1
-    -- StmtEmitter:234
+    -- StmtEmitter:248
     for _, name in List.__lz_each(arm:child("bindings")) do
-        -- StmtEmitter:235
+        -- StmtEmitter:249
         if name ~= "_" then
-            -- StmtEmitter:236
+            -- StmtEmitter:250
             self.ctx:declare_local(name)
-            -- StmtEmitter:237
+            -- StmtEmitter:251
             lines:push((((("local " .. name) .. " = ") .. temp) .. "._") .. Option.__lz_unwrap_or(Option.__lz_wrap(tostring(i)), "0"))
         end
-        -- StmtEmitter:239
+        -- StmtEmitter:253
         i = i + 1
     end
-    -- StmtEmitter:241
+    -- StmtEmitter:255
     for _, stmt in List.__lz_each(arm:child("body")) do
-        -- StmtEmitter:242
+        -- StmtEmitter:256
         lines:push(StmtEmitter.emit_stmt(self, stmt))
     end
-    -- StmtEmitter:244
+    -- StmtEmitter:258
     self.ctx:pop_scope()
-    -- StmtEmitter:245
+    -- StmtEmitter:259
     if lines:len() > 0 then
-        -- StmtEmitter:246
+        -- StmtEmitter:260
         parts:push(Text.indent(Text.lines(lines)))
     end
 end
--- StmtEmitter:251
+-- StmtEmitter:265
 function StmtEmitter.emit_block(self, stmts)
-    -- StmtEmitter:252
-    if stmts:len() == 0 then
-        -- StmtEmitter:253
-        return ""
-    end
-    -- StmtEmitter:255
-    return Text.indent(Text.lines((function() local __lz_m3 = List.new() for _, stmt in List.__lz_each(stmts) do List.push(__lz_m3, StmtEmitter.emit_stmt(self, stmt)) end return __lz_m3 end)()))
-end
--- StmtEmitter:260
-function StmtEmitter.emit_fn_body(self, params, param_types, body)
-    -- StmtEmitter:261
-    self.ctx:push_scope()
-    -- StmtEmitter:262
-    for _, param in List.__lz_each(params) do
-        -- StmtEmitter:263
-        self.ctx:declare_local(param)
-    end
-    -- StmtEmitter:265
-    local lines = StmtEmitter.default_guards(self, params, param_types)
     -- StmtEmitter:266
-    for _, stmt in List.__lz_each(body) do
+    if stmts:len() == 0 then
         -- StmtEmitter:267
-        lines:push(StmtEmitter.emit_stmt(self, stmt))
+        return ""
     end
     -- StmtEmitter:269
+    return Text.indent(Text.lines((function() local __lz_m3 = List.new() for _, stmt in List.__lz_each(stmts) do List.push(__lz_m3, StmtEmitter.emit_stmt(self, stmt)) end return __lz_m3 end)()))
+end
+-- StmtEmitter:274
+function StmtEmitter.emit_fn_body(self, params, param_types, body)
+    -- StmtEmitter:275
+    self.ctx:push_scope()
+    -- StmtEmitter:276
+    for _, param in List.__lz_each(params) do
+        -- StmtEmitter:277
+        self.ctx:declare_local(param)
+    end
+    -- StmtEmitter:279
+    local lines = StmtEmitter.default_guards(self, params, param_types)
+    -- StmtEmitter:280
+    for _, stmt in List.__lz_each(body) do
+        -- StmtEmitter:281
+        lines:push(StmtEmitter.emit_stmt(self, stmt))
+    end
+    -- StmtEmitter:283
     self.ctx:pop_scope()
-    -- StmtEmitter:270
+    -- StmtEmitter:284
     if lines:len() == 0 then
-        -- StmtEmitter:271
+        -- StmtEmitter:285
         return ""
     end
-    -- StmtEmitter:273
+    -- StmtEmitter:287
     return Text.indent(Text.lines(lines))
 end
--- StmtEmitter:278
+-- StmtEmitter:292
 function StmtEmitter.default_guards(self, params, param_types)
-    -- StmtEmitter:279
+    -- StmtEmitter:293
     local lines = List.__lz_from({})
-    -- StmtEmitter:280
+    -- StmtEmitter:294
     local type_i = 1
-    -- StmtEmitter:281
+    -- StmtEmitter:295
     for _, pname in List.__lz_each(params) do
-        -- StmtEmitter:282
+        -- StmtEmitter:296
         if pname ~= "self" then
-            -- StmtEmitter:283
+            -- StmtEmitter:297
             local pt = param_types:get(type_i)
-            -- StmtEmitter:284
+            -- StmtEmitter:298
             if Option.is_some(pt) then
-                -- StmtEmitter:285
+                -- StmtEmitter:299
                 local def = Option.unwrap(pt):attr("default")
-                -- StmtEmitter:286
+                -- StmtEmitter:300
                 if Option.__lz_is_some(def) then
-                    -- StmtEmitter:287
+                    -- StmtEmitter:301
                     lines:push(((((("if " .. pname) .. " == nil then ") .. pname) .. " = ") .. self.exprs:emit(Option.__lz_unwrap(def))) .. " end")
                 end
             end
-            -- StmtEmitter:290
+            -- StmtEmitter:304
             type_i = type_i + 1
         end
     end
-    -- StmtEmitter:293
+    -- StmtEmitter:307
     return lines
 end
--- StmtEmitter:296
+-- StmtEmitter:310
 function StmtEmitter.emit_variable(self, node)
-    -- StmtEmitter:297
+    -- StmtEmitter:311
     local name = node:child("name")
-    -- StmtEmitter:298
+    -- StmtEmitter:312
     local value = node:attr("value")
-    -- StmtEmitter:299
+    -- StmtEmitter:313
     if Option.unwrap_or(node:attr("reassign"), false) then
-        -- StmtEmitter:300
+        -- StmtEmitter:314
         local rhs = "nil"
-        -- StmtEmitter:301
+        -- StmtEmitter:315
         if Option.is_some(value) then
-            -- StmtEmitter:302
+            -- StmtEmitter:316
             rhs = self.exprs:emit(Option.unwrap(value))
         end
-        -- StmtEmitter:304
+        -- StmtEmitter:318
         return (self.ctx:emit_name(name) .. " = ") .. rhs
     end
-    -- StmtEmitter:306
-    self.ctx:declare_local(name)
-    -- StmtEmitter:307
-    if Option.is_some(value) then
-        -- StmtEmitter:308
-        return (("local " .. name) .. " = ") .. self.exprs:emit(Option.unwrap(value))
-    end
-    -- StmtEmitter:310
-    return "local " .. name
-end
--- StmtEmitter:313
-function StmtEmitter.emit_index_assign(self, node)
-    -- StmtEmitter:314
-    local target = node:child("target")
-    -- StmtEmitter:315
-    return ((((("List.__lz_idx_set(" .. self.exprs:emit(target:child("object"))) .. ", ") .. self.exprs:emit(target:child("index"))) .. ", ") .. self.exprs:emit(node:child("value"))) .. ")"
-end
--- StmtEmitter:318
-function StmtEmitter.emit_local_function(self, node)
-    -- StmtEmitter:319
-    self.ctx:declare_local(node:child("name"))
     -- StmtEmitter:320
-    local header = ((("local function " .. node:child("name")) .. "(") .. Text.join(node:child("params"), ", ")) .. ")"
+    self.ctx:declare_local(name)
     -- StmtEmitter:321
+    local mangled = self.ctx:mangle_local(name)
+    -- StmtEmitter:322
+    if Option.is_some(value) then
+        -- StmtEmitter:323
+        return (("local " .. mangled) .. " = ") .. self.exprs:emit(Option.unwrap(value))
+    end
+    -- StmtEmitter:325
+    return "local " .. mangled
+end
+-- StmtEmitter:328
+function StmtEmitter.emit_index_assign(self, node)
+    -- StmtEmitter:329
+    local target = node:child("target")
+    -- StmtEmitter:330
+    local idx_set = (self.ctx:mangle_class("List") .. ".") .. self.ctx:mangle_member("List", "__lz_idx_set")
+    -- StmtEmitter:331
+    return ((((((idx_set .. "(") .. self.exprs:emit(target:child("object"))) .. ", ") .. self.exprs:emit(target:child("index"))) .. ", ") .. self.exprs:emit(node:child("value"))) .. ")"
+end
+-- StmtEmitter:334
+function StmtEmitter.emit_local_function(self, node)
+    -- StmtEmitter:335
+    local orig_name = node:child("name")
+    -- StmtEmitter:336
+    self.ctx:declare_local(orig_name)
+    -- StmtEmitter:337
+    local mangled = self.ctx:mangle_local(orig_name)
+    -- StmtEmitter:338
+    local header = ((("local function " .. mangled) .. "(") .. Text.join(StmtEmitter.mangle_params(self, node:child("params")), ", ")) .. ")"
+    -- StmtEmitter:339
     return StmtEmitter.wrap_body(self, header, StmtEmitter.emit_fn_body(self, node:child("params"), node:child("param_types"), node:child("body")))
 end
--- StmtEmitter:324
+-- StmtEmitter:342
 function StmtEmitter.emit_return(self, node)
-    -- StmtEmitter:325
+    -- StmtEmitter:343
     local value = node:attr("value")
-    -- StmtEmitter:326
+    -- StmtEmitter:344
     if Option.is_some(value) then
-        -- StmtEmitter:327
+        -- StmtEmitter:345
         return "return " .. self.exprs:emit(Option.unwrap(value))
     end
-    -- StmtEmitter:329
+    -- StmtEmitter:347
     return "return"
 end
--- StmtEmitter:332
+-- StmtEmitter:350
 function StmtEmitter.emit_if(self, node)
-    -- StmtEmitter:333
+    -- StmtEmitter:352
+    local dead_true = node:attr("dead_true")
+    -- StmtEmitter:353
+    if Option.is_some(dead_true) then
+        -- StmtEmitter:354
+        local lines = (function() local __lz_m4 = List.new() for _, s in List.__lz_each(Option.unwrap(dead_true)) do List.push(__lz_m4, StmtEmitter.emit_stmt(self, s)) end return __lz_m4 end)()
+        -- StmtEmitter:355
+        return Text.lines(lines)
+    end
+    -- StmtEmitter:357
+    if Option.unwrap_or(node:attr("dead_empty"), false) then
+        -- StmtEmitter:358
+        return ""
+    end
+    -- StmtEmitter:361
     local parts = List.__lz_from({})
-    -- StmtEmitter:334
+    -- StmtEmitter:362
     for i, clause in List.__lz_each(node:child("clauses")) do
-        -- StmtEmitter:335
+        -- StmtEmitter:363
         local keyword = "elseif "
-        -- StmtEmitter:336
+        -- StmtEmitter:364
         if i == 0 then
-            -- StmtEmitter:337
+            -- StmtEmitter:365
             keyword = "if "
         end
-        -- StmtEmitter:339
+        -- StmtEmitter:367
         parts:push((keyword .. self.exprs:emit(clause:child("condition"))) .. " then")
-        -- StmtEmitter:340
+        -- StmtEmitter:368
         StmtEmitter.push_block(self, parts, clause:child("body"))
     end
-    -- StmtEmitter:342
+    -- StmtEmitter:370
     local else_body = node:attr("else_body")
-    -- StmtEmitter:343
+    -- StmtEmitter:371
     if Option.is_some(else_body) then
-        -- StmtEmitter:344
+        -- StmtEmitter:372
         parts:push("else")
-        -- StmtEmitter:345
+        -- StmtEmitter:373
         StmtEmitter.push_block(self, parts, Option.unwrap(else_body))
     end
-    -- StmtEmitter:347
+    -- StmtEmitter:375
     parts:push("end")
-    -- StmtEmitter:348
+    -- StmtEmitter:376
     return Text.lines(parts)
 end
--- StmtEmitter:351
+-- StmtEmitter:379
 function StmtEmitter.emit_while(self, node)
-    -- StmtEmitter:352
+    -- StmtEmitter:380
     local parts = List.__lz_from({("while " .. self.exprs:emit(node:child("condition"))) .. " do"})
-    -- StmtEmitter:353
+    -- StmtEmitter:381
     StmtEmitter.push_block(self, parts, node:child("body"))
-    -- StmtEmitter:354
+    -- StmtEmitter:382
     parts:push("end")
-    -- StmtEmitter:355
+    -- StmtEmitter:383
     return Text.lines(parts)
 end
--- StmtEmitter:358
+-- StmtEmitter:386
 function StmtEmitter.emit_loop(self, node)
-    -- StmtEmitter:359
+    -- StmtEmitter:387
     local parts = List.__lz_from({"while true do"})
-    -- StmtEmitter:360
+    -- StmtEmitter:388
     StmtEmitter.push_block(self, parts, node:child("body"))
-    -- StmtEmitter:361
+    -- StmtEmitter:389
     parts:push("end")
-    -- StmtEmitter:362
+    -- StmtEmitter:390
     return Text.lines(parts)
 end
--- StmtEmitter:367
+-- StmtEmitter:395
 function StmtEmitter.emit_for(self, node)
-    -- StmtEmitter:368
+    -- StmtEmitter:396
     local loop_body = List.__lz_from({})
-    -- StmtEmitter:369
+    -- StmtEmitter:397
     for _, stmt in List.__lz_each(node:child("body")) do
-        -- StmtEmitter:370
+        -- StmtEmitter:398
         loop_body:push(stmt)
     end
-    -- StmtEmitter:372
+    -- StmtEmitter:400
     local step = node:attr("step")
-    -- StmtEmitter:373
+    -- StmtEmitter:401
     if Option.is_some(step) then
-        -- StmtEmitter:374
+        -- StmtEmitter:402
         loop_body:push(Option.unwrap(step))
     end
-    -- StmtEmitter:377
+    -- StmtEmitter:405
     local do_body = List.__lz_from({})
-    -- StmtEmitter:378
+    -- StmtEmitter:406
     local init = node:attr("init")
-    -- StmtEmitter:379
+    -- StmtEmitter:407
     if Option.is_some(init) then
-        -- StmtEmitter:380
+        -- StmtEmitter:408
         do_body:push(StmtEmitter.emit_stmt(self, Option.unwrap(init)))
     end
-    -- StmtEmitter:383
+    -- StmtEmitter:411
     local cond = "true"
-    -- StmtEmitter:384
+    -- StmtEmitter:412
     local condition = node:attr("condition")
-    -- StmtEmitter:385
+    -- StmtEmitter:413
     if Option.is_some(condition) then
-        -- StmtEmitter:386
+        -- StmtEmitter:414
         cond = self.exprs:emit(Option.unwrap(condition))
     end
-    -- StmtEmitter:388
+    -- StmtEmitter:416
     local while_parts = List.__lz_from({("while " .. cond) .. " do"})
-    -- StmtEmitter:389
+    -- StmtEmitter:417
     StmtEmitter.push_block(self, while_parts, loop_body)
-    -- StmtEmitter:390
+    -- StmtEmitter:418
     while_parts:push("end")
-    -- StmtEmitter:391
+    -- StmtEmitter:419
     do_body:push(Text.lines(while_parts))
-    -- StmtEmitter:393
+    -- StmtEmitter:421
     return Text.lines(List.__lz_from({"do", Text.indent(Text.lines(do_body)), "end"}))
 end
--- StmtEmitter:399
+-- StmtEmitter:427
 function StmtEmitter.emit_for_in(self, node)
-    -- StmtEmitter:400
+    -- StmtEmitter:428
     local iter = self.exprs:emit(node:child("iter"))
-    -- StmtEmitter:401
+    -- StmtEmitter:429
     self.ctx:push_scope()
-    -- StmtEmitter:402
+    -- StmtEmitter:430
     local vars = node:child("vars")
-    -- StmtEmitter:403
+    -- StmtEmitter:431
     for _, name in List.__lz_each(vars) do
-        -- StmtEmitter:404
+        -- StmtEmitter:432
         self.ctx:declare_local(name)
     end
-    -- StmtEmitter:406
+    -- StmtEmitter:434
+    local vars_mangled = (function() local __lz_m5 = List.new() for _, v in List.__lz_each(vars) do List.push(__lz_m5, self.ctx:mangle_local(v)) end return __lz_m5 end)()
+    -- StmtEmitter:435
+    local each = (self.ctx:mangle_class("List") .. ".") .. self.ctx:mangle_member("List", "__lz_each")
+    -- StmtEmitter:436
     local header = ""
-    -- StmtEmitter:407
+    -- StmtEmitter:437
     if vars:len() == 1 then
-        -- StmtEmitter:408
-        header = ((("for _, " .. Option.__lz_unwrap(vars:get(1))) .. " in List.__lz_each(") .. iter) .. ") do"
+        -- StmtEmitter:438
+        header = ((((("for _, " .. Option.unwrap(vars_mangled:get(1))) .. " in ") .. each) .. "(") .. iter) .. ") do"
     else
-        -- StmtEmitter:410
-        header = ((("for " .. Text.join(vars, ", ")) .. " in List.__lz_each(") .. iter) .. ") do"
+        -- StmtEmitter:440
+        header = ((((("for " .. Text.join(vars_mangled, ", ")) .. " in ") .. each) .. "(") .. iter) .. ") do"
     end
-    -- StmtEmitter:412
+    -- StmtEmitter:442
     local parts = List.__lz_from({header})
-    -- StmtEmitter:413
+    -- StmtEmitter:443
     StmtEmitter.push_block(self, parts, node:child("body"))
-    -- StmtEmitter:414
+    -- StmtEmitter:444
     parts:push("end")
-    -- StmtEmitter:415
+    -- StmtEmitter:445
     self.ctx:pop_scope()
-    -- StmtEmitter:416
+    -- StmtEmitter:446
     return Text.lines(parts)
 end
--- StmtEmitter:419
+-- StmtEmitter:449
 function StmtEmitter.emit_method(self, node)
-    -- StmtEmitter:420
+    -- StmtEmitter:450
     local params = node:child("params")
-    -- StmtEmitter:421
+    -- StmtEmitter:451
     local lua_params = params
-    -- StmtEmitter:422
+    -- StmtEmitter:452
     if not Option.unwrap_or(node:attr("is_static"), false) then
-        -- StmtEmitter:423
+        -- StmtEmitter:453
         lua_params = StmtEmitter.with_self(self, params)
     end
-    -- StmtEmitter:425
-    local header = ((((("function " .. self.ctx:name()) .. ".") .. node:child("name")) .. "(") .. Text.join(lua_params, ", ")) .. ")"
-    -- StmtEmitter:426
+    -- StmtEmitter:455
+    local header = ((((("function " .. self.ctx:name()) .. ".") .. self.ctx:mangle_self_member(node:child("name"))) .. "(") .. Text.join(StmtEmitter.mangle_params(self, lua_params), ", ")) .. ")"
+    -- StmtEmitter:456
     return StmtEmitter.wrap_body(self, header, StmtEmitter.emit_fn_body(self, lua_params, node:child("param_types"), node:child("body")))
 end
--- StmtEmitter:429
+-- StmtEmitter:459
 function StmtEmitter.emit_lua_method(self, node)
-    -- StmtEmitter:430
+    -- StmtEmitter:460
     local params = node:child("params")
-    -- StmtEmitter:431
+    -- StmtEmitter:461
     local lua_params = params
-    -- StmtEmitter:432
+    -- StmtEmitter:462
     if not Option.unwrap_or(node:attr("is_static"), false) then
-        -- StmtEmitter:433
+        -- StmtEmitter:463
         lua_params = StmtEmitter.with_self(self, params)
     end
-    -- StmtEmitter:435
-    local header = ((((("function " .. self.ctx:name()) .. ".") .. node:child("name")) .. "(") .. Text.join(lua_params, ", ")) .. ")"
-    -- StmtEmitter:436
+    -- StmtEmitter:466
+    local header = ((((("function " .. self.ctx:name()) .. ".") .. self.ctx:mangle_self_member(node:child("name"))) .. "(") .. Text.join(lua_params, ", ")) .. ")"
+    -- StmtEmitter:467
     return Text.lines(List.__lz_from({header, Text.indent(node:child("raw_body")), "end"}))
 end
--- StmtEmitter:439
+-- StmtEmitter:470
 function StmtEmitter.emit_static_field(self, node)
-    -- StmtEmitter:440
+    -- StmtEmitter:471
     local value = node:attr("value")
-    -- StmtEmitter:441
+    -- StmtEmitter:472
     local rhs = "nil"
-    -- StmtEmitter:442
+    -- StmtEmitter:473
     if Option.is_some(value) then
-        -- StmtEmitter:443
+        -- StmtEmitter:474
         rhs = self.exprs:emit(Option.unwrap(value))
     end
-    -- StmtEmitter:445
-    return (((self.ctx:name() .. ".") .. node:child("name")) .. " = ") .. rhs
+    -- StmtEmitter:476
+    return (((self.ctx:name() .. ".") .. self.ctx:mangle_self_member(node:child("name"))) .. " = ") .. rhs
 end
--- StmtEmitter:448
+-- StmtEmitter:479
 function StmtEmitter.emit_constructor(self, node)
-    -- StmtEmitter:449
+    -- StmtEmitter:480
     self.ctx:push_scope()
-    -- StmtEmitter:450
+    -- StmtEmitter:481
     for _, param in List.__lz_each(node:child("params")) do
-        -- StmtEmitter:451
+        -- StmtEmitter:482
         self.ctx:declare_local(param)
     end
-    -- StmtEmitter:453
+    -- StmtEmitter:484
     self.ctx:declare_local("self")
-    -- StmtEmitter:455
-    local lines = List.__lz_from({"local self = {}"})
-    -- StmtEmitter:456
+    -- StmtEmitter:486
+    local self_name = self.ctx:mangle_local("self")
+    -- StmtEmitter:487
+    local lines = List.__lz_from({("local " .. self_name) .. " = {}"})
+    -- StmtEmitter:488
     for _, guard in List.__lz_each(StmtEmitter.default_guards(self, node:child("params"), node:child("param_types"))) do
-        -- StmtEmitter:457
+        -- StmtEmitter:489
         lines:push(guard)
     end
-    -- StmtEmitter:459
+    -- StmtEmitter:491
     for _, method in List.__lz_each(self.ctx:instance_method_names()) do
-        -- StmtEmitter:460
-        lines:push((((("self." .. method) .. " = ") .. self.ctx:name()) .. ".") .. method)
+        -- StmtEmitter:492
+        local mangled = self.ctx:mangle_self_member(method)
+        -- StmtEmitter:493
+        lines:push((((((self_name .. ".") .. mangled) .. " = ") .. self.ctx:name()) .. ".") .. mangled)
     end
-    -- StmtEmitter:462
+    -- StmtEmitter:495
     for _, prop in List.__lz_each(self.ctx:property_decls()) do
-        -- StmtEmitter:463
+        -- StmtEmitter:496
         local value = prop:attr("value")
-        -- StmtEmitter:464
+        -- StmtEmitter:497
         if Option.is_some(value) then
-            -- StmtEmitter:465
-            lines:push((("self." .. prop:child("name")) .. " = ") .. self.exprs:emit(Option.unwrap(value)))
+            -- StmtEmitter:498
+            lines:push((((self_name .. ".") .. self.ctx:mangle_self_member(prop:child("name"))) .. " = ") .. self.exprs:emit(Option.unwrap(value)))
         end
     end
-    -- StmtEmitter:468
+    -- StmtEmitter:501
     for _, stmt in List.__lz_each(node:child("body")) do
-        -- StmtEmitter:469
+        -- StmtEmitter:502
         lines:push(StmtEmitter.emit_stmt(self, stmt))
     end
-    -- StmtEmitter:471
-    lines:push("return self")
-    -- StmtEmitter:472
+    -- StmtEmitter:504
+    lines:push("return " .. self_name)
+    -- StmtEmitter:505
     self.ctx:pop_scope()
-    -- StmtEmitter:474
-    local header = ((("function " .. self.ctx:name()) .. ".new(") .. Text.join(node:child("params"), ", ")) .. ")"
-    -- StmtEmitter:475
+    -- StmtEmitter:507
+    local header = ((("function " .. self.ctx:name()) .. ".new(") .. Text.join(StmtEmitter.mangle_params(self, node:child("params")), ", ")) .. ")"
+    -- StmtEmitter:508
     return Text.lines(List.__lz_from({header, Text.indent(Text.lines(lines)), "end"}))
 end
--- StmtEmitter:478
+-- StmtEmitter:511
 function StmtEmitter.emit_closure(self, params, param_types, body)
-    -- StmtEmitter:479
-    local header = ("function(" .. Text.join(params, ", ")) .. ")"
-    -- StmtEmitter:480
+    -- StmtEmitter:512
+    local header = ("function(" .. Text.join(StmtEmitter.mangle_params(self, params), ", ")) .. ")"
+    -- StmtEmitter:513
     return StmtEmitter.wrap_body(self, header, StmtEmitter.emit_fn_body(self, params, param_types, body))
 end
--- StmtEmitter:484
+-- StmtEmitter:516
+function StmtEmitter.mangle_params(self, params)
+    -- StmtEmitter:517
+    return (function() local __lz_m6 = List.new() for _, p in List.__lz_each(params) do List.push(__lz_m6, self.ctx:mangle_local(p)) end return __lz_m6 end)()
+end
+-- StmtEmitter:521
 function StmtEmitter.wrap_body(self, header, body)
-    -- StmtEmitter:485
+    -- StmtEmitter:522
     if body == "" then
-        -- StmtEmitter:486
+        -- StmtEmitter:523
         return Text.lines(List.__lz_from({header, "end"}))
     end
-    -- StmtEmitter:488
+    -- StmtEmitter:525
     return Text.lines(List.__lz_from({header, body, "end"}))
 end
--- StmtEmitter:492
+-- StmtEmitter:529
 function StmtEmitter.push_block(self, parts, stmts)
-    -- StmtEmitter:493
+    -- StmtEmitter:530
     local body = StmtEmitter.emit_block(self, stmts)
-    -- StmtEmitter:494
+    -- StmtEmitter:531
     if body ~= "" then
-        -- StmtEmitter:495
+        -- StmtEmitter:532
         parts:push(body)
     end
 end
--- StmtEmitter:499
+-- StmtEmitter:536
 function StmtEmitter.with_self(self, params)
-    -- StmtEmitter:500
+    -- StmtEmitter:537
     local out = List.__lz_from({"self"})
-    -- StmtEmitter:501
+    -- StmtEmitter:538
     for _, param in List.__lz_each(params) do
-        -- StmtEmitter:502
+        -- StmtEmitter:539
         out:push(param)
     end
-    -- StmtEmitter:504
+    -- StmtEmitter:541
     return out
 end
 
@@ -10285,8 +10695,8 @@ Meta.target = "Lua 5.1"
 
 local Codegen = {}
 
--- Codegen:21
-function Codegen.new(class_name, imports, externs, variant_owner, plat)
+-- Codegen:24
+function Codegen.new(class_name, imports, externs, variant_owner, plat, opt_level, mangler, prebuilt_classes)
     local self = {}
     self.generate = Codegen.generate
     self.class_block = Codegen.class_block
@@ -10294,170 +10704,186 @@ function Codegen.new(class_name, imports, externs, variant_owner, plat)
     self.is_property = Codegen.is_property
     self.is_emittable = Codegen.is_emittable
     self.has_constructor = Codegen.has_constructor
-    -- Codegen:22
+    self.opt_level = 0
+    self.mangler = 0
+    self.prebuilt_classes = 0
+    -- Codegen:25
     self.class_name = class_name
-    -- Codegen:23
+    -- Codegen:26
     self.known_classes = Map.__lz_from({})
-    -- Codegen:24
+    -- Codegen:27
     for _, name in List.__lz_each(imports) do
-        -- Codegen:25
+        -- Codegen:28
         List.__lz_idx_set(self.known_classes, name, true)
     end
-    -- Codegen:27
+    -- Codegen:30
     self.externs = externs
-    -- Codegen:28
+    -- Codegen:31
     self.variant_owner = variant_owner
-    -- Codegen:29
+    -- Codegen:32
     self.plat = plat
+    -- Codegen:33
+    self.opt_level = opt_level
+    -- Codegen:34
+    self.mangler = mangler
+    -- Codegen:35
+    self.prebuilt_classes = prebuilt_classes
     return self
 end
--- Codegen:35
+-- Codegen:41
 function Codegen.generate(self, program)
-    -- Codegen:36
+    -- Codegen:42
     local block = Codegen.class_block(self, program)
-    -- Codegen:38
+    -- Codegen:44
     local sections = List.__lz_from({Codegen.header(), block})
-    -- Codegen:39
+    -- Codegen:45
     if Codegen.has_constructor(self, program:child("body")) then
-        -- Codegen:40
+        -- Codegen:46
         sections:push(("return " .. self.class_name) .. ".new(...)")
     end
-    -- Codegen:42
+    -- Codegen:48
     return Text.join(sections, Text.nl() .. Text.nl())
 end
--- Codegen:48
+-- Codegen:54
 function Codegen.class_block(self, program)
-    -- Codegen:49
-    local body = program:child("body")
-    -- Codegen:50
-    local ctx = Codegen.build_context(self, body)
-    -- Codegen:51
-    local exprs = ExprEmitter.new(ctx)
-    -- Codegen:52
-    local stmts = StmtEmitter.new(ctx, exprs)
-    -- Codegen:53
-    exprs:inject_stmts(stmts)
     -- Codegen:55
-    local member_lines = (function() local __lz_m1 = List.new() for _, stmt in List.__lz_each(body) do if Codegen.is_emittable(self, stmt) then List.push(__lz_m1, stmts:emit_member(stmt)) end end return __lz_m1 end)()
+    local body = program:child("body")
+    -- Codegen:56
+    local ctx = Codegen.build_context(self, body)
     -- Codegen:57
-    local block = ("local " .. self.class_name) .. " = {}"
+    local exprs = ExprEmitter.new(ctx)
     -- Codegen:58
-    if member_lines:len() > 0 then
-        -- Codegen:59
-        block = ((block .. Text.nl()) .. Text.nl()) .. Text.join(member_lines, Text.nl())
-    end
+    local stmts = StmtEmitter.new(ctx, exprs)
+    -- Codegen:59
+    exprs:inject_stmts(stmts)
     -- Codegen:61
+    local member_lines = (function() local __lz_m1 = List.new() for _, stmt in List.__lz_each(body) do if Codegen.is_emittable(self, stmt) then List.push(__lz_m1, stmts:emit_member(stmt)) end end return __lz_m1 end)()
+    -- Codegen:63
+    local sep = Text.nl() .. Text.nl()
+    -- Codegen:64
+    if self.opt_level >= 1 then
+        -- Codegen:65
+        sep = Text.nl()
+    end
+    -- Codegen:67
+    local block = ("local " .. ctx:name()) .. " = {}"
+    -- Codegen:68
+    if member_lines:len() > 0 then
+        -- Codegen:69
+        block = (block .. sep) .. Text.join(member_lines, Text.nl())
+    end
+    -- Codegen:71
     return block
 end
--- Codegen:66
+-- Codegen:76
 function Codegen.build_context(self, body)
-    -- Codegen:67
+    -- Codegen:77
     local members = Map.__lz_from({})
-    -- Codegen:68
+    -- Codegen:78
     local instance_methods = Map.__lz_from({})
-    -- Codegen:69
+    -- Codegen:79
     local instance_order = List.__lz_from({})
-    -- Codegen:70
+    -- Codegen:80
     local properties = List.__lz_from({})
-    -- Codegen:71
+    -- Codegen:81
     for _, stmt in List.__lz_each(body) do
-        -- Codegen:72
+        -- Codegen:82
         local stmt_platform = Option.unwrap_or(stmt:attr("platform"), "")
-        -- Codegen:73
+        -- Codegen:83
         if (stmt_platform ~= "") and (stmt_platform ~= self.plat) then
         else
-            -- Codegen:77
+            -- Codegen:87
             local k = stmt.kind
-            -- Codegen:78
+            -- Codegen:88
             if k == "FunctionDecl" then
-                -- Codegen:79
+                -- Codegen:89
                 List.__lz_idx_set(members, stmt:child("name"), true)
-                -- Codegen:80
+                -- Codegen:90
                 if not Option.unwrap_or(stmt:attr("is_static"), false) then
-                    -- Codegen:81
+                    -- Codegen:91
                     List.__lz_idx_set(instance_methods, stmt:child("name"), true)
-                    -- Codegen:82
+                    -- Codegen:92
                     instance_order:push(stmt:child("name"))
                 end
             elseif k == "VariableDecl" then
-                -- Codegen:85
+                -- Codegen:95
                 if Codegen.is_property(self, stmt) then
-                    -- Codegen:86
+                    -- Codegen:96
                     properties:push(stmt)
                 else
-                    -- Codegen:88
+                    -- Codegen:98
                     List.__lz_idx_set(members, stmt:child("name"), true)
                 end
             end
         end
     end
-    -- Codegen:93
-    return CgContext.new(self.class_name, members, instance_methods, instance_order, properties, self.known_classes, self.externs, self.variant_owner)
+    -- Codegen:103
+    return CgContext.new(self.class_name, members, instance_methods, instance_order, properties, self.known_classes, self.externs, self.variant_owner, self.opt_level, self.mangler, self.prebuilt_classes)
 end
--- Codegen:96
+-- Codegen:106
 function Codegen.is_property(self, stmt)
-    -- Codegen:97
+    -- Codegen:107
     local visibility = Option.unwrap_or(stmt:attr("visibility"), "")
-    -- Codegen:98
+    -- Codegen:108
     local is_static = Option.unwrap_or(stmt:attr("is_static"), false)
-    -- Codegen:99
+    -- Codegen:109
     return (visibility ~= "") and (not is_static)
 end
--- Codegen:104
+-- Codegen:114
 function Codegen.is_emittable(self, stmt)
-    -- Codegen:105
-    local k = stmt.kind
-    -- Codegen:106
-    if k == "ImportDecl" then
-        -- Codegen:107
-        return false
-    end
-    -- Codegen:109
-    if k == "ExternDecl" then
-        -- Codegen:110
-        return false
-    end
-    -- Codegen:112
-    if k == "TraitDecl" then
-        -- Codegen:113
-        return false
-    end
     -- Codegen:115
-    if k == "ImplementDecl" then
-        -- Codegen:116
+    local k = stmt.kind
+    -- Codegen:116
+    if k == "ImportDecl" then
+        -- Codegen:117
         return false
     end
-    -- Codegen:118
-    if (k == "VariableDecl") and Codegen.is_property(self, stmt) then
-        -- Codegen:119
+    -- Codegen:119
+    if k == "ExternDecl" then
+        -- Codegen:120
         return false
     end
-    -- Codegen:121
-    local stmt_platform = Option.unwrap_or(stmt:attr("platform"), "")
     -- Codegen:122
-    if (stmt_platform ~= "") and (stmt_platform ~= self.plat) then
+    if k == "TraitDecl" then
         -- Codegen:123
         return false
     end
     -- Codegen:125
+    if k == "ImplementDecl" then
+        -- Codegen:126
+        return false
+    end
+    -- Codegen:128
+    if (k == "VariableDecl") and Codegen.is_property(self, stmt) then
+        -- Codegen:129
+        return false
+    end
+    -- Codegen:131
+    local stmt_platform = Option.unwrap_or(stmt:attr("platform"), "")
+    -- Codegen:132
+    if (stmt_platform ~= "") and (stmt_platform ~= self.plat) then
+        -- Codegen:133
+        return false
+    end
+    -- Codegen:135
     return true
 end
--- Codegen:128
+-- Codegen:138
 function Codegen.has_constructor(self, body)
-    -- Codegen:129
+    -- Codegen:139
     for _, stmt in List.__lz_each(body) do
-        -- Codegen:130
+        -- Codegen:140
         if stmt.kind == "ConstructorDecl" then
-            -- Codegen:131
+            -- Codegen:141
             return true
         end
     end
-    -- Codegen:134
+    -- Codegen:144
     return false
 end
--- Codegen:137
+-- Codegen:147
 function Codegen.header()
-    -- Codegen:138
+    -- Codegen:148
     return Text.lines(List.__lz_from({"--------------------------------------------------------------------", ((("-- Generated by the " .. Meta.name) .. " compiler v") .. Meta.version) .. " (self-hosted)", "-- Target runtime: " .. Meta.target, "-- This file is auto-generated. Do not edit by hand.", "--------------------------------------------------------------------"}))
 end
 
@@ -10688,7 +11114,7 @@ function Expander.compile_handler(handler_class, modules)
         -- Expander:66
         if not m.is_trait then
             -- Expander:68
-            local cg = Codegen.new(m.class_name, m.imports, Map.__lz_from({}), Map.__lz_from({}), "")
+            local cg = Codegen.new(m.class_name, m.imports, Map.__lz_from({}), Map.__lz_from({}), "", 0, 0, 0)
             -- Expander:69
             blocks:push(cg:class_block(m.ast))
         end
@@ -10741,154 +11167,309 @@ function Expander.call_handler(handler, method, ctx)
 
 end
 
+local Mangler = {}
+
+-- Mangler:12
+function Mangler.new()
+    local self = {}
+    self.pin = Mangler.pin
+    self.mangle_class = Mangler.mangle_class
+    self.mangle_local = Mangler.mangle_local
+    self.class_map = Map.__lz_from({})
+    self.local_map = Map.__lz_from({})
+    self.class_counter = 0
+    self.local_counter = 0
+    return self
+end
+-- Mangler:15
+function Mangler.idiv(a, b)
+    -- Mangler:16
+    local af = Option.__lz_unwrap_or(Option.__lz_wrap(tonumber(a)), 0.0)
+    -- Mangler:17
+    local bf = Option.__lz_unwrap_or(Option.__lz_wrap(tonumber(b)), 1.0)
+    -- Mangler:18
+    return Option.unwrap_or(Option.__lz_wrap(math.floor(af / bf)), 0)
+end
+-- Mangler:22
+function Mangler.short(n)
+    -- Mangler:23
+    local letters = "abcdefghijklmnopqrstuvwxyz"
+    -- Mangler:24
+    local base = 26
+    -- Mangler:25
+    local out = ""
+    -- Mangler:26
+    local idx = n
+    -- Mangler:27
+    while true do
+        -- Mangler:28
+        local rem = idx - (Mangler.idiv(idx, base) * base)
+        -- Mangler:29
+        out = Option.unwrap_or(Option.__lz_wrap(string.sub(letters, rem + 1, rem + 1)), "a") .. out
+        -- Mangler:30
+        idx = Mangler.idiv(idx, base) - 1
+        -- Mangler:31
+        if idx < 0 then
+            -- Mangler:32
+            break
+        end
+    end
+    -- Mangler:35
+    return out
+end
+-- Mangler:39
+function Mangler.pin(self, name)
+    -- Mangler:40
+    List.__lz_idx_set(self.class_map, name, name)
+end
+-- Mangler:44
+function Mangler.mangle_class(self, name)
+    -- Mangler:45
+    local hit = self.class_map:get(name)
+    -- Mangler:46
+    if Option.is_some(hit) then
+        -- Mangler:47
+        return Option.unwrap(hit)
+    end
+    -- Mangler:49
+    local s = Mangler.short(self.class_counter)
+    -- Mangler:50
+    self.class_counter = self.class_counter + 1
+    -- Mangler:51
+    List.__lz_idx_set(self.class_map, name, s)
+    -- Mangler:52
+    return s
+end
+-- Mangler:56
+function Mangler.mangle_local(self, name)
+    -- Mangler:57
+    local hit = self.local_map:get(name)
+    -- Mangler:58
+    if Option.is_some(hit) then
+        -- Mangler:59
+        return Option.unwrap(hit)
+    end
+    -- Mangler:61
+    local s = Mangler.short(self.local_counter)
+    -- Mangler:62
+    self.local_counter = self.local_counter + 1
+    -- Mangler:63
+    List.__lz_idx_set(self.local_map, name, s)
+    -- Mangler:64
+    return s
+end
+
 local Bundler = {}
 
--- Bundler:21
-function Bundler.new(modules, entry_class, variant_owner, plat)
+-- Bundler:24
+function Bundler.new(modules, entry_class, variant_owner, plat, opt_level)
     local self = {}
     self.bundle = Bundler.bundle
     self.collect_externs = Bundler.collect_externs
     self.extern_wraps = Bundler.extern_wraps
+    self.is_no_mangle = Bundler.is_no_mangle
     self.is_extern_module = Bundler.is_extern_module
+    self.opt_level = 0
+    self.mangler = 0
+    self.prebuilt_set = 0
+    -- Bundler:25
     self.modules = modules
+    -- Bundler:26
     self.entry_class = entry_class
+    -- Bundler:27
     self.variant_owner = variant_owner
+    -- Bundler:28
     self.plat = plat
+    -- Bundler:29
+    self.opt_level = opt_level
     return self
 end
--- Bundler:23
+-- Bundler:32
 function Bundler.bundle(self)
-    -- Bundler:24
+    -- Bundler:33
     local externs = Bundler.collect_externs(self)
-    -- Bundler:26
+    -- Bundler:35
+    if self.opt_level >= 3 then
+        -- Bundler:36
+        self.mangler = Mangler.new()
+        -- Bundler:37
+        local ps = Map.__lz_from({})
+        -- Bundler:38
+        for _, m in List.__lz_each(self.modules) do
+            -- Bundler:39
+            if Bundler.is_no_mangle(self, m) then
+                -- Bundler:40
+                List.__lz_idx_set(ps, m.class_name, true)
+                -- Bundler:41
+                self.mangler:pin(m.class_name)
+            end
+        end
+        -- Bundler:44
+        self.prebuilt_set = ps
+        -- Bundler:45
+        for _, m in List.__lz_each(self.modules) do
+            -- Bundler:46
+            if ((not m.is_trait) and (not Bundler.is_no_mangle(self, m))) and (not Bundler.is_extern_module(self, m)) then
+                -- Bundler:47
+                self.mangler:mangle_class(m.class_name)
+            end
+        end
+    end
+    -- Bundler:52
     local blocks = List.__lz_from({})
-    -- Bundler:27
+    -- Bundler:53
     local entry_has_ctor = false
-    -- Bundler:28
+    -- Bundler:54
     local entry_source = ""
-    -- Bundler:29
+    -- Bundler:55
     local entry_is_trait = false
-    -- Bundler:30
+    -- Bundler:56
     for _, m in List.__lz_each(self.modules) do
-        -- Bundler:31
+        -- Bundler:57
         if m.class_name == self.entry_class then
-            -- Bundler:32
+            -- Bundler:58
             entry_is_trait = m.is_trait
-            -- Bundler:33
+            -- Bundler:59
             entry_source = m.source
         end
-        -- Bundler:35
+        -- Bundler:61
         if (not Bundler.is_extern_module(self, m)) and (not m.is_trait) then
-            -- Bundler:36
+            -- Bundler:62
             if m.is_prebuilt then
-                -- Bundler:37
+                -- Bundler:63
                 blocks:push(m.prebuilt_lua)
             else
-                -- Bundler:39
-                local cg = Codegen.new(m.class_name, m.imports, externs, self.variant_owner, self.plat)
-                -- Bundler:40
+                -- Bundler:65
+                local cg = Codegen.new(m.class_name, m.imports, externs, self.variant_owner, self.plat, self.opt_level, self.mangler, self.prebuilt_set)
+                -- Bundler:66
                 blocks:push(cg:class_block(m.ast))
-                -- Bundler:41
+                -- Bundler:67
                 if m.class_name == self.entry_class then
-                    -- Bundler:42
+                    -- Bundler:68
                     entry_has_ctor = cg:has_constructor(m.ast:child("body"))
                 end
             end
         end
     end
-    -- Bundler:48
+    -- Bundler:74
     if (not entry_is_trait) and (not entry_has_ctor) then
-        -- Bundler:49
+        -- Bundler:75
         Error.new("LinkError", ("entry class '" .. self.entry_class) .. "' must define a constructor", 1, 1, entry_source, 1):raise()
     end
-    -- Bundler:52
+    -- Bundler:78
+    local entry_ref = self.entry_class
+    -- Bundler:79
+    if (self.opt_level >= 3) and (self.mangler ~= 0) then
+        -- Bundler:80
+        entry_ref = self.mangler:mangle_class(self.entry_class)
+    end
+    -- Bundler:83
+    local sep = Text.nl() .. Text.nl()
+    -- Bundler:84
+    if self.opt_level >= 1 then
+        -- Bundler:85
+        sep = Text.nl()
+    end
+    -- Bundler:88
     local sections = List.__lz_from({Codegen.header()})
-    -- Bundler:53
+    -- Bundler:89
     for _, block in List.__lz_each(blocks) do
-        -- Bundler:54
+        -- Bundler:90
         sections:push(block)
     end
-    -- Bundler:56
+    -- Bundler:92
     if entry_is_trait then
-        -- Bundler:57
+        -- Bundler:93
         sections:push("return nil")
     else
-        -- Bundler:59
-        sections:push(("return " .. self.entry_class) .. ".new(...)")
+        -- Bundler:95
+        sections:push(("return " .. entry_ref) .. ".new(...)")
     end
-    -- Bundler:61
-    return Text.join(sections, Text.nl() .. Text.nl())
+    -- Bundler:97
+    return Text.join(sections, sep)
 end
--- Bundler:70
+-- Bundler:106
 function Bundler.collect_externs(self)
-    -- Bundler:71
+    -- Bundler:107
     local externs = Map.__lz_from({})
-    -- Bundler:72
+    -- Bundler:108
     for _, m in List.__lz_each(self.modules) do
-        -- Bundler:73
+        -- Bundler:109
         if not m.is_prebuilt then
-            -- Bundler:74
+            -- Bundler:110
             local binds = Map.__lz_from({})
-            -- Bundler:75
+            -- Bundler:111
             for _, node in List.__lz_each(m.ast:child("body")) do
-                -- Bundler:76
+                -- Bundler:112
                 if node.kind == "ExternDecl" then
-                    -- Bundler:77
+                    -- Bundler:113
                     local extern_plat = Option.__lz_unwrap_or(node:attr("platform"), "")
-                    -- Bundler:78
+                    -- Bundler:114
                     if (extern_plat == "") or (extern_plat == self.plat) then
-                        -- Bundler:79
+                        -- Bundler:115
                         List.__lz_idx_set(binds, node:child("name"), Map.__lz_from({["target"] = node:child("target"), ["wrap"] = Bundler.extern_wraps(self, node)}))
                     end
                 end
             end
-            -- Bundler:83
+            -- Bundler:119
             if binds:len() > 0 then
-                -- Bundler:84
+                -- Bundler:120
                 List.__lz_idx_set(externs, m.class_name, binds)
             end
         end
     end
-    -- Bundler:88
+    -- Bundler:124
     return externs
 end
--- Bundler:91
+-- Bundler:127
 function Bundler.extern_wraps(self, node)
-    -- Bundler:92
+    -- Bundler:128
     local rt = node:attr("return_type")
-    -- Bundler:93
+    -- Bundler:129
     if Option.is_none(rt) then
-        -- Bundler:94
+        -- Bundler:130
         return true
     end
-    -- Bundler:96
+    -- Bundler:132
     local name = Option.unwrap(rt):child("name")
-    -- Bundler:97
+    -- Bundler:133
     return (name == "Option") or (name == "dynamic")
 end
--- Bundler:102
-function Bundler.is_extern_module(self, m)
-    -- Bundler:103
+-- Bundler:138
+Bundler.stdlib_names = Map.__lz_from({["List"] = true, ["Map"] = true, ["Option"] = true, ["Result"] = true, ["Sys"] = true, ["Str"] = true, ["Num"] = true, ["File"] = true, ["Path"] = true, ["Iterable"] = true})
+-- Bundler:146
+function Bundler.is_no_mangle(self, m)
+    -- Bundler:147
     if m.is_prebuilt then
-        -- Bundler:104
+        -- Bundler:148
+        return true
+    end
+    -- Bundler:150
+    return Bundler.stdlib_names:has(m.class_name)
+end
+-- Bundler:155
+function Bundler.is_extern_module(self, m)
+    -- Bundler:156
+    if m.is_prebuilt then
+        -- Bundler:157
         return false
     end
-    -- Bundler:106
+    -- Bundler:159
     local has_extern = false
-    -- Bundler:107
+    -- Bundler:160
     local has_other = false
-    -- Bundler:108
+    -- Bundler:161
     for _, node in List.__lz_each(m.ast:child("body")) do
-        -- Bundler:109
+        -- Bundler:162
         if node.kind == "ExternDecl" then
-            -- Bundler:110
+            -- Bundler:163
             has_extern = true
         else
-            -- Bundler:112
+            -- Bundler:165
             has_other = true
         end
     end
-    -- Bundler:115
+    -- Bundler:168
     return has_extern and (not has_other)
 end
 
@@ -11893,70 +12474,84 @@ function Main.new()
         -- Main:31
         local is_check = false
         -- Main:32
-        local i = 2
+        local opt_level = 0
         -- Main:33
+        local i = 2
+        -- Main:34
         while true do
-            -- Main:34
-            local flag = Option.__lz_wrap(Sys.__lz_argv(i))
             -- Main:35
+            local flag = Option.__lz_wrap(Sys.__lz_argv(i))
+            -- Main:36
             if Option.is_none(flag) then
-                -- Main:36
+                -- Main:37
                 break
             end
-            -- Main:38
-            local f = Option.unwrap(flag)
             -- Main:39
+            local f = Option.unwrap(flag)
+            -- Main:40
             if f == "--platform" then
-                -- Main:40
-                i = i + 1
                 -- Main:41
-                local val = Option.__lz_wrap(Sys.__lz_argv(i))
+                i = i + 1
                 -- Main:42
+                local val = Option.__lz_wrap(Sys.__lz_argv(i))
+                -- Main:43
                 if Option.is_some(val) then
-                    -- Main:43
+                    -- Main:44
                     plat = Option.unwrap(val)
                 end
             elseif f == "--pkg-path" then
-                -- Main:46
-                i = i + 1
                 -- Main:47
-                local val = Option.__lz_wrap(Sys.__lz_argv(i))
+                i = i + 1
                 -- Main:48
+                local val = Option.__lz_wrap(Sys.__lz_argv(i))
+                -- Main:49
                 if Option.is_some(val) then
-                    -- Main:49
+                    -- Main:50
                     pkg_path = Option.unwrap(val)
                 else
-                    -- Main:51
+                    -- Main:52
                     Error.new("MissingFlagValue", "--pkg-path requires a directory argument", 0, 0, "", 1):raise()
                 end
             elseif f == "--lib" then
-                -- Main:54
+                -- Main:55
                 is_lib = true
             elseif f == "--check" then
-                -- Main:56
+                -- Main:57
                 is_check = true
+            elseif f == "-O0" then
+                -- Main:59
+                opt_level = 0
+            elseif f == "-O1" then
+                -- Main:61
+                opt_level = 1
+            elseif f == "-O2" then
+                -- Main:63
+                opt_level = 2
+            elseif f == "-Os" then
+                -- Main:65
+                opt_level = 3
             end
-            -- Main:58
+            -- Main:67
             i = i + 1
         end
-        -- Main:60
+        -- Main:69
         if is_check then
-            -- Main:61
+            -- Main:70
             Main.check_file(Option.unwrap(path), pkg_path)
         elseif is_lib then
-            -- Main:63
-            Main.build_lib(Option.unwrap(path), plat, pkg_path)
+            -- Main:72
+            Main.build_lib(Option.unwrap(path), plat, pkg_path, opt_level)
         else
-            -- Main:65
-            Main.build_file(Option.unwrap(path), plat, pkg_path)
+            -- Main:74
+            Main.build_file(Option.unwrap(path), plat, pkg_path, opt_level)
         end
     else
-        -- Main:68
+        -- Main:77
         Error.new("NoFileAppended", "No file appended, use 'lazarus <FILE.laz>'", 0, 0, "", 2):raise()
     end
     return self
 end
--- Main:75
+-- Main:84
 function Main.check_file(path, pkg_path)
 
         _G._lz_check_mode = true
@@ -11997,365 +12592,365 @@ function Main.check_file(path, pkg_path)
         os.exit(0)
 
 end
--- Main:117
-function Main.build_file(path, plat, pkg_path)
-    -- Main:118
-    local linker = Linker.new(path, pkg_path)
-    -- Main:119
-    local modules = linker:link()
-    -- Main:121
-    local variant_owner = Map.__lz_from({})
-    -- Main:122
-    local enums = Map.__lz_from({})
-    -- Main:123
-    local variant_arity = Map.__lz_from({})
-    -- Main:124
-    local variant_fields = Map.__lz_from({})
-    -- Main:125
-    local enum_type_params = Map.__lz_from({})
-    -- Main:126
-    local classes = Map.__lz_from({})
+-- Main:126
+function Main.build_file(path, plat, pkg_path, opt_level)
     -- Main:127
-    local traits = Map.__lz_from({})
+    local linker = Linker.new(path, pkg_path)
     -- Main:128
-    local gated_externs = Map.__lz_from({})
+    local modules = linker:link()
     -- Main:130
+    local variant_owner = Map.__lz_from({})
+    -- Main:131
+    local enums = Map.__lz_from({})
+    -- Main:132
+    local variant_arity = Map.__lz_from({})
+    -- Main:133
+    local variant_fields = Map.__lz_from({})
+    -- Main:134
+    local enum_type_params = Map.__lz_from({})
+    -- Main:135
+    local classes = Map.__lz_from({})
+    -- Main:136
+    local traits = Map.__lz_from({})
+    -- Main:137
+    local gated_externs = Map.__lz_from({})
+    -- Main:139
     for _, m in List.__lz_each(modules) do
-        -- Main:131
+        -- Main:140
         if not m.is_prebuilt then
-            -- Main:132
+            -- Main:141
             Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
-            -- Main:133
+            -- Main:142
             Main.collect_traits(m.ast, traits, m.class_name)
         end
     end
-    -- Main:137
+    -- Main:146
     local handler_cache = Map.__lz_from({})
-    -- Main:138
+    -- Main:147
     for _, m in List.__lz_each(modules) do
-        -- Main:139
+        -- Main:148
         if (not m.is_trait) and (not m.is_prebuilt) then
-            -- Main:140
+            -- Main:149
             Expander.new(m.class_name, handler_cache):expand(m.ast, modules)
         end
     end
-    -- Main:144
+    -- Main:153
     for _, m in List.__lz_each(modules) do
-        -- Main:145
+        -- Main:154
         if m.is_prebuilt then
-            -- Main:146
+            -- Main:155
             List.__lz_idx_set(classes, m.class_name, m.meta_sig)
         elseif not m.is_trait then
-            -- Main:148
+            -- Main:157
             Main.collect_signatures(m.ast, m.class_name, classes, plat, gated_externs)
         end
     end
-    -- Main:152
-    for _, m in List.__lz_each(modules) do
-        -- Main:153
-        if (not m.is_trait) and (not m.is_prebuilt) then
-            -- Main:154
-            Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity, gated_externs)
-            -- Main:155
-            Typecheck.new(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, traits):check(m.ast)
-            -- Main:156
-            Optimizer.new():optimize(m.ast)
-        end
-    end
-    -- Main:160
-    local entry_class = linker:entry_class()
     -- Main:161
-    local bundle = Bundler.new(modules, entry_class, variant_owner, plat):bundle()
-    -- Main:163
-    local entry_sig = Option.unwrap_or(classes:get(entry_class), 0)
-    -- Main:164
-    local meta_block = ""
-    -- Main:165
-    if entry_sig ~= 0 then
-        -- Main:166
-        meta_block = (MetaEmitter.emit(entry_class, entry_sig) .. Text.nl()) .. Text.nl()
+    for _, m in List.__lz_each(modules) do
+        -- Main:162
+        if (not m.is_trait) and (not m.is_prebuilt) then
+            -- Main:163
+            Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity, gated_externs)
+            -- Main:164
+            Typecheck.new(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, traits):check(m.ast)
+            -- Main:165
+            Optimizer.new(opt_level):optimize(m.ast, m.class_name)
+        end
     end
     -- Main:169
-    local out_path = entry_class .. ".lua"
+    local entry_class = linker:entry_class()
     -- Main:170
-    local file = Option.__lz_unwrap(Option.__lz_wrap(io.open(out_path, "w")))
-    -- Main:171
-    file:write(meta_block .. bundle)
+    local bundle = Bundler.new(modules, entry_class, variant_owner, plat, opt_level):bundle()
     -- Main:172
+    local entry_sig = Option.unwrap_or(classes:get(entry_class), 0)
+    -- Main:173
+    local meta_block = ""
+    -- Main:174
+    if entry_sig ~= 0 then
+        -- Main:175
+        meta_block = (MetaEmitter.emit(entry_class, entry_sig) .. Text.nl()) .. Text.nl()
+    end
+    -- Main:178
+    local out_path = entry_class .. ".lua"
+    -- Main:179
+    local file = Option.__lz_unwrap(Option.__lz_wrap(io.open(out_path, "w")))
+    -- Main:180
+    file:write(meta_block .. bundle)
+    -- Main:181
     file:close()
 end
--- Main:179
-function Main.build_lib(path, plat, pkg_path)
-    -- Main:180
-    local linker = Linker.new(path, pkg_path)
-    -- Main:181
-    local modules = linker:link()
-    -- Main:183
-    local variant_owner = Map.__lz_from({})
-    -- Main:184
-    local enums = Map.__lz_from({})
-    -- Main:185
-    local variant_arity = Map.__lz_from({})
-    -- Main:186
-    local variant_fields = Map.__lz_from({})
-    -- Main:187
-    local enum_type_params = Map.__lz_from({})
-    -- Main:188
-    local classes = Map.__lz_from({})
+-- Main:188
+function Main.build_lib(path, plat, pkg_path, opt_level)
     -- Main:189
-    local traits = Map.__lz_from({})
+    local linker = Linker.new(path, pkg_path)
     -- Main:190
-    local gated_externs = Map.__lz_from({})
+    local modules = linker:link()
     -- Main:192
+    local variant_owner = Map.__lz_from({})
+    -- Main:193
+    local enums = Map.__lz_from({})
+    -- Main:194
+    local variant_arity = Map.__lz_from({})
+    -- Main:195
+    local variant_fields = Map.__lz_from({})
+    -- Main:196
+    local enum_type_params = Map.__lz_from({})
+    -- Main:197
+    local classes = Map.__lz_from({})
+    -- Main:198
+    local traits = Map.__lz_from({})
+    -- Main:199
+    local gated_externs = Map.__lz_from({})
+    -- Main:201
     for _, m in List.__lz_each(modules) do
-        -- Main:193
+        -- Main:202
         if not m.is_prebuilt then
-            -- Main:194
+            -- Main:203
             Main.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
-            -- Main:195
+            -- Main:204
             Main.collect_traits(m.ast, traits, m.class_name)
         end
     end
-    -- Main:199
+    -- Main:208
     local handler_cache = Map.__lz_from({})
-    -- Main:200
+    -- Main:209
     for _, m in List.__lz_each(modules) do
-        -- Main:201
+        -- Main:210
         if (not m.is_trait) and (not m.is_prebuilt) then
-            -- Main:202
+            -- Main:211
             Expander.new(m.class_name, handler_cache):expand(m.ast, modules)
         end
     end
-    -- Main:206
+    -- Main:215
     for _, m in List.__lz_each(modules) do
-        -- Main:207
+        -- Main:216
         if m.is_prebuilt then
-            -- Main:208
+            -- Main:217
             List.__lz_idx_set(classes, m.class_name, m.meta_sig)
         elseif not m.is_trait then
-            -- Main:210
+            -- Main:219
             Main.collect_signatures(m.ast, m.class_name, classes, plat, gated_externs)
         end
     end
-    -- Main:214
+    -- Main:223
     for _, m in List.__lz_each(modules) do
-        -- Main:215
+        -- Main:224
         if (not m.is_trait) and (not m.is_prebuilt) then
-            -- Main:216
+            -- Main:225
             Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity, gated_externs)
-            -- Main:217
+            -- Main:226
             Typecheck.new(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, traits):check(m.ast)
-            -- Main:218
-            Optimizer.new():optimize(m.ast)
+            -- Main:227
+            Optimizer.new(opt_level):optimize(m.ast, m.class_name)
         end
     end
-    -- Main:222
+    -- Main:231
     local entry_class = linker:entry_class()
-    -- Main:223
+    -- Main:232
     local entry_module = Option.unwrap(modules:get(modules:len()))
-    -- Main:224
+    -- Main:233
     local externs = Map.__lz_from({})
-    -- Main:225
+    -- Main:234
     for _, m in List.__lz_each(modules) do
-        -- Main:226
+        -- Main:235
         if not m.is_prebuilt then
-            -- Main:227
+            -- Main:236
             local binds = Map.__lz_from({})
-            -- Main:228
+            -- Main:237
             for _, node in List.__lz_each(m.ast:child("body")) do
-                -- Main:229
+                -- Main:238
                 if node.kind == "ExternDecl" then
-                    -- Main:230
+                    -- Main:239
                     local extern_plat = Option.__lz_unwrap_or(node:attr("platform"), "")
-                    -- Main:231
+                    -- Main:240
                     if (extern_plat == "") or (extern_plat == plat) then
-                        -- Main:232
+                        -- Main:241
                         local rt = node:attr("return_type")
-                        -- Main:233
+                        -- Main:242
                         local wrap = true
-                        -- Main:234
+                        -- Main:243
                         if Option.__lz_is_some(rt) then
-                            -- Main:235
+                            -- Main:244
                             local rname = Option.__lz_unwrap(rt):child("name")
-                            -- Main:236
+                            -- Main:245
                             wrap = (rname == "Option") or (rname == "dynamic")
                         end
-                        -- Main:238
+                        -- Main:247
                         List.__lz_idx_set(binds, node:child("name"), Map.__lz_from({["target"] = node:child("target"), ["wrap"] = wrap}))
                     end
                 end
             end
-            -- Main:242
+            -- Main:251
             if binds:len() > 0 then
-                -- Main:243
+                -- Main:252
                 List.__lz_idx_set(externs, m.class_name, binds)
             end
         end
     end
-    -- Main:247
-    local cg = Codegen.new(entry_class, entry_module.imports, externs, variant_owner, plat)
-    -- Main:248
+    -- Main:256
+    local cg = Codegen.new(entry_class, entry_module.imports, externs, variant_owner, plat, opt_level, 0, 0)
+    -- Main:257
     local class_block = cg:class_block(entry_module.ast)
-    -- Main:250
+    -- Main:259
     local entry_sig = Option.unwrap_or(classes:get(entry_class), 0)
-    -- Main:251
+    -- Main:260
     local meta_block = ""
-    -- Main:252
+    -- Main:261
     if entry_sig ~= 0 then
-        -- Main:253
+        -- Main:262
         meta_block = (MetaEmitter.emit(entry_class, entry_sig) .. Text.nl()) .. Text.nl()
     end
-    -- Main:256
+    -- Main:265
     local out_path = entry_class .. ".lua"
-    -- Main:257
+    -- Main:266
     local file = Option.__lz_unwrap(Option.__lz_wrap(io.open(out_path, "w")))
-    -- Main:258
+    -- Main:267
     file:write(meta_block .. class_block)
-    -- Main:259
+    -- Main:268
     file:close()
 end
--- Main:266
+-- Main:275
 function Main.collect_enums(ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
-    -- Main:267
+    -- Main:276
     for _, stmt in List.__lz_each(ast:child("body")) do
-        -- Main:268
+        -- Main:277
         if stmt.kind == "EnumDecl" then
-            -- Main:269
+            -- Main:278
             local name = stmt:child("name")
-            -- Main:270
+            -- Main:279
             List.__lz_idx_set(enum_type_params, name, Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_from({})))
-            -- Main:271
+            -- Main:280
             local names = List.__lz_from({})
-            -- Main:272
+            -- Main:281
             for _, v in List.__lz_each(stmt:child("variants")) do
-                -- Main:273
+                -- Main:282
                 local vn = v:child("name")
-                -- Main:274
+                -- Main:283
                 names:push(vn)
-                -- Main:275
+                -- Main:284
                 List.__lz_idx_set(variant_owner, vn, name)
-                -- Main:276
+                -- Main:285
                 List.__lz_idx_set(variant_arity, vn, v:child("fields"):len())
-                -- Main:277
+                -- Main:286
                 List.__lz_idx_set(variant_fields, vn, v:child("fields"))
             end
-            -- Main:279
+            -- Main:288
             List.__lz_idx_set(enums, name, names)
         end
     end
 end
--- Main:289
+-- Main:298
 function Main.collect_signatures(ast, class_name, classes, plat, gated_externs)
-    -- Main:290
+    -- Main:299
     local fields = Map.__lz_from({})
-    -- Main:291
+    -- Main:300
     local methods = Map.__lz_from({})
-    -- Main:292
+    -- Main:301
     local ctor = 0
-    -- Main:293
+    -- Main:302
     local ctor_names = List.__lz_from({})
-    -- Main:294
+    -- Main:303
     local type_params = List.__lz_from({})
-    -- Main:295
+    -- Main:304
     for _, stmt in List.__lz_each(ast:child("body")) do
-        -- Main:296
+        -- Main:305
         local k = stmt.kind
-        -- Main:297
+        -- Main:306
         if k == "VariableDecl" then
-            -- Main:298
+            -- Main:307
             local visibility = Option.__lz_unwrap_or(stmt:attr("visibility"), "")
-            -- Main:299
+            -- Main:308
             local is_static = Option.__lz_unwrap_or(stmt:attr("is_static"), false)
-            -- Main:300
+            -- Main:309
             if (visibility ~= "") and (not is_static) then
-                -- Main:301
+                -- Main:310
                 List.__lz_idx_set(fields, stmt:child("name"), stmt:attr("type"))
             end
         elseif k == "FunctionDecl" then
-            -- Main:304
+            -- Main:313
             local params = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_from({}))
-            -- Main:305
+            -- Main:314
             local param_names = stmt:child("params")
-            -- Main:306
+            -- Main:315
             local result = Option.__lz_unwrap_or(stmt:attr("return_type"), 0)
-            -- Main:307
+            -- Main:316
             local is_static = Option.__lz_unwrap_or(stmt:attr("is_static"), false)
-            -- Main:308
+            -- Main:317
             local mtype_params = Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_from({}))
-            -- Main:309
+            -- Main:318
             List.__lz_idx_set(methods, stmt:child("name"), Map.__lz_from({["params"] = params, ["param_names"] = param_names, ["result"] = result, ["is_static"] = is_static, ["type_params"] = mtype_params}))
         elseif k == "ConstructorDecl" then
-            -- Main:311
+            -- Main:320
             ctor = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_from({}))
-            -- Main:312
+            -- Main:321
             ctor_names = stmt:child("params")
-            -- Main:313
+            -- Main:322
             type_params = Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_from({}))
         elseif k == "ExternDecl" then
-            -- Main:315
+            -- Main:324
             local params = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_from({}))
-            -- Main:316
+            -- Main:325
             local all_typed = true
-            -- Main:317
+            -- Main:326
             for _, pt in List.__lz_each(params) do
-                -- Main:318
+                -- Main:327
                 if Option.__lz_unwrap_or(pt:attr("inferred"), false) or (pt:child("name") == "dynamic") then
-                    -- Main:319
+                    -- Main:328
                     all_typed = false
                 end
             end
-            -- Main:322
+            -- Main:331
             if all_typed and (params:len() > 0) then
-                -- Main:323
+                -- Main:332
                 local extern_platform = Option.__lz_unwrap_or(stmt:attr("platform"), "")
-                -- Main:324
+                -- Main:333
                 local ename = stmt:child("name")
-                -- Main:325
+                -- Main:334
                 if (extern_platform == "") or (extern_platform == plat) then
-                    -- Main:326
+                    -- Main:335
                     local extern_result = Option.__lz_unwrap_or(stmt:attr("return_type"), 0)
-                    -- Main:327
+                    -- Main:336
                     List.__lz_idx_set(methods, ename, Map.__lz_from({["params"] = params, ["result"] = extern_result, ["is_static"] = true, ["type_params"] = List.__lz_from({})}))
-                    -- Main:328
+                    -- Main:337
                     gated_externs:delete(ename)
                 elseif not methods:has(ename) then
-                    -- Main:330
+                    -- Main:339
                     List.__lz_idx_set(gated_externs, ename, extern_platform)
                 end
             end
         end
     end
-    -- Main:335
+    -- Main:344
     List.__lz_idx_set(classes, class_name, Map.__lz_from({["fields"] = fields, ["methods"] = methods, ["ctor"] = ctor, ["ctor_names"] = ctor_names, ["type_params"] = type_params}))
 end
--- Main:343
+-- Main:352
 function Main.collect_traits(ast, traits, class_name)
-    -- Main:344
+    -- Main:353
     for _, stmt in List.__lz_each(ast:child("body")) do
-        -- Main:345
+        -- Main:354
         if stmt.kind == "TraitDecl" then
-            -- Main:346
+            -- Main:355
             local name = stmt:child("name")
-            -- Main:347
+            -- Main:356
             if name == "" then
-                -- Main:348
+                -- Main:357
                 name = class_name
             end
-            -- Main:350
+            -- Main:359
             local methods = Map.__lz_from({})
-            -- Main:351
+            -- Main:360
             for _, m in List.__lz_each(stmt:child("methods")) do
-                -- Main:352
+                -- Main:361
                 List.__lz_idx_set(methods, m:child("name"), Map.__lz_from({["params"] = m:child("param_types"), ["result"] = m:child("return_type"), ["type_params"] = m:child("type_params")}))
             end
-            -- Main:354
+            -- Main:363
             local properties = Map.__lz_from({})
-            -- Main:355
+            -- Main:364
             for _, p in List.__lz_each(stmt:child("properties")) do
-                -- Main:356
+                -- Main:365
                 List.__lz_idx_set(properties, p:child("name"), p:child("type"))
             end
-            -- Main:358
+            -- Main:367
             List.__lz_idx_set(traits, name, Map.__lz_from({["methods"] = methods, ["properties"] = properties, ["type_params"] = stmt:child("type_params")}))
         end
     end

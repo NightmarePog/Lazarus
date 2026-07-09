@@ -29,6 +29,7 @@ constructor() {
         mut pkg_path = ""
         mut is_lib = false
         mut is_check = false
+        mut opt_level = 0
         mut i = 2
         loop {
             mut flag = Sys.argv(i)
@@ -54,15 +55,23 @@ constructor() {
                 is_lib = true
             } else if f == "--check" {
                 is_check = true
+            } else if f == "-O0" {
+                opt_level = 0
+            } else if f == "-O1" {
+                opt_level = 1
+            } else if f == "-O2" {
+                opt_level = 2
+            } else if f == "-Os" {
+                opt_level = 3
             }
             i = i + 1
         }
         if is_check {
             Main.check_file(path.unwrap(), pkg_path)
         } else if is_lib {
-            Main.build_lib(path.unwrap(), plat, pkg_path)
+            Main.build_lib(path.unwrap(), plat, pkg_path, opt_level)
         } else {
-            Main.build_file(path.unwrap(), plat, pkg_path)
+            Main.build_file(path.unwrap(), plat, pkg_path, opt_level)
         }
     } else {
         Error("NoFileAppended", "No file appended, use 'lazarus <FILE.laz>'", 0, 0, "", 2).raise()
@@ -114,7 +123,7 @@ private static lua check_file(path: str, pkg_path: str): unit {
 // A file entry point: follow its imports and bundle the whole program. Each
 // module is analysed and optimised on its own before the bundler composes them.
 // Output is written to <EntryClass>.lua with a LAZARUS_META header.
-static build_file(path: str, plat: str, pkg_path: str): unit {
+static build_file(path: str, plat: str, pkg_path: str, opt_level: int): unit {
     mut linker = Linker(path, pkg_path)
     mut modules = linker.link()
 
@@ -153,12 +162,12 @@ static build_file(path: str, plat: str, pkg_path: str): unit {
         if not m.is_trait and not m.is_prebuilt {
             Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity, gated_externs)
             Typecheck(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, traits).check(m.ast)
-            Optimizer().optimize(m.ast)
+            Optimizer(opt_level).optimize(m.ast, m.class_name)
         }
     }
 
     mut entry_class = linker.entry_class()
-    mut bundle = Bundler(modules, entry_class, variant_owner, plat).bundle()
+    mut bundle = Bundler(modules, entry_class, variant_owner, plat, opt_level).bundle()
 
     mut entry_sig = classes.get(entry_class).unwrap_or(0)
     mut meta_block = ""
@@ -176,7 +185,7 @@ static build_file(path: str, plat: str, pkg_path: str): unit {
 // then emit ONLY the entry class block — no stdlib prelude, no entry-point call.
 // Output is <EntryClass>.lua with a LAZARUS_META header. The file can be imported
 // as a prebuilt library by other programs without recompilation.
-static build_lib(path: str, plat: str, pkg_path: str): unit {
+static build_lib(path: str, plat: str, pkg_path: str, opt_level: int): unit {
     mut linker = Linker(path, pkg_path)
     mut modules = linker.link()
 
@@ -215,7 +224,7 @@ static build_lib(path: str, plat: str, pkg_path: str): unit {
         if not m.is_trait and not m.is_prebuilt {
             Schematic.analyze(m.ast, m.source, m.class_name, m.imports, variant_owner, enums, variant_arity, gated_externs)
             Typecheck(m.source, m.class_name, m.imports, enums, classes, variant_fields, variant_owner, enum_type_params, traits).check(m.ast)
-            Optimizer().optimize(m.ast)
+            Optimizer(opt_level).optimize(m.ast, m.class_name)
         }
     }
 
@@ -244,7 +253,7 @@ static build_lib(path: str, plat: str, pkg_path: str): unit {
             }
         }
     }
-    mut cg = Codegen(entry_class, entry_module.imports, externs, variant_owner, plat)
+    mut cg = Codegen(entry_class, entry_module.imports, externs, variant_owner, plat, opt_level, 0, 0)
     mut class_block = cg.class_block(entry_module.ast)
 
     mut entry_sig = classes.get(entry_class).unwrap_or(0)

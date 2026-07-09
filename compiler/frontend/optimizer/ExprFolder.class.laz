@@ -10,10 +10,44 @@ import frontend.optimizer.Constants
 import std.Num
 
 private folds: int = 0
-constructor()
+private opt_level: int = 0
+constructor(opt_level: int) {
+    .opt_level = opt_level
+}
 
 public fold_count(): int {
     return .folds
+}
+
+// Pre-pass: register static single-return functions as inlining candidates (O2+).
+// Populated here; used in fold_call via try_inline_call.
+private inlineable: Map<str, dynamic> = [:]
+
+public register_inlineables(class_name: str, body: List<Node>): unit {
+    if .opt_level < 2 {
+        return
+    }
+    for stmt in body {
+        if stmt.kind != "FunctionDecl" {
+        } else if not stmt.attr("is_static").unwrap_or(false) {
+        } else if stmt.attr("raw_body").is_some() {
+        } else {
+            mut params = stmt.child("params")
+            if params.len() <= 3 {
+                mut fn_body = stmt.child("body")
+                if fn_body.len() == 1 {
+                    mut only = fn_body.get(1).unwrap()
+                    if only.kind == "ReturnStmt" {
+                        mut val = only.attr("value")
+                        if val.is_some() {
+                            mut key = class_name ++ "." ++ stmt.child("name")
+                            .inlineable[key] = ["params": params, "expr": val.unwrap()]
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 public fold(node: Node, constants: Constants): Node {
@@ -129,10 +163,117 @@ private apply(op: str, a: dynamic, b: dynamic): dynamic {
     return a / b
 }
 
+// O2 inlining candidates: zero-arg method calls that become Lua comparisons.
+// Values: "nil_neq" | "nil_eq" | "kind_ok" | "kind_err"
+private static inline_builtins = [
+    "is_some": "nil_neq",
+    "is_none": "nil_eq",
+    "is_ok": "kind_ok",
+    "is_err": "kind_err"
+]
+
 private fold_call(node: Node, constants: Constants): Node {
     node.set("callee", .fold(node.child("callee"), constants))
     node.set("args", [.fold(arg, constants) for arg in node.child("args")])
+    if .opt_level >= 2 {
+        mut inlined = .try_inline_builtin(node)
+        if inlined.is_some() {
+            .folds = .folds + 1
+            return inlined.unwrap()
+        }
+        mut inlined2 = .try_inline_call(node)
+        if inlined2.is_some() {
+            return inlined2.unwrap()
+        }
+    }
     return node
+}
+
+private try_inline_builtin(node: Node): Option<Node> {
+    if node.child("args").len() != 0 {
+        return Option.none()
+    }
+    mut callee = node.child("callee")
+    if callee.kind != "MemberExpr" {
+        return Option.none()
+    }
+    mut field = callee.child("field")
+    mut repl = ExprFolder.inline_builtins.get(field)
+    if repl.is_none() {
+        return Option.none()
+    }
+    mut obj = callee.child("object")
+    mut ln = node.line()
+    mut col = node.col()
+    mut kind = repl.unwrap()
+    if kind == "nil_neq" {
+        return Option.some(Ast.binary("NEQ", obj, Ast.literal("nil", false, ln, col), ln, col))
+    }
+    if kind == "nil_eq" {
+        return Option.some(Ast.binary("EQ", obj, Ast.literal("nil", false, ln, col), ln, col))
+    }
+    mut kind_member = Ast.member(obj, "kind", ln, col)
+    if kind == "kind_ok" {
+        return Option.some(Ast.binary("EQ", kind_member, Ast.literal("string", "ok", ln, col), ln, col))
+    }
+    return Option.some(Ast.binary("EQ", kind_member, Ast.literal("string", "err", ln, col), ln, col))
+}
+
+private try_inline_call(node: Node): Option<Node> {
+    mut callee = node.child("callee")
+    if callee.kind != "MemberExpr" {
+        return Option.none()
+    }
+    mut obj = callee.child("object")
+    if obj.kind != "IdentifierExpr" {
+        return Option.none()
+    }
+    mut key = obj.child("name") ++ "." ++ callee.child("field")
+    mut entry = .inlineable.get(key)
+    if entry.is_none() {
+        return Option.none()
+    }
+    mut info = entry.unwrap()
+    mut params = info["params"]
+    mut args = node.child("args")
+    if params.len() != args.len() {
+        return Option.none()
+    }
+    mut mapping = [:]
+    mut i = 1
+    for param in params {
+        mapping[param] = args.get(i).unwrap()
+        i = i + 1
+    }
+    .folds = .folds + 1
+    return Option.some(.subst(info["expr"], mapping))
+}
+
+private subst(expr: Node, mapping: Map<str, Node>): Node {
+    if expr.kind == "IdentifierExpr" {
+        mut hit = mapping.get(expr.child("name"))
+        if hit.is_some() {
+            return hit.unwrap()
+        }
+        return expr
+    }
+    if expr.kind == "LiteralExpr" {
+        return expr
+    }
+    if expr.kind == "BinaryExpr" {
+        return Ast.binary(expr.child("op"), .subst(expr.child("left"), mapping), .subst(expr.child("right"), mapping), expr.line(), expr.col())
+    }
+    if expr.kind == "UnaryExpr" {
+        return Ast.unary(expr.child("op"), .subst(expr.child("operand"), mapping), expr.line(), expr.col())
+    }
+    if expr.kind == "MemberExpr" {
+        return Ast.member(.subst(expr.child("object"), mapping), expr.child("field"), expr.line(), expr.col())
+    }
+    if expr.kind == "CallExpr" {
+        mut new_args = [.subst(a, mapping) for a in expr.child("args")]
+        return Ast.call(.subst(expr.child("callee"), mapping), new_args, expr.line(), expr.col())
+    }
+    return expr
 }
 
 private fold_list(node: Node, constants: Constants): Node {

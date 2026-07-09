@@ -27,18 +27,27 @@ private static op_map = [
     "OR": "or"
 ]
 
-// Option / Result methods only — List/Map primitives are now real instance
-// methods dispatched via the class path. `unwrap`/`unwrap_or` serve both Option
-// and Result (the lua helper dispatches on the runtime tag).
-private static builtins = [
-    "is_some": "Option.__lz_is_some",
-    "is_none": "Option.__lz_is_none",
-    "is_ok": "Result.__lz_is_ok",
-    "is_err": "Result.__lz_is_err",
-    "unwrap": "Option.__lz_unwrap",
-    "unwrap_or": "Option.__lz_unwrap_or",
-    "error": "Result.error"
+// Option / Result methods — {class, fn} pairs for mangler-aware emission.
+private static builtin_meta = [
+    "is_some": ["cls": "Option", "fn": "__lz_is_some"],
+    "is_none": ["cls": "Option", "fn": "__lz_is_none"],
+    "is_ok": ["cls": "Result", "fn": "__lz_is_ok"],
+    "is_err": ["cls": "Result", "fn": "__lz_is_err"],
+    "unwrap": ["cls": "Option", "fn": "__lz_unwrap"],
+    "unwrap_or": ["cls": "Option", "fn": "__lz_unwrap_or"],
+    "error": ["cls": "Result", "fn": "error"]
 ]
+
+// Resolve a builtin method name to its fully-qualified Lua target, using the
+// mangler so -Os output stays consistent.
+private builtin_target(field: str): Option<str> {
+    mut entry = ExprEmitter.builtin_meta.get(field)
+    if entry.is_none() {
+        return Option.none()
+    }
+    mut e = entry.unwrap()
+    return Option.some(.ctx.mangle_class(e["cls"]) ++ "." ++ .ctx.mangle_member(e["cls"], e["fn"]))
+}
 
 // Built-in constructors `Option.some/none` and `Result.ok/err`, keyed by
 // `Type.method` — intercepted before dispatch_class so `Option` is not
@@ -72,7 +81,7 @@ public emit(node: Node): str {
     match node.kind {
         "LiteralExpr" => { return .emit_literal(node) }
         "IdentifierExpr" => { return .emit_identifier(node) }
-        "SelfExpr" => { return "self" }
+        "SelfExpr" => { return .ctx.mangle_local("self") }
         "MemberExpr" => { return .emit_field(node) }
         "ListExpr" => { return .emit_list(node) }
         "MapExpr" => { return .emit_map(node) }
@@ -114,9 +123,9 @@ private emit_list_comp(node: Node): str {
     .ctx.push_scope()
     .declare_loop_vars(node.child("vars"))
     mut header = .each_header(node.child("vars"), iter)
-    mut body = .comp_body(node, "List.push(" ++ temp ++ ", " ++ .emit(node.child("element")) ++ ")")
+    mut body = .comp_body(node, .lz_fn("List", "push") ++ "(" ++ temp ++ ", " ++ .emit(node.child("element")) ++ ")")
     .ctx.pop_scope()
-    return "(function() local " ++ temp ++ " = List.new() " ++ header ++ " " ++ body ++ " end return " ++ temp ++ " end)()"
+    return "(function() local " ++ temp ++ " = " ++ .lz_fn("List", "new") ++ "() " ++ header ++ " " ++ body ++ " end return " ++ temp ++ " end)()"
 }
 
 private emit_map_comp(node: Node): str {
@@ -125,9 +134,15 @@ private emit_map_comp(node: Node): str {
     .ctx.push_scope()
     .declare_loop_vars(node.child("vars"))
     mut header = .each_header(node.child("vars"), iter)
-    mut body = .comp_body(node, "List.__lz_idx_set(" ++ temp ++ ", " ++ .emit(node.child("key")) ++ ", " ++ .emit(node.child("value")) ++ ")")
+    mut body = .comp_body(node, .lz_fn("List", "__lz_idx_set") ++ "(" ++ temp ++ ", " ++ .emit(node.child("key")) ++ ", " ++ .emit(node.child("value")) ++ ")")
     .ctx.pop_scope()
-    return "(function() local " ++ temp ++ " = Map.new() " ++ header ++ " " ++ body ++ " end return " ++ temp ++ " end)()"
+    return "(function() local " ++ temp ++ " = " ++ .lz_fn("Map", "new") ++ "() " ++ header ++ " " ++ body ++ " end return " ++ temp ++ " end)()"
+}
+
+// Helper: qualified mangled name for a known runtime class method.
+// Uses mangle_member so prebuilt stdlib method names are never mangled.
+private lz_fn(cls: str, fn_name: str): str {
+    return .ctx.mangle_class(cls) ++ "." ++ .ctx.mangle_member(cls, fn_name)
 }
 
 private declare_loop_vars(vars: List<str>): unit {
@@ -149,10 +164,11 @@ private comp_body(node: Node, add: str): str {
 // The `for … in List.__lz_each(iter) do` header, matching the for-in lowering:
 // a single variable takes the value (index discarded); two take key and value.
 private each_header(vars: List<str>, iter: str): str {
+    mut each = .lz_fn("List", "__lz_each")
     if vars.len() == 1 {
-        return "for _, " ++ vars.get(1).unwrap() ++ " in List.__lz_each(" ++ iter ++ ") do"
+        return "for _, " ++ vars.get(1).unwrap() ++ " in " ++ each ++ "(" ++ iter ++ ") do"
     }
-    return "for " ++ Text.join(vars, ", ") ++ " in List.__lz_each(" ++ iter ++ ") do"
+    return "for " ++ Text.join(vars, ", ") ++ " in " ++ each ++ "(" ++ iter ++ ") do"
 }
 
 // A bare name: a nullary enum variant lowers to its owner-qualified form, anything
@@ -184,20 +200,22 @@ private emit_literal(node: Node): str {
 }
 
 private emit_field(node: Node): str {
+    // Member names are never mangled (see mangle_member). Only the class table variable
+    // name is mangled, which emit_operand handles via emit_identifier / mangle_class.
     return .emit_operand(node.child("object")) ++ "." ++ node.child("field")
 }
 
 private emit_list(node: Node): str {
-    return "List.__lz_from({" ++ Text.join(.emit_args(node.child("elements")), ", ") ++ "})"
+    return .lz_fn("List", "__lz_from") ++ "({" ++ Text.join(.emit_args(node.child("elements")), ", ") ++ "})"
 }
 
 private emit_map(node: Node): str {
     mut parts = ["[" ++ .emit(entry.child("key")) ++ "] = " ++ .emit(entry.child("value")) for entry in node.child("entries")]
-    return "Map.__lz_from({" ++ Text.join(parts, ", ") ++ "})"
+    return .lz_fn("Map", "__lz_from") ++ "({" ++ Text.join(parts, ", ") ++ "})"
 }
 
 private emit_index(node: Node): str {
-    return "List.__lz_idx_get(" ++ .emit(node.child("object")) ++ ", " ++ .emit(node.child("index")) ++ ")"
+    return .lz_fn("List", "__lz_idx_get") ++ "(" ++ .emit(node.child("object")) ++ ", " ++ .emit(node.child("index")) ++ ")"
 }
 
 private emit_unary(node: Node): str {
@@ -228,22 +246,24 @@ private emit_call(node: Node): str {
                 mut ext = target.unwrap()
                 mut call = ext["target"] ++ "(" ++ Text.join(args, ", ") ++ ")"
                 if ext["wrap"] {
-                    return "Option.__lz_wrap(" ++ call ++ ")"
+                    return .ctx.mangle_class("Option") ++ "." ++ .ctx.mangle_member("Option", "__lz_wrap") ++ "(" ++ call ++ ")"
                 }
                 return call
             }
-            mut ctor = ExprEmitter.constructors.get(object.child("name") ++ "." ++ field)
-            if ctor.is_some() {
-                return ctor.unwrap() ++ "(" ++ Text.join(args, ", ") ++ ")"
+            mut ctor_key = object.child("name") ++ "." ++ field
+            if ExprEmitter.constructors.has(ctor_key) {
+                mut cls_name = object.child("name")
+                return .ctx.mangle_class(cls_name) ++ "." ++ .ctx.mangle_member(cls_name, field) ++ "(" ++ Text.join(args, ", ") ++ ")"
             }
         }
 
         mut dispatch_cls = node.attr("dispatch_class")
         if dispatch_cls.is_some() {
-            return dispatch_cls.unwrap() ++ "." ++ field ++ "(" ++ Text.join(.with_receiver(object, args), ", ") ++ ")"
+            mut dc = dispatch_cls.unwrap()
+            return .ctx.mangle_class(dc) ++ "." ++ .ctx.mangle_member(dc, field) ++ "(" ++ Text.join(.with_receiver(object, args), ", ") ++ ")"
         }
         if not node.attr("known_method").unwrap_or(false) {
-            mut helper = ExprEmitter.builtins.get(field)
+            mut helper = .builtin_target(field)
             if helper.is_some() {
                 return helper.unwrap() ++ "(" ++ Text.join(.with_receiver(object, args), ", ") ++ ")"
             }
@@ -253,7 +273,7 @@ private emit_call(node: Node): str {
     if callee.kind == "IdentifierExpr" {
         mut name = callee.child("name")
         if .ctx.is_construction(name) {
-            return name ++ ".new(" ++ Text.join(args, ", ") ++ ")"
+            return .ctx.emit_name(name) ++ ".new(" ++ Text.join(args, ", ") ++ ")"
         }
     }
 

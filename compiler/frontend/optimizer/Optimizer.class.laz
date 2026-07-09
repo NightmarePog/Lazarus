@@ -8,11 +8,15 @@ import frontend.optimizer.ExprFolder
 import frontend.optimizer.StmtFolder
 
 private folds: int = 0
-constructor()
+private opt_level: int = 0
+constructor(opt_level: int) {
+    .opt_level = opt_level
+}
 
-public optimize(program: Node): Node {
-    mut exprs = ExprFolder()
-    mut stmts = StmtFolder(exprs)
+public optimize(program: Node, class_name: str): Node {
+    mut exprs = ExprFolder(.opt_level)
+    exprs.register_inlineables(class_name, program.child("body"))
+    mut stmts = StmtFolder(exprs, .opt_level)
     stmts.fold_block(program.child("body"), Constants.empty())
     .folds = exprs.fold_count()
     return program

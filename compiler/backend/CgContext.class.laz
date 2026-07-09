@@ -14,8 +14,22 @@ private properties: List<Node>
 private known_classes: Map<str, bool>
 private externs: Map<str, Map<str, dynamic>>
 private variant_owner: Map<str, str>
-@auto
-constructor(cls: str, members: Map<str, bool>, instance_methods: Map<str, bool>, instance_order: List<str>, properties: List<Node>, known_classes: Map<str, bool>, externs: Map<str, Map<str, dynamic>>, variant_owner: Map<str, str>)
+private opt_level_val: int = 0
+private mangler_val: dynamic = 0
+private prebuilt_classes_val: dynamic = 0
+constructor(cls: str, members: Map<str, bool>, instance_methods: Map<str, bool>, instance_order: List<str>, properties: List<Node>, known_classes: Map<str, bool>, externs: Map<str, Map<str, dynamic>>, variant_owner: Map<str, str>, opt_level: int, mangler: dynamic, prebuilt_classes: dynamic) {
+    .cls = cls
+    .members = members
+    .instance_methods = instance_methods
+    .instance_order = instance_order
+    .properties = properties
+    .known_classes = known_classes
+    .externs = externs
+    .variant_owner = variant_owner
+    .opt_level_val = opt_level
+    .mangler_val = mangler
+    .prebuilt_classes_val = prebuilt_classes
+}
 private scopes: List<Map<str, bool>> = [[:]]
 private temp_seq: int = 0
 
@@ -26,8 +40,38 @@ public fresh_temp(): str {
     return f"__lz_m{.temp_seq}"
 }
 
+public opt_level(): int {
+    return .opt_level_val
+}
+
+public mangle_class(n: str): str {
+    if .opt_level_val < 3 or .mangler_val == 0 {
+        return n
+    }
+    return .mangler_val.mangle_class(n)
+}
+
+public mangle_local(n: str): str {
+    if .opt_level_val < 3 or .mangler_val == 0 {
+        return n
+    }
+    return .mangler_val.mangle_local(n)
+}
+
+// Method and member names are never mangled: raw Lua bodies in stdlib and instance
+// method tables use original names, so mangling would break colon-dispatch without
+// full type inference to route every call through the class-table path.
+public mangle_member(cls: str, member: str): str {
+    return member
+}
+
+// mangle_member for the current class (used in emit_method, emit_static_field, etc.).
+public mangle_self_member(member: str): str {
+    return member
+}
+
 public name(): str {
-    return .cls
+    return .mangle_class(.cls)
 }
 
 // Instance-method names in declaration order (for the `self.m = C.m` copies).
@@ -96,16 +140,17 @@ public is_variant(name: str): bool {
 }
 
 public variant_qualified(name: str): str {
-    return .variant_owner.get(name).unwrap() ++ "." ++ name
+    mut owner = .variant_owner.get(name).unwrap()
+    return .mangle_class(owner) ++ "." ++ .mangle_member(owner, name)
 }
 
 // Qualify a member reference as `C.name`; leave locals, parameters and globals bare.
 public emit_name(name: str): str {
     if .is_local(name) {
-        return name
+        return .mangle_local(name)
     }
     if .is_member(name) {
-        return .cls ++ "." ++ name
+        return .mangle_class(.cls) ++ "." ++ .mangle_self_member(name)
     }
-    return name
+    return .mangle_class(name)
 }

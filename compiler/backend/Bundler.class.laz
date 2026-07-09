@@ -8,6 +8,7 @@
 // Prebuilt modules (loaded from .lua with LAZARUS_META) are emitted verbatim.
 
 import backend.Codegen
+import backend.Mangler
 import backend.Text
 import backend.linker.Module
 import frontend.parser.Node
@@ -17,11 +18,36 @@ private modules: List<Module>
 private entry_class: str
 private variant_owner: Map<str, str>
 private plat: str
-@auto
-constructor(modules: List<Module>, entry_class: str, variant_owner: Map<str, str>, plat: str)
+private opt_level: int = 0
+private mangler: dynamic = 0
+private prebuilt_set: dynamic = 0
+constructor(modules: List<Module>, entry_class: str, variant_owner: Map<str, str>, plat: str, opt_level: int) {
+    .modules = modules
+    .entry_class = entry_class
+    .variant_owner = variant_owner
+    .plat = plat
+    .opt_level = opt_level
+}
 
 public bundle(): str {
     mut externs = .collect_externs()
+
+    if .opt_level >= 3 {
+        .mangler = Mangler()
+        mut ps = [:]
+        for m in .modules {
+            if .is_no_mangle(m) {
+                ps[m.class_name] = true
+                .mangler.pin(m.class_name)
+            }
+        }
+        .prebuilt_set = ps
+        for m in .modules {
+            if not m.is_trait and not .is_no_mangle(m) and not .is_extern_module(m) {
+                .mangler.mangle_class(m.class_name)
+            }
+        }
+    }
 
     mut blocks = []
     mut entry_has_ctor = false
@@ -36,7 +62,7 @@ public bundle(): str {
             if m.is_prebuilt {
                 blocks.push(m.prebuilt_lua)
             } else {
-                mut cg = Codegen(m.class_name, m.imports, externs, .variant_owner, .plat)
+                mut cg = Codegen(m.class_name, m.imports, externs, .variant_owner, .plat, .opt_level, .mangler, .prebuilt_set)
                 blocks.push(cg.class_block(m.ast))
                 if m.class_name == .entry_class {
                     entry_has_ctor = cg.has_constructor(m.ast.child("body"))
@@ -49,6 +75,16 @@ public bundle(): str {
         Error("LinkError", "entry class '" ++ .entry_class ++ "' must define a constructor", 1, 1, entry_source, 1).raise()
     }
 
+    mut entry_ref = .entry_class
+    if .opt_level >= 3 and .mangler != 0 {
+        entry_ref = .mangler.mangle_class(.entry_class)
+    }
+
+    mut sep = Text.nl() ++ Text.nl()
+    if .opt_level >= 1 {
+        sep = Text.nl()
+    }
+
     mut sections = [Codegen.header()]
     for block in blocks {
         sections.push(block)
@@ -56,9 +92,9 @@ public bundle(): str {
     if entry_is_trait {
         sections.push("return nil")
     } else {
-        sections.push("return " ++ .entry_class ++ ".new(...)")
+        sections.push("return " ++ entry_ref ++ ".new(...)")
     }
-    return Text.join(sections, Text.nl() ++ Text.nl())
+    return Text.join(sections, sep)
 }
 
 // Gather every module's extern bindings into
@@ -95,6 +131,23 @@ private extern_wraps(node: Node): bool {
     }
     mut name = rt.unwrap().child("name")
     return name == "Option" or name == "dynamic"
+}
+
+// Known stdlib class names — these modules use raw Lua bodies that reference
+// their own class name, so they must never be mangled.
+private static stdlib_names = [
+    "List": true, "Map": true, "Option": true, "Result": true,
+    "Sys": true, "Str": true, "Num": true,
+    "File": true, "Path": true, "Iterable": true
+]
+
+// A module that should not have its class name or member names mangled:
+// prebuilt .lua modules (emitted verbatim) and known stdlib classes.
+private is_no_mangle(m: Module): bool {
+    if m.is_prebuilt {
+        return true
+    }
+    return Bundler.stdlib_names.has(m.class_name)
 }
 
 // A module is an extern namespace when its body holds extern declarations and
