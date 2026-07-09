@@ -10834,56 +10834,61 @@ function Bundler.collect_externs(self)
                 -- Bundler:76
                 if node.kind == "ExternDecl" then
                     -- Bundler:77
-                    List.__lz_idx_set(binds, node:child("name"), Map.__lz_from({["target"] = node:child("target"), ["wrap"] = Bundler.extern_wraps(self, node)}))
+                    local extern_plat = Option.__lz_unwrap_or(node:attr("platform"), "")
+                    -- Bundler:78
+                    if (extern_plat == "") or (extern_plat == self.plat) then
+                        -- Bundler:79
+                        List.__lz_idx_set(binds, node:child("name"), Map.__lz_from({["target"] = node:child("target"), ["wrap"] = Bundler.extern_wraps(self, node)}))
+                    end
                 end
             end
-            -- Bundler:80
+            -- Bundler:83
             if binds:len() > 0 then
-                -- Bundler:81
+                -- Bundler:84
                 List.__lz_idx_set(externs, m.class_name, binds)
             end
         end
     end
-    -- Bundler:85
+    -- Bundler:88
     return externs
 end
--- Bundler:88
+-- Bundler:91
 function Bundler.extern_wraps(self, node)
-    -- Bundler:89
+    -- Bundler:92
     local rt = node:attr("return_type")
-    -- Bundler:90
+    -- Bundler:93
     if Option.is_none(rt) then
-        -- Bundler:91
+        -- Bundler:94
         return true
     end
-    -- Bundler:93
+    -- Bundler:96
     local name = Option.unwrap(rt):child("name")
-    -- Bundler:94
+    -- Bundler:97
     return (name == "Option") or (name == "dynamic")
 end
--- Bundler:99
+-- Bundler:102
 function Bundler.is_extern_module(self, m)
-    -- Bundler:100
+    -- Bundler:103
     if m.is_prebuilt then
-        -- Bundler:101
+        -- Bundler:104
         return false
     end
-    -- Bundler:103
+    -- Bundler:106
     local has_extern = false
-    -- Bundler:104
+    -- Bundler:107
     local has_other = false
-    -- Bundler:105
+    -- Bundler:108
     for _, node in List.__lz_each(m.ast:child("body")) do
-        -- Bundler:106
+        -- Bundler:109
         if node.kind == "ExternDecl" then
-            -- Bundler:107
+            -- Bundler:110
             has_extern = true
         else
-            -- Bundler:109
+            -- Bundler:112
             has_other = true
         end
     end
-    -- Bundler:112
+    -- Bundler:115
     return has_extern and (not has_other)
 end
 
@@ -12161,191 +12166,196 @@ function Main.build_lib(path, plat, pkg_path)
                 -- Main:229
                 if node.kind == "ExternDecl" then
                     -- Main:230
-                    local rt = node:attr("return_type")
+                    local extern_plat = Option.__lz_unwrap_or(node:attr("platform"), "")
                     -- Main:231
-                    local wrap = true
-                    -- Main:232
-                    if Option.__lz_is_some(rt) then
+                    if (extern_plat == "") or (extern_plat == plat) then
+                        -- Main:232
+                        local rt = node:attr("return_type")
                         -- Main:233
-                        local rname = Option.__lz_unwrap(rt):child("name")
+                        local wrap = true
                         -- Main:234
-                        wrap = (rname == "Option") or (rname == "dynamic")
+                        if Option.__lz_is_some(rt) then
+                            -- Main:235
+                            local rname = Option.__lz_unwrap(rt):child("name")
+                            -- Main:236
+                            wrap = (rname == "Option") or (rname == "dynamic")
+                        end
+                        -- Main:238
+                        List.__lz_idx_set(binds, node:child("name"), Map.__lz_from({["target"] = node:child("target"), ["wrap"] = wrap}))
                     end
-                    -- Main:236
-                    List.__lz_idx_set(binds, node:child("name"), Map.__lz_from({["target"] = node:child("target"), ["wrap"] = wrap}))
                 end
             end
-            -- Main:239
+            -- Main:242
             if binds:len() > 0 then
-                -- Main:240
+                -- Main:243
                 List.__lz_idx_set(externs, m.class_name, binds)
             end
         end
     end
-    -- Main:244
-    local cg = Codegen.new(entry_class, entry_module.imports, externs, variant_owner, plat)
-    -- Main:245
-    local class_block = cg:class_block(entry_module.ast)
     -- Main:247
-    local entry_sig = Option.unwrap_or(classes:get(entry_class), 0)
+    local cg = Codegen.new(entry_class, entry_module.imports, externs, variant_owner, plat)
     -- Main:248
+    local class_block = cg:class_block(entry_module.ast)
+    -- Main:250
+    local entry_sig = Option.unwrap_or(classes:get(entry_class), 0)
+    -- Main:251
     local meta_block = ""
-    -- Main:249
+    -- Main:252
     if entry_sig ~= 0 then
-        -- Main:250
+        -- Main:253
         meta_block = (MetaEmitter.emit(entry_class, entry_sig) .. Text.nl()) .. Text.nl()
     end
-    -- Main:253
-    local out_path = entry_class .. ".lua"
-    -- Main:254
-    local file = Option.__lz_unwrap(Option.__lz_wrap(io.open(out_path, "w")))
-    -- Main:255
-    file:write(meta_block .. class_block)
     -- Main:256
+    local out_path = entry_class .. ".lua"
+    -- Main:257
+    local file = Option.__lz_unwrap(Option.__lz_wrap(io.open(out_path, "w")))
+    -- Main:258
+    file:write(meta_block .. class_block)
+    -- Main:259
     file:close()
 end
--- Main:263
+-- Main:266
 function Main.collect_enums(ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
-    -- Main:264
+    -- Main:267
     for _, stmt in List.__lz_each(ast:child("body")) do
-        -- Main:265
+        -- Main:268
         if stmt.kind == "EnumDecl" then
-            -- Main:266
-            local name = stmt:child("name")
-            -- Main:267
-            List.__lz_idx_set(enum_type_params, name, Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_from({})))
-            -- Main:268
-            local names = List.__lz_from({})
             -- Main:269
+            local name = stmt:child("name")
+            -- Main:270
+            List.__lz_idx_set(enum_type_params, name, Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_from({})))
+            -- Main:271
+            local names = List.__lz_from({})
+            -- Main:272
             for _, v in List.__lz_each(stmt:child("variants")) do
-                -- Main:270
-                local vn = v:child("name")
-                -- Main:271
-                names:push(vn)
-                -- Main:272
-                List.__lz_idx_set(variant_owner, vn, name)
                 -- Main:273
-                List.__lz_idx_set(variant_arity, vn, v:child("fields"):len())
+                local vn = v:child("name")
                 -- Main:274
+                names:push(vn)
+                -- Main:275
+                List.__lz_idx_set(variant_owner, vn, name)
+                -- Main:276
+                List.__lz_idx_set(variant_arity, vn, v:child("fields"):len())
+                -- Main:277
                 List.__lz_idx_set(variant_fields, vn, v:child("fields"))
             end
-            -- Main:276
+            -- Main:279
             List.__lz_idx_set(enums, name, names)
         end
     end
 end
--- Main:286
+-- Main:289
 function Main.collect_signatures(ast, class_name, classes, plat, gated_externs)
-    -- Main:287
-    local fields = Map.__lz_from({})
-    -- Main:288
-    local methods = Map.__lz_from({})
-    -- Main:289
-    local ctor = 0
     -- Main:290
-    local ctor_names = List.__lz_from({})
+    local fields = Map.__lz_from({})
     -- Main:291
-    local type_params = List.__lz_from({})
+    local methods = Map.__lz_from({})
     -- Main:292
+    local ctor = 0
+    -- Main:293
+    local ctor_names = List.__lz_from({})
+    -- Main:294
+    local type_params = List.__lz_from({})
+    -- Main:295
     for _, stmt in List.__lz_each(ast:child("body")) do
-        -- Main:293
+        -- Main:296
         local k = stmt.kind
-        -- Main:294
+        -- Main:297
         if k == "VariableDecl" then
-            -- Main:295
+            -- Main:298
             local visibility = Option.__lz_unwrap_or(stmt:attr("visibility"), "")
-            -- Main:296
+            -- Main:299
             local is_static = Option.__lz_unwrap_or(stmt:attr("is_static"), false)
-            -- Main:297
+            -- Main:300
             if (visibility ~= "") and (not is_static) then
-                -- Main:298
+                -- Main:301
                 List.__lz_idx_set(fields, stmt:child("name"), stmt:attr("type"))
             end
         elseif k == "FunctionDecl" then
-            -- Main:301
-            local params = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_from({}))
-            -- Main:302
-            local param_names = stmt:child("params")
-            -- Main:303
-            local result = Option.__lz_unwrap_or(stmt:attr("return_type"), 0)
             -- Main:304
-            local is_static = Option.__lz_unwrap_or(stmt:attr("is_static"), false)
+            local params = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_from({}))
             -- Main:305
-            local mtype_params = Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_from({}))
+            local param_names = stmt:child("params")
             -- Main:306
+            local result = Option.__lz_unwrap_or(stmt:attr("return_type"), 0)
+            -- Main:307
+            local is_static = Option.__lz_unwrap_or(stmt:attr("is_static"), false)
+            -- Main:308
+            local mtype_params = Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_from({}))
+            -- Main:309
             List.__lz_idx_set(methods, stmt:child("name"), Map.__lz_from({["params"] = params, ["param_names"] = param_names, ["result"] = result, ["is_static"] = is_static, ["type_params"] = mtype_params}))
         elseif k == "ConstructorDecl" then
-            -- Main:308
+            -- Main:311
             ctor = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_from({}))
-            -- Main:309
+            -- Main:312
             ctor_names = stmt:child("params")
-            -- Main:310
+            -- Main:313
             type_params = Option.__lz_unwrap_or(stmt:attr("type_params"), List.__lz_from({}))
         elseif k == "ExternDecl" then
-            -- Main:312
+            -- Main:315
             local params = Option.__lz_unwrap_or(stmt:attr("param_types"), List.__lz_from({}))
-            -- Main:313
+            -- Main:316
             local all_typed = true
-            -- Main:314
+            -- Main:317
             for _, pt in List.__lz_each(params) do
-                -- Main:315
+                -- Main:318
                 if Option.__lz_unwrap_or(pt:attr("inferred"), false) or (pt:child("name") == "dynamic") then
-                    -- Main:316
+                    -- Main:319
                     all_typed = false
                 end
             end
-            -- Main:319
+            -- Main:322
             if all_typed and (params:len() > 0) then
-                -- Main:320
+                -- Main:323
                 local extern_platform = Option.__lz_unwrap_or(stmt:attr("platform"), "")
-                -- Main:321
+                -- Main:324
                 local ename = stmt:child("name")
-                -- Main:322
+                -- Main:325
                 if (extern_platform == "") or (extern_platform == plat) then
-                    -- Main:323
+                    -- Main:326
                     local extern_result = Option.__lz_unwrap_or(stmt:attr("return_type"), 0)
-                    -- Main:324
+                    -- Main:327
                     List.__lz_idx_set(methods, ename, Map.__lz_from({["params"] = params, ["result"] = extern_result, ["is_static"] = true, ["type_params"] = List.__lz_from({})}))
-                    -- Main:325
+                    -- Main:328
                     gated_externs:delete(ename)
                 elseif not methods:has(ename) then
-                    -- Main:327
+                    -- Main:330
                     List.__lz_idx_set(gated_externs, ename, extern_platform)
                 end
             end
         end
     end
-    -- Main:332
+    -- Main:335
     List.__lz_idx_set(classes, class_name, Map.__lz_from({["fields"] = fields, ["methods"] = methods, ["ctor"] = ctor, ["ctor_names"] = ctor_names, ["type_params"] = type_params}))
 end
--- Main:340
+-- Main:343
 function Main.collect_traits(ast, traits, class_name)
-    -- Main:341
+    -- Main:344
     for _, stmt in List.__lz_each(ast:child("body")) do
-        -- Main:342
+        -- Main:345
         if stmt.kind == "TraitDecl" then
-            -- Main:343
+            -- Main:346
             local name = stmt:child("name")
-            -- Main:344
+            -- Main:347
             if name == "" then
-                -- Main:345
+                -- Main:348
                 name = class_name
             end
-            -- Main:347
+            -- Main:350
             local methods = Map.__lz_from({})
-            -- Main:348
+            -- Main:351
             for _, m in List.__lz_each(stmt:child("methods")) do
-                -- Main:349
+                -- Main:352
                 List.__lz_idx_set(methods, m:child("name"), Map.__lz_from({["params"] = m:child("param_types"), ["result"] = m:child("return_type"), ["type_params"] = m:child("type_params")}))
             end
-            -- Main:351
+            -- Main:354
             local properties = Map.__lz_from({})
-            -- Main:352
+            -- Main:355
             for _, p in List.__lz_each(stmt:child("properties")) do
-                -- Main:353
+                -- Main:356
                 List.__lz_idx_set(properties, p:child("name"), p:child("type"))
             end
-            -- Main:355
+            -- Main:358
             List.__lz_idx_set(traits, name, Map.__lz_from({["methods"] = methods, ["properties"] = properties, ["type_params"] = stmt:child("type_params")}))
         end
     end

@@ -227,13 +227,16 @@ static build_lib(path: str, plat: str, pkg_path: str): unit {
             mut binds = [:]
             for node in m.ast.child("body") {
                 if node.kind == "ExternDecl" {
-                    mut rt = node.attr("return_type")
-                    mut wrap = true
-                    if rt.is_some() {
-                        mut rname = rt.unwrap().child("name")
-                        wrap = rname == "Option" or rname == "dynamic"
+                    mut extern_plat = node.attr("platform").unwrap_or("")
+                    if extern_plat == "" or extern_plat == plat {
+                        mut rt = node.attr("return_type")
+                        mut wrap = true
+                        if rt.is_some() {
+                            mut rname = rt.unwrap().child("name")
+                            wrap = rname == "Option" or rname == "dynamic"
+                        }
+                        binds[node.child("name")] = ["target": node.child("target"), "wrap": wrap]
                     }
-                    binds[node.child("name")] = ["target": node.child("target"), "wrap": wrap]
                 }
             }
             if binds.len() > 0 {

@@ -74,7 +74,10 @@ private collect_externs(): Map<str, Map<str, dynamic>> {
             mut binds = [:]
             for node in m.ast.child("body") {
                 if node.kind == "ExternDecl" {
-                    binds[node.child("name")] = ["target": node.child("target"), "wrap": .extern_wraps(node)]
+                    mut extern_plat = node.attr("platform").unwrap_or("")
+                    if extern_plat == "" or extern_plat == .plat {
+                        binds[node.child("name")] = ["target": node.child("target"), "wrap": .extern_wraps(node)]
+                    }
                 }
             }
             if binds.len() > 0 {
