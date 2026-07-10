@@ -1,33 +1,31 @@
-# Run with: vhs demo/demo.tape
-# Install:  yay -S vhs   (or from https://github.com/charmbracelet/vhs)
-
 Output demo/demo.gif
 
-Set FontSize 15
-Set Width 800
-Set Height 420
+Set FontSize 14
+Set Width 1000
+Set Height 500
 Set Theme "Dracula"
 Set Shell "bash"
-Set FontFamily "JetBrains Mono"
 
 Hide
-Type "cd /path/to/Lazarus"
+Type "cd /home/nightmare/Github/lazarus-lang/Lazarus"
 Enter
+Sleep 300ms
 Show
 
-Sleep 500ms
+Ctrl+L
+Sleep 400ms
 
 Type "cat demo/Demo.class.laz"
-Sleep 300ms
+Sleep 200ms
 Enter
-Sleep 2s
+Sleep 2500ms
 
 Type "lua bin/lazarusc.lua demo/Demo.class.laz --pkg-path ."
-Sleep 300ms
+Sleep 200ms
 Enter
 Sleep 3s
 
 Type "lua Demo.lua"
-Sleep 300ms
+Sleep 200ms
 Enter
-Sleep 2s
+Sleep 2500ms

@@ -6,6 +6,8 @@
 ![Language: Lua](https://img.shields.io/badge/target-Lua%205.1-000080.svg)
 ![Self-hosted](https://img.shields.io/badge/compiler-self--hosted-brightgreen.svg)
 
+![Demo](demo/demo.gif)
+
 Lazarus is a small, statically-typed language that compiles to Lua. The output is a single self-contained `.lua` file with no runtime dependencies, which makes it a good fit for environments where you have Lua but not much else: ComputerCraft computers, embedded scripting runtimes, or anywhere a plain `.lua` file is easier to deploy than a set of modules.
 
 The main thing Lazarus gives you over writing Lua directly is structure. Classes with real constructors, a type system that catches mistakes before runtime, a module system that resolves imports at compile time, and a clean interop layer for calling existing Lua APIs with type signatures.
