@@ -57,10 +57,22 @@ myproject/
     Entity.class.laz
   util/
     Grid.object.laz
-  std/         (symlinked or copied from the Lazarus stdlib)
+  std/
 ```
 
 `Main.class.laz` imports from `engine.World`, which imports from `engine.Entity`, and so on. The compiler resolves all of that, checks types, and emits one `Main.lua`.
+
+The `std/` directory must be present. The compiler does not ship it separately -- copy or symlink it from the Lazarus repo:
+
+```sh
+ln -s /path/to/lazarus/std ./std
+```
+
+Or skip the symlink and pass `--pkg-path` at compile time:
+
+```sh
+lua bin/lazarusc.lua src/Main.class.laz --pkg-path /path/to/lazarus
+```
 
 ## The standard library
 

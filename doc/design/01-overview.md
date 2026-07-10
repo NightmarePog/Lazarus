@@ -72,6 +72,16 @@ lua bin/lazarusc.lua MyProgram.class.laz
 lua MyProgram.lua
 ```
 
+**The stdlib is not bundled.** The compiler looks for `std/` next to your source file. Before compiling your own projects, either copy or symlink `std/` from the Lazarus repo into your project directory, or pass `--pkg-path` to tell the compiler where to find it:
+
+```sh
+# symlink (recommended -- stays up to date)
+ln -s /path/to/lazarus/std ./std
+
+# or pass it at compile time
+lua bin/lazarusc.lua MyProgram.class.laz --pkg-path /path/to/lazarus
+```
+
 Flags:
 
 ```sh

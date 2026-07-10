@@ -57,6 +57,16 @@ The filename (without the suffix) is the class or module name, so filenames are 
 
 ## Building
 
+The compiler looks for `std/` next to your source file. Copy or symlink the `std/` directory from this repo into your project, or point the compiler at it with `--pkg-path`:
+
+```sh
+# Option A: copy/symlink std/ into your project
+cp -r /path/to/lazarus/std ./std
+
+# Option B: pass --pkg-path instead
+lua bin/lazarusc.lua MyProgram.class.laz --pkg-path /path/to/lazarus
+```
+
 ```sh
 # Compile a file (output: <ClassName>.lua in the current directory)
 lua bin/lazarusc.lua path/to/Entry.class.laz
