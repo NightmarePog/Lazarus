@@ -83,7 +83,7 @@ public check_condition(node: Node, scope: Scope): unit {
     .check(node, scope)
     mut reason = Booleanity.non_bool_reason(node)
     if reason != "" {
-        .fail(node, "Condition must be a boolean, but this is " ++ reason ++ "; the language has no truthiness, so use an explicit comparison or a boolean method (e.g. '.is_some()')", 1)
+        .fail(node, "Condition must be a boolean, but this is " + reason + "; the language has no truthiness, so use an explicit comparison or a boolean method (e.g. '.is_some()')", 1)
     }
 }
 
@@ -92,9 +92,9 @@ private check_identifier(node: Node, scope: Scope): unit {
     if scope.lookup(name).is_none() and not .variant_owner.has(name) {
         mut gated = .gated_externs.get(name)
         if gated.is_some() {
-            .fail(node, "extern '" ++ name ++ "' is only available on platform '" ++ gated.unwrap() ++ "' — compile with --platform " ++ gated.unwrap(), Str.len(name).unwrap_or(1))
+            .fail(node, "extern '" + name + "' is only available on platform '" + gated.unwrap() + "' — compile with --platform " + gated.unwrap(), Str.len(name).unwrap_or(1))
         }
-        .fail(node, "Undeclared identifier '" ++ name ++ "'", Str.len(name).unwrap_or(1))
+        .fail(node, "Undeclared identifier '" + name + "'", Str.len(name).unwrap_or(1))
     }
 }
 
@@ -105,7 +105,7 @@ private check_call(node: Node, scope: Scope): unit {
         mut name = callee.child("name")
         mut entry = scope.lookup(name)
         if entry.is_some() and entry.unwrap().noncallable {
-            .fail(callee, "'" ++ name ++ "' is not callable; it holds a value, not a function", Str.len(name).unwrap_or(1))
+            .fail(callee, "'" + name + "' is not callable; it holds a value, not a function", Str.len(name).unwrap_or(1))
         }
     }
     for arg in node.child("args") {
@@ -125,11 +125,11 @@ private check_member(node: Node, scope: Scope): unit {
     if object.kind == "SelfExpr" {
         mut field = node.child("field")
         if not .in_instance {
-            .fail(node, "'." ++ field ++ "' refers to an instance field, but there is no receiver here; it is valid only inside an instance method or constructor", Str.len(field).unwrap_or(1) + 1)
+            .fail(node, "'." + field + "' refers to an instance field, but there is no receiver here; it is valid only inside an instance method or constructor", Str.len(field).unwrap_or(1) + 1)
         }
         mut known = .properties.has(field) or .methods.has(field)
         if not known {
-            .fail(node, "Unknown instance member '." ++ field ++ "'; declare it as a 'private'/'public' property or an instance method", Str.len(field).unwrap_or(1) + 1)
+            .fail(node, "Unknown instance member '." + field + "'; declare it as a 'private'/'public' property or an instance method", Str.len(field).unwrap_or(1) + 1)
         }
     } else {
         .check(object, scope)

@@ -1288,22 +1288,22 @@ local Keywords = {}
 -- Keywords:5
 Keywords.words = Map.__lz_from({["import"] = "IMPORT", ["extern"] = "EXTERN", ["lua"] = "LUA", ["enum"] = "ENUM", ["trait"] = "TRAIT", ["implement"] = "IMPLEMENT", ["fn"] = "FN", ["private"] = "PRIVATE", ["public"] = "PUBLIC", ["mut"] = "MUTABLE", ["static"] = "STATIC", ["self"] = "SELF", ["constructor"] = "CONSTRUCTOR", ["return"] = "RETURN", ["if"] = "IF", ["else"] = "ELSE", ["while"] = "WHILE", ["loop"] = "LOOP", ["for"] = "FOR", ["in"] = "IN", ["break"] = "BREAK", ["true"] = "TRUE", ["false"] = "FALSE", ["and"] = "AND", ["or"] = "OR", ["not"] = "NOT", ["platform"] = "PLATFORM"})
 -- Keywords:35
-Keywords.ops2 = Map.__lz_from({["++"] = "CONCAT", ["=>"] = "FAT_ARROW", ["->"] = "ARROW", ["=="] = "EQ", ["!="] = "NEQ", ["<="] = "LESS_EQUAL", [">="] = "GREATER_EQUAL", ["+="] = "PLUS_ASSIGN", ["-="] = "MINUS_ASSIGN", ["*="] = "STAR_ASSIGN", ["/="] = "SLASH_ASSIGN"})
--- Keywords:49
+Keywords.ops2 = Map.__lz_from({["=>"] = "FAT_ARROW", ["->"] = "ARROW", ["=="] = "EQ", ["!="] = "NEQ", ["<="] = "LESS_EQUAL", [">="] = "GREATER_EQUAL", ["+="] = "PLUS_ASSIGN", ["-="] = "MINUS_ASSIGN", ["*="] = "STAR_ASSIGN", ["/="] = "SLASH_ASSIGN"})
+-- Keywords:48
 Keywords.ops1 = Map.__lz_from({["="] = "ASSIGN", ["+"] = "PLUS", ["-"] = "MINUS", ["*"] = "MULTIPLY", ["/"] = "DIVIDE", ["%"] = "MODULO", ["^"] = "POWER", ["<"] = "LESS", [">"] = "GREATER", ["("] = "LEFT_BRACKET", [")"] = "RIGHT_BRACKET", ["{"] = "BODY_START", ["}"] = "BODY_END", [","] = "COMMA", [":"] = "COLON", ["."] = "DOT", [";"] = "SEMICOLON", ["["] = "LSQUARE", ["]"] = "RSQUARE", ["#"] = "HASH", ["|"] = "PIPE", ["?"] = "QUESTION"})
--- Keywords:74
+-- Keywords:73
 function Keywords.word_kind(word)
-    -- Keywords:75
+    -- Keywords:74
     return Option.__lz_unwrap_or(Keywords.words:get(word), "IDENTIFIER")
 end
--- Keywords:78
+-- Keywords:77
 function Keywords.two(pair)
-    -- Keywords:79
+    -- Keywords:78
     return Keywords.ops2:get(pair)
 end
--- Keywords:82
+-- Keywords:81
 function Keywords.one(ch)
-    -- Keywords:83
+    -- Keywords:82
     return Keywords.ops1:get(ch)
 end
 
@@ -7153,1283 +7153,1290 @@ function Typecheck.type_binary(self, node, scope)
     local rt = Typecheck.type_expr(self, node:child("right"), scope)
     -- Typecheck:553
     local op = node:child("op")
-    -- Typecheck:554
-    if Typecheck.is_arith(self, op) then
-        -- Typecheck:555
-        return Typecheck.arith_type(self, node, op, lt, rt)
-    end
-    -- Typecheck:557
-    if op == "CONCAT" then
+    -- Typecheck:556
+    if (((op == "PLUS") and ((lt.kind == "str") or (rt.kind == "str"))) and Typecheck.str_or_dynamic(self, lt)) and Typecheck.str_or_dynamic(self, rt) then
+        -- Typecheck:557
+        node:set("op", "CONCAT")
         -- Typecheck:558
-        return Typecheck.concat_type(self, node, lt, rt)
+        return Type.str()
     end
     -- Typecheck:560
-    if (op == "EQ") or (op == "NEQ") then
+    if Typecheck.is_arith(self, op) then
         -- Typecheck:561
-        return Typecheck.equality_type(self, node, lt, rt)
+        return Typecheck.arith_type(self, node, op, lt, rt)
     end
     -- Typecheck:563
-    if Typecheck.is_ordering(self, op) then
+    if op == "CONCAT" then
         -- Typecheck:564
-        return Typecheck.ordering_type(self, node, lt, rt)
+        return Typecheck.concat_type(self, node, lt, rt)
     end
     -- Typecheck:566
+    if (op == "EQ") or (op == "NEQ") then
+        -- Typecheck:567
+        return Typecheck.equality_type(self, node, lt, rt)
+    end
+    -- Typecheck:569
+    if Typecheck.is_ordering(self, op) then
+        -- Typecheck:570
+        return Typecheck.ordering_type(self, node, lt, rt)
+    end
+    -- Typecheck:572
     return Type.bool()
 end
--- Typecheck:569
+-- Typecheck:575
 function Typecheck.is_arith(self, op)
-    -- Typecheck:570
+    -- Typecheck:576
     return (((((op == "PLUS") or (op == "MINUS")) or (op == "MULTIPLY")) or (op == "DIVIDE")) or (op == "MODULO")) or (op == "POWER")
 end
--- Typecheck:573
+-- Typecheck:579
 function Typecheck.is_ordering(self, op)
-    -- Typecheck:574
+    -- Typecheck:580
     return (((op == "LESS") or (op == "LESS_EQUAL")) or (op == "GREATER")) or (op == "GREATER_EQUAL")
 end
--- Typecheck:579
+-- Typecheck:585
 function Typecheck.concat_type(self, node, lt, rt)
-    -- Typecheck:580
+    -- Typecheck:586
     if (not Typecheck.str_or_dynamic(self, lt)) or (not Typecheck.str_or_dynamic(self, rt)) then
-        -- Typecheck:581
-        Typecheck.fail(self, node, ((("++ joins strings, found " .. lt:describe()) .. " and ") .. rt:describe()) .. "; convert explicitly")
+        -- Typecheck:587
+        Typecheck.fail(self, node, ((("string concatenation requires str on both sides, found " .. lt:describe()) .. " and ") .. rt:describe()) .. "; convert explicitly")
     end
-    -- Typecheck:583
+    -- Typecheck:589
     return Type.str()
 end
--- Typecheck:586
+-- Typecheck:592
 function Typecheck.str_or_dynamic(self, t)
-    -- Typecheck:587
+    -- Typecheck:593
     return t:is_dynamic() or (t.kind == "str")
 end
--- Typecheck:591
+-- Typecheck:597
 function Typecheck.equality_type(self, node, lt, rt)
-    -- Typecheck:592
+    -- Typecheck:598
     if ((not lt:is_dynamic()) and (not rt:is_dynamic())) and (not lt:equals(rt)) then
-        -- Typecheck:593
+        -- Typecheck:599
         Typecheck.fail(self, node, ((("cannot compare " .. lt:describe()) .. " and ") .. rt:describe()) .. " for equality")
     end
-    -- Typecheck:595
+    -- Typecheck:601
     return Type.bool()
 end
--- Typecheck:599
+-- Typecheck:605
 function Typecheck.ordering_type(self, node, lt, rt)
-    -- Typecheck:600
-    if lt:is_dynamic() or rt:is_dynamic() then
-        -- Typecheck:601
-        return Type.bool()
-    end
-    -- Typecheck:603
-    if (lt.kind == "str") and (rt.kind == "str") then
-        -- Typecheck:604
-        return Type.bool()
-    end
     -- Typecheck:606
-    if (not lt:is_numeric()) or (not rt:is_numeric()) then
+    if lt:is_dynamic() or rt:is_dynamic() then
         -- Typecheck:607
-        Typecheck.fail(self, node, (("ordering needs numbers or strings, found " .. lt:describe()) .. " and ") .. rt:describe())
+        return Type.bool()
     end
     -- Typecheck:609
-    if not lt:equals(rt) then
+    if (lt.kind == "str") and (rt.kind == "str") then
         -- Typecheck:610
-        Typecheck.fail(self, node, ((("cannot order " .. lt:describe()) .. " against ") .. rt:describe()) .. "; convert explicitly")
+        return Type.bool()
     end
     -- Typecheck:612
+    if (not lt:is_numeric()) or (not rt:is_numeric()) then
+        -- Typecheck:613
+        Typecheck.fail(self, node, (("ordering needs numbers or strings, found " .. lt:describe()) .. " and ") .. rt:describe())
+    end
+    -- Typecheck:615
+    if not lt:equals(rt) then
+        -- Typecheck:616
+        Typecheck.fail(self, node, ((("cannot order " .. lt:describe()) .. " against ") .. rt:describe()) .. "; convert explicitly")
+    end
+    -- Typecheck:618
     return Type.bool()
 end
--- Typecheck:615
+-- Typecheck:621
 function Typecheck.arith_type(self, node, op, lt, rt)
-    -- Typecheck:616
+    -- Typecheck:622
     if lt:is_dynamic() or rt:is_dynamic() then
-        -- Typecheck:617
+        -- Typecheck:623
         return Type.dynamic()
     end
-    -- Typecheck:619
+    -- Typecheck:625
     if (not lt:is_numeric()) or (not rt:is_numeric()) then
-        -- Typecheck:620
+        -- Typecheck:626
         Typecheck.fail(self, node, (("arithmetic needs numbers, found " .. lt:describe()) .. " and ") .. rt:describe())
     end
-    -- Typecheck:622
+    -- Typecheck:628
     if not lt:equals(rt) then
-        -- Typecheck:623
+        -- Typecheck:629
         Typecheck.fail(self, node, ((("cannot mix " .. lt:describe()) .. " and ") .. rt:describe()) .. " in arithmetic; convert explicitly")
     end
-    -- Typecheck:625
+    -- Typecheck:631
     if op == "DIVIDE" then
-        -- Typecheck:626
+        -- Typecheck:632
         return Type.float()
     end
-    -- Typecheck:628
+    -- Typecheck:634
     return lt
 end
--- Typecheck:635
+-- Typecheck:641
 function Typecheck.identifier_type(self, name, scope)
-    -- Typecheck:636
+    -- Typecheck:642
     local found = scope:lookup(name)
-    -- Typecheck:637
+    -- Typecheck:643
     if Option.is_some(found) then
-        -- Typecheck:638
+        -- Typecheck:644
         return Option.unwrap(found)
     end
-    -- Typecheck:640
+    -- Typecheck:646
     if self.variant_owner:has(name) then
-        -- Typecheck:641
+        -- Typecheck:647
         return Typecheck.enum_instance(self, Option.unwrap(self.variant_owner:get(name)), Map.__lz_from({}))
     end
-    -- Typecheck:643
+    -- Typecheck:649
     if self.classes:has(name) then
-        -- Typecheck:644
+        -- Typecheck:650
         return Type.class_of(name, List.__lz_from({}))
     end
-    -- Typecheck:646
+    -- Typecheck:652
     return Type.dynamic()
 end
--- Typecheck:651
+-- Typecheck:657
 function Typecheck.type_call(self, node, scope)
-    -- Typecheck:652
+    -- Typecheck:658
     local callee = node:child("callee")
-    -- Typecheck:653
+    -- Typecheck:659
     local args = node:child("args")
-    -- Typecheck:654
+    -- Typecheck:660
     if callee.kind == "MemberExpr" then
-        -- Typecheck:655
+        -- Typecheck:661
         local obj = callee:child("object")
-        -- Typecheck:656
+        -- Typecheck:662
         if (obj.kind == "IdentifierExpr") and ((obj:child("name") == "Option") or (obj:child("name") == "Result")) then
-            -- Typecheck:657
+            -- Typecheck:663
             return Typecheck.type_builtin_ctor(self, obj:child("name"), callee:child("field"), args, scope)
         end
-        -- Typecheck:659
+        -- Typecheck:665
         return Typecheck.type_method_call(self, callee, args, scope, node)
     end
-    -- Typecheck:661
+    -- Typecheck:667
     if callee.kind == "IdentifierExpr" then
-        -- Typecheck:662
+        -- Typecheck:668
         local name = callee:child("name")
-        -- Typecheck:663
+        -- Typecheck:669
         if self.variant_owner:has(name) then
-            -- Typecheck:664
+            -- Typecheck:670
             return Typecheck.type_variant(self, name, args, scope, node)
         end
-        -- Typecheck:666
+        -- Typecheck:672
         if (not Option.is_some(scope:lookup(name))) and self.traits:has(name) then
-            -- Typecheck:667
+            -- Typecheck:673
             Typecheck.fail(self, callee, ("cannot construct trait '" .. name) .. "'")
         end
-        -- Typecheck:669
+        -- Typecheck:675
         if (not Option.is_some(scope:lookup(name))) and self.classes:has(name) then
-            -- Typecheck:670
+            -- Typecheck:676
             return Typecheck.type_construction(self, name, args, scope, node)
         end
     end
-    -- Typecheck:673
+    -- Typecheck:679
     if Typecheck.is_labeled(self, args) then
-        -- Typecheck:674
+        -- Typecheck:680
         Typecheck.fail(self, node, "labeled arguments can only be used with a known method or constructor")
     end
-    -- Typecheck:676
+    -- Typecheck:682
     local callee_type = Typecheck.type_expr(self, callee, scope)
-    -- Typecheck:677
+    -- Typecheck:683
     if callee_type.kind == "fn" then
-        -- Typecheck:678
+        -- Typecheck:684
         return Typecheck.type_fn_call(self, callee_type, args, scope, node)
     end
-    -- Typecheck:680
+    -- Typecheck:686
     for _, arg in List.__lz_each(args) do
-        -- Typecheck:681
+        -- Typecheck:687
         Typecheck.type_expr(self, arg, scope)
     end
-    -- Typecheck:683
+    -- Typecheck:689
     return Type.dynamic()
 end
--- Typecheck:686
+-- Typecheck:692
 function Typecheck.type_fn_call(self, fn_type, args, scope, node)
-    -- Typecheck:687
+    -- Typecheck:693
     local params = fn_type.params
-    -- Typecheck:688
+    -- Typecheck:694
     if args:len() ~= params:len() then
-        -- Typecheck:689
+        -- Typecheck:695
         Typecheck.fail(self, node, (("wrong number of arguments: expected " .. Typecheck.count(self, params:len())) .. ", found ") .. Typecheck.count(self, args:len()))
     end
-    -- Typecheck:691
+    -- Typecheck:697
     local i = 1
-    -- Typecheck:692
+    -- Typecheck:698
     for _, arg in List.__lz_each(args) do
-        -- Typecheck:693
+        -- Typecheck:699
         local expected = Option.unwrap_or(params:get(i), Type.dynamic())
-        -- Typecheck:694
+        -- Typecheck:700
         local actual = Typecheck.type_expr(self, arg, scope)
-        -- Typecheck:695
+        -- Typecheck:701
         Typecheck.expect(self, expected, actual, arg, "argument")
-        -- Typecheck:696
+        -- Typecheck:702
         i = i + 1
     end
-    -- Typecheck:698
+    -- Typecheck:704
     return Option.unwrap_or(fn_type.result, Type.dynamic())
 end
--- Typecheck:703
+-- Typecheck:709
 function Typecheck.type_construction(self, name, args, scope, node)
-    -- Typecheck:704
+    -- Typecheck:710
     local ctor = Option.__lz_unwrap(Option.unwrap(self.classes:get(name)):get("ctor"))
-    -- Typecheck:705
+    -- Typecheck:711
     local call_args = args
-    -- Typecheck:706
+    -- Typecheck:712
     if Typecheck.is_labeled(self, args) then
-        -- Typecheck:707
+        -- Typecheck:713
         local ctor_names = Option.__lz_unwrap_or(Option.unwrap(self.classes:get(name)):get("ctor_names"), List.__lz_from({}))
-        -- Typecheck:708
+        -- Typecheck:714
         call_args = Typecheck.resolve_labeled(self, ctor, ctor_names, args, node)
-        -- Typecheck:709
+        -- Typecheck:715
         node:set("args", call_args)
     end
-    -- Typecheck:711
+    -- Typecheck:717
     local subst = Map.__lz_from({})
-    -- Typecheck:712
+    -- Typecheck:718
     if ctor == 0 then
-        -- Typecheck:713
+        -- Typecheck:719
         for _, arg in List.__lz_each(call_args) do
-            -- Typecheck:714
+            -- Typecheck:720
             Typecheck.type_expr(self, arg, scope)
         end
     else
-        -- Typecheck:717
+        -- Typecheck:723
         Typecheck.infer_and_check(self, ctor, Typecheck.class_var_set(self, name), call_args, scope, node, subst)
     end
-    -- Typecheck:719
+    -- Typecheck:725
     return Typecheck.class_instance(self, name, subst)
 end
--- Typecheck:724
+-- Typecheck:730
 function Typecheck.type_variant(self, name, args, scope, node)
-    -- Typecheck:725
+    -- Typecheck:731
     local owner = Option.unwrap(self.variant_owner:get(name))
-    -- Typecheck:726
+    -- Typecheck:732
     local subst = Map.__lz_from({})
-    -- Typecheck:727
+    -- Typecheck:733
     Typecheck.infer_and_check(self, Option.unwrap_or(self.variant_fields:get(name), List.__lz_from({})), Typecheck.enum_var_set(self, owner), args, scope, node, subst)
-    -- Typecheck:728
+    -- Typecheck:734
     return Typecheck.enum_instance(self, owner, subst)
 end
--- Typecheck:731
+-- Typecheck:737
 function Typecheck.type_method_call(self, member, args, scope, call)
-    -- Typecheck:732
+    -- Typecheck:738
     local object = member:child("object")
-    -- Typecheck:733
+    -- Typecheck:739
     local method = member:child("field")
-    -- Typecheck:734
+    -- Typecheck:740
     local recv = Typecheck.receiver_type(self, object, scope)
-    -- Typecheck:735
+    -- Typecheck:741
     if Typecheck.is_builtin_type(self, recv) then
-        -- Typecheck:736
+        -- Typecheck:742
         local class_entry = self.classes:get(recv.name)
-        -- Typecheck:737
+        -- Typecheck:743
         if Option.is_some(class_entry) then
-            -- Typecheck:738
+            -- Typecheck:744
             local sig = Option.__lz_unwrap(Option.unwrap(class_entry):get("methods")):get(method)
-            -- Typecheck:739
+            -- Typecheck:745
             if Option.__lz_is_some(sig) and Option.__lz_unwrap_or(Option.__lz_unwrap(sig):get("is_static"), false) then
-                -- Typecheck:740
+                -- Typecheck:746
                 call:set("dispatch_class", recv.name)
-                -- Typecheck:741
+                -- Typecheck:747
                 local full_args = List.__lz_from({object})
-                -- Typecheck:742
+                -- Typecheck:748
                 for _, arg in List.__lz_each(args) do
-                    -- Typecheck:742
+                    -- Typecheck:748
                     full_args:push(arg)
                 end
-                -- Typecheck:743
+                -- Typecheck:749
                 return Typecheck.type_method_sig(self, recv.name, recv, Option.__lz_unwrap(sig), full_args, scope, call)
             end
         end
-        -- Typecheck:746
+        -- Typecheck:752
         return Typecheck.builtin_method(self, recv, method, args, scope)
     end
-    -- Typecheck:748
+    -- Typecheck:754
     if recv.kind == "iface" then
-        -- Typecheck:749
+        -- Typecheck:755
         local t = Typecheck.iface_method(self, recv, method, args, scope, call)
-        -- Typecheck:750
+        -- Typecheck:756
         call:set("known_method", true)
-        -- Typecheck:751
+        -- Typecheck:757
         return t
     end
-    -- Typecheck:753
+    -- Typecheck:759
     local cls = Typecheck.class_name_of(self, recv)
-    -- Typecheck:754
+    -- Typecheck:760
     if cls == "" then
-        -- Typecheck:755
+        -- Typecheck:761
         for _, arg in List.__lz_each(args) do
-            -- Typecheck:756
+            -- Typecheck:762
             Typecheck.type_expr(self, arg, scope)
         end
-        -- Typecheck:758
+        -- Typecheck:764
         return Type.dynamic()
     end
-    -- Typecheck:760
+    -- Typecheck:766
     call:set("known_method", true)
-    -- Typecheck:761
+    -- Typecheck:767
     local sig = Option.__lz_unwrap(Option.unwrap(self.classes:get(cls)):get("methods")):get(method)
-    -- Typecheck:762
+    -- Typecheck:768
     if not Option.__lz_is_some(sig) then
-        -- Typecheck:763
+        -- Typecheck:769
         local fields = Option.__lz_unwrap(Option.unwrap(self.classes:get(cls)):get("fields"))
-        -- Typecheck:764
+        -- Typecheck:770
         local field_opt = fields:get(method)
-        -- Typecheck:765
+        -- Typecheck:771
         if Option.__lz_is_some(field_opt) then
-            -- Typecheck:766
+            -- Typecheck:772
             local field_node_opt = Option.__lz_unwrap(field_opt)
-            -- Typecheck:767
+            -- Typecheck:773
             if Option.__lz_is_some(field_node_opt) then
-                -- Typecheck:768
+                -- Typecheck:774
                 local ft = Typecheck.substitute(self, Typecheck.resolve_with(self, Option.__lz_unwrap(field_node_opt), Typecheck.class_var_set(self, cls)), Typecheck.receiver_subst(self, cls, recv))
-                -- Typecheck:769
+                -- Typecheck:775
                 if ft.kind == "fn" then
-                    -- Typecheck:770
+                    -- Typecheck:776
                     return Typecheck.type_fn_call(self, ft, args, scope, call)
                 end
             end
         end
-        -- Typecheck:774
+        -- Typecheck:780
         if Typecheck.static_receiver(self, object, scope) then
-            -- Typecheck:775
+            -- Typecheck:781
             for _, arg in List.__lz_each(args) do
-                -- Typecheck:776
+                -- Typecheck:782
                 Typecheck.type_expr(self, arg, scope)
             end
-            -- Typecheck:778
+            -- Typecheck:784
             return Type.dynamic()
-        end
-        -- Typecheck:780
-        Typecheck.fail(self, member, (("no method '" .. method) .. "' on ") .. cls)
-    end
-    -- Typecheck:782
-    if Option.__lz_unwrap_or(Option.__lz_unwrap(sig):get("is_static"), false) and (not Typecheck.static_receiver(self, object, scope)) then
-        -- Typecheck:783
-        call:set("dispatch_class", cls)
-        -- Typecheck:784
-        local full_args = List.__lz_from({object})
-        -- Typecheck:785
-        for _, arg in List.__lz_each(args) do
-            -- Typecheck:785
-            full_args:push(arg)
         end
         -- Typecheck:786
-        return Typecheck.type_method_sig(self, cls, recv, Option.__lz_unwrap(sig), full_args, scope, call)
+        Typecheck.fail(self, member, (("no method '" .. method) .. "' on ") .. cls)
     end
     -- Typecheck:788
+    if Option.__lz_unwrap_or(Option.__lz_unwrap(sig):get("is_static"), false) and (not Typecheck.static_receiver(self, object, scope)) then
+        -- Typecheck:789
+        call:set("dispatch_class", cls)
+        -- Typecheck:790
+        local full_args = List.__lz_from({object})
+        -- Typecheck:791
+        for _, arg in List.__lz_each(args) do
+            -- Typecheck:791
+            full_args:push(arg)
+        end
+        -- Typecheck:792
+        return Typecheck.type_method_sig(self, cls, recv, Option.__lz_unwrap(sig), full_args, scope, call)
+    end
+    -- Typecheck:794
     return Typecheck.type_method_sig(self, cls, recv, Option.__lz_unwrap(sig), args, scope, call)
 end
--- Typecheck:793
+-- Typecheck:799
 function Typecheck.type_method_sig(self, cls, recv, sig, args, scope, call)
-    -- Typecheck:794
+    -- Typecheck:800
     local call_args = args
-    -- Typecheck:795
+    -- Typecheck:801
     if Typecheck.is_labeled(self, args) then
-        -- Typecheck:796
+        -- Typecheck:802
         local names = Option.unwrap_or(sig:get("param_names"), List.__lz_from({}))
-        -- Typecheck:797
+        -- Typecheck:803
         call_args = Typecheck.resolve_labeled(self, Option.unwrap(sig:get("params")), names, args, call)
-        -- Typecheck:798
+        -- Typecheck:804
         call:set("args", call_args)
     end
-    -- Typecheck:800
+    -- Typecheck:806
     local vars = Typecheck.method_var_set(self, cls, sig)
-    -- Typecheck:801
+    -- Typecheck:807
     local subst = Typecheck.receiver_subst(self, cls, recv)
-    -- Typecheck:802
+    -- Typecheck:808
     Typecheck.infer_and_check(self, Option.unwrap(sig:get("params")), vars, call_args, scope, call, subst)
-    -- Typecheck:803
+    -- Typecheck:809
     local result = Option.unwrap_or(sig:get("result"), 0)
-    -- Typecheck:804
+    -- Typecheck:810
     if result == 0 then
-        -- Typecheck:805
+        -- Typecheck:811
         return Type.dynamic()
     end
-    -- Typecheck:807
+    -- Typecheck:813
     return Typecheck.substitute(self, Typecheck.resolve_with(self, result, vars), subst)
 end
--- Typecheck:814
+-- Typecheck:820
 function Typecheck.type_member(self, node, scope)
-    -- Typecheck:815
+    -- Typecheck:821
     local object = node:child("object")
-    -- Typecheck:816
+    -- Typecheck:822
     local field = node:child("field")
-    -- Typecheck:817
+    -- Typecheck:823
     local recv = Typecheck.receiver_type(self, object, scope)
-    -- Typecheck:818
+    -- Typecheck:824
     local cls = Typecheck.class_name_of(self, recv)
-    -- Typecheck:819
+    -- Typecheck:825
     if cls == "" then
-        -- Typecheck:820
+        -- Typecheck:826
         return Type.dynamic()
     end
-    -- Typecheck:822
+    -- Typecheck:828
     local entry = Option.unwrap(self.classes:get(cls))
-    -- Typecheck:823
+    -- Typecheck:829
     local ft = Option.__lz_unwrap(entry:get("fields")):get(field)
-    -- Typecheck:824
+    -- Typecheck:830
     if Option.__lz_is_some(ft) then
-        -- Typecheck:825
+        -- Typecheck:831
         local fnode = Option.__lz_unwrap(ft)
-        -- Typecheck:826
+        -- Typecheck:832
         if Option.__lz_is_none(fnode) then
-            -- Typecheck:827
+            -- Typecheck:833
             return Type.dynamic()
         end
-        -- Typecheck:829
+        -- Typecheck:835
         return Typecheck.substitute(self, Typecheck.resolve_with(self, Option.__lz_unwrap(fnode), Typecheck.class_var_set(self, cls)), Typecheck.receiver_subst(self, cls, recv))
     end
-    -- Typecheck:831
-    if Option.__lz_unwrap(entry:get("methods")):has(field) then
-        -- Typecheck:832
-        return Type.dynamic()
-    end
-    -- Typecheck:834
-    if Typecheck.static_receiver(self, object, scope) then
-        -- Typecheck:835
-        return Type.dynamic()
-    end
     -- Typecheck:837
+    if Option.__lz_unwrap(entry:get("methods")):has(field) then
+        -- Typecheck:838
+        return Type.dynamic()
+    end
+    -- Typecheck:840
+    if Typecheck.static_receiver(self, object, scope) then
+        -- Typecheck:841
+        return Type.dynamic()
+    end
+    -- Typecheck:843
     Typecheck.fail(self, node, (("no field '" .. field) .. "' on ") .. cls)
 end
--- Typecheck:842
+-- Typecheck:848
 function Typecheck.receiver_type(self, object, scope)
-    -- Typecheck:843
+    -- Typecheck:849
     if object.kind == "SelfExpr" then
-        -- Typecheck:844
+        -- Typecheck:850
         return Type.class_of(self.class_name, Typecheck.self_args(self))
     end
-    -- Typecheck:846
+    -- Typecheck:852
     if object.kind == "IdentifierExpr" then
-        -- Typecheck:847
+        -- Typecheck:853
         local found = scope:lookup(object:child("name"))
-        -- Typecheck:848
+        -- Typecheck:854
         if Option.is_some(found) then
-            -- Typecheck:849
+            -- Typecheck:855
             return Option.unwrap(found)
         end
-        -- Typecheck:851
+        -- Typecheck:857
         if self.classes:has(object:child("name")) then
-            -- Typecheck:852
+            -- Typecheck:858
             return Type.class_of(object:child("name"), List.__lz_from({}))
         end
-        -- Typecheck:854
+        -- Typecheck:860
         return Type.dynamic()
     end
-    -- Typecheck:856
+    -- Typecheck:862
     return Typecheck.type_expr(self, object, scope)
 end
--- Typecheck:859
+-- Typecheck:865
 function Typecheck.class_name_of(self, t)
-    -- Typecheck:860
+    -- Typecheck:866
     if (t.kind == "class") or (t.kind == "enum") then
-        -- Typecheck:861
+        -- Typecheck:867
         return t.name
     end
-    -- Typecheck:863
+    -- Typecheck:869
     return ""
 end
--- Typecheck:869
+-- Typecheck:875
 function Typecheck.static_receiver(self, object, scope)
-    -- Typecheck:870
+    -- Typecheck:876
     if object.kind ~= "IdentifierExpr" then
-        -- Typecheck:871
+        -- Typecheck:877
         return false
     end
-    -- Typecheck:873
+    -- Typecheck:879
     return (not Option.is_some(scope:lookup(object:child("name")))) and self.classes:has(object:child("name"))
 end
--- Typecheck:876
+-- Typecheck:882
 function Typecheck.is_labeled(self, args)
-    -- Typecheck:877
+    -- Typecheck:883
     local first = args:get(1)
-    -- Typecheck:878
+    -- Typecheck:884
     if Option.is_none(first) then
-        -- Typecheck:879
+        -- Typecheck:885
         return false
     end
-    -- Typecheck:881
+    -- Typecheck:887
     return Option.unwrap(first).kind == "LabeledArg"
 end
--- Typecheck:886
+-- Typecheck:892
 function Typecheck.resolve_labeled(self, param_nodes, param_names, args, node)
-    -- Typecheck:887
+    -- Typecheck:893
     local named = Map.__lz_from({})
-    -- Typecheck:888
+    -- Typecheck:894
     for _, arg in List.__lz_each(args) do
-        -- Typecheck:889
+        -- Typecheck:895
         local label = arg:child("name")
-        -- Typecheck:890
+        -- Typecheck:896
         if named:has(label) then
-            -- Typecheck:891
+            -- Typecheck:897
             Typecheck.fail(self, node, ("duplicate labeled argument '" .. label) .. "'")
         end
-        -- Typecheck:893
+        -- Typecheck:899
         List.__lz_idx_set(named, label, arg:child("value"))
     end
-    -- Typecheck:895
+    -- Typecheck:901
     for label, _ in List.__lz_each(named) do
-        -- Typecheck:896
+        -- Typecheck:902
         local found = false
-        -- Typecheck:897
+        -- Typecheck:903
         for _, pname in List.__lz_each(param_names) do
-            -- Typecheck:898
+            -- Typecheck:904
             if pname == label then
-                -- Typecheck:899
+                -- Typecheck:905
                 found = true
             end
         end
-        -- Typecheck:902
+        -- Typecheck:908
         if not found then
-            -- Typecheck:903
+            -- Typecheck:909
             Typecheck.fail(self, node, ("unknown labeled argument '" .. label) .. "'")
         end
     end
-    -- Typecheck:906
+    -- Typecheck:912
     local resolved = List.__lz_from({})
-    -- Typecheck:907
+    -- Typecheck:913
     local i = 1
-    -- Typecheck:908
+    -- Typecheck:914
     for _, pname in List.__lz_each(param_names) do
-        -- Typecheck:909
+        -- Typecheck:915
         if named:has(pname) then
-            -- Typecheck:910
+            -- Typecheck:916
             resolved:push(Option.unwrap(named:get(pname)))
         else
-            -- Typecheck:912
+            -- Typecheck:918
             if not Option.__lz_is_some(Option.unwrap(param_nodes:get(i)):attr("default")) then
-                -- Typecheck:913
+                -- Typecheck:919
                 Typecheck.fail(self, node, ("missing required argument '" .. pname) .. "'")
             end
-            -- Typecheck:915
+            -- Typecheck:921
             resolved:push(Node.new("LiteralExpr", Map.__lz_from({["lit_kind"] = "nil", ["value"] = 0, ["line"] = node:line(), ["col"] = node:col()})))
         end
-        -- Typecheck:917
+        -- Typecheck:923
         i = i + 1
     end
-    -- Typecheck:919
+    -- Typecheck:925
     return resolved
 end
--- Typecheck:926
+-- Typecheck:932
 function Typecheck.infer_and_check(self, param_nodes, callee_vars, args, scope, node, subst)
-    -- Typecheck:927
+    -- Typecheck:933
     if args:len() > param_nodes:len() then
-        -- Typecheck:928
+        -- Typecheck:934
         Typecheck.fail(self, node, (("wrong number of arguments: expected " .. Typecheck.count(self, param_nodes:len())) .. ", found ") .. Typecheck.count(self, args:len()))
     end
-    -- Typecheck:930
+    -- Typecheck:936
     if args:len() < param_nodes:len() then
-        -- Typecheck:931
+        -- Typecheck:937
         local i = args:len() + 1
-        -- Typecheck:932
+        -- Typecheck:938
         while i <= param_nodes:len() do
-            -- Typecheck:933
+            -- Typecheck:939
             if not Option.__lz_is_some(Option.unwrap(param_nodes:get(i)):attr("default")) then
-                -- Typecheck:934
+                -- Typecheck:940
                 Typecheck.fail(self, node, ((((("wrong number of arguments: expected " .. Typecheck.count(self, param_nodes:len())) .. ", found ") .. Typecheck.count(self, args:len())) .. " (parameter ") .. Typecheck.count(self, i)) .. " has no default)")
             end
-            -- Typecheck:936
+            -- Typecheck:942
             i = i + 1
         end
     end
-    -- Typecheck:939
+    -- Typecheck:945
     local ptypes = List.__lz_from({})
-    -- Typecheck:940
+    -- Typecheck:946
     local atypes = List.__lz_from({})
-    -- Typecheck:941
+    -- Typecheck:947
     local i = 1
-    -- Typecheck:942
+    -- Typecheck:948
     for _, arg in List.__lz_each(args) do
-        -- Typecheck:943
+        -- Typecheck:949
         local pt = Typecheck.resolve_with(self, Option.unwrap(param_nodes:get(i)), callee_vars)
-        -- Typecheck:944
+        -- Typecheck:950
         local at = Typecheck.type_expr(self, arg, scope)
-        -- Typecheck:945
+        -- Typecheck:951
         Typecheck.unify(self, pt, at, subst)
-        -- Typecheck:946
+        -- Typecheck:952
         ptypes:push(pt)
-        -- Typecheck:947
+        -- Typecheck:953
         atypes:push(at)
-        -- Typecheck:948
+        -- Typecheck:954
         i = i + 1
     end
-    -- Typecheck:950
+    -- Typecheck:956
     local j = 1
-    -- Typecheck:951
+    -- Typecheck:957
     for _, arg in List.__lz_each(args) do
-        -- Typecheck:952
+        -- Typecheck:958
         Typecheck.expect(self, Typecheck.substitute(self, Option.unwrap(ptypes:get(j)), subst), Option.unwrap(atypes:get(j)), arg, "argument")
-        -- Typecheck:953
+        -- Typecheck:959
         j = j + 1
     end
 end
--- Typecheck:957
+-- Typecheck:963
 function Typecheck.count(self, n)
-    -- Typecheck:958
+    -- Typecheck:964
     return Option.__lz_unwrap_or(Option.__lz_wrap(string.format("%d", n)), "?")
 end
--- Typecheck:963
+-- Typecheck:969
 function Typecheck.field_type(self, opt)
-    -- Typecheck:964
+    -- Typecheck:970
     if not Option.is_some(opt) then
-        -- Typecheck:965
+        -- Typecheck:971
         return Type.dynamic()
     end
-    -- Typecheck:967
+    -- Typecheck:973
     return Typecheck.resolve(self, Option.unwrap(opt))
 end
--- Typecheck:974
+-- Typecheck:980
 function Typecheck.self_args(self)
-    -- Typecheck:975
+    -- Typecheck:981
     return (function() local __lz_m5 = List.new() for _, p in List.__lz_each(Typecheck.own_type_params(self)) do List.push(__lz_m5, Type.var(p)) end return __lz_m5 end)()
 end
--- Typecheck:978
+-- Typecheck:984
 function Typecheck.class_instance(self, name, subst)
-    -- Typecheck:979
+    -- Typecheck:985
     return Type.class_of(name, Typecheck.solved_args(self, Typecheck.class_params(self, name), subst))
 end
--- Typecheck:982
+-- Typecheck:988
 function Typecheck.enum_instance(self, owner, subst)
-    -- Typecheck:983
+    -- Typecheck:989
     return Type.enum_of(owner, Typecheck.solved_args(self, Option.unwrap_or(self.enum_type_params:get(owner), List.__lz_from({})), subst))
 end
--- Typecheck:988
+-- Typecheck:994
 function Typecheck.solved_args(self, params, subst)
-    -- Typecheck:989
+    -- Typecheck:995
     return (function() local __lz_m6 = List.new() for _, p in List.__lz_each(params) do List.push(__lz_m6, Typecheck.subst_lookup(self, subst, p)) end return __lz_m6 end)()
 end
--- Typecheck:992
+-- Typecheck:998
 function Typecheck.subst_lookup(self, subst, name)
-    -- Typecheck:993
+    -- Typecheck:999
     local v = subst:get(name)
-    -- Typecheck:994
+    -- Typecheck:1000
     if Option.is_some(v) then
-        -- Typecheck:995
+        -- Typecheck:1001
         return Option.unwrap(v)
     end
-    -- Typecheck:997
+    -- Typecheck:1003
     return Type.dynamic()
 end
--- Typecheck:1000
+-- Typecheck:1006
 function Typecheck.class_params(self, name)
-    -- Typecheck:1001
+    -- Typecheck:1007
     local centry = self.classes:get(name)
-    -- Typecheck:1002
+    -- Typecheck:1008
     if Option.is_some(centry) then
-        -- Typecheck:1003
+        -- Typecheck:1009
         return Option.__lz_unwrap_or(Option.unwrap(centry):get("type_params"), List.__lz_from({}))
     end
-    -- Typecheck:1005
+    -- Typecheck:1011
     return List.__lz_from({})
 end
--- Typecheck:1008
+-- Typecheck:1014
 function Typecheck.class_var_set(self, name)
-    -- Typecheck:1009
+    -- Typecheck:1015
     local out = Map.__lz_from({})
-    -- Typecheck:1010
+    -- Typecheck:1016
     for _, p in List.__lz_each(Typecheck.class_params(self, name)) do
-        -- Typecheck:1011
+        -- Typecheck:1017
         List.__lz_idx_set(out, p, true)
     end
-    -- Typecheck:1013
+    -- Typecheck:1019
     return out
 end
--- Typecheck:1016
+-- Typecheck:1022
 function Typecheck.enum_var_set(self, name)
-    -- Typecheck:1017
+    -- Typecheck:1023
     local out = Map.__lz_from({})
-    -- Typecheck:1018
+    -- Typecheck:1024
     for _, p in List.__lz_each(Option.unwrap_or(self.enum_type_params:get(name), List.__lz_from({}))) do
-        -- Typecheck:1019
+        -- Typecheck:1025
         List.__lz_idx_set(out, p, true)
     end
-    -- Typecheck:1021
+    -- Typecheck:1027
     return out
 end
--- Typecheck:1024
+-- Typecheck:1030
 function Typecheck.method_var_set(self, cls, sig)
-    -- Typecheck:1025
+    -- Typecheck:1031
     local out = Typecheck.class_var_set(self, cls)
-    -- Typecheck:1026
+    -- Typecheck:1032
     for _, p in List.__lz_each(Option.unwrap_or(sig:get("type_params"), List.__lz_from({}))) do
-        -- Typecheck:1027
+        -- Typecheck:1033
         List.__lz_idx_set(out, p, true)
     end
-    -- Typecheck:1029
+    -- Typecheck:1035
     return out
 end
--- Typecheck:1037
+-- Typecheck:1043
 function Typecheck.receiver_subst(self, cls, recv)
-    -- Typecheck:1038
+    -- Typecheck:1044
     local subst = Map.__lz_from({})
-    -- Typecheck:1039
+    -- Typecheck:1045
     local i = 1
-    -- Typecheck:1040
+    -- Typecheck:1046
     for _, p in List.__lz_each(Typecheck.class_params(self, cls)) do
-        -- Typecheck:1041
+        -- Typecheck:1047
         local arg = recv.params:get(i)
-        -- Typecheck:1042
+        -- Typecheck:1048
         if Option.is_some(arg) then
-            -- Typecheck:1043
+            -- Typecheck:1049
             List.__lz_idx_set(subst, p, Option.unwrap(arg))
         end
-        -- Typecheck:1045
+        -- Typecheck:1051
         i = i + 1
     end
-    -- Typecheck:1047
+    -- Typecheck:1053
     return subst
 end
--- Typecheck:1052
+-- Typecheck:1058
 function Typecheck.resolve_with(self, node, vars)
-    -- Typecheck:1053
+    -- Typecheck:1059
     local saved = self.type_vars
-    -- Typecheck:1054
+    -- Typecheck:1060
     self.type_vars = vars
-    -- Typecheck:1055
+    -- Typecheck:1061
     local r = Typecheck.resolve(self, node)
-    -- Typecheck:1056
+    -- Typecheck:1062
     self.type_vars = saved
-    -- Typecheck:1057
+    -- Typecheck:1063
     return r
 end
--- Typecheck:1063
+-- Typecheck:1069
 function Typecheck.unify(self, param, arg, subst)
-    -- Typecheck:1064
+    -- Typecheck:1070
     if param.kind == "var" then
-        -- Typecheck:1065
+        -- Typecheck:1071
         if not subst:has(param.name) then
-            -- Typecheck:1066
+            -- Typecheck:1072
             List.__lz_idx_set(subst, param.name, arg)
         end
-        -- Typecheck:1068
-        return
-    end
-    -- Typecheck:1070
-    if param:is_dynamic() or arg:is_dynamic() then
-        -- Typecheck:1071
-        return
-    end
-    -- Typecheck:1073
-    if ((param.kind == arg.kind) and ((param.kind == "class") or (param.kind == "enum"))) and (param.name == arg.name) then
         -- Typecheck:1074
+        return
+    end
+    -- Typecheck:1076
+    if param:is_dynamic() or arg:is_dynamic() then
+        -- Typecheck:1077
+        return
+    end
+    -- Typecheck:1079
+    if ((param.kind == arg.kind) and ((param.kind == "class") or (param.kind == "enum"))) and (param.name == arg.name) then
+        -- Typecheck:1080
         local i = 1
-        -- Typecheck:1075
+        -- Typecheck:1081
         for _, p in List.__lz_each(param.params) do
-            -- Typecheck:1076
+            -- Typecheck:1082
             Typecheck.unify(self, p, Option.unwrap_or(arg.params:get(i), Type.dynamic()), subst)
-            -- Typecheck:1077
+            -- Typecheck:1083
             i = i + 1
         end
     end
 end
--- Typecheck:1084
+-- Typecheck:1090
 function Typecheck.substitute(self, t, subst)
-    -- Typecheck:1085
+    -- Typecheck:1091
     if t.kind == "var" then
-        -- Typecheck:1086
+        -- Typecheck:1092
         return Typecheck.subst_lookup(self, subst, t.name)
     end
-    -- Typecheck:1088
+    -- Typecheck:1094
     if t.kind == "fn" then
-        -- Typecheck:1089
+        -- Typecheck:1095
         return Type.func((function() local __lz_m7 = List.new() for _, p in List.__lz_each(t.params) do List.push(__lz_m7, Typecheck.substitute(self, p, subst)) end return __lz_m7 end)(), Typecheck.substitute(self, Option.unwrap(t.result), subst))
     end
-    -- Typecheck:1091
+    -- Typecheck:1097
     if ((t.kind == "class") or (t.kind == "enum")) and (t.params:len() > 0) then
-        -- Typecheck:1092
+        -- Typecheck:1098
         return Type.new(t.kind, t.name, (function() local __lz_m8 = List.new() for _, a in List.__lz_each(t.params) do List.push(__lz_m8, Typecheck.substitute(self, a, subst)) end return __lz_m8 end)(), t.result)
     end
-    -- Typecheck:1094
+    -- Typecheck:1100
     return t
 end
--- Typecheck:1102
+-- Typecheck:1108
 function Typecheck.resolve(self, t)
-    -- Typecheck:1103
+    -- Typecheck:1109
     if t.kind == "TypeUnion" then
-        -- Typecheck:1104
+        -- Typecheck:1110
         return Type.union((function() local __lz_m9 = List.new() for _, m in List.__lz_each(t:child("members")) do List.push(__lz_m9, Typecheck.resolve(self, m)) end return __lz_m9 end)())
     end
-    -- Typecheck:1106
+    -- Typecheck:1112
     if t.kind == "TypeFn" then
-        -- Typecheck:1107
+        -- Typecheck:1113
         return Type.func((function() local __lz_m10 = List.new() for _, p in List.__lz_each(t:child("params")) do List.push(__lz_m10, Typecheck.resolve(self, p)) end return __lz_m10 end)(), Typecheck.resolve(self, t:child("result")))
     end
-    -- Typecheck:1109
+    -- Typecheck:1115
     local name = t:child("name")
-    -- Typecheck:1110
+    -- Typecheck:1116
     local __lz_m11 = name
     if __lz_m11 == "int" then
-        -- Typecheck:1111
+        -- Typecheck:1117
         return Type.int()
     elseif __lz_m11 == "float" then
-        -- Typecheck:1112
+        -- Typecheck:1118
         return Type.float()
     elseif __lz_m11 == "bool" then
-        -- Typecheck:1113
+        -- Typecheck:1119
         return Type.bool()
     elseif __lz_m11 == "str" then
-        -- Typecheck:1114
+        -- Typecheck:1120
         return Type.str()
     elseif __lz_m11 == "unit" then
-        -- Typecheck:1115
+        -- Typecheck:1121
         return Type.unit()
     elseif __lz_m11 == "dynamic" then
-        -- Typecheck:1116
+        -- Typecheck:1122
         return Type.dynamic()
     else
     end
-    -- Typecheck:1119
+    -- Typecheck:1125
     if self.type_vars:has(name) then
-        -- Typecheck:1120
+        -- Typecheck:1126
         return Type.var(name)
     end
-    -- Typecheck:1122
-    if Typecheck.is_builtin_name(self, name) then
-        -- Typecheck:1123
-        return Type.class_of(name, Typecheck.resolve_args(self, t, name))
-    end
-    -- Typecheck:1125
-    if self.enums:has(name) then
-        -- Typecheck:1126
-        return Type.enum_of(name, Typecheck.resolve_args(self, t, name))
-    end
     -- Typecheck:1128
-    if self.traits:has(name) then
+    if Typecheck.is_builtin_name(self, name) then
         -- Typecheck:1129
-        return Type.iface_of(name, Typecheck.resolve_args(self, t, name))
+        return Type.class_of(name, Typecheck.resolve_args(self, t, name))
     end
     -- Typecheck:1131
-    if self.known_classes:has(name) or self.classes:has(name) then
+    if self.enums:has(name) then
         -- Typecheck:1132
-        return Type.class_of(name, Typecheck.resolve_args(self, t, name))
+        return Type.enum_of(name, Typecheck.resolve_args(self, t, name))
     end
     -- Typecheck:1134
+    if self.traits:has(name) then
+        -- Typecheck:1135
+        return Type.iface_of(name, Typecheck.resolve_args(self, t, name))
+    end
+    -- Typecheck:1137
+    if self.known_classes:has(name) or self.classes:has(name) then
+        -- Typecheck:1138
+        return Type.class_of(name, Typecheck.resolve_args(self, t, name))
+    end
+    -- Typecheck:1140
     return Type.dynamic()
 end
--- Typecheck:1139
+-- Typecheck:1145
 function Typecheck.resolve_args(self, t, name)
-    -- Typecheck:1140
+    -- Typecheck:1146
     local nodes = t:child("args")
-    -- Typecheck:1141
+    -- Typecheck:1147
     if nodes:len() == 0 then
-        -- Typecheck:1142
+        -- Typecheck:1148
         return List.__lz_from({})
     end
-    -- Typecheck:1144
+    -- Typecheck:1150
     local declared = Typecheck.declared_arity(self, name)
-    -- Typecheck:1145
+    -- Typecheck:1151
     if (declared >= 0) and (nodes:len() ~= declared) then
-        -- Typecheck:1146
+        -- Typecheck:1152
         Typecheck.fail(self, t, (((name .. " expects ") .. Typecheck.count(self, declared)) .. " type argument(s), found ") .. Typecheck.count(self, nodes:len()))
     end
-    -- Typecheck:1148
+    -- Typecheck:1154
     return (function() local __lz_m12 = List.new() for _, a in List.__lz_each(nodes) do List.push(__lz_m12, Typecheck.resolve(self, a)) end return __lz_m12 end)()
 end
--- Typecheck:1151
+-- Typecheck:1157
 function Typecheck.declared_arity(self, name)
-    -- Typecheck:1152
+    -- Typecheck:1158
     if ((name == "Option") or (name == "Result")) or (name == "List") then
-        -- Typecheck:1153
+        -- Typecheck:1159
         return 1
     end
-    -- Typecheck:1155
+    -- Typecheck:1161
     if name == "Map" then
-        -- Typecheck:1156
+        -- Typecheck:1162
         return 2
     end
-    -- Typecheck:1158
+    -- Typecheck:1164
     if self.enum_type_params:has(name) then
-        -- Typecheck:1159
+        -- Typecheck:1165
         return Option.unwrap(self.enum_type_params:get(name)):len()
     end
-    -- Typecheck:1161
+    -- Typecheck:1167
     if self.traits:has(name) then
-        -- Typecheck:1162
+        -- Typecheck:1168
         return Option.__lz_unwrap_or(Option.unwrap(self.traits:get(name)):get("type_params"), List.__lz_from({})):len()
     end
-    -- Typecheck:1164
+    -- Typecheck:1170
     local centry = self.classes:get(name)
-    -- Typecheck:1165
+    -- Typecheck:1171
     if Option.is_some(centry) then
-        -- Typecheck:1166
+        -- Typecheck:1172
         return Option.__lz_unwrap_or(Option.unwrap(centry):get("type_params"), List.__lz_from({})):len()
     end
-    -- Typecheck:1168
+    -- Typecheck:1174
     return -1
 end
--- Typecheck:1171
+-- Typecheck:1177
 function Typecheck.expect(self, expected, actual, node, what)
-    -- Typecheck:1172
+    -- Typecheck:1178
     if not Typecheck.compatible(self, expected, actual) then
-        -- Typecheck:1173
+        -- Typecheck:1179
         if (expected.kind == "iface") and (self.iface_reason ~= "") then
-            -- Typecheck:1174
+            -- Typecheck:1180
             Typecheck.fail(self, node, (((actual:describe() .. " does not satisfy ") .. expected:describe()) .. ": ") .. self.iface_reason)
         end
-        -- Typecheck:1176
+        -- Typecheck:1182
         Typecheck.fail(self, node, (((("type mismatch in " .. what) .. ": expected ") .. expected:describe()) .. ", found ") .. actual:describe())
     end
 end
--- Typecheck:1184
+-- Typecheck:1190
 function Typecheck.compatible(self, expected, actual)
-    -- Typecheck:1185
+    -- Typecheck:1191
     if expected:is_dynamic() or actual:is_dynamic() then
-        -- Typecheck:1186
+        -- Typecheck:1192
         return true
     end
-    -- Typecheck:1188
+    -- Typecheck:1194
     if (expected.kind == "var") or (actual.kind == "var") then
-        -- Typecheck:1189
+        -- Typecheck:1195
         return true
     end
-    -- Typecheck:1192
+    -- Typecheck:1198
     if expected.kind == "union" then
-        -- Typecheck:1193
+        -- Typecheck:1199
         for _, m in List.__lz_each(expected.params) do
-            -- Typecheck:1194
+            -- Typecheck:1200
             if Typecheck.compatible(self, m, actual) then
-                -- Typecheck:1195
+                -- Typecheck:1201
                 return true
             end
         end
-        -- Typecheck:1198
+        -- Typecheck:1204
         return false
     end
-    -- Typecheck:1201
+    -- Typecheck:1207
     if actual.kind == "union" then
-        -- Typecheck:1202
+        -- Typecheck:1208
         for _, m in List.__lz_each(actual.params) do
-            -- Typecheck:1203
+            -- Typecheck:1209
             if not Typecheck.compatible(self, expected, m) then
-                -- Typecheck:1204
+                -- Typecheck:1210
                 return false
             end
         end
-        -- Typecheck:1207
+        -- Typecheck:1213
         return true
     end
-    -- Typecheck:1209
+    -- Typecheck:1215
     if expected.kind == "iface" then
-        -- Typecheck:1210
+        -- Typecheck:1216
         return Typecheck.satisfies(self, expected, actual)
     end
-    -- Typecheck:1212
+    -- Typecheck:1218
     if expected.kind == "fn" then
-        -- Typecheck:1213
-        if actual.kind ~= "fn" then
-            -- Typecheck:1214
-            return false
-        end
-        -- Typecheck:1216
-        if expected.params:len() ~= actual.params:len() then
-            -- Typecheck:1217
-            return false
-        end
         -- Typecheck:1219
+        if actual.kind ~= "fn" then
+            -- Typecheck:1220
+            return false
+        end
+        -- Typecheck:1222
+        if expected.params:len() ~= actual.params:len() then
+            -- Typecheck:1223
+            return false
+        end
+        -- Typecheck:1225
         local i = 1
-        -- Typecheck:1220
+        -- Typecheck:1226
         for _, p in List.__lz_each(expected.params) do
-            -- Typecheck:1221
+            -- Typecheck:1227
             if not Typecheck.compatible(self, p, Option.unwrap_or(actual.params:get(i), Type.dynamic())) then
-                -- Typecheck:1222
+                -- Typecheck:1228
                 return false
             end
-            -- Typecheck:1224
+            -- Typecheck:1230
             i = i + 1
         end
-        -- Typecheck:1226
+        -- Typecheck:1232
         return Typecheck.compatible(self, Option.unwrap_or(expected.result, Type.dynamic()), Option.unwrap_or(actual.result, Type.dynamic()))
     end
-    -- Typecheck:1230
+    -- Typecheck:1236
     if (((expected.kind == "class") or (expected.kind == "enum")) and ((actual.kind == "class") or (actual.kind == "enum"))) and (expected.name == actual.name) then
-        -- Typecheck:1233
-        return Typecheck.args_compatible(self, expected.params, actual.params)
-    end
-    -- Typecheck:1235
-    if not expected:equals(actual) then
-        -- Typecheck:1236
-        return false
-    end
-    -- Typecheck:1238
-    if (expected.kind == "class") or (expected.kind == "enum") then
         -- Typecheck:1239
         return Typecheck.args_compatible(self, expected.params, actual.params)
     end
     -- Typecheck:1241
+    if not expected:equals(actual) then
+        -- Typecheck:1242
+        return false
+    end
+    -- Typecheck:1244
+    if (expected.kind == "class") or (expected.kind == "enum") then
+        -- Typecheck:1245
+        return Typecheck.args_compatible(self, expected.params, actual.params)
+    end
+    -- Typecheck:1247
     return true
 end
--- Typecheck:1244
+-- Typecheck:1250
 function Typecheck.args_compatible(self, a, b)
-    -- Typecheck:1245
+    -- Typecheck:1251
     local n = a:len()
-    -- Typecheck:1246
+    -- Typecheck:1252
     if b:len() > n then
-        -- Typecheck:1247
+        -- Typecheck:1253
         n = b:len()
     end
-    -- Typecheck:1249
+    -- Typecheck:1255
     local i = 1
-    -- Typecheck:1250
+    -- Typecheck:1256
     while true do
-        -- Typecheck:1251
+        -- Typecheck:1257
         if i > n then
-            -- Typecheck:1252
+            -- Typecheck:1258
             break
         end
-        -- Typecheck:1254
+        -- Typecheck:1260
         if not Typecheck.compatible(self, Option.unwrap_or(a:get(i), Type.dynamic()), Option.unwrap_or(b:get(i), Type.dynamic())) then
-            -- Typecheck:1255
+            -- Typecheck:1261
             return false
         end
-        -- Typecheck:1257
+        -- Typecheck:1263
         i = i + 1
     end
-    -- Typecheck:1259
+    -- Typecheck:1265
     return true
 end
--- Typecheck:1267
+-- Typecheck:1273
 function Typecheck.satisfies(self, iface, actual)
-    -- Typecheck:1268
-    if actual:is_dynamic() or (actual.kind == "var") then
-        -- Typecheck:1269
-        return true
-    end
-    -- Typecheck:1271
-    if (actual.kind == "iface") and (actual.name == iface.name) then
-        -- Typecheck:1272
-        return Typecheck.args_compatible(self, iface.params, actual.params)
-    end
     -- Typecheck:1274
-    if not self.traits:has(iface.name) then
+    if actual:is_dynamic() or (actual.kind == "var") then
         -- Typecheck:1275
         return true
     end
     -- Typecheck:1277
-    local key = (iface.name .. "<:") .. actual.name
-    -- Typecheck:1278
-    if Option.unwrap_or(self.checking:get(key), false) then
-        -- Typecheck:1279
+    if (actual.kind == "iface") and (actual.name == iface.name) then
+        -- Typecheck:1278
+        return Typecheck.args_compatible(self, iface.params, actual.params)
+    end
+    -- Typecheck:1280
+    if not self.traits:has(iface.name) then
+        -- Typecheck:1281
         return true
     end
-    -- Typecheck:1281
-    List.__lz_idx_set(self.checking, key, true)
-    -- Typecheck:1282
-    local ok = Typecheck.conforms(self, iface, actual)
     -- Typecheck:1283
-    List.__lz_idx_set(self.checking, key, false)
+    local key = (iface.name .. "<:") .. actual.name
     -- Typecheck:1284
+    if Option.unwrap_or(self.checking:get(key), false) then
+        -- Typecheck:1285
+        return true
+    end
+    -- Typecheck:1287
+    List.__lz_idx_set(self.checking, key, true)
+    -- Typecheck:1288
+    local ok = Typecheck.conforms(self, iface, actual)
+    -- Typecheck:1289
+    List.__lz_idx_set(self.checking, key, false)
+    -- Typecheck:1290
     return ok
 end
--- Typecheck:1290
+-- Typecheck:1296
 function Typecheck.conforms(self, iface, actual)
-    -- Typecheck:1291
+    -- Typecheck:1297
     local centry = self.classes:get(actual.name)
-    -- Typecheck:1292
+    -- Typecheck:1298
     if not Option.is_some(centry) then
-        -- Typecheck:1293
+        -- Typecheck:1299
         return true
     end
-    -- Typecheck:1295
-    local cls = Option.unwrap(centry)
-    -- Typecheck:1296
-    local cmethods = Option.__lz_unwrap(cls:get("methods"))
-    -- Typecheck:1297
-    local cfields = Option.__lz_unwrap(cls:get("fields"))
-    -- Typecheck:1298
-    local def = Option.unwrap(self.traits:get(iface.name))
-    -- Typecheck:1300
-    local ivars = Typecheck.name_set(self, Option.__lz_unwrap_or(def:get("type_params"), List.__lz_from({})))
     -- Typecheck:1301
-    local isubst = Typecheck.pair_subst(self, Option.__lz_unwrap_or(def:get("type_params"), List.__lz_from({})), iface.params)
+    local cls = Option.unwrap(centry)
     -- Typecheck:1302
-    local cvars = Typecheck.class_var_set(self, actual.name)
+    local cmethods = Option.__lz_unwrap(cls:get("methods"))
     -- Typecheck:1303
+    local cfields = Option.__lz_unwrap(cls:get("fields"))
+    -- Typecheck:1304
+    local def = Option.unwrap(self.traits:get(iface.name))
+    -- Typecheck:1306
+    local ivars = Typecheck.name_set(self, Option.__lz_unwrap_or(def:get("type_params"), List.__lz_from({})))
+    -- Typecheck:1307
+    local isubst = Typecheck.pair_subst(self, Option.__lz_unwrap_or(def:get("type_params"), List.__lz_from({})), iface.params)
+    -- Typecheck:1308
+    local cvars = Typecheck.class_var_set(self, actual.name)
+    -- Typecheck:1309
     local csubst = Typecheck.receiver_subst(self, actual.name, actual)
-    -- Typecheck:1305
+    -- Typecheck:1311
     for mname, msig in List.__lz_each(Option.__lz_unwrap(def:get("methods"))) do
-        -- Typecheck:1306
+        -- Typecheck:1312
         local found = cmethods:get(mname)
-        -- Typecheck:1307
+        -- Typecheck:1313
         if not Option.__lz_is_some(found) then
-            -- Typecheck:1308
+            -- Typecheck:1314
             return Typecheck.reject(self, iface, ("missing method '" .. mname) .. "'")
         end
-        -- Typecheck:1310
+        -- Typecheck:1316
         local csig = Option.__lz_unwrap(found)
-        -- Typecheck:1311
+        -- Typecheck:1317
         if Option.__lz_unwrap_or(csig:get("is_static"), false) then
-            -- Typecheck:1312
+            -- Typecheck:1318
             return Typecheck.reject(self, iface, ("method '" .. mname) .. "' must be an instance method")
         end
-        -- Typecheck:1314
+        -- Typecheck:1320
         local iparams = Option.__lz_unwrap(msig:get("params"))
-        -- Typecheck:1315
+        -- Typecheck:1321
         local cparams = Option.__lz_unwrap(csig:get("params"))
-        -- Typecheck:1316
+        -- Typecheck:1322
         if iparams:len() ~= cparams:len() then
-            -- Typecheck:1317
+            -- Typecheck:1323
             return Typecheck.reject(self, iface, ((("method '" .. mname) .. "' expects ") .. Typecheck.count(self, iparams:len())) .. " parameter(s)")
         end
-        -- Typecheck:1319
+        -- Typecheck:1325
         local imvars = Typecheck.merge_vars(self, ivars, Option.__lz_unwrap_or(msig:get("type_params"), List.__lz_from({})))
-        -- Typecheck:1320
+        -- Typecheck:1326
         local cmvars = Typecheck.merge_vars(self, cvars, Option.__lz_unwrap_or(csig:get("type_params"), List.__lz_from({})))
-        -- Typecheck:1321
+        -- Typecheck:1327
         local i = 1
-        -- Typecheck:1322
+        -- Typecheck:1328
         for _, ip in List.__lz_each(iparams) do
-            -- Typecheck:1323
+            -- Typecheck:1329
             local it = Typecheck.substitute(self, Typecheck.resolve_with(self, ip, imvars), isubst)
-            -- Typecheck:1324
+            -- Typecheck:1330
             local ct = Typecheck.substitute(self, Typecheck.resolve_with(self, Option.__lz_unwrap(cparams:get(i)), cmvars), csubst)
-            -- Typecheck:1325
+            -- Typecheck:1331
             if not Typecheck.compatible(self, it, ct) then
-                -- Typecheck:1326
+                -- Typecheck:1332
                 return Typecheck.reject(self, iface, (((((("method '" .. mname) .. "' parameter ") .. Typecheck.count(self, i)) .. " is ") .. ct:describe()) .. ", expected ") .. it:describe())
             end
-            -- Typecheck:1328
+            -- Typecheck:1334
             i = i + 1
         end
-        -- Typecheck:1330
+        -- Typecheck:1336
         local iret = Typecheck.substitute(self, Typecheck.resolve_with(self, Option.__lz_unwrap(msig:get("result")), imvars), isubst)
-        -- Typecheck:1331
+        -- Typecheck:1337
         local cret = Typecheck.node_type(self, Option.__lz_unwrap_or(csig:get("result"), 0), cmvars, csubst)
-        -- Typecheck:1332
+        -- Typecheck:1338
         if not Typecheck.compatible(self, iret, cret) then
-            -- Typecheck:1333
+            -- Typecheck:1339
             return Typecheck.reject(self, iface, (((("method '" .. mname) .. "' returns ") .. cret:describe()) .. ", expected ") .. iret:describe())
         end
     end
-    -- Typecheck:1337
+    -- Typecheck:1343
     for pname, pnode in List.__lz_each(Option.__lz_unwrap(def:get("properties"))) do
-        -- Typecheck:1338
+        -- Typecheck:1344
         local pf = cfields:get(pname)
-        -- Typecheck:1339
+        -- Typecheck:1345
         if not Option.__lz_is_some(pf) then
-            -- Typecheck:1340
+            -- Typecheck:1346
             return Typecheck.reject(self, iface, ("missing property '" .. pname) .. "'")
         end
-        -- Typecheck:1342
+        -- Typecheck:1348
         local it = Typecheck.substitute(self, Typecheck.resolve_with(self, pnode, ivars), isubst)
-        -- Typecheck:1343
+        -- Typecheck:1349
         local ct = Typecheck.opt_node_type(self, Option.__lz_unwrap(pf), cvars, csubst)
-        -- Typecheck:1344
+        -- Typecheck:1350
         if not Typecheck.compatible(self, it, ct) then
-            -- Typecheck:1345
+            -- Typecheck:1351
             return Typecheck.reject(self, iface, (((("property '" .. pname) .. "' is ") .. ct:describe()) .. ", expected ") .. it:describe())
         end
     end
-    -- Typecheck:1348
+    -- Typecheck:1354
     return true
 end
--- Typecheck:1353
+-- Typecheck:1359
 function Typecheck.reject(self, iface, why)
-    -- Typecheck:1354
+    -- Typecheck:1360
     self.iface_reason = why
-    -- Typecheck:1355
+    -- Typecheck:1361
     return false
 end
--- Typecheck:1359
+-- Typecheck:1365
 function Typecheck.node_type(self, node, vars, subst)
-    -- Typecheck:1360
+    -- Typecheck:1366
     if node == 0 then
-        -- Typecheck:1361
+        -- Typecheck:1367
         return Type.dynamic()
     end
-    -- Typecheck:1363
+    -- Typecheck:1369
     return Typecheck.substitute(self, Typecheck.resolve_with(self, node, vars), subst)
 end
--- Typecheck:1368
+-- Typecheck:1374
 function Typecheck.opt_node_type(self, opt, vars, subst)
-    -- Typecheck:1369
+    -- Typecheck:1375
     if not Option.is_some(opt) then
-        -- Typecheck:1370
+        -- Typecheck:1376
         return Type.dynamic()
     end
-    -- Typecheck:1372
+    -- Typecheck:1378
     return Typecheck.node_type(self, Option.unwrap(opt), vars, subst)
 end
--- Typecheck:1375
+-- Typecheck:1381
 function Typecheck.name_set(self, names)
-    -- Typecheck:1376
+    -- Typecheck:1382
     local out = Map.__lz_from({})
-    -- Typecheck:1377
+    -- Typecheck:1383
     for _, n in List.__lz_each(names) do
-        -- Typecheck:1378
+        -- Typecheck:1384
         List.__lz_idx_set(out, n, true)
     end
-    -- Typecheck:1380
+    -- Typecheck:1386
     return out
 end
--- Typecheck:1383
+-- Typecheck:1389
 function Typecheck.pair_subst(self, names, types)
-    -- Typecheck:1384
+    -- Typecheck:1390
     local out = Map.__lz_from({})
-    -- Typecheck:1385
+    -- Typecheck:1391
     local i = 1
-    -- Typecheck:1386
+    -- Typecheck:1392
     for _, n in List.__lz_each(names) do
-        -- Typecheck:1387
+        -- Typecheck:1393
         local t = types:get(i)
-        -- Typecheck:1388
+        -- Typecheck:1394
         if Option.is_some(t) then
-            -- Typecheck:1389
+            -- Typecheck:1395
             List.__lz_idx_set(out, n, Option.unwrap(t))
         end
-        -- Typecheck:1391
+        -- Typecheck:1397
         i = i + 1
     end
-    -- Typecheck:1393
+    -- Typecheck:1399
     return out
 end
--- Typecheck:1396
+-- Typecheck:1402
 function Typecheck.merge_vars(self, base, names)
-    -- Typecheck:1397
+    -- Typecheck:1403
     local out = Map.__lz_from({})
-    -- Typecheck:1398
+    -- Typecheck:1404
     for k, v in List.__lz_each(base) do
-        -- Typecheck:1399
+        -- Typecheck:1405
         List.__lz_idx_set(out, k, v)
     end
-    -- Typecheck:1401
+    -- Typecheck:1407
     for _, n in List.__lz_each(names) do
-        -- Typecheck:1402
+        -- Typecheck:1408
         List.__lz_idx_set(out, n, true)
     end
-    -- Typecheck:1404
+    -- Typecheck:1410
     return out
 end
--- Typecheck:1410
+-- Typecheck:1416
 function Typecheck.iface_method(self, recv, method, args, scope, call)
-    -- Typecheck:1411
+    -- Typecheck:1417
     local def = Option.unwrap(self.traits:get(recv.name))
-    -- Typecheck:1412
+    -- Typecheck:1418
     local msig_opt = Option.__lz_unwrap(def:get("methods")):get(method)
-    -- Typecheck:1413
+    -- Typecheck:1419
     if not Option.__lz_is_some(msig_opt) then
-        -- Typecheck:1414
+        -- Typecheck:1420
         Typecheck.fail(self, call, (("no method '" .. method) .. "' on trait ") .. recv.name)
     end
-    -- Typecheck:1416
+    -- Typecheck:1422
     local msig = Option.__lz_unwrap(msig_opt)
-    -- Typecheck:1417
+    -- Typecheck:1423
     local vars = Typecheck.merge_vars(self, Typecheck.name_set(self, Option.__lz_unwrap_or(def:get("type_params"), List.__lz_from({}))), Option.__lz_unwrap_or(msig:get("type_params"), List.__lz_from({})))
-    -- Typecheck:1418
+    -- Typecheck:1424
     local subst = Typecheck.pair_subst(self, Option.__lz_unwrap_or(def:get("type_params"), List.__lz_from({})), recv.params)
-    -- Typecheck:1419
+    -- Typecheck:1425
     Typecheck.infer_and_check(self, Option.__lz_unwrap(msig:get("params")), vars, args, scope, call, subst)
-    -- Typecheck:1420
+    -- Typecheck:1426
     local result = Option.__lz_unwrap_or(msig:get("result"), 0)
-    -- Typecheck:1421
+    -- Typecheck:1427
     if result == 0 then
-        -- Typecheck:1422
+        -- Typecheck:1428
         return Type.dynamic()
     end
-    -- Typecheck:1424
+    -- Typecheck:1430
     return Typecheck.substitute(self, Typecheck.resolve_with(self, result, vars), subst)
 end
--- Typecheck:1427
+-- Typecheck:1433
 function Typecheck.fail(self, node, message)
-    -- Typecheck:1428
+    -- Typecheck:1434
     Error.new("TypeError", message, node:line(), node:col(), self.source, 1):raise()
 end
 

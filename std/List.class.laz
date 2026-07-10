@@ -190,7 +190,7 @@ static join(xs: List<str>, sep: str): str {
             result = x
             head = false
         } else {
-            result = result ++ sep ++ x
+            result = result + sep + x
         }
     }
     return result

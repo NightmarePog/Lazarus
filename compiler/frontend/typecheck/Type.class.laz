@@ -98,9 +98,9 @@ public describe(): str {
         mut i = 1
         for m in .params {
             if i > 1 {
-                inner = inner ++ " | "
+                inner = inner + " | "
             }
-            inner = inner ++ m.describe()
+            inner = inner + m.describe()
             i = i + 1
         }
         return inner
@@ -113,24 +113,24 @@ public describe(): str {
         mut i = 1
         for a in .params {
             if i > 1 {
-                inner = inner ++ ", "
+                inner = inner + ", "
             }
-            inner = inner ++ a.describe()
+            inner = inner + a.describe()
             i = i + 1
         }
-        return .name ++ "<" ++ inner ++ ">"
+        return .name + "<" + inner + ">"
     }
     if .kind == "fn" {
         mut inner = ""
         mut i = 1
         for p in .params {
             if i > 1 {
-                inner = inner ++ ", "
+                inner = inner + ", "
             }
-            inner = inner ++ p.describe()
+            inner = inner + p.describe()
             i = i + 1
         }
-        return "(" ++ inner ++ ") -> " ++ .result.unwrap().describe()
+        return "(" + inner + ") -> " + .result.unwrap().describe()
     }
     return .kind
 }

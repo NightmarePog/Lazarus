@@ -24,7 +24,7 @@ private lua map_raw_get(m, k): dynamic {
 // Produce the full --[[LAZARUS_META\n<json>\n]] block for one class.
 emit(class_name: str, sig: dynamic): str {
     mut nl = Text.nl()
-    return "--[[LAZARUS_META" ++ nl ++ MetaEmitter.sig_json(class_name, sig) ++ nl ++ "]]"
+    return "--[[LAZARUS_META" + nl + MetaEmitter.sig_json(class_name, sig) + nl + "]]"
 }
 
 private sig_json(class_name: str, sig: dynamic): str {
@@ -33,7 +33,7 @@ private sig_json(class_name: str, sig: dynamic): str {
     mut ct = MetaEmitter.type_list_json(sig.get("ctor").unwrap())
     mut cn = MetaEmitter.str_list_json(sig.get("ctor_names").unwrap_or([]))
     mut tv = MetaEmitter.str_list_json(sig.get("type_params").unwrap_or([]))
-    return "{\"class\":" ++ MetaEmitter.qstr(class_name) ++ ",\"fields\":" ++ f ++ ",\"methods\":" ++ m ++ ",\"ctor\":" ++ ct ++ ",\"cnames\":" ++ cn ++ ",\"tvars\":" ++ tv ++ "}"
+    return "{\"class\":" + MetaEmitter.qstr(class_name) + ",\"fields\":" + f + ",\"methods\":" + m + ",\"ctor\":" + ct + ",\"cnames\":" + cn + ",\"tvars\":" + tv + "}"
 }
 
 // Use sorted_keys() so JSON output is deterministic across Lua VM instances.
@@ -45,18 +45,18 @@ private fields_json(fields: dynamic): str {
         if val.is_some() {
             type_j = MetaEmitter.type_json(val.unwrap())
         }
-        out.push(MetaEmitter.qstr(key) ++ ":" ++ type_j)
+        out.push(MetaEmitter.qstr(key) + ":" + type_j)
     }
-    return "{" ++ Text.join(out, ",") ++ "}"
+    return "{" + Text.join(out, ",") + "}"
 }
 
 private methods_json(methods: dynamic): str {
     mut out = []
     for name in MetaEmitter.sorted_keys(methods) {
         mut sig = MetaEmitter.map_raw_get(methods, name)
-        out.push(MetaEmitter.qstr(name) ++ ":" ++ MetaEmitter.method_json(sig))
+        out.push(MetaEmitter.qstr(name) + ":" + MetaEmitter.method_json(sig))
     }
-    return "{" ++ Text.join(out, ",") ++ "}"
+    return "{" + Text.join(out, ",") + "}"
 }
 
 private method_json(sig: dynamic): str {
@@ -72,7 +72,7 @@ private method_json(sig: dynamic): str {
         s = "true"
     }
     mut tv = MetaEmitter.str_list_json(sig.get("type_params").unwrap_or([]))
-    return "{\"params\":" ++ p ++ ",\"pnames\":" ++ pn ++ ",\"result\":" ++ r ++ ",\"static\":" ++ s ++ ",\"tvars\":" ++ tv ++ "}"
+    return "{\"params\":" + p + ",\"pnames\":" + pn + ",\"result\":" + r + ",\"static\":" + s + ",\"tvars\":" + tv + "}"
 }
 
 // types is either 0 (no-ctor sentinel) or List<Node>
@@ -84,7 +84,7 @@ private type_list_json(types: dynamic): str {
     for t in types {
         parts.push(MetaEmitter.type_json(t))
     }
-    return "[" ++ Text.join(parts, ",") ++ "]"
+    return "[" + Text.join(parts, ",") + "]"
 }
 
 private type_json(node: dynamic): str {
@@ -93,12 +93,12 @@ private type_json(node: dynamic): str {
     }
     mut name = node.child("name")
     mut args_j = MetaEmitter.type_list_json(node.child("args"))
-    return "{\"name\":" ++ MetaEmitter.qstr(name) ++ ",\"args\":" ++ args_j ++ "}"
+    return "{\"name\":" + MetaEmitter.qstr(name) + ",\"args\":" + args_j + "}"
 }
 
 private str_list_json(items: List<str>): str {
     mut parts = [MetaEmitter.qstr(s) for s in items]
-    return "[" ++ Text.join(parts, ",") ++ "]"
+    return "[" + Text.join(parts, ",") + "]"
 }
 
 // Quote and JSON-escape a string (handles the ASCII chars used in type names).
@@ -110,13 +110,13 @@ private qstr(s: str): str {
         if i > len { break }
         mut ch = Str.sub(s, i, i).unwrap_or("")
         if ch == "\"" {
-            out = out ++ "\\\""
+            out = out + "\\\""
         } else if ch == "\\" {
-            out = out ++ "\\\\"
+            out = out + "\\\\"
         } else {
-            out = out ++ ch
+            out = out + ch
         }
         i = i + 1
     }
-    return out ++ "\""
+    return out + "\""
 }

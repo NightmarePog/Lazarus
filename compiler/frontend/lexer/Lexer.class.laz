@@ -304,11 +304,11 @@ private read_string(): Token {
             Error("UnterminatedString", "unterminated string literal", line, col, .source, 1).raise()
         }
         if Char.is_backslash(.current) {
-            text = text ++ Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
-            text = text ++ .read_escape(line, col)
+            text = text + Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
+            text = text + .read_escape(line, col)
             seg_start = .pos
         } else if Char.is_quote(.current) {
-            text = text ++ Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
+            text = text + Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
             break
         } else {
             .advance()
@@ -342,7 +342,7 @@ private read_symbol(): Token {
     mut line = .line
     mut col = .col
     mut ch = .current
-    mut pair = ch ++ .peek()
+    mut pair = ch + .peek()
     mut two = Keywords.two(pair)
     if two.is_some() {
         .advance()
@@ -382,7 +382,7 @@ private read_symbol(): Token {
         .advance()
         return Token(kind, ch, line, col)
     }
-    Error("UnexpectedChar", "unexpected character '" ++ ch ++ "'", line, col, .source, 1).raise()
+    Error("UnexpectedChar", "unexpected character '" + ch + "'", line, col, .source, 1).raise()
     return Token("ERROR", ch, line, col)
 }
 
@@ -457,20 +457,20 @@ private scan_str_segment(multiline: bool): str {
         }
         if .current == "{" {
             if .peek() == "{" {
-                result = result ++ Str.sub(.source, seg_start, .pos - 1).unwrap_or("") ++ "{"
+                result = result + Str.sub(.source, seg_start, .pos - 1).unwrap_or("") + "{"
                 .advance()
                 .advance()
                 seg_start = .pos
             } else {
-                result = result ++ Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
+                result = result + Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
                 break
             }
         } else if Char.is_backslash(.current) {
-            result = result ++ Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
-            result = result ++ .read_escape(.line, .col)
+            result = result + Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
+            result = result + .read_escape(.line, .col)
             seg_start = .pos
         } else if Char.is_quote(.current) {
-            result = result ++ Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
+            result = result + Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
             break
         } else {
             .advance()
@@ -528,16 +528,16 @@ private read_triple_interp(line: int, col: int): List<Token> {
         }
         if .current == "{" {
             if .peek() == "{" {
-                raw = raw ++ "{"
+                raw = raw + "{"
                 .advance()
                 .advance()
             } else {
                 mut idx = Str.format("%d", hole_tokens.len()).unwrap_or("0")
-                raw = raw ++ sentinel ++ idx
+                raw = raw + sentinel + idx
                 hole_tokens.push(.scan_interp_expr(line, col))
             }
         } else {
-            raw = raw ++ .current
+            raw = raw + .current
             .advance()
         }
     }
@@ -625,9 +625,9 @@ private strip_indent(content: str): str {
             stripped_line = Str.sub(ln, s, ln_len).unwrap_or("")
         }
         if i > start {
-            result = result ++ nl
+            result = result + nl
         }
-        result = result ++ stripped_line
+        result = result + stripped_line
         i = i + 1
     }
     return result

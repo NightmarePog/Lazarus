@@ -8,7 +8,7 @@ import Error
 // names the kind of binding for the message (e.g. "Function", "Binding").
 check_value(name: str, line: int, col: int, source: str, what: str): unit {
     if not Naming.is_snake(name) {
-        Error("SemanticError", what ++ " name '" ++ name ++ "' must be snake_case", line, col, source, Str.len(name).unwrap_or(1)).raise()
+        Error("SemanticError", what + " name '" + name + "' must be snake_case", line, col, source, Str.len(name).unwrap_or(1)).raise()
     }
 }
 

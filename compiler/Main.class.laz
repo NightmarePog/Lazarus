@@ -200,12 +200,12 @@ static build_file(path: str, plat: str, pkg_path: str, opt_level: int): unit {
     mut entry_sig = classes.get(entry_class).unwrap_or(0)
     mut meta_block = ""
     if entry_sig != 0 {
-        meta_block = MetaEmitter.emit(entry_class, entry_sig) ++ Text.nl() ++ Text.nl()
+        meta_block = MetaEmitter.emit(entry_class, entry_sig) + Text.nl() + Text.nl()
     }
 
-    mut out_path = entry_class ++ ".lua"
+    mut out_path = entry_class + ".lua"
     mut file = Sys.open(out_path, "w").unwrap()
-    file.write(meta_block ++ bundle)
+    file.write(meta_block + bundle)
     file.close()
 }
 
@@ -287,11 +287,11 @@ static build_lib(path: str, plat: str, pkg_path: str, opt_level: int): unit {
     mut entry_sig = classes.get(entry_class).unwrap_or(0)
     mut meta_block = ""
     if entry_sig != 0 {
-        meta_block = MetaEmitter.emit(entry_class, entry_sig) ++ Text.nl() ++ Text.nl()
+        meta_block = MetaEmitter.emit(entry_class, entry_sig) + Text.nl() + Text.nl()
     }
 
-    mut out_path = entry_class ++ ".lua"
+    mut out_path = entry_class + ".lua"
     mut file = Sys.open(out_path, "w").unwrap()
-    file.write(meta_block ++ class_block)
+    file.write(meta_block + class_block)
     file.close()
 }

@@ -72,7 +72,7 @@ public bundle(): str {
     }
 
     if not entry_is_trait and not entry_has_ctor {
-        Error("LinkError", "entry class '" ++ .entry_class ++ "' must define a constructor", 1, 1, entry_source, 1).raise()
+        Error("LinkError", "entry class '" + .entry_class + "' must define a constructor", 1, 1, entry_source, 1).raise()
     }
 
     mut entry_ref = .entry_class
@@ -80,7 +80,7 @@ public bundle(): str {
         entry_ref = .mangler.mangle_class(.entry_class)
     }
 
-    mut sep = Text.nl() ++ Text.nl()
+    mut sep = Text.nl() + Text.nl()
     if .opt_level >= 1 {
         sep = Text.nl()
     }
@@ -92,7 +92,7 @@ public bundle(): str {
     if entry_is_trait {
         sections.push("return nil")
     } else {
-        sections.push("return " ++ entry_ref ++ ".new(...)")
+        sections.push("return " + entry_ref + ".new(...)")
     }
     return Text.join(sections, sep)
 }

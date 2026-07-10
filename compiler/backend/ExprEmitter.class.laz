@@ -46,7 +46,7 @@ private builtin_target(field: str): Option<str> {
         return Option.none()
     }
     mut e = entry.unwrap()
-    return Option.some(.ctx.mangle_class(e["cls"]) ++ "." ++ .ctx.mangle_member(e["cls"], e["fn"]))
+    return Option.some(.ctx.mangle_class(e["cls"]) + "." + .ctx.mangle_member(e["cls"], e["fn"]))
 }
 
 // Built-in constructors `Option.some/none` and `Result.ok/err`, keyed by
@@ -102,9 +102,9 @@ public emit(node: Node): str {
 // StmtEmitter at the next statement boundary.
 private emit_propagate(node: Node): str {
     mut temp = .ctx.fresh_temp()
-    .pending.push("local " ++ temp ++ " = " ++ .emit(node.child("inner")))
-    .pending.push("if " ++ temp ++ ".kind == 'err' then return " ++ temp ++ " end")
-    return temp ++ ".value"
+    .pending.push("local " + temp + " = " + .emit(node.child("inner")))
+    .pending.push("if " + temp + ".kind == 'err' then return " + temp + " end")
+    return temp + ".value"
 }
 
 private emit_fn_expr(node: Node): str {
@@ -121,9 +121,9 @@ private emit_list_comp(node: Node): str {
     .ctx.push_scope()
     .declare_loop_vars(node.child("vars"))
     mut header = .each_header(node.child("vars"), iter)
-    mut body = .comp_body(node, .lz_fn("List", "push") ++ "(" ++ temp ++ ", " ++ .emit(node.child("element")) ++ ")")
+    mut body = .comp_body(node, .lz_fn("List", "push") + "(" + temp + ", " + .emit(node.child("element")) + ")")
     .ctx.pop_scope()
-    return "(function() local " ++ temp ++ " = " ++ .lz_fn("List", "new") ++ "() " ++ header ++ " " ++ body ++ " end return " ++ temp ++ " end)()"
+    return "(function() local " + temp + " = " + .lz_fn("List", "new") + "() " + header + " " + body + " end return " + temp + " end)()"
 }
 
 private emit_map_comp(node: Node): str {
@@ -132,15 +132,15 @@ private emit_map_comp(node: Node): str {
     .ctx.push_scope()
     .declare_loop_vars(node.child("vars"))
     mut header = .each_header(node.child("vars"), iter)
-    mut body = .comp_body(node, .lz_fn("List", "__lz_idx_set") ++ "(" ++ temp ++ ", " ++ .emit(node.child("key")) ++ ", " ++ .emit(node.child("value")) ++ ")")
+    mut body = .comp_body(node, .lz_fn("List", "__lz_idx_set") + "(" + temp + ", " + .emit(node.child("key")) + ", " + .emit(node.child("value")) + ")")
     .ctx.pop_scope()
-    return "(function() local " ++ temp ++ " = " ++ .lz_fn("Map", "new") ++ "() " ++ header ++ " " ++ body ++ " end return " ++ temp ++ " end)()"
+    return "(function() local " + temp + " = " + .lz_fn("Map", "new") + "() " + header + " " + body + " end return " + temp + " end)()"
 }
 
 // Helper: qualified mangled name for a known runtime class method.
 // Uses mangle_member so prebuilt stdlib method names are never mangled.
 private lz_fn(cls: str, fn_name: str): str {
-    return .ctx.mangle_class(cls) ++ "." ++ .ctx.mangle_member(cls, fn_name)
+    return .ctx.mangle_class(cls) + "." + .ctx.mangle_member(cls, fn_name)
 }
 
 private declare_loop_vars(vars: List<str>): unit {
@@ -154,7 +154,7 @@ private declare_loop_vars(vars: List<str>): unit {
 private comp_body(node: Node, add: str): str {
     mut cond = node.attr("cond")
     if cond.is_some() {
-        return "if " ++ .emit(cond.unwrap()) ++ " then " ++ add ++ " end"
+        return "if " + .emit(cond.unwrap()) + " then " + add + " end"
     }
     return add
 }
@@ -165,9 +165,9 @@ private each_header(vars: List<str>, iter: str): str {
     mut each = .lz_fn("List", "__lz_each")
     mut mangled = [.ctx.mangle_local(v) for v in vars]
     if vars.len() == 1 {
-        return "for _, " ++ mangled.get(1).unwrap() ++ " in " ++ each ++ "(" ++ iter ++ ") do"
+        return "for _, " + mangled.get(1).unwrap() + " in " + each + "(" + iter + ") do"
     }
-    return "for " ++ Text.join(mangled, ", ") ++ " in " ++ each ++ "(" ++ iter ++ ") do"
+    return "for " + Text.join(mangled, ", ") + " in " + each + "(" + iter + ") do"
 }
 
 // A bare name: a nullary enum variant lowers to its owner-qualified form, anything
@@ -201,24 +201,24 @@ private emit_literal(node: Node): str {
 private emit_field(node: Node): str {
     // Member names are never mangled (see mangle_member). Only the class table variable
     // name is mangled, which emit_operand handles via emit_identifier / mangle_class.
-    return .emit_operand(node.child("object")) ++ "." ++ node.child("field")
+    return .emit_operand(node.child("object")) + "." + node.child("field")
 }
 
 private emit_list(node: Node): str {
-    return .lz_fn("List", "__lz_from") ++ "({" ++ Text.join(.emit_args(node.child("elements")), ", ") ++ "})"
+    return .lz_fn("List", "__lz_from") + "({" + Text.join(.emit_args(node.child("elements")), ", ") + "})"
 }
 
 private emit_map(node: Node): str {
-    mut parts = ["[" ++ .emit(entry.child("key")) ++ "] = " ++ .emit(entry.child("value")) for entry in node.child("entries")]
-    return .lz_fn("Map", "__lz_from") ++ "({" ++ Text.join(parts, ", ") ++ "})"
+    mut parts = ["[" + .emit(entry.child("key")) + "] = " + .emit(entry.child("value")) for entry in node.child("entries")]
+    return .lz_fn("Map", "__lz_from") + "({" + Text.join(parts, ", ") + "})"
 }
 
 private emit_index(node: Node): str {
-    return .lz_fn("List", "__lz_idx_get") ++ "(" ++ .emit(node.child("object")) ++ ", " ++ .emit(node.child("index")) ++ ")"
+    return .lz_fn("List", "__lz_idx_get") + "(" + .emit(node.child("object")) + ", " + .emit(node.child("index")) + ")"
 }
 
 private emit_unary(node: Node): str {
-    return "not " ++ .emit_operand(node.child("operand"))
+    return "not " + .emit_operand(node.child("operand"))
 }
 
 private emit_binary(node: Node): str {
@@ -226,9 +226,9 @@ private emit_binary(node: Node): str {
     mut right = .emit_operand(node.child("right"))
     mut op = node.child("op")
     if op == "MODULO" {
-        return "(" ++ left ++ " - math.floor(" ++ left ++ " / " ++ right ++ ") * " ++ right ++ ")"
+        return "(" + left + " - math.floor(" + left + " / " + right + ") * " + right + ")"
     }
-    return left ++ " " ++ ExprEmitter.op_map.get(op).unwrap_or(op) ++ " " ++ right
+    return left + " " + ExprEmitter.op_map.get(op).unwrap_or(op) + " " + right
 }
 
 private emit_call(node: Node): str {
@@ -243,28 +243,28 @@ private emit_call(node: Node): str {
             mut target = .ctx.extern_target(object.child("name"), field)
             if target.is_some() {
                 mut ext = target.unwrap()
-                mut call = ext["target"] ++ "(" ++ Text.join(args, ", ") ++ ")"
+                mut call = ext["target"] + "(" + Text.join(args, ", ") + ")"
                 if ext["wrap"] {
-                    return .ctx.mangle_class("Option") ++ "." ++ .ctx.mangle_member("Option", "__lz_wrap") ++ "(" ++ call ++ ")"
+                    return .ctx.mangle_class("Option") + "." + .ctx.mangle_member("Option", "__lz_wrap") + "(" + call + ")"
                 }
                 return call
             }
-            mut ctor_key = object.child("name") ++ "." ++ field
+            mut ctor_key = object.child("name") + "." + field
             if ExprEmitter.constructors.has(ctor_key) {
                 mut cls_name = object.child("name")
-                return .ctx.mangle_class(cls_name) ++ "." ++ .ctx.mangle_member(cls_name, field) ++ "(" ++ Text.join(args, ", ") ++ ")"
+                return .ctx.mangle_class(cls_name) + "." + .ctx.mangle_member(cls_name, field) + "(" + Text.join(args, ", ") + ")"
             }
         }
 
         mut dispatch_cls = node.attr("dispatch_class")
         if dispatch_cls.is_some() {
             mut dc = dispatch_cls.unwrap()
-            return .ctx.mangle_class(dc) ++ "." ++ .ctx.mangle_member(dc, field) ++ "(" ++ Text.join(.with_receiver(object, args), ", ") ++ ")"
+            return .ctx.mangle_class(dc) + "." + .ctx.mangle_member(dc, field) + "(" + Text.join(.with_receiver(object, args), ", ") + ")"
         }
         if not node.attr("known_method").unwrap_or(false) {
             mut helper = .builtin_target(field)
             if helper.is_some() {
-                return helper.unwrap() ++ "(" ++ Text.join(.with_receiver(object, args), ", ") ++ ")"
+                return helper.unwrap() + "(" + Text.join(.with_receiver(object, args), ", ") + ")"
             }
         }
     }
@@ -272,7 +272,7 @@ private emit_call(node: Node): str {
     if callee.kind == "IdentifierExpr" {
         mut name = callee.child("name")
         if .ctx.is_construction(name) {
-            return .ctx.emit_name(name) ++ ".new(" ++ Text.join(args, ", ") ++ ")"
+            return .ctx.emit_name(name) + ".new(" + Text.join(args, ", ") + ")"
         }
     }
 
@@ -280,18 +280,18 @@ private emit_call(node: Node): str {
         mut object = callee.child("object")
         mut field = callee.child("field")
         if object.kind == "SelfExpr" and .ctx.is_instance_method(field) {
-            return .ctx.name() ++ "." ++ field ++ "(" ++ Text.join(.with_receiver(object, args), ", ") ++ ")"
+            return .ctx.name() + "." + field + "(" + Text.join(.with_receiver(object, args), ", ") + ")"
         }
         if not .receiver_is_class(object) {
-            return .emit_operand(object) ++ ":" ++ field ++ "(" ++ Text.join(args, ", ") ++ ")"
+            return .emit_operand(object) + ":" + field + "(" + Text.join(args, ", ") + ")"
         }
     }
 
     mut callee_src = .emit(callee)
     if callee.kind == "BinaryExpr" {
-        callee_src = "(" ++ callee_src ++ ")"
+        callee_src = "(" + callee_src + ")"
     }
-    return callee_src ++ "(" ++ Text.join(args, ", ") ++ ")"
+    return callee_src + "(" + Text.join(args, ", ") + ")"
 }
 
 // Emit an operand, parenthesising a binary/unary expression that would otherwise
@@ -299,7 +299,7 @@ private emit_call(node: Node): str {
 private emit_operand(node: Node): str {
     mut src = .emit(node)
     if .needs_parens(node) {
-        return "(" ++ src ++ ")"
+        return "(" + src + ")"
     }
     return src
 }
@@ -343,19 +343,19 @@ private lua_quote_str(value: str): str {
     while i <= n {
         mut c = Str.sub(value, i, i).unwrap_or("")
         if c == dq {
-            result = result ++ bs ++ dq
+            result = result + bs + dq
         } else if c == lf {
-            result = result ++ bs ++ "n"
+            result = result + bs + "n"
         } else if c == cr {
-            result = result ++ bs ++ "r"
+            result = result + bs + "r"
         } else if c == bs {
-            result = result ++ bs ++ bs
+            result = result + bs + bs
         } else {
-            result = result ++ c
+            result = result + c
         }
         i = i + 1
     }
-    return dq ++ result ++ dq
+    return dq + result + dq
 }
 
 // Emits an InterpolatedString as a Lua concatenation expression. Empty string
@@ -373,7 +373,7 @@ private emit_interp(node: Node): str {
                 pieces.push(.lua_quote_str(v))
             }
         } else {
-            pieces.push("tostring(" ++ .emit(part) ++ ")")
+            pieces.push("tostring(" + .emit(part) + ")")
         }
         i = i + 1
     }
@@ -383,5 +383,5 @@ private emit_interp(node: Node): str {
     if pieces.len() == 1 {
         return pieces.get(1).unwrap()
     }
-    return "(" ++ Text.join(pieces, " .. ") ++ ")"
+    return "(" + Text.join(pieces, " .. ") + ")"
 }

@@ -254,11 +254,11 @@ private parse_identifier_statement(tok: Token): Node {
 
 // A braced block `{ <statement>* }`; `context` names it for error messages.
 private parse_block(context: str): List<Node> {
-    mut open = .cursor.consume("BODY_START", "Expected '{' to open " ++ context)
+    mut open = .cursor.consume("BODY_START", "Expected '{' to open " + context)
     mut body = []
     loop {
         if .cursor.at_end() {
-            .cursor.fail_at("Expected '}' to close " ++ context, open.line, open.column, 1)
+            .cursor.fail_at("Expected '}' to close " + context, open.line, open.column, 1)
             break
         }
         if .cursor.check("BODY_END") {
@@ -266,7 +266,7 @@ private parse_block(context: str): List<Node> {
         }
         body.push(.parse_statement())
     }
-    .cursor.consume("BODY_END", "Expected '}' to close " ++ context)
+    .cursor.consume("BODY_END", "Expected '}' to close " + context)
     return body
 }
 
@@ -462,7 +462,7 @@ private parse_binding(visibility: str, mutable: bool, name_err: str, is_static: 
     if .cursor.match("ASSIGN") {
         attrs["value"] = .exprs.expression()
     } else if not mutable and not is_property {
-        .cursor.fail("Immutable binding '" ++ name.value ++ "' must be initialised: expected '='")
+        .cursor.fail("Immutable binding '" + name.value + "' must be initialised: expected '='")
     }
     return Ast.node("VariableDecl", attrs)
 }
@@ -481,7 +481,7 @@ private parse_assignment(name_err: str): Node {
         mut value = Ast.binary(binop.unwrap(), target, .exprs.expression(), name.line, name.column)
         return .local_binding(name, value)
     }
-    .cursor.fail("Expected '=' or a compound assignment after '" ++ name.value ++ "'")
+    .cursor.fail("Expected '=' or a compound assignment after '" + name.value + "'")
     return Ast.error_node()
 }
 

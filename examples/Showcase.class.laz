@@ -34,7 +34,7 @@ static brand() {
 }
 
 describe() {
-    return .label ++ " = " ++ "ready"
+    return .label + " = " + "ready"
 }
 
 constructor() {

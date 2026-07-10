@@ -12,9 +12,9 @@ join(a: str, b: str): str {
         return b
     }
     if Str.is_suffix(a, "/") {
-        return a ++ b
+        return a + b
     }
-    return a ++ "/" ++ b
+    return a + "/" + b
 }
 
 // 1-based index of the last '/' in `s`, or 0 when there is none.
@@ -120,11 +120,11 @@ normalize(s: str): str {
             out = part
             first = false
         } else {
-            out = out ++ "/" ++ part
+            out = out + "/" + part
         }
     }
     if absolute {
-        return "/" ++ out
+        return "/" + out
     }
     if out == "" {
         return "."

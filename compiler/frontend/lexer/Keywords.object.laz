@@ -33,7 +33,6 @@ private words = [
 ]
 
 private ops2 = [
-    "++": "CONCAT",
     "=>": "FAT_ARROW",
     "->": "ARROW",
     "==": "EQ",

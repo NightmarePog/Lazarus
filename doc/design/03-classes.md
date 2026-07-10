@@ -1,211 +1,200 @@
-# 03 — Classes
+# Classes
 
-A `.laz` file **is** a class. The filename is the class name. There is no `class`
-keyword and no surrounding braces — the top level of the file is the class body.
+A `.class.laz` file defines a class. The file name (without the suffix) is the class name. There is no `class` keyword: the top level of the file is the class body.
 
-## Anatomy of a class file
+## Fields
 
-The top level of a file may contain, in any order:
-
-- **instance fields** — `name: Type [= default]`
-- **a constructor** — `init(params) { ... }`
-- **instance methods** — `fn name(self, ...) [: Ret] { ... }`
-- **static members** — a `static { ... }` block
-- **inheritance / trait headers** — `extends Parent`, `impl TraitA, TraitB`
-- **nested enums** — `enum Name { ... }`
-- **nested traits** — `trait Name { ... }`
-- **imports** — `import Other`
+Instance fields are declared at the top level of the file with a visibility keyword and a name. The type annotation is optional but recommended:
 
 ```
-// Sprite.laz  ->  class Sprite
-import Vec2
+// Point.class.laz
+public x: int
+public y: int
+private label: str = "point"
+```
 
-extends Actor               // single base class
-impl Show, Drawable         // traits this class satisfies
+`public` makes a field accessible to other files. `private` keeps it internal. Fields have no default visibility: one of the two must be written. A field with a default value (`= expr`) uses that value if the constructor does not set it. A field without a default must be assigned in the constructor.
 
-pub pos: Vec2               // instance field, no default (init must set it)
-mut hp: int = 100           // mutable instance field with a default
+Static fields belong to the class itself rather than any instance:
 
-static {
-    count: int = 0          // shared across all instances
-    fn total(): int { return count }
+```
+private static count: int = 0
+public static max: int = 1000
+```
+
+## Constructor
+
+A class has one `constructor` block. Instances are created by calling the class name:
+
+```
+constructor(x: int, y: int) {
+    .x = x
+    .y = y
 }
 
-init(pos: Vec2) {
-    self.pos = pos
-    Sprite.count += 1       // static access from inside
+p = Point(3, 4)
+```
+
+Inside the constructor, `.field` assigns an instance field. This is shorthand for `self.field`.
+
+For fields that are simply assigned from a constructor parameter with the same name, there is a shorthand: prefix the parameter name with a dot. This declares the field and assigns it in one step:
+
+```
+constructor(.x: int, .y: int) { }
+```
+
+This is exactly equivalent to declaring the fields at the top and writing `.x = x`, `.y = y` in the body. If the field was already declared above with an explicit visibility, the shorthand just generates the assignment without re-declaring it.
+
+## Instance methods
+
+Instance methods are declared with just a name, parameters, and a body. No keyword is needed:
+
+```
+distance(other: Point): float {
+    mut dx = .x - other.x
+    mut dy = .y - other.y
+    return Num.sqrt((dx * dx + dy * dy) as float)
 }
 
-pub fn show(self): str {    // satisfies trait Show
-    return "sprite at ({self.pos.x}, {self.pos.y})"
-}
-
-override fn update(self) {  // overrides Actor.update
-    super.update()
-    self.hp -= 1
-}
-```
-
-## Instance fields
-
-Declared as typed bindings at the top level:
-
-```
-pub x: int = 0     // public, mutable? No -> immutable by default
-mut y: int = 0     // mutable
-name: str          // private, no default -> init must assign it
-```
-
-Rules:
-- **Immutable by default.** `x: int` is read-only after construction. `mut x: int`
-  permits reassignment (including `self.x = ...` inside methods and `+=`).
-- **Private by default.** `pub` exposes a field to importers.
-- **Defaults allowed.** A field with `= expr` may be omitted by `init`; a field
-  without a default **must** be assigned in `init` (Schematic enforces it).
-- Field types are required (no inference for fields).
-
-## Constructor: `init`
-
-A class has **one** `init` block. Construction is a call on the class name:
-
-```
-init(pos: Vec2, hp: int = 100) {   // default param values allowed
-    self.pos = pos
-    self.hp = hp
-}
-
-s = Sprite(origin)        // hp defaults to 100
-s2 = Sprite(origin, 50)
-```
-
-- `init` has no return type and returns the new instance implicitly.
-- Inside `init`, `self` refers to the fresh instance; every field without a
-  default must be assigned before `init` ends.
-- For alternative constructors, write **static factory functions** that call
-  `init` (there is only one `init`):
-
-```
-static {
-    fn at_origin(): Sprite { return Sprite(Vec2(0, 0)) }
-}
-s = Sprite.at_origin()
-```
-
-- A class with an **abstract method** (below) cannot be constructed; `init`
-  on such a class is only callable by subclasses via `super`.
-
-## Methods and `self`
-
-A function with a `self` first parameter is an **instance method**; without it,
-it is **static** (and belongs in the `static` block — see below).
-
-```
-pub fn dist(self): float { ... }
-```
-
-Calls use an **implicit receiver** — you do not pass `self` at the call site:
-
-```
-d = s.dist()          // not s.dist(s)
-self.update()         // from inside another method
-super.update()        // parent's version
-```
-
-This lowers to Lua's `:` method-call syntax. See
-[08-implementation.md](08-implementation.md).
-
-## Static members
-
-Shared (per-class, not per-instance) state and functions live in a `static`
-block:
-
-```
-static {
-    count: int = 0
-    max: int = 1000
-    fn reset() { count = 0 }
+label(): str {
+    return .label
 }
 ```
 
-- Static fields follow the same immutable-by-default / `pub` rules.
-- Static functions have no `self`.
-- Inside the class, reference statics bare (`count`) or qualified (`Sprite.count`);
-  from another file, qualified after import (`Sprite.total()`).
-- **The entry point** `fn main()` is just a static function with no `self` in the
-  file you build (it need not be inside the `static { }` block — a top-level
-  `self`-less `fn` is static by definition; the block is for grouping shared
-  state). See [06-modules-and-linking.md](06-modules-and-linking.md).
+Inside an instance method, `.field` reads or writes an instance field. The `self` keyword also works and is useful when you need to pass the current instance as an argument or call into a `lua` body.
 
-## Inheritance
-
-Single inheritance via a top-of-file `extends`:
+Methods are public by default. Add `private` to restrict access to the class itself:
 
 ```
-extends Actor
-```
-
-- A subclass inherits the parent's fields and methods.
-- Overriding a parent method **requires** the `override` keyword; `override` on a
-  method that does not actually override (typo, wrong signature) is a
-  `SEMANTIC_ERROR`, and shadowing without `override` is also an error. This
-  catches the classic accidental-override bug.
-- `super.method()` calls the parent's implementation.
-- The constructor chain: a subclass `init` should call `super(...)` to run the
-  parent constructor (exact form: `super(args)` as the first statement when the
-  parent has a non-trivial `init`).
-
-### Abstract methods
-
-A base class may declare a method with no body:
-
-```
-// Actor.laz
-abstract fn update(self)
-
-pub fn tick(self) {
-    self.update()    // dispatches to the subclass override
+private validate(): bool {
+    return .x >= 0 and .y >= 0
 }
 ```
 
-- A class containing an abstract method **cannot be instantiated**.
-- Every concrete subclass **must** provide an `override fn update(self)`;
-  otherwise it is a `SEMANTIC_ERROR`.
+## Static methods
 
-## Traits on a class
-
-A class declares the traits it satisfies in an `impl` header and provides their
-methods in the body:
+Static methods belong to the class, not to any instance. They are declared with `static`:
 
 ```
-impl Show, Drawable
-
-pub fn show(self): str { ... }   // required by Show
-pub fn draw(self) { ... }        // required by Drawable
+static origin(): Point {
+    return Point(0, 0)
+}
 ```
 
-The checker verifies every trait method is present with a matching signature.
-Traits are **compile-time contracts only** — there is no `dyn`, and calls are
-statically resolved. Trait declaration and semantics are in
-[04-types-and-data.md](04-types-and-data.md).
+Static methods are called through the class name: `Point.origin()`. They cannot access instance fields.
 
-## Calling across classes
+The entry point of a program is `static main()` in the file you build.
+
+## Nested functions
+
+Functions can be defined inside other functions. They close over the outer scope and can call each other:
 
 ```
-import Counter
-
-Counter.bump()           // static call, qualified
-c = Counter()            // construct an instance (if init is pub)
-v = c.value()            // instance method, implicit receiver
+static sum_of_squares(items: List<int>): int {
+    square(n: int): int {
+        return n * n
+    }
+    mut total = 0
+    for x in items {
+        total = total + square(x)
+    }
+    return total
+}
 ```
 
-Inside its own file a class refers to its own members bare (`bump()`, `count`);
-from another file everything is qualified through the imported class name.
+## A complete example
 
-## Lowering (summary)
+```
+// Counter.class.laz
+import std.Sys
 
-A class becomes a Lua table acting as a metatable; instances are tables whose
-metatable's `__index` is the class (and the class's metatable's `__index` is its
-parent — that chain is how inheritance and `super` resolve). `init` becomes a
-constructor function that `setmetatable`s a fresh table. Full details, including
-how `static`, `override`, abstract stubs, and method dispatch are emitted, are in
-[08-implementation.md](08-implementation.md).
+private count: int = 0
+private step: int
+
+constructor(step: int) {
+    .step = step
+}
+
+tick() {
+    .count = .count + .step
+}
+
+value(): int {
+    return .count
+}
+
+reset() {
+    .count = 0
+}
+
+static make(step: int): Counter {
+    return Counter(step)
+}
+
+static main() {
+    mut c = Counter.make(5)
+    c.tick()
+    c.tick()
+    c.tick()
+    Sys.print(f"value: {c.value()}")        // value: 15
+    c.reset()
+    Sys.print(f"after reset: {c.value()}")  // after reset: 0
+}
+```
+
+## Enums
+
+Enums are declared inside a class file. They are sum types: a value of an enum type is exactly one of its variants, and each variant can carry data:
+
+```
+enum Direction {
+    North,
+    South,
+    East,
+    West
+}
+
+enum Shape {
+    Circle(float),
+    Rect(float, float),
+    Dot
+}
+```
+
+Variants without payload are bare names. Variants with payload list the types in parentheses.
+
+Use `match` to branch on an enum value (see [04-control-flow.md](04-control-flow.md)):
+
+```
+static describe(d: Direction): str {
+    match d {
+        North => { return "north" }
+        South => { return "south" }
+        East  => { return "east" }
+        West  => { return "west" }
+    }
+}
+```
+
+## Inline traits
+
+Traits can also be declared inside a class file. A class implements a trait by declaring `implement TraitName` at the top level and providing the required methods:
+
+```
+trait Renderable {
+    draw(): str
+    bounds(): Rect
+}
+
+implement Renderable
+
+draw(): str {
+    return f"point at ({.x}, {.y})"
+}
+
+bounds(): Rect {
+    return Rect(.x, .y, 1, 1)
+}
+```
+
+See [06-traits.md](06-traits.md) for the full trait system.

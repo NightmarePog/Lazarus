@@ -169,7 +169,7 @@ private parse_primary(): Node {
             return Ast.member(Ast.self_expr(tok.line, tok.column), field.value, tok.line, tok.column)
         }
         "EOF" => { .cursor.fail("Unexpected end of input") }
-        _ => { .cursor.fail("Unexpected token '" ++ tok.value ++ "'") }
+        _ => { .cursor.fail("Unexpected token '" + tok.value + "'") }
     }
     return Ast.error_node()
 }

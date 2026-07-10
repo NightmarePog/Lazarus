@@ -69,7 +69,7 @@ private collect_property(stmt: Node, properties: Map<str, bool>, source: str): u
     if visibility != "" and not is_static {
         mut name = stmt.child("name")
         if properties.has(name) {
-            Error("SemanticError", "Duplicate declaration '" ++ name ++ "'", stmt.line(), stmt.col(), source, Str.len(name).unwrap_or(1)).raise()
+            Error("SemanticError", "Duplicate declaration '" + name + "'", stmt.line(), stmt.col(), source, Str.len(name).unwrap_or(1)).raise()
         }
         properties[name] = true
     }

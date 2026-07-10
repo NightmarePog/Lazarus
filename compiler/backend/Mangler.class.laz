@@ -36,7 +36,7 @@ private static short_from(n: int, letters: str): str {
     mut idx = n
     loop {
         mut rem = idx - Mangler.idiv(idx, base) * base
-        out = Str.sub(letters, rem + 1, rem + 1).unwrap_or("a") ++ out
+        out = Str.sub(letters, rem + 1, rem + 1).unwrap_or("a") + out
         idx = Mangler.idiv(idx, base) - 1
         if idx < 0 {
             break

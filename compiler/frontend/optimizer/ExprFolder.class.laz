@@ -40,7 +40,7 @@ public register_inlineables(class_name: str, body: List<Node>): unit {
                     if only.kind == "ReturnStmt" {
                         mut val = only.attr("value")
                         if val.is_some() {
-                            mut key = class_name ++ "." ++ stmt.child("name")
+                            mut key = class_name + "." + stmt.child("name")
                             .inlineable[key] = ["params": params, "expr": val.unwrap()]
                         }
                     }
@@ -229,7 +229,7 @@ private try_inline_call(node: Node): Option<Node> {
     if obj.kind != "IdentifierExpr" {
         return Option.none()
     }
-    mut key = obj.child("name") ++ "." ++ callee.child("field")
+    mut key = obj.child("name") + "." + callee.child("field")
     mut entry = .inlineable.get(key)
     if entry.is_none() {
         return Option.none()

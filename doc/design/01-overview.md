@@ -1,123 +1,96 @@
-# 01 — Overview
+# Overview
 
-## What Lazarus is
+Lazarus is a small, statically-typed language that compiles to a single Lua file. You get real classes, a type system that catches mistakes before runtime, and a module system that resolves imports at compile time. The output is plain Lua that runs anywhere Lua 5.1 runs, with no runtime dependencies.
 
-Lazarus is a small, statically-typed, **class-oriented** language that compiles
-to a single self-contained **Lua** file. It exists to give large Lua programs —
-especially ComputerCraft / OpenComputers mods — real structure: classes with
-constructors and inheritance, a static type system that catches mistakes before
-they reach the device, and a clean module system, all with **minimum
-boilerplate**.
+The language was designed for environments where you have Lua but not much else: ComputerCraft computers, embedded scripting runtimes, game mod environments, or any place where dropping a single `.lua` file is simpler than managing a package ecosystem.
 
-The guiding principle: **the file is the class.** There is no `class` wrapper to
-write — opening a `.laz` file *is* opening a class body. The filename is the
-class name.
+## Three kinds of files
 
-## The "file = class" model
+Every Lazarus source file ends in `.laz`, but the suffix before that tells the compiler what kind of thing it defines:
+
+**`.class.laz`** defines a class. Classes are instantiable types: they have a constructor, instance fields, and instance methods. The file name (without the suffix) becomes the class name, so `Counter.class.laz` defines a class called `Counter`.
+
+**`.object.laz`** defines an object. Objects are static namespaces with no instances. Every member is implicitly static. They are used for utility modules, math helpers, and Lua API wrappers. `Str.object.laz` defines `Str`, which you call as `Str.upper(s)`.
+
+**`.trait.laz`** defines a trait. Traits are contracts: a set of method signatures that a class can promise to implement. The standard library trait `Iterable.trait.laz` defines what it means to be iterable.
+
+All filenames are PascalCase.
+
+## A first example
+
+Here is a small program that creates a counter, increments it, and prints the result:
 
 ```
-// Counter.laz   ->   class Counter
-count: int = 0                  // an instance field (private, immutable)
+// Counter.class.laz
+import std.Sys
 
-init() { }                      // constructor; Counter() makes one
+private count: int = 0
 
-pub fn value(self): int {       // an instance method
-    return self.count
+constructor() { }
+
+increment() {
+    .count = .count + 1
+}
+
+value(): int {
+    return .count
+}
+
+static main() {
+    mut c = Counter()
+    c.increment()
+    c.increment()
+    c.increment()
+    Sys.print(f"count is {c.value()}")
 }
 ```
 
-A class is a **reference type**: you construct instances with `Counter()`, each
-carries its own field values, methods take `self`, and classes can inherit from
-one another. This is ordinary object orientation — it just happens that one file
-holds exactly one class, so the class needs no surrounding braces or name
-declaration.
+Run it:
 
-Two kinds of user-defined type exist:
-
-- **Classes** (the file itself) — identity, constructor (`init`), inheritance
-  (`extends`), instance + `static` members, methods with `self`. A class with
-  only fields is your equivalent of a plain data record.
-- **Enums** (declared *inside* a class file) — sum types with optional payloads,
-  consumed by `match`. Enums are **data-only**.
-
-There is deliberately **no `struct`**, and **no user generics** in v1. The
-generic-looking built-ins — `Option<T>`, `[T]`, `{K: V}` — are provided by the
-compiler. `Result` is **not** a built-in: it ships in the stdlib as typed classes
-(`ResultBool`/`ResultString`/`ResultInt`).
-
-## A complete example
-
-```
-// Vec2.laz  ->  class Vec2  (used as a data record)
-pub x: int = 0
-pub y: int = 0
-
-init(x: int, y: int) {
-    self.x = x
-    self.y = y
-}
-
-pub fn add(self, o: Vec2): Vec2 {
-    return Vec2(self.x + o.x, self.y + o.y)
-}
+```sh
+lua bin/lazarusc.lua Counter.class.laz
+lua Counter.lua
+# count is 3
 ```
 
-```
-// Main.laz  ->  class Main  (the program)
-import Vec2
+A few things to notice:
 
-enum Status { Ok, Blocked }
+The file name is the class name. There is no `class Counter` declaration anywhere.
 
-fn main() {                       // no self -> static; the entry point
-    a = Vec2(1, 2)
-    b = Vec2(3, 4)
-    c = a.add(b)                  // implicit receiver
+Fields are accessed inside methods with a leading dot: `.count`. This is shorthand for `self.count`. The `self` keyword also exists and can be used directly, but the dot form is more common.
 
-    msg = "sum = ({c.x}, {c.y})"  // string interpolation
+`static main()` is the entry point. The compiler appends a call to it at the end of the output. Static methods belong to the class, not to any instance.
 
-    if c.x > 0 and c.y > 0 {
-        report(Status.Ok, msg)
-    } else {
-        report(Status.Blocked, msg)
-    }
-}
+`f"..."` is a format string. Expressions inside `{}` are evaluated and interpolated into the string. Regular `"..."` strings have no interpolation.
 
-fn report(s: Status, msg: str) {
-    match s {
-        Ok => { print_line(msg) },
-        Blocked => { print_line("blocked") },
-    }
-}
+## Building
+
+The self-hosted compiler is `bin/lazarusc.lua`. It takes a source file and writes `<ClassName>.lua` to the current directory:
+
+```sh
+lua bin/lazarusc.lua MyProgram.class.laz
+lua MyProgram.lua
 ```
 
-This whole program (both files) compiles to **one** Lua file with `Main.main()`
-called at the bottom. Nothing is required at runtime.
+Flags:
 
-## Pipeline
-
-Lazarus keeps its five-stage pipeline (see [`../pipeline.md`](../pipeline.md)):
-
-```
-source ─▶ Lexer ─▶ Parser ─▶ Schematic ─▶ Optimizer ─▶ Codegen ─▶ Lua
-                                 (types)                 (bundle)
+```sh
+--check          # report errors without writing output
+--lib            # compile as a library (no entry-point call)
+--platform <n>   # set the target platform name
+-O0 / -O1 / -O2 / -Os  # optimization level (O0 is default)
 ```
 
-The type system is the heavy new addition and lives in **Schematic** (today it
-only does scope/name checks). Types are **erased**: by the time Codegen runs, the
-AST is plain class/enum/expression structure and the emitted Lua carries no type
-information — so the static guarantees cost nothing at runtime.
+Via make:
 
-## Target runtime
+```sh
+make selfbuild FILE=MyProgram.class.laz
+```
 
-v1 targets **Lua 5.0**. That backend has three quirks the compiler works around,
-none of which affect the surface language:
+## How compilation works
 
-- no `#` length operator → `.len()` lowers to `table.getn` / a tracked length;
-- no `%` modulo → synthesized as `a - floor(a / b) * b`;
-- varargs via the `arg` table rather than `...`.
+The compiler resolves all imports, runs each file through the pipeline (lexer, parser, schematic, typechecker, optimizer, codegen), and bundles everything into one chunk. The output has no `require` calls and no runtime dependencies. Dependencies are emitted in the correct order so a class is always defined before it is used.
 
-A **Lua 5.4** backend is planned. That is the reason `int` and `float` are
-distinct types now even though 5.0 represents both as doubles: under 5.4 they map
-to genuine integer/float, and code written today stays correct.
+The type system is erased at codegen. The emitted Lua carries no type information and pays no runtime cost for it.
 
-See [08-implementation.md](08-implementation.md) for the full lowering.
+Continue to [02-variables-and-types.md](02-variables-and-types.md) for the basics of variables and the type system.

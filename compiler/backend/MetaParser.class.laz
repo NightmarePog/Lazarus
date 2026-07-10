@@ -213,16 +213,16 @@ private parse_str(): str {
             mut esc = .peek()
             .pos = .pos + 1
             if esc == "\"" {
-                out = out ++ "\""
+                out = out + "\""
             } else if esc == "\\" {
-                out = out ++ "\\"
+                out = out + "\\"
             } else if esc == "n" {
-                out = out ++ "\n"
+                out = out + "\n"
             } else {
-                out = out ++ esc
+                out = out + esc
             }
         } else {
-            out = out ++ ch
+            out = out + ch
             .pos = .pos + 1
         }
     }

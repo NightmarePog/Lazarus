@@ -51,7 +51,7 @@ public link(): List<Module> {
 private preload_core(): unit {
     mut list_loaded = false
     for name in ["Option", "Result", "List", "Map"] {
-        mut path = .resolve_rel("std/" ++ name ++ ".class.laz")
+        mut path = .resolve_rel("std/" + name + ".class.laz")
         if Sys.file_exists(path) {
             .load(path, "", 0, 0, 1)
             if name == "List" {
@@ -88,7 +88,7 @@ private load(path: str, origin_source: str, origin_line: int, origin_col: int, o
 
     mut source_opt = Sys.read_file(path)
     if source_opt.is_none() {
-        Error("LinkError", "cannot resolve import '" ++ path ++ "'", origin_line, origin_col, origin_source, origin_span).raise()
+        Error("LinkError", "cannot resolve import '" + path + "'", origin_line, origin_col, origin_source, origin_span).raise()
     }
     mut source = source_opt.unwrap()
 
@@ -131,12 +131,12 @@ private load_prebuilt(path: str, origin_source: str, origin_line: int, origin_co
     }
     mut source_opt = Sys.read_file(path)
     if source_opt.is_none() {
-        Error("LinkError", "cannot resolve import '" ++ path ++ "'", origin_line, origin_col, origin_source, origin_span).raise()
+        Error("LinkError", "cannot resolve import '" + path + "'", origin_line, origin_col, origin_source, origin_span).raise()
     }
     mut lua_source = source_opt.unwrap()
     mut sig_opt = MetaParser.parse_meta(lua_source)
     if sig_opt.is_none() {
-        Error("LinkError", "prebuilt library '" ++ path ++ "' has no LAZARUS_META block", origin_line, origin_col, origin_source, origin_span).raise()
+        Error("LinkError", "prebuilt library '" + path + "' has no LAZARUS_META block", origin_line, origin_col, origin_source, origin_span).raise()
     }
     mut class_name = Path.stem(path)
     mut dummy_ast = Node("Program", ["body": []])
@@ -150,23 +150,23 @@ private load_prebuilt(path: str, origin_source: str, origin_line: int, origin_co
 // exist, .class.laz is returned so load() raises the precise error.
 private resolve(node: Node): str {
     mut base = Text.join(node.child("segments"), "/")
-    mut class_path = .resolve_rel(base ++ ".class.laz")
+    mut class_path = .resolve_rel(base + ".class.laz")
     if Sys.file_exists(class_path) {
         return class_path
     }
-    mut object_path = .resolve_rel(base ++ ".object.laz")
+    mut object_path = .resolve_rel(base + ".object.laz")
     if Sys.file_exists(object_path) {
         return object_path
     }
-    mut trait_path = .resolve_rel(base ++ ".trait.laz")
+    mut trait_path = .resolve_rel(base + ".trait.laz")
     if Sys.file_exists(trait_path) {
         return trait_path
     }
-    mut lua_path = .resolve_rel(base ++ ".lua")
+    mut lua_path = .resolve_rel(base + ".lua")
     if Sys.file_exists(lua_path) {
         return lua_path
     }
-    mut laz_path = .resolve_rel(base ++ ".laz")
+    mut laz_path = .resolve_rel(base + ".laz")
     if Sys.file_exists(laz_path) {
         return laz_path
     }

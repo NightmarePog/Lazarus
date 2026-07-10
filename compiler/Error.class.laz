@@ -41,26 +41,26 @@ public lua print(): unit {
 
 public format(): str {
     mut esc = Str.char(27).unwrap_or("")
-    mut red = esc ++ "[31m"
-    mut bold = esc ++ "[1m"
-    mut reset = esc ++ "[0m"
+    mut red = esc + "[31m"
+    mut bold = esc + "[1m"
+    mut reset = esc + "[0m"
     mut nl = Str.char(10).unwrap_or("")
 
     mut prefix = Str.format("   %d │ ", .line).unwrap_or("")
     mut pad = Str.rep(" ", Error.display_width(prefix) + .column - 1).unwrap_or("")
-    mut carets = red ++ Str.rep("^", .span).unwrap_or("^") ++ reset
+    mut carets = red + Str.rep("^", .span).unwrap_or("^") + reset
 
     mut out = ""
-    out = out ++ nl
-    out = out ++ red ++ "╭─ Error ──────────────────────────────" ++ reset ++ nl
-    out = out ++ "│ Type: " ++ bold ++ .kind ++ reset ++ nl
-    out = out ++ Str.format("│ Location: unknown:%d:%d", .line, .column).unwrap_or("│ Location: unknown") ++ nl
-    out = out ++ "│" ++ nl
-    out = out ++ "│ " ++ .message ++ nl
-    out = out ++ "│" ++ nl
-    out = out ++ "│ " ++ prefix ++ Error.source_line(.source, .line) ++ nl
-    out = out ++ "│ " ++ pad ++ carets ++ nl
-    out = out ++ red ++ "╰──────────────────────────────────────" ++ reset
+    out = out + nl
+    out = out + red + "╭─ Error ──────────────────────────────" + reset + nl
+    out = out + "│ Type: " + bold + .kind + reset + nl
+    out = out + Str.format("│ Location: unknown:%d:%d", .line, .column).unwrap_or("│ Location: unknown") + nl
+    out = out + "│" + nl
+    out = out + "│ " + .message + nl
+    out = out + "│" + nl
+    out = out + "│ " + prefix + Error.source_line(.source, .line) + nl
+    out = out + "│ " + pad + carets + nl
+    out = out + red + "╰──────────────────────────────────────" + reset
     return out
 }
 
@@ -84,7 +84,7 @@ static source_line(source: str, target: int): str {
             out = ""
         } else {
             if cur == target {
-                out = out ++ c
+                out = out + c
             }
         }
         i = i + 1

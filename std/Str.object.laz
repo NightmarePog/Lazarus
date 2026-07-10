@@ -87,7 +87,7 @@ pad_left(s: str, width: int, fill: str): str {
     if n >= width {
         return s
     }
-    return Str.rep(fill, width - n).unwrap_or("") ++ s
+    return Str.rep(fill, width - n).unwrap_or("") + s
 }
 
 pad_right(s: str, width: int, fill: str): str {
@@ -95,7 +95,7 @@ pad_right(s: str, width: int, fill: str): str {
     if n >= width {
         return s
     }
-    return s ++ Str.rep(fill, width - n).unwrap_or("")
+    return s + Str.rep(fill, width - n).unwrap_or("")
 }
 
 is_prefix(s: str, prefix: str): bool {
@@ -121,7 +121,7 @@ replace(s: str, from: str, to: str): str {
         Some(pos) => {
             mut n = Str.len(s).unwrap_or(0)
             mut flen = Str.len(from).unwrap_or(0)
-            return Str.sub(s, 1, pos - 1).unwrap_or("") ++ to ++ Str.sub(s, pos + flen, n).unwrap_or("")
+            return Str.sub(s, 1, pos - 1).unwrap_or("") + to + Str.sub(s, pos + flen, n).unwrap_or("")
         }
         None => { return s }
     }
@@ -140,10 +140,10 @@ replace_all(s: str, from: str, to: str): str {
         match Str.find(rest, from) {
             Some(pos) => {
                 mut rlen = Str.len(rest).unwrap_or(0)
-                out = out ++ Str.sub(rest, 1, pos - 1).unwrap_or("") ++ to
+                out = out + Str.sub(rest, 1, pos - 1).unwrap_or("") + to
                 rest = Str.sub(rest, pos + flen, rlen).unwrap_or("")
             }
-            None => { return out ++ rest }
+            None => { return out + rest }
         }
     }
 }

@@ -141,7 +141,7 @@ public is_variant(name: str): bool {
 
 public variant_qualified(name: str): str {
     mut owner = .variant_owner.get(name).unwrap()
-    return .mangle_class(owner) ++ "." ++ .mangle_member(owner, name)
+    return .mangle_class(owner) + "." + .mangle_member(owner, name)
 }
 
 // Qualify a member reference as `C.name`; leave locals, parameters and globals bare.
@@ -150,7 +150,7 @@ public emit_name(name: str): str {
         return .mangle_local(name)
     }
     if .is_member(name) {
-        return .mangle_class(.cls) ++ "." ++ .mangle_self_member(name)
+        return .mangle_class(.cls) + "." + .mangle_self_member(name)
     }
     return .mangle_class(name)
 }

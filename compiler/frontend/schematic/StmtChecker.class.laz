@@ -75,10 +75,10 @@ private check_variable(stmt: Node, scope: Scope, frame: Frame): unit {
 
 private declare_binding(stmt: Node, scope: Scope, frame: Frame, name: str, visibility: str): unit {
     if not frame.in_function and visibility == "" {
-        .fail(stmt, "Top-level binding '" ++ name ++ "' must declare visibility ('private' or 'public')", Str.len(name).unwrap_or(1))
+        .fail(stmt, "Top-level binding '" + name + "' must declare visibility ('private' or 'public')", Str.len(name).unwrap_or(1))
     }
     if scope.declared_here(name) {
-        .fail(stmt, "Duplicate declaration '" ++ name ++ "'", Str.len(name).unwrap_or(1))
+        .fail(stmt, "Duplicate declaration '" + name + "'", Str.len(name).unwrap_or(1))
     }
     Naming.check_value(name, stmt.line(), stmt.col(), .source, "Binding")
     mut mutable = stmt.attr("mutable").unwrap_or(false)
@@ -99,7 +99,7 @@ private declare_binding(stmt: Node, scope: Scope, frame: Frame, name: str, visib
 
 private reassign_binding(stmt: Node, scope: Scope, name: str, existing: Symbol): unit {
     if not existing.mutable {
-        .fail(stmt, "Cannot assign to immutable binding '" ++ name ++ "'", Str.len(name).unwrap_or(1))
+        .fail(stmt, "Cannot assign to immutable binding '" + name + "'", Str.len(name).unwrap_or(1))
     }
     mut value = stmt.attr("value")
     if value.is_some() {
@@ -130,7 +130,7 @@ private value_noncallable(stmt: Node): bool {
 private check_function(stmt: Node, scope: Scope, frame: Frame): unit {
     mut name = stmt.child("name")
     if scope.declared_here(name) {
-        .fail(stmt, "Duplicate declaration '" ++ name ++ "'", Str.len(name).unwrap_or(1))
+        .fail(stmt, "Duplicate declaration '" + name + "'", Str.len(name).unwrap_or(1))
     }
     Naming.check_value(name, stmt.line(), stmt.col(), .source, "Function")
     scope.declare(name, Symbol("function", false, false))
@@ -165,7 +165,7 @@ private check_callable_body(stmt: Node, scope: Scope, frame: Frame, is_instance:
 private bind_params(stmt: Node, scope: Scope): unit {
     for param in stmt.child("params") {
         if scope.declared_here(param) {
-            .fail(stmt, "Duplicate parameter '" ++ param ++ "'", Str.len(param).unwrap_or(1))
+            .fail(stmt, "Duplicate parameter '" + param + "'", Str.len(param).unwrap_or(1))
         }
         Naming.check_value(param, stmt.line(), stmt.col(), .source, "Parameter")
         scope.declare(param, Symbol("variable", false, false))
@@ -276,7 +276,7 @@ private check_for_in(stmt: Node, scope: Scope, frame: Frame): unit {
     mut inner = scope.child()
     for name in stmt.child("vars") {
         if inner.declared_here(name) {
-            .fail(stmt, "Duplicate loop variable '" ++ name ++ "'", Str.len(name).unwrap_or(1))
+            .fail(stmt, "Duplicate loop variable '" + name + "'", Str.len(name).unwrap_or(1))
         }
         Naming.check_value(name, stmt.line(), stmt.col(), .source, "Loop variable")
         inner.declare(name, Symbol("variable", false, false))
@@ -325,13 +325,13 @@ private check_variant_arm(stmt: Node, arm: Node, enum_name: str, covered: Map<st
     mut v = arm.child("variant")
     mut owner = .variant_owner.get(v)
     if owner.is_none() {
-        .fail(stmt, "Unknown enum variant '" ++ v ++ "' in match", Str.len(v).unwrap_or(1))
+        .fail(stmt, "Unknown enum variant '" + v + "' in match", Str.len(v).unwrap_or(1))
     }
     if enum_name != "" and enum_name != owner.unwrap() {
-        .fail(stmt, "match arms mix variants from different enums ('" ++ enum_name ++ "' and '" ++ owner.unwrap() ++ "')", Str.len(v).unwrap_or(1))
+        .fail(stmt, "match arms mix variants from different enums ('" + enum_name + "' and '" + owner.unwrap() + "')", Str.len(v).unwrap_or(1))
     }
     if covered.has(v) {
-        .fail(stmt, "Duplicate match arm for variant '" ++ v ++ "'", Str.len(v).unwrap_or(1))
+        .fail(stmt, "Duplicate match arm for variant '" + v + "'", Str.len(v).unwrap_or(1))
     }
     mut arity = .variant_arity.get(v).unwrap_or(0)
     mut bound = arm.child("bindings").len()
@@ -354,7 +354,7 @@ private declare_bindings(arm: Node, scope: Scope): unit {
 private check_exhaustive(stmt: Node, enum_name: str, covered: Map<str, bool>): unit {
     for variant in .enums.get(enum_name).unwrap() {
         if not covered.has(variant) {
-            .fail(stmt, "Non-exhaustive match on enum '" ++ enum_name ++ "': missing variant '" ++ variant ++ "' (add it, or a '_' arm)", 1)
+            .fail(stmt, "Non-exhaustive match on enum '" + enum_name + "': missing variant '" + variant + "' (add it, or a '_' arm)", 1)
         }
     }
 }

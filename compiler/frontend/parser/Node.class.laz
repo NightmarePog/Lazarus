@@ -35,7 +35,7 @@ public set(name: str, value: dynamic): unit {
 public summary(): str {
     mut named = .attrs.get("name")
     if named.is_some() {
-        return .kind ++ " " ++ named.unwrap()
+        return .kind + " " + named.unwrap()
     }
     return .kind
 }

@@ -117,7 +117,7 @@ private expect_literal(s: str): unit {
     mut i = 1
     while i <= n {
         if .curr != Str.sub(s, i, i).unwrap_or("") {
-            .fail("expected '" ++ s ++ "'")
+            .fail("expected '" + s + "'")
         }
         .advance()
         i = i + 1
@@ -133,11 +133,11 @@ private parse_string(): str {
             .fail("unterminated string")
         }
         if .curr == "\\" {
-            result = result ++ Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
-            result = result ++ .read_escape()
+            result = result + Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
+            result = result + .read_escape()
             seg_start = .pos
         } else if .curr == "\"" {
-            result = result ++ Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
+            result = result + Str.sub(.source, seg_start, .pos - 1).unwrap_or("")
             .advance()
             break
         } else {
@@ -166,7 +166,7 @@ private read_escape(): str {
         .advance()
         return "?"
     }
-    .fail("unknown escape: \\" ++ ch)
+    .fail("unknown escape: \\" + ch)
     return ""
 }
 

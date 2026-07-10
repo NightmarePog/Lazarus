@@ -63,7 +63,7 @@ static compile_handler(handler_class: str, modules: List<Module>): dynamic {
             blocks.push(cg.class_block(m.ast))
         }
     }
-    blocks.push("return " ++ handler_class)
+    blocks.push("return " + handler_class)
     return Expander.load_lua(Text.join(blocks, "\n\n"), handler_class, Node)
 }
 

@@ -112,13 +112,13 @@ private type_stmt(stmt: Node, scope: Scope, ret: Type): unit {
 private type_implement(stmt: Node): unit {
     mut tname = stmt.child("name")
     if not .traits.has(tname) {
-        .fail(stmt, "unknown trait '" ++ tname ++ "'")
+        .fail(stmt, "unknown trait '" + tname + "'")
         return
     }
     mut iface = Type.iface_of(tname, [])
     mut cls = Type.class_of(.class_name, .self_args())
     if not .satisfies(iface, cls) {
-        .fail(stmt, .class_name ++ " does not implement trait '" ++ tname ++ "': " ++ .iface_reason)
+        .fail(stmt, .class_name + " does not implement trait '" + tname + "': " + .iface_reason)
     }
 }
 
@@ -250,7 +250,7 @@ private type_if(stmt: Node, scope: Scope, ret: Type): unit {
 private type_condition(node: Node, scope: Scope): unit {
     mut t = .type_expr(node, scope)
     if not t.is_dynamic() and t.kind != "bool" {
-        .fail(node, "a condition must be a bool, found " ++ t.describe())
+        .fail(node, "a condition must be a bool, found " + t.describe())
     }
 }
 
@@ -551,6 +551,12 @@ private type_binary(node: Node, scope: Scope): Type {
     mut lt = .type_expr(node.child("left"), scope)
     mut rt = .type_expr(node.child("right"), scope)
     mut op = node.child("op")
+    // Allow `+` as string concatenation when at least one side is a known str.
+    // Rewrites the op so codegen emits `..` without any further changes.
+    if op == "PLUS" and (lt.kind == "str" or rt.kind == "str") and .str_or_dynamic(lt) and .str_or_dynamic(rt) {
+        node.set("op", "CONCAT")
+        return Type.str()
+    }
     if .is_arith(op) {
         return .arith_type(node, op, lt, rt)
     }
@@ -574,11 +580,11 @@ private is_ordering(op: str): bool {
     return op == "LESS" or op == "LESS_EQUAL" or op == "GREATER" or op == "GREATER_EQUAL"
 }
 
-// `++` joins two strings; either side may be `dynamic`, but a concrete non-string
-// must be converted first.
+// `+` and `+` both join strings; either side may be `dynamic`, but a concrete
+// non-string must be converted first.
 private concat_type(node: Node, lt: Type, rt: Type): Type {
     if not .str_or_dynamic(lt) or not .str_or_dynamic(rt) {
-        .fail(node, "++ joins strings, found " ++ lt.describe() ++ " and " ++ rt.describe() ++ "; convert explicitly")
+        .fail(node, "string concatenation requires str on both sides, found " + lt.describe() + " and " + rt.describe() + "; convert explicitly")
     }
     return Type.str()
 }
@@ -590,7 +596,7 @@ private str_or_dynamic(t: Type): bool {
 // `==`/`!=` compare two values of the same type; a `dynamic` side defers.
 private equality_type(node: Node, lt: Type, rt: Type): Type {
     if not lt.is_dynamic() and not rt.is_dynamic() and not lt.equals(rt) {
-        .fail(node, "cannot compare " ++ lt.describe() ++ " and " ++ rt.describe() ++ " for equality")
+        .fail(node, "cannot compare " + lt.describe() + " and " + rt.describe() + " for equality")
     }
     return Type.bool()
 }
@@ -604,10 +610,10 @@ private ordering_type(node: Node, lt: Type, rt: Type): Type {
         return Type.bool()
     }
     if not lt.is_numeric() or not rt.is_numeric() {
-        .fail(node, "ordering needs numbers or strings, found " ++ lt.describe() ++ " and " ++ rt.describe())
+        .fail(node, "ordering needs numbers or strings, found " + lt.describe() + " and " + rt.describe())
     }
     if not lt.equals(rt) {
-        .fail(node, "cannot order " ++ lt.describe() ++ " against " ++ rt.describe() ++ "; convert explicitly")
+        .fail(node, "cannot order " + lt.describe() + " against " + rt.describe() + "; convert explicitly")
     }
     return Type.bool()
 }
@@ -617,10 +623,10 @@ private arith_type(node: Node, op: str, lt: Type, rt: Type): Type {
         return Type.dynamic()
     }
     if not lt.is_numeric() or not rt.is_numeric() {
-        .fail(node, "arithmetic needs numbers, found " ++ lt.describe() ++ " and " ++ rt.describe())
+        .fail(node, "arithmetic needs numbers, found " + lt.describe() + " and " + rt.describe())
     }
     if not lt.equals(rt) {
-        .fail(node, "cannot mix " ++ lt.describe() ++ " and " ++ rt.describe() ++ " in arithmetic; convert explicitly")
+        .fail(node, "cannot mix " + lt.describe() + " and " + rt.describe() + " in arithmetic; convert explicitly")
     }
     if op == "DIVIDE" {
         return Type.float()
@@ -664,7 +670,7 @@ private type_call(node: Node, scope: Scope): Type {
             return .type_variant(name, args, scope, node)
         }
         if not scope.lookup(name).is_some() and .traits.has(name) {
-            .fail(callee, "cannot construct trait '" ++ name ++ "'")
+            .fail(callee, "cannot construct trait '" + name + "'")
         }
         if not scope.lookup(name).is_some() and .classes.has(name) {
             return .type_construction(name, args, scope, node)
@@ -686,7 +692,7 @@ private type_call(node: Node, scope: Scope): Type {
 private type_fn_call(fn_type: Type, args: List<Node>, scope: Scope, node: Node): Type {
     mut params = fn_type.params
     if args.len() != params.len() {
-        .fail(node, "wrong number of arguments: expected " ++ .count(params.len()) ++ ", found " ++ .count(args.len()))
+        .fail(node, "wrong number of arguments: expected " + .count(params.len()) + ", found " + .count(args.len()))
     }
     mut i = 1
     for arg in args {
@@ -777,7 +783,7 @@ private type_method_call(member: Node, args: List<Node>, scope: Scope, call: Nod
             }
             return Type.dynamic()
         }
-        .fail(member, "no method '" ++ method ++ "' on " ++ cls)
+        .fail(member, "no method '" + method + "' on " + cls)
     }
     if sig.unwrap().get("is_static").unwrap_or(false) and not .static_receiver(object, scope) {
         call.set("dispatch_class", cls)
@@ -834,7 +840,7 @@ private type_member(node: Node, scope: Scope): Type {
     if .static_receiver(object, scope) {
         return Type.dynamic()
     }
-    .fail(node, "no field '" ++ field ++ "' on " ++ cls)
+    .fail(node, "no field '" + field + "' on " + cls)
 }
 
 // The receiver's type: the current class (with its own params as vars) for
@@ -888,7 +894,7 @@ private resolve_labeled(param_nodes: List<Node>, param_names: List<str>, args: L
     for arg in args {
         mut label = arg.child("name")
         if named.has(label) {
-            .fail(node, "duplicate labeled argument '" ++ label ++ "'")
+            .fail(node, "duplicate labeled argument '" + label + "'")
         }
         named[label] = arg.child("value")
     }
@@ -900,7 +906,7 @@ private resolve_labeled(param_nodes: List<Node>, param_names: List<str>, args: L
             }
         }
         if not found {
-            .fail(node, "unknown labeled argument '" ++ label ++ "'")
+            .fail(node, "unknown labeled argument '" + label + "'")
         }
     }
     mut resolved = []
@@ -910,7 +916,7 @@ private resolve_labeled(param_nodes: List<Node>, param_names: List<str>, args: L
             resolved.push(named.get(pname).unwrap())
         } else {
             if not param_nodes.get(i).unwrap().attr("default").is_some() {
-                .fail(node, "missing required argument '" ++ pname ++ "'")
+                .fail(node, "missing required argument '" + pname + "'")
             }
             resolved.push(Node("LiteralExpr", ["lit_kind": "nil", "value": 0, "line": node.line(), "col": node.col()]))
         }
@@ -925,13 +931,13 @@ private resolve_labeled(param_nodes: List<Node>, param_names: List<str>, args: L
 // must accept its arg.
 private infer_and_check(param_nodes: List<Node>, callee_vars: Map<str, bool>, args: List<Node>, scope: Scope, node: Node, subst: Map<str, Type>): unit {
     if args.len() > param_nodes.len() {
-        .fail(node, "wrong number of arguments: expected " ++ .count(param_nodes.len()) ++ ", found " ++ .count(args.len()))
+        .fail(node, "wrong number of arguments: expected " + .count(param_nodes.len()) + ", found " + .count(args.len()))
     }
     if args.len() < param_nodes.len() {
         mut i = args.len() + 1
         while i <= param_nodes.len() {
             if not param_nodes.get(i).unwrap().attr("default").is_some() {
-                .fail(node, "wrong number of arguments: expected " ++ .count(param_nodes.len()) ++ ", found " ++ .count(args.len()) ++ " (parameter " ++ .count(i) ++ " has no default)")
+                .fail(node, "wrong number of arguments: expected " + .count(param_nodes.len()) + ", found " + .count(args.len()) + " (parameter " + .count(i) + " has no default)")
             }
             i = i + 1
         }
@@ -1143,7 +1149,7 @@ private resolve_args(t: Node, name: str): List<Type> {
     }
     mut declared = .declared_arity(name)
     if declared >= 0 and nodes.len() != declared {
-        .fail(t, name ++ " expects " ++ .count(declared) ++ " type argument(s), found " ++ .count(nodes.len()))
+        .fail(t, name + " expects " + .count(declared) + " type argument(s), found " + .count(nodes.len()))
     }
     return [.resolve(a) for a in nodes]
 }
@@ -1171,9 +1177,9 @@ private declared_arity(name: str): int {
 private expect(expected: Type, actual: Type, node: Node, what: str): unit {
     if not .compatible(expected, actual) {
         if expected.kind == "iface" and .iface_reason != "" {
-            .fail(node, actual.describe() ++ " does not satisfy " ++ expected.describe() ++ ": " ++ .iface_reason)
+            .fail(node, actual.describe() + " does not satisfy " + expected.describe() + ": " + .iface_reason)
         }
-        .fail(node, "type mismatch in " ++ what ++ ": expected " ++ expected.describe() ++ ", found " ++ actual.describe())
+        .fail(node, "type mismatch in " + what + ": expected " + expected.describe() + ", found " + actual.describe())
     }
 }
 
@@ -1274,7 +1280,7 @@ private satisfies(iface: Type, actual: Type): bool {
     if not .traits.has(iface.name) {
         return true
     }
-    mut key = iface.name ++ "<:" ++ actual.name
+    mut key = iface.name + "<:" + actual.name
     if .checking.get(key).unwrap_or(false) {
         return true
     }
@@ -1305,16 +1311,16 @@ private conforms(iface: Type, actual: Type): bool {
     for mname, msig in def.get("methods").unwrap() {
         mut found = cmethods.get(mname)
         if not found.is_some() {
-            return .reject(iface, "missing method '" ++ mname ++ "'")
+            return .reject(iface, "missing method '" + mname + "'")
         }
         mut csig = found.unwrap()
         if csig.get("is_static").unwrap_or(false) {
-            return .reject(iface, "method '" ++ mname ++ "' must be an instance method")
+            return .reject(iface, "method '" + mname + "' must be an instance method")
         }
         mut iparams = msig.get("params").unwrap()
         mut cparams = csig.get("params").unwrap()
         if iparams.len() != cparams.len() {
-            return .reject(iface, "method '" ++ mname ++ "' expects " ++ .count(iparams.len()) ++ " parameter(s)")
+            return .reject(iface, "method '" + mname + "' expects " + .count(iparams.len()) + " parameter(s)")
         }
         mut imvars = .merge_vars(ivars, msig.get("type_params").unwrap_or([]))
         mut cmvars = .merge_vars(cvars, csig.get("type_params").unwrap_or([]))
@@ -1323,26 +1329,26 @@ private conforms(iface: Type, actual: Type): bool {
             mut it = .substitute(.resolve_with(ip, imvars), isubst)
             mut ct = .substitute(.resolve_with(cparams.get(i).unwrap(), cmvars), csubst)
             if not .compatible(it, ct) {
-                return .reject(iface, "method '" ++ mname ++ "' parameter " ++ .count(i) ++ " is " ++ ct.describe() ++ ", expected " ++ it.describe())
+                return .reject(iface, "method '" + mname + "' parameter " + .count(i) + " is " + ct.describe() + ", expected " + it.describe())
             }
             i = i + 1
         }
         mut iret = .substitute(.resolve_with(msig.get("result").unwrap(), imvars), isubst)
         mut cret = .node_type(csig.get("result").unwrap_or(0), cmvars, csubst)
         if not .compatible(iret, cret) {
-            return .reject(iface, "method '" ++ mname ++ "' returns " ++ cret.describe() ++ ", expected " ++ iret.describe())
+            return .reject(iface, "method '" + mname + "' returns " + cret.describe() + ", expected " + iret.describe())
         }
     }
 
     for pname, pnode in def.get("properties").unwrap() {
         mut pf = cfields.get(pname)
         if not pf.is_some() {
-            return .reject(iface, "missing property '" ++ pname ++ "'")
+            return .reject(iface, "missing property '" + pname + "'")
         }
         mut it = .substitute(.resolve_with(pnode, ivars), isubst)
         mut ct = .opt_node_type(pf.unwrap(), cvars, csubst)
         if not .compatible(it, ct) {
-            return .reject(iface, "property '" ++ pname ++ "' is " ++ ct.describe() ++ ", expected " ++ it.describe())
+            return .reject(iface, "property '" + pname + "' is " + ct.describe() + ", expected " + it.describe())
         }
     }
     return true
@@ -1411,7 +1417,7 @@ private iface_method(recv: Type, method: str, args: List<Node>, scope: Scope, ca
     mut def = .traits.get(recv.name).unwrap()
     mut msig_opt = def.get("methods").unwrap().get(method)
     if not msig_opt.is_some() {
-        .fail(call, "no method '" ++ method ++ "' on trait " ++ recv.name)
+        .fail(call, "no method '" + method + "' on trait " + recv.name)
     }
     mut msig = msig_opt.unwrap()
     mut vars = .merge_vars(.name_set(def.get("type_params").unwrap_or([])), msig.get("type_params").unwrap_or([]))
