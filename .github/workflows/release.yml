@@ -1,36 +1,61 @@
-name: CI
+name: Release
 
 on:
   push:
-    branches: [main]
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
-  build-and-release:
+  release:
+    name: Build and release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Lua 5.1
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y lua5.1
-          sudo ln -sf /usr/bin/lua5.1 /usr/local/bin/lua
+      - name: Install Lua
+        uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: "5.4"
 
-      - name: Build self-hosted compiler (fixpoint check)
+      - name: Install LuaRocks
+        uses: leafo/gh-actions-luarocks@v4
+
+      - name: Verify fixpoint
         run: make selfhost
+
+      - name: Package stdlib
+        run: tar -czf std.tar.gz std/
 
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v$(date -u +%Y-%m-%d)-$(git rev-parse --short HEAD)"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "$TAG"
-          git push origin "$TAG"
-          gh release create "$TAG" bin/lazarusc.lua \
-            --title "Lazarus $TAG" \
-            --notes "Automated build from commit \`$(git rev-parse --short HEAD)\`."
+          gh release create "${{ github.ref_name }}" \
+            bin/lazarusc.lua \
+            std.tar.gz \
+            --title "Lazarus ${{ github.ref_name }}" \
+            --notes-file - << 'EOF'
+          See the [changelog](https://github.com/NightmarePog/Lazarus/commits/${{ github.ref_name }}) for what changed in this release.
+
+          ## Assets
+
+          | File | Description |
+          |---|---|
+          | `lazarusc.lua` | The self-hosted compiler. Run with `lua lazarusc.lua <File.class.laz>`. |
+          | `std.tar.gz` | The standard library. Extract next to your source files. |
+
+          ## Quick start
+
+          ```sh
+          # extract the stdlib
+          tar -xzf std.tar.gz
+
+          # compile
+          lua lazarusc.lua MyProgram.class.laz
+          lua MyProgram.lua
+          ```
+          EOF
