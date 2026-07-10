@@ -1,0 +1,26 @@
+import std.Sys
+import std.Option
+
+private scores: Map<str, int>
+
+add(name: str, score: int) {
+    .scores[name] = score
+}
+
+grade(score: int): str {
+    if score >= 90 { return "A" }
+    if score >= 80 { return "B" }
+    if score >= 70 { return "C" }
+    return "F"
+}
+
+constructor() {
+    .scores = [:]
+    .add("Alice", 95)
+    .add("Bob",   82)
+    .add("Carol", 67)
+
+    for name, score in .scores {
+        Sys.print(f"{name}: {score}  ({.grade(score)})")
+    }
+}

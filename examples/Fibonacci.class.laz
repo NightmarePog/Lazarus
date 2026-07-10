@@ -1,0 +1,27 @@
+// Fibonacci with memoization using Map and Option.
+
+import std.Sys
+
+private cache: Map<int, int>
+
+fib(n: int): int {
+    if n <= 1 {
+        return n
+    }
+    mut cached = .cache.get(n)
+    if cached.is_some() {
+        return cached.unwrap()
+    }
+    mut result = .fib(n - 1) + .fib(n - 2)
+    .cache[n] = result
+    return result
+}
+
+constructor() {
+    .cache = [:]
+    mut i = 0
+    while i <= 10 {
+        Sys.print(f"fib({i}) = {.fib(i)}")
+        i = i + 1
+    }
+}

@@ -1,7 +1,7 @@
 # Lazarus
 
 [![CI](https://github.com/NightmarePog/Lazarus/actions/workflows/ci.yml/badge.svg)](https://github.com/NightmarePog/Lazarus/actions/workflows/ci.yml)
-[![Docs](https://github.com/NightmarePog/Lazarus/actions/workflows/docs.yml/badge.svg)](https://nightmarepog.github.io/Lazarus/)
+[![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://nightmarepog.github.io/Lazarus/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Language: Lua](https://img.shields.io/badge/target-Lua%205.1-000080.svg)
 ![Self-hosted](https://img.shields.io/badge/compiler-self--hosted-brightgreen.svg)

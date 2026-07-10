@@ -1,0 +1,48 @@
+// A simple todo list: add tasks, mark them done, print the list.
+// Uses List, Option, and for-in.
+
+import std.Sys
+import std.Option
+
+private tasks: List<str>
+private done: List<bool>
+
+add(name: str) {
+    .tasks.push(name)
+    .done.push(false)
+}
+
+finish(name: str) {
+    mut i = 0
+    for task in .tasks {
+        if task == name {
+            .done[i] = true
+        }
+        i = i + 1
+    }
+}
+
+print_list() {
+    mut i = 0
+    for task in .tasks {
+        if .done[i] {
+            Sys.print("[x] " + task)
+        } else {
+            Sys.print("[ ] " + task)
+        }
+        i = i + 1
+    }
+}
+
+constructor() {
+    .tasks = []
+    .done  = []
+
+    .add("buy groceries")
+    .add("write tests")
+    .add("ship v1.0")
+    .add("write more examples")
+
+    .finish("ship v1.0")
+    .print_list()
+}

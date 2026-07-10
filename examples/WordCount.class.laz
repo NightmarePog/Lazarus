@@ -1,0 +1,26 @@
+// Count word frequency in a string using Map and Str.
+
+import std.Sys
+import std.Str
+
+private counts: Map<str, int>
+
+count(text: str) {
+    mut words = Str.split(text, " ")
+    for word in words {
+        mut w = Str.trim(word)
+        if w != "" {
+            mut n = .counts.get(w).unwrap_or(0)
+            .counts[w] = n + 1
+        }
+    }
+}
+
+constructor() {
+    .counts = [:]
+    .count("the quick brown fox jumps over the lazy dog the fox the")
+
+    for word, n in .counts {
+        Sys.print(f"{word}: {n}")
+    }
+}
