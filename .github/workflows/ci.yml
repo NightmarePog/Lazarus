@@ -37,5 +37,5 @@ jobs:
               Sys.print(.msg)
           }
           LAZ
-          lua bin/lazarusc.lua /tmp/Smoke.class.laz --pkg-path .
+          lua bin/lazec.lua /tmp/Smoke.class.laz --pkg-path .
           lua Smoke.lua | grep -q "hello world"

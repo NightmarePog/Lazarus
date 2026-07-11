@@ -1,6 +1,6 @@
 #!/bin/sh
-# build-compiler — rebuild the self-hosted Lazarus compiler from compiler/,
-# seeded by the committed self-host binary (bin/lazarusc.lua). Does NOT use src/.
+# build-compiler — rebuild the self-hosted Laze compiler from compiler/,
+# seeded by the committed self-host binary (bin/lazec.lua). Does NOT use src/.
 #
 # It compiles the compiler with the current seed (stage 1), then with that
 # result (stage 2), then once more (stage 3). A correct self-hosting compiler is
@@ -14,12 +14,12 @@
 set -e
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-SEED="$ROOT/bin/lazarusc.lua"
+SEED="$ROOT/bin/lazec.lua"
 ENTRY="$ROOT/compiler/Main.class.laz"
 
 if [ ! -f "$SEED" ]; then
     echo "build-compiler: missing seed $SEED" >&2
-    echo "  bootstrap it once with: lua src/cli.lua build compiler/Main.laz -o bin/lazarusc.lua" >&2
+    echo "  bootstrap it once with: lua src/cli.lua build compiler/Main.laz -o bin/lazec.lua" >&2
     exit 1
 fi
 
@@ -38,4 +38,4 @@ if ! cmp -s "$work/s2/Main.lua" "$work/s3/Main.lua"; then
 fi
 
 cp "$work/s2/Main.lua" "$SEED"
-echo "build-compiler: installed bin/lazarusc.lua ($(wc -l < "$SEED") lines), fixpoint verified"
+echo "build-compiler: installed bin/lazec.lua ($(wc -l < "$SEED") lines), fixpoint verified"

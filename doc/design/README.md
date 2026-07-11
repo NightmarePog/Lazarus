@@ -1,6 +1,6 @@
-# Lazarus Language Reference
+# Laze Language Reference
 
-These documents describe the current Lazarus language: what it looks like, how each feature works, and how it maps to the Lua output.
+These documents describe the current Laze language: what it looks like, how each feature works, and how it maps to the Lua output.
 
 Start with [01-overview.md](01-overview.md) if you are new to the language. The documents are written to be read in order, but each one also works as a standalone reference.
 
@@ -8,7 +8,7 @@ Start with [01-overview.md](01-overview.md) if you are new to the language. The 
 
 | Document | What it covers |
 |---|---|
-| [01-overview.md](01-overview.md) | What Lazarus is, the three file kinds, a complete working example |
+| [01-overview.md](01-overview.md) | What Laze is, the three file kinds, a complete working example |
 | [02-variables-and-types.md](02-variables-and-types.md) | Bindings, mut, primitive types, strings, function types |
 | [03-classes.md](03-classes.md) | Class files: fields, constructors, methods, visibility, enums |
 | [04-control-flow.md](04-control-flow.md) | if, while, loop, for, for-in, match, break, return |

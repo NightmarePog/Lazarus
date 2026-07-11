@@ -1,7 +1,7 @@
 // Constants — the names currently known to hold a compile-time literal, mapping
 // each to its LiteralExpr node, for constant propagation. A child scope inherits
 // the current constants but drops any name shadowed by a parameter or loop
-// variable (built by copying, since Lazarus maps cannot delete a key).
+// variable (built by copying, since Laze maps cannot delete a key).
 
 import frontend.parser.Node
 

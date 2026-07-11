@@ -1,4 +1,4 @@
-# Contributing to Lazarus
+# Contributing to Laze
 
 Thanks for wanting to contribute. This document covers how to get set up, how the project is structured, and what to keep in mind before opening a PR.
 
@@ -7,8 +7,8 @@ Thanks for wanting to contribute. This document covers how to get set up, how th
 You need Lua 5.4 installed. Clone the repo and verify everything works:
 
 ```sh
-git clone https://github.com/NightmarePog/Lazarus
-cd Lazarus
+git clone https://github.com/NightmarePog/Laze
+cd Laze
 make selfhost
 ```
 
@@ -17,10 +17,10 @@ If `make selfhost` prints `fixpoint verified`, you're good. That command rebuild
 ## Project layout
 
 ```
-compiler/     Lazarus compiler source (written in Lazarus)
+compiler/     Laze compiler source (written in Laze)
 std/          Standard library
 doc/          Documentation
-bin/          Compiled compiler binary (bin/lazarusc.lua)
+bin/          Compiled compiler binary (bin/lazec.lua)
 examples/     Example programs
 ```
 
@@ -58,4 +58,4 @@ Bug reports and feature requests are welcome. For bugs, include the source file 
 
 ## What's a good first contribution
 
-Issues tagged [`good first issue`](https://github.com/NightmarePog/Lazarus/issues?q=is%3Aopen+label%3A%22good+first+issue%22) are scoped to be approachable without deep knowledge of the full pipeline.
+Issues tagged [`good first issue`](https://github.com/NightmarePog/Laze/issues?q=is%3Aopen+label%3A%22good+first+issue%22) are scoped to be approachable without deep knowledge of the full pipeline.

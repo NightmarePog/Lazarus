@@ -2,7 +2,7 @@
 
 ## Option
 
-`Option<T>` represents a value that might not be there. It is an enum with two variants: `Some(T)` holds a value, and `None` means absence. There is no `nil` in Lazarus: whenever something might be missing, the type is `Option`.
+`Option<T>` represents a value that might not be there. It is an enum with two variants: `Some(T)` holds a value, and `None` means absence. There is no `nil` in Laze: whenever something might be missing, the type is `Option`.
 
 ```
 find(items: List<str>, target: str): Option<int> {

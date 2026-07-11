@@ -1,4 +1,4 @@
-// MetaParser — extracts and parses the LAZARUS_META block from a compiled .lua
+// MetaParser — extracts and parses the LAZE_META block from a compiled .lua
 // file, reconstructing the class signature that Main.collect_signatures would
 // have produced from source. Used by the linker when importing a prebuilt .lua
 // library in place of a missing .laz source file.
@@ -14,9 +14,9 @@ constructor(src: str) {
     .pos = 1
 }
 
-// Extract the single JSON line from a --[[LAZARUS_META\n<json>\n]] block.
+// Extract the single JSON line from a --[[LAZE_META\n<json>\n]] block.
 static extract_json(lua_source: str): Option<str> {
-    mut marker = "--[[LAZARUS_META"
+    mut marker = "--[[LAZE_META"
     mut mp = Str.find(lua_source, marker)
     if mp.is_none() {
         return None
@@ -36,8 +36,8 @@ static extract_json(lua_source: str): Option<str> {
     return Some(Str.sub(lua_source, json_start, json_end).unwrap_or(""))
 }
 
-// Parse the LAZARUS_META block and return a collect_signatures-compatible sig,
-// or None if the file has no LAZARUS_META block.
+// Parse the LAZE_META block and return a collect_signatures-compatible sig,
+// or None if the file has no LAZE_META block.
 static parse_meta(lua_source: str): Option<dynamic> {
     mut json_opt = MetaParser.extract_json(lua_source)
     if json_opt.is_none() {

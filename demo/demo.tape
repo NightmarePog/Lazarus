@@ -7,7 +7,7 @@ Set Theme "Dracula"
 Set Shell "bash"
 
 Hide
-Type "cd /home/nightmare/Github/lazarus-lang/Lazarus"
+Type "cd /home/nightmare/Github/lazarus-lang/Laze"
 Enter
 Sleep 300ms
 Show
@@ -20,7 +20,7 @@ Sleep 200ms
 Enter
 Sleep 2500ms
 
-Type "lua bin/lazarusc.lua demo/Demo.class.laz --pkg-path ."
+Type "lua bin/lazec.lua demo/Demo.class.laz --pkg-path ."
 Sleep 200ms
 Enter
 Sleep 3s

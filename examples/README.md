@@ -1,6 +1,6 @@
 # Examples
 
-Each `.class.laz` file here is a runnable Lazarus program, paired with the `.lua` file the compiler produces. The generated `.lua` files are checked in so you can read the input and output side by side without running the compiler.
+Each `.class.laz` file here is a runnable Laze program, paired with the `.lua` file the compiler produces. The generated `.lua` files are checked in so you can read the input and output side by side without running the compiler.
 
 | Source | Output | Shows |
 |---|---|---|
@@ -16,7 +16,7 @@ Each `.class.laz` file here is a runnable Lazarus program, paired with the `.lua
 The compiler writes `<ClassName>.lua` to the current directory:
 
 ```sh
-lua bin/lazarusc.lua examples/Showcase.class.laz
+lua bin/lazec.lua examples/Showcase.class.laz
 lua Showcase.lua
 ```
 
@@ -33,7 +33,7 @@ lua -e 'local M = dofile("examples/Mutability.lua"); print(M.counter)'   -- 10
 The `multi/` directory shows how import works across files. `Main.class.laz` imports `Box`, which the compiler resolves to `Box.class.laz` in the same directory:
 
 ```sh
-lua bin/lazarusc.lua examples/multi/Main.class.laz
+lua bin/lazec.lua examples/multi/Main.class.laz
 lua Main.lua
 ```
 

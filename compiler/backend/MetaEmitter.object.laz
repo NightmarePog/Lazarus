@@ -1,11 +1,11 @@
 // MetaEmitter — serialises a class signature (as produced by Main.collect_signatures)
-// into a LAZARUS_META comment block prepended to compiled .lua files. The block lets
+// into a LAZE_META comment block prepended to compiled .lua files. The block lets
 // the linker reconstruct type information without the .laz source.
 
 import std.Str
 import backend.Text
 
-// Returns the keys of a Lazarus map sorted alphabetically, so JSON output is
+// Returns the keys of a Laze map sorted alphabetically, so JSON output is
 // deterministic across Lua VM instances (pairs() order is undefined).
 private lua sorted_keys(m): List<str> {
     local keys = {}
@@ -16,15 +16,15 @@ private lua sorted_keys(m): List<str> {
     return { kind = 'list', items = keys }
 }
 
-// Returns the value for key k from a Lazarus map (raw, not Option-wrapped).
+// Returns the value for key k from a Laze map (raw, not Option-wrapped).
 private lua map_raw_get(m, k): dynamic {
     return m.items[k]
 }
 
-// Produce the full --[[LAZARUS_META\n<json>\n]] block for one class.
+// Produce the full --[[LAZE_META\n<json>\n]] block for one class.
 emit(class_name: str, sig: dynamic): str {
     mut nl = Text.nl()
-    return "--[[LAZARUS_META" + nl + MetaEmitter.sig_json(class_name, sig) + nl + "]]"
+    return "--[[LAZE_META" + nl + MetaEmitter.sig_json(class_name, sig) + nl + "]]"
 }
 
 private sig_json(class_name: str, sig: dynamic): str {

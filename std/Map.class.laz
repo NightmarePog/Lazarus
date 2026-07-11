@@ -2,7 +2,7 @@ private kind: str
 private items: dynamic
 
 // Factory — same rationale as List.new(): avoids a 0-param static method call
-// in a Lazarus constructor body that the old seed binary would mistype.
+// in a Laze constructor body that the old seed binary would mistype.
 static lua new(): Map<dynamic, dynamic> {
     local self = {}
     self.kind = 'map'

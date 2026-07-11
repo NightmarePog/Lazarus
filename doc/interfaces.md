@@ -1,4 +1,4 @@
-# Lazarus — Interfaces
+# Laze — Interfaces
 
 An **interface** is a structural contract: a set of method signatures and property
 requirements. Any class that has those members satisfies the interface — there is

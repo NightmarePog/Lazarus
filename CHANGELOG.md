@@ -41,11 +41,11 @@ First public release.
 
 ### Compiler
 
-- Self-hosted: source in `compiler/`, compiled output is `bin/lazarusc.lua`
+- Self-hosted: source in `compiler/`, compiled output is `bin/lazec.lua`
 - Fixpoint verification on every `make selfhost`
 - Four optimization levels: `-O0` (default), `-O1`, `-O2`, `-Os` (full name mangling)
 - `--check` mode: reports errors as JSON lines without producing output, used by tooling
-- `--lib` mode: emits only the entry class block with a `LAZARUS_META` header for prebuilt libraries
+- `--lib` mode: emits only the entry class block with a `LAZE_META` header for prebuilt libraries
 - `--platform <name>` flag for platform-gated builds
 - `--pkg-path <dir>` to specify where the standard library lives
 - Parser error recovery — reports all errors in a file, not just the first

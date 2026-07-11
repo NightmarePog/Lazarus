@@ -1,5 +1,5 @@
 // Str — string utilities: extern bindings to Lua's `string` library plus
-// pure-Lazarus functions built on them. `find` uses a single-return shim
+// pure-Laze functions built on them. `find` uses a single-return shim
 // (`__lz_str_find`) since the language has no multiple returns: it yields the
 // 1-based match start, or None when absent. Externs with an Option return wrap
 // at the boundary; `split` returns its list directly. All matching is

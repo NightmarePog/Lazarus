@@ -4,7 +4,7 @@
 // stages see a plain single-class program. An already-loaded file is skipped,
 // breaking cycles; an unreadable import raises at its `import` line.
 //
-// When a `.laz` file is absent but a `.lua` file with a LAZARUS_META block exists,
+// When a `.laz` file is absent but a `.lua` file with a LAZE_META block exists,
 // the linker loads it as a prebuilt module: the metadata drives typechecking and
 // the Lua source is bundled verbatim without re-compilation.
 
@@ -121,7 +121,7 @@ private load(path: str, origin_source: str, origin_line: int, origin_col: int, o
     .loaded[path] = true
 }
 
-// Load a prebuilt .lua module: parse its LAZARUS_META block for type signatures
+// Load a prebuilt .lua module: parse its LAZE_META block for type signatures
 // and mark it for verbatim Lua emission (no re-compilation).
 private load_prebuilt(path: str, origin_source: str, origin_line: int, origin_col: int, origin_span: int): unit {
     if .loaded.has(path) {
@@ -134,7 +134,7 @@ private load_prebuilt(path: str, origin_source: str, origin_line: int, origin_co
     mut lua_source = source_opt.unwrap()
     mut sig_opt = MetaParser.parse_meta(lua_source)
     if sig_opt.is_none() {
-        Error("LinkError", "prebuilt library '" + path + "' has no LAZARUS_META block", origin_line, origin_col, origin_source, origin_span).raise()
+        Error("LinkError", "prebuilt library '" + path + "' has no LAZE_META block", origin_line, origin_col, origin_source, origin_span).raise()
     }
     mut class_name = Path.stem(path)
     mut dummy_ast = Node("Program", ["body": []])

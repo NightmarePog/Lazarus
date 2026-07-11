@@ -1,5 +1,5 @@
 [book]
-title = "Lazarus"
+title = "Laze"
 description = "A statically-typed language that compiles to Lua"
 src = "../doc/design"
 language = "en"
@@ -8,6 +8,6 @@ language = "en"
 build-dir = "dist"
 
 [output.html]
-git-repository-url = "https://github.com/NightmarePog/Lazarus"
-edit-url-template = "https://github.com/NightmarePog/Lazarus/edit/main/doc/design/{path}"
-site-url = "/Lazarus/"
+git-repository-url = "https://github.com/NightmarePog/Laze"
+edit-url-template = "https://github.com/NightmarePog/Laze/edit/main/doc/design/{path}"
+site-url = "/Laze/"

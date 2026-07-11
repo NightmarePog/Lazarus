@@ -71,7 +71,7 @@ private emit_variant_ctor(name: str, mangled_name: str, fields: List<Node>): str
 
 // Statement boundary: emit the node, then prepend any pending `?`-propagation
 // lines accumulated during expression emission. A source-location comment is
-// prepended so runtime Lua errors can be mapped back to the Lazarus source.
+// prepended so runtime Lua errors can be mapped back to the Laze source.
 public emit_stmt(node: Node): str {
     mut result = .emit_stmt_inner(node)
     mut prefix = .exprs.take_pending()

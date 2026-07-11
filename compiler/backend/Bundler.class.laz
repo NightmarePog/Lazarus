@@ -5,7 +5,7 @@
 // declarations emits no class — its bindings are gathered into the externs map and
 // threaded into every real module's codegen. Pass two generates each non-extern
 // class block with that map and the module's imports as its known classes.
-// Prebuilt modules (loaded from .lua with LAZARUS_META) are emitted verbatim.
+// Prebuilt modules (loaded from .lua with LAZE_META) are emitted verbatim.
 
 import backend.Codegen
 import backend.Mangler
