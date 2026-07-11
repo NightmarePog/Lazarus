@@ -171,12 +171,7 @@ private parse_object_member(): Node {
         .cursor.fail("an #object file has no instances; remove the constructor")
         return Ast.error_node()
     }
-    mut macros = .parse_macros()
-    mut node = .parse_object_member_decl(visibility)
-    if macros.len() > 0 {
-        node.set("macro_modifiers", macros)
-    }
-    return node
+    return .parse_object_member_decl(visibility)
 }
 
 private parse_object_member_decl(visibility: str): Node {
@@ -215,14 +210,6 @@ private parse_statement(): Node {
             if tok.value == "match" and .starts_match() {
                 .cursor.advance()
                 return .parse_match(tok)
-            }
-            if .is_macro_ahead() {
-                mut macros = .parse_macros()
-                mut node = .parse_statement()
-                if macros.len() > 0 {
-                    node.set("macro_modifiers", macros)
-                }
-                return node
             }
             return .parse_identifier_statement(tok)
         }
@@ -397,16 +384,8 @@ private parse_extern(tok: Token): Node {
     return Ast.extern_decl(name.value, params, param_types, return_type, target.value, tok.line, tok.column)
 }
 
-// A `private`/`public` declaration: a property, a class member, or a method.
-// Any leading macro modifiers (e.g. `Debug Serialize`) are consumed first and
-// stored on the resulting node as `macro_modifiers`.
 private parse_member(visibility: str): Node {
-    mut macros = .parse_macros()
-    mut node = .parse_member_decl(visibility)
-    if macros.len() > 0 {
-        node.set("macro_modifiers", macros)
-    }
-    return node
+    return .parse_member_decl(visibility)
 }
 
 private parse_member_decl(visibility: str): Node {
@@ -431,12 +410,7 @@ private parse_member_decl(visibility: str): Node {
 }
 
 private parse_static(): Node {
-    mut macros = .parse_macros()
-    mut node = .parse_static_decl()
-    if macros.len() > 0 {
-        node.set("macro_modifiers", macros)
-    }
-    return node
+    return .parse_static_decl()
 }
 
 private parse_static_decl(): Node {
@@ -505,52 +479,6 @@ private parse_method(visibility: str, is_static: bool): Node {
         body = .parse_block("method body")
     }
     return Ast.function_decl(name.value, params, body, is_static, visibility, name.line, name.column, param_types, return_type, type_params)
-}
-
-// True when the current IDENTIFIER is a macro modifier rather than the declaration
-// name. Peeks past the identifier (and its optional `(bare-ids)` args); if what
-// follows is another IDENTIFIER or a declaration-starting keyword, it's a macro.
-private is_macro_ahead(): bool {
-    mut i = .cursor.position() + 1
-    if .cursor.token_at(i).kind == "LEFT_BRACKET" {
-        i = i + 1
-        loop {
-            mut k = .cursor.token_at(i).kind
-            if k == "EOF" { return false }
-            if k == "RIGHT_BRACKET" {
-                i = i + 1
-                break
-            }
-            if k == "IDENTIFIER" or k == "COMMA" { i = i + 1 }
-            else { return false }
-        }
-    }
-    mut after = .cursor.token_at(i).kind
-    return after == "IDENTIFIER" or after == "CONSTRUCTOR" or after == "PLATFORM" or after == "STATIC" or after == "LUA"
-}
-
-// Consume zero or more `Name` or `Name(arg, …)` macro modifier tokens and return
-// them as a list. Each entry has `name` (the handler class) and `args` (method
-// names to invoke; empty means call the default `apply` method).
-private parse_macros(): List<Map<str, dynamic>> {
-    mut macros = []
-    loop {
-        if not .cursor.check("IDENTIFIER") { break }
-        if not .is_macro_ahead() { break }
-        mut name_tok = .cursor.advance()
-        mut args = []
-        if .cursor.match("LEFT_BRACKET") {
-            loop {
-                if .cursor.check("RIGHT_BRACKET") { break }
-                mut arg = .cursor.consume("IDENTIFIER", "Expected macro argument")
-                args.push(arg.value)
-                if not .cursor.match("COMMA") { break }
-            }
-            .cursor.consume("RIGHT_BRACKET", "Expected ')' after macro arguments")
-        }
-        macros.push(["name": name_tok.value, "args": args, "line": name_tok.line, "col": name_tok.column])
-    }
-    return macros
 }
 
 private parse_platform_stmt(): Node {
