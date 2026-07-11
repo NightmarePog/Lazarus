@@ -48,7 +48,7 @@ static add(a: int, b: int): int {
 
 ## Primitive types
 
-Lazarus has four primitive types:
+Laze has four primitive types:
 
 `int` is a whole number. `float` is a real number. They are distinct and do not mix: adding an `int` and a `float` without an explicit conversion is a type error. This distinction matters because a future backend will map them to Lua 5.4's real integer and float types.
 
@@ -59,7 +59,7 @@ x: float = 3.14
 
 `str` is a string. `bool` is a boolean, with the literals `true` and `false`.
 
-There is no `nil` in Lazarus. Absence is represented with `Option<T>` (see [05-types-and-data.md](05-types-and-data.md)).
+There is no `nil` in Laze. Absence is represented with `Option<T>` (see [05-types-and-data.md](05-types-and-data.md)).
 
 ## The dynamic type
 

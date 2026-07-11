@@ -43,7 +43,7 @@ Every import is project-root-relative. There is no relative `../` form.
 The compiler takes a single entry file and follows its imports transitively. Everything reachable ends up in one output file:
 
 ```
-lua bin/lazarusc.lua src/Main.class.laz
+lua bin/lazec.lua src/Main.class.laz
 lua Main.lua
 ```
 
@@ -62,7 +62,7 @@ myproject/
 
 `Main.class.laz` imports from `engine.World`, which imports from `engine.Entity`, and so on. The compiler resolves all of that, checks types, and emits one `Main.lua`.
 
-The `std/` directory must be present. The compiler does not ship it separately -- copy or symlink it from the Lazarus repo:
+The `std/` directory must be present. The compiler does not ship it separately -- copy or symlink it from the Laze repo:
 
 ```sh
 ln -s /path/to/lazarus/std ./std
@@ -71,7 +71,7 @@ ln -s /path/to/lazarus/std ./std
 Or skip the symlink and pass `--pkg-path` at compile time:
 
 ```sh
-lua bin/lazarusc.lua src/Main.class.laz --pkg-path /path/to/lazarus
+lua bin/lazec.lua src/Main.class.laz --pkg-path /path/to/lazarus
 ```
 
 ## The standard library
@@ -97,7 +97,7 @@ Most programs import at least `std.Sys` for printing and `std.Str` for string op
 
 ## Externs in object files
 
-The standard library objects are implemented with `extern` declarations, which bind a Lazarus name to an existing Lua global:
+The standard library objects are implemented with `extern` declarations, which bind a Laze name to an existing Lua global:
 
 ```
 // std/Sys.object.laz
@@ -115,7 +115,7 @@ See [07-interop.md](07-interop.md) for the full interop system.
 If you are building a reusable module rather than a runnable program, compile with `--lib`:
 
 ```sh
-lua bin/lazarusc.lua MyLib.class.laz --lib
+lua bin/lazec.lua MyLib.class.laz --lib
 ```
 
-Library mode skips the entry-point call and prepends a `LAZARUS_META` header to the output. The linker can then load this prebuilt `.lua` without re-compiling the source.
+Library mode skips the entry-point call and prepends a `LAZE_META` header to the output. The linker can then load this prebuilt `.lua` without re-compiling the source.

@@ -1,16 +1,16 @@
-# Lazarus
+# Laze
 
-[![CI](https://github.com/NightmarePog/Lazarus/actions/workflows/ci.yml/badge.svg)](https://github.com/NightmarePog/Lazarus/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://nightmarepog.github.io/Lazarus/)
+[![CI](https://github.com/NightmarePog/Laze/actions/workflows/ci.yml/badge.svg)](https://github.com/NightmarePog/Laze/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://nightmarepog.github.io/Laze/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Language: Lua](https://img.shields.io/badge/target-Lua%205.1-000080.svg)
 ![Self-hosted](https://img.shields.io/badge/compiler-self--hosted-brightgreen.svg)
 
 ![Demo](demo/demo.gif)
 
-Lazarus is a small, statically-typed language that compiles to Lua. The output is a single self-contained `.lua` file with no runtime dependencies, which makes it a good fit for environments where you have Lua but not much else: ComputerCraft computers, embedded scripting runtimes, or anywhere a plain `.lua` file is easier to deploy than a set of modules.
+Laze is a small, statically-typed language that compiles to Lua. The output is a single self-contained `.lua` file with no runtime dependencies, which makes it a good fit for environments where you have Lua but not much else: ComputerCraft computers, embedded scripting runtimes, or anywhere a plain `.lua` file is easier to deploy than a set of modules.
 
-The main thing Lazarus gives you over writing Lua directly is structure. Classes with real constructors, a type system that catches mistakes before runtime, a module system that resolves imports at compile time, and a clean interop layer for calling existing Lua APIs with type signatures.
+The main thing Laze gives you over writing Lua directly is structure. Classes with real constructors, a type system that catches mistakes before runtime, a module system that resolves imports at compile time, and a clean interop layer for calling existing Lua APIs with type signatures.
 
 ## Quick example
 
@@ -41,13 +41,13 @@ static main() {
 Run it:
 
 ```sh
-lua bin/lazarusc.lua Counter.class.laz
+lua bin/lazec.lua Counter.class.laz
 lua Counter.lua
 ```
 
 ## File kinds
 
-Lazarus has three file kinds, distinguished by the suffix before `.laz`:
+Laze has three file kinds, distinguished by the suffix before `.laz`:
 
 | Suffix | Kind | Used for |
 |---|---|---|
@@ -66,21 +66,21 @@ The compiler looks for `std/` next to your source file. Copy or symlink the `std
 cp -r /path/to/lazarus/std ./std
 
 # Option B: pass --pkg-path instead
-lua bin/lazarusc.lua MyProgram.class.laz --pkg-path /path/to/lazarus
+lua bin/lazec.lua MyProgram.class.laz --pkg-path /path/to/lazarus
 ```
 
 ```sh
 # Compile a file (output: <ClassName>.lua in the current directory)
-lua bin/lazarusc.lua path/to/Entry.class.laz
+lua bin/lazec.lua path/to/Entry.class.laz
 
 # Check for errors without producing output
-lua bin/lazarusc.lua path/to/File.class.laz --check
+lua bin/lazec.lua path/to/File.class.laz --check
 
 # Set optimization level (O0 is default, Os is smallest output)
-lua bin/lazarusc.lua Entry.class.laz -O2
+lua bin/lazec.lua Entry.class.laz -O2
 
-# Compile as a library (no entry-point call, exports LAZARUS_META header)
-lua bin/lazarusc.lua Lib.class.laz --lib
+# Compile as a library (no entry-point call, exports LAZE_META header)
+lua bin/lazec.lua Lib.class.laz --lib
 ```
 
 Via make:
@@ -91,7 +91,7 @@ make selfbuild FILE=path/to/Entry.class.laz
 
 ## Language reference
 
-Documentation: **[nightmarepog.github.io/Lazarus](https://nightmarepog.github.io/Lazarus/)**
+Documentation: **[nightmarepog.github.io/Laze](https://nightmarepog.github.io/Laze/)**
 
 Source is in [`doc/design/`](doc/design/).
 
@@ -114,10 +114,10 @@ Source is in [`doc/design/`](doc/design/).
 
 ## Compiler development
 
-The compiler is self-hosted: it is written in Lazarus and compiled by the binary it produces. The source lives in `compiler/`. The compiled output is `bin/lazarusc.lua`.
+The compiler is self-hosted: it is written in Laze and compiled by the binary it produces. The source lives in `compiler/`. The compiled output is `bin/lazec.lua`.
 
 ```sh
-make selfhost    # rebuild bin/lazarusc.lua from compiler/ (verifies the fixpoint)
+make selfhost    # rebuild bin/lazec.lua from compiler/ (verifies the fixpoint)
 make lint        # run selene
 make format      # run stylua
 ```

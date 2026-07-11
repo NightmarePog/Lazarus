@@ -146,7 +146,7 @@ to `{kind="Some", _1=5}` via the bare-variant rewrite. Nothing else to do.
 ## Testing & guardrails
 
 - `make selfhost` fixpoint holds (compiler source stays non-generic).
-- New typed `.laz` programs (run through `bin/lazarusc.lua`):
+- New typed `.laz` programs (run through `bin/lazec.lua`):
   - generic enum: `Some(5)` → `Option<int>`; payload flows through `match` (`v : int`).
   - generic class via `constructor<T>`: field/method `T` flow; `Pair(1,"x").first() : int`.
   - generic method `<U>`.

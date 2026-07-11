@@ -1,10 +1,10 @@
 # Lua Interop
 
-Lazarus compiles to Lua and can call any Lua function or global. Two mechanisms handle this: typed `extern` declarations for safe, checked calls, and inline `lua` bodies for everything else.
+Laze compiles to Lua and can call any Lua function or global. Two mechanisms handle this: typed `extern` declarations for safe, checked calls, and inline `lua` bodies for everything else.
 
 ## extern declarations
 
-An `extern` declaration binds a Lazarus name to a Lua global and gives it a type signature. After the declaration, calls through that name are type-checked and emit directly to the Lua global:
+An `extern` declaration binds a Laze name to a Lua global and gives it a type signature. After the declaration, calls through that name are type-checked and emit directly to the Lua global:
 
 ```
 // In a .object.laz file
@@ -21,7 +21,7 @@ extern upper(s: str): Option<str>    = "string.upper"
 extern format(fmt) = "string.format"
 ```
 
-`extern` declarations without a return type, or with an `Option<T>` return type, wrap the Lua return value at the boundary. If Lua returns `nil`, the Lazarus side receives `None`.
+`extern` declarations without a return type, or with an `Option<T>` return type, wrap the Lua return value at the boundary. If Lua returns `nil`, the Laze side receives `None`.
 
 You can leave a parameter untyped when the underlying Lua function is variadic or accepts multiple numeric types:
 
@@ -82,7 +82,7 @@ platform(roblox) extern sleep(n: float): unit = "task.wait"
 Pass the platform name at build time with `--platform`:
 
 ```sh
-lua bin/lazarusc.lua Main.class.laz --platform cc
+lua bin/lazec.lua Main.class.laz --platform cc
 ```
 
 The compiler emits only the declarations that match the given platform. Declarations without a `platform` modifier are always included.

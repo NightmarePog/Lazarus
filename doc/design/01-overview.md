@@ -1,12 +1,12 @@
 # Overview
 
-Lazarus is a small, statically-typed language that compiles to a single Lua file. You get real classes, a type system that catches mistakes before runtime, and a module system that resolves imports at compile time. The output is plain Lua that runs anywhere Lua 5.1 runs, with no runtime dependencies.
+Laze is a small, statically-typed language that compiles to a single Lua file. You get real classes, a type system that catches mistakes before runtime, and a module system that resolves imports at compile time. The output is plain Lua that runs anywhere Lua 5.1 runs, with no runtime dependencies.
 
 The language was designed for environments where you have Lua but not much else: ComputerCraft computers, embedded scripting runtimes, game mod environments, or any place where dropping a single `.lua` file is simpler than managing a package ecosystem.
 
 ## Three kinds of files
 
-Every Lazarus source file ends in `.laz`, but the suffix before that tells the compiler what kind of thing it defines:
+Every Laze source file ends in `.laz`, but the suffix before that tells the compiler what kind of thing it defines:
 
 **`.class.laz`** defines a class. Classes are instantiable types: they have a constructor, instance fields, and instance methods. The file name (without the suffix) becomes the class name, so `Counter.class.laz` defines a class called `Counter`.
 
@@ -48,7 +48,7 @@ static main() {
 Run it:
 
 ```sh
-lua bin/lazarusc.lua Counter.class.laz
+lua bin/lazec.lua Counter.class.laz
 lua Counter.lua
 # count is 3
 ```
@@ -65,21 +65,21 @@ Fields are accessed inside methods with a leading dot: `.count`. This is shortha
 
 ## Building
 
-The self-hosted compiler is `bin/lazarusc.lua`. It takes a source file and writes `<ClassName>.lua` to the current directory:
+The self-hosted compiler is `bin/lazec.lua`. It takes a source file and writes `<ClassName>.lua` to the current directory:
 
 ```sh
-lua bin/lazarusc.lua MyProgram.class.laz
+lua bin/lazec.lua MyProgram.class.laz
 lua MyProgram.lua
 ```
 
-**The stdlib is not bundled.** The compiler looks for `std/` next to your source file. Before compiling your own projects, either copy or symlink `std/` from the Lazarus repo into your project directory, or pass `--pkg-path` to tell the compiler where to find it:
+**The stdlib is not bundled.** The compiler looks for `std/` next to your source file. Before compiling your own projects, either copy or symlink `std/` from the Laze repo into your project directory, or pass `--pkg-path` to tell the compiler where to find it:
 
 ```sh
 # symlink (recommended -- stays up to date)
 ln -s /path/to/lazarus/std ./std
 
 # or pass it at compile time
-lua bin/lazarusc.lua MyProgram.class.laz --pkg-path /path/to/lazarus
+lua bin/lazec.lua MyProgram.class.laz --pkg-path /path/to/lazarus
 ```
 
 Flags:

@@ -1,4 +1,4 @@
-# Lazarus — Roadmap & Planned Features
+# Laze — Roadmap & Planned Features
 
 Status snapshot and the agreed backlog. Captures the planning discussion of
 2026-06-27. For the deeper v2 language spec see [`doc/design/`](design/); for the
@@ -42,13 +42,13 @@ fixpoint check before the next.
 | # | Feature | Notes |
 |---|---------|-------|
 | **B1** | **Multi-version / platform codegen** — Lua 5.1 / 5.2 / 5.3, **ComputerCraft / OpenComputers** | A `--target` system: the codegen and the `__lz_*` runtime prelude adapt per target (5.3 integers & `//`, `table.unpack` vs `unpack`, no `setfenv` in 5.2+…), plus platform stdlib/externs (CC `term`, OC `component`). Mostly additive in `Runtime`/`Codegen`. Pairs with B2. |
-| **B2** | **Native backend (C, then optionally LLVM)** — exploratory | Emit C (clang/gcc → native) from the **typed IR**, with a small runtime + GC. The frontend + type system are the reusable, done part; the project's center of gravity is **a runtime with garbage collection**, not the codegen. Key blockers: a memory/GC model, and `dynamic` (needs a boxed fallback or fully-typed code). NB: going `Lazarus → Lua → C` **erases the types** that make native compilation worthwhile — emit C straight from the typed IR. For a free standalone binary today, `luastatic` bundles the Lua VM; for free speed, run output under **LuaJIT**. |
+| **B2** | **Native backend (C, then optionally LLVM)** — exploratory | Emit C (clang/gcc → native) from the **typed IR**, with a small runtime + GC. The frontend + type system are the reusable, done part; the project's center of gravity is **a runtime with garbage collection**, not the codegen. Key blockers: a memory/GC model, and `dynamic` (needs a boxed fallback or fully-typed code). NB: going `Laze → Lua → C` **erases the types** that make native compilation worthwhile — emit C straight from the typed IR. For a free standalone binary today, `luastatic` bundles the Lua VM; for free speed, run output under **LuaJIT**. |
 
 ### Tooling (separate programs that reuse the frontend; do not change the language)
 
 | # | Feature | Notes |
 |---|---------|-------|
-| **T1** | **Documentation generator** | Walk the AST, keep `public` declarations, emit Markdown with typed signatures + the leading `//` doc comments. Non-invasive comment capture: pair contiguous `//` blocks with each node's `line`/`col` — **no lexer/parser change**. Replaces the dead Doxygen setup (`doc/Doxyfile`, which has no Lazarus parser). Higher with the new typing/interfaces. |
+| **T1** | **Documentation generator** | Walk the AST, keep `public` declarations, emit Markdown with typed signatures + the leading `//` doc comments. Non-invasive comment capture: pair contiguous `//` blocks with each node's `line`/`col` — **no lexer/parser change**. Replaces the dead Doxygen setup (`doc/Doxyfile`, which has no Laze parser). Higher with the new typing/interfaces. |
 | **T2** | **LSP server** | Wrap the existing lexer/parser/checker, speak JSON-RPC over stdio: diagnostics first, then hover / go-to-def / completion. Big but additive; the frontend already produces what it needs. |
 | **T3** | **Package manager** | Manifest + dependency resolver for lib importing. Scope small first: a manifest + local/path deps + resolver. Mostly tooling outside the compiler; pairs with B1. |
 

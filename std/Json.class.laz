@@ -21,7 +21,7 @@ static lua parse(s: str): dynamic {
     return Json.new(s):parse_value()
 }
 
-// Emit a Lazarus value as a compact JSON string.
+// Emit a Laze value as a compact JSON string.
 static lua emit(v: dynamic): str {
     if v == nil then return 'null' end
     local t = type(v)

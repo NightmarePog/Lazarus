@@ -1,4 +1,4 @@
-// The Lazarus compiler: resolve imports, lex, parse, analyse, optimise and emit
+// The Laze compiler: resolve imports, lex, parse, analyse, optimise and emit
 // one runnable Lua 5.1 chunk to stdout.
 //
 //   lua Main.lua path/to/Entry.laz   # bundle a file together with its imports
@@ -74,7 +74,7 @@ constructor() {
             Main.build_file(path.unwrap(), plat, pkg_path, opt_level)
         }
     } else {
-        Error("NoFileAppended", "No file appended, use 'lazarus <FILE.laz>'", 0, 0, "", 2).raise()
+        Error("NoFileAppended", "No file appended, use 'lazec <FILE.laz>'", 0, 0, "", 2).raise()
     }
 }
 
@@ -149,7 +149,7 @@ private static lua check_file(path: str, pkg_path: str): unit {
 
 // A file entry point: follow its imports and bundle the whole program. Each
 // module is analysed and optimised on its own before the bundler composes them.
-// Output is written to <EntryClass>.lua with a LAZARUS_META header.
+// Output is written to <EntryClass>.lua with a LAZE_META header.
 static build_file(path: str, plat: str, pkg_path: str, opt_level: int): unit {
     mut linker = Linker(path, pkg_path)
     mut modules = linker.link()
@@ -203,7 +203,7 @@ static build_file(path: str, plat: str, pkg_path: str, opt_level: int): unit {
 
 // Library compilation: analyse the entry module (and its imports for typechecking),
 // then emit ONLY the entry class block — no stdlib prelude, no entry-point call.
-// Output is <EntryClass>.lua with a LAZARUS_META header. The file can be imported
+// Output is <EntryClass>.lua with a LAZE_META header. The file can be imported
 // as a prebuilt library by other programs without recompilation.
 static build_lib(path: str, plat: str, pkg_path: str, opt_level: int): unit {
     mut linker = Linker(path, pkg_path)

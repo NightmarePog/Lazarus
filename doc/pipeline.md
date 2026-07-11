@@ -1,4 +1,4 @@
-# Lazarus – Compiler Pipeline
+# Laze – Compiler Pipeline
 
 ## Overview
 
@@ -51,7 +51,7 @@ To add a new language feature, follow [`adding-features.md`](adding-features.md)
 
 Follows `import` statements recursively, reads each `.laz` file, lexes and
 parses it, and returns the modules sorted so each dependency comes before its
-dependents. Prebuilt `.lua` libraries (those with a `LAZARUS_META` header) are
+dependents. Prebuilt `.lua` libraries (those with a `LAZE_META` header) are
 loaded directly without recompilation.
 
 File kinds are determined by filename suffix:
@@ -369,7 +369,7 @@ prelude when collections or Options are used, appends the entry-point call
 `return EntryClass.new(...)`, and writes the result. Also handles prebuilt (`.lua`)
 library modules by inserting their source verbatim.
 
-The `LAZARUS_META` header (written by `MetaEmitter`) records the class
+The `LAZE_META` header (written by `MetaEmitter`) records the class
 signature so the file can be imported as a prebuilt library without
 recompilation.
 

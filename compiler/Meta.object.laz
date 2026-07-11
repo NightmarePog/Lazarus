@@ -1,5 +1,5 @@
 // Meta — compiler-wide metadata: name, version, and target runtime.
 
-public name: str = "Lazarus"
+public name: str = "Laze"
 public version: str = "1.0"
 public target: str = "Lua 5.1"

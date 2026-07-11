@@ -320,7 +320,7 @@ private read_string(): Token {
 
 // Consumes the backslash (already confirmed current) and the following character,
 // returning the decoded value. Uses Str.char for characters that can't appear
-// literally in a Lazarus string (backslash=92, quote=34).
+// literally in a Laze string (backslash=92, quote=34).
 private read_escape(str_line: int, str_col: int): str {
     .advance()
     if .at_end() {

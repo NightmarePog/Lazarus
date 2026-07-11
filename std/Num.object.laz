@@ -1,5 +1,5 @@
 // Num — extern bindings to Lua's `math` library plus `tonumber` / `tostring`,
-// and pure-Lazarus numeric helpers. `to_number` wraps at the Option boundary
+// and pure-Laze numeric helpers. `to_number` wraps at the Option boundary
 // (None for a non-numeric string). to_text / to_int / to_float are left with
 // untyped params because callers pass both int and float — tostring/tonumber/
 // math.floor accept any number in Lua.

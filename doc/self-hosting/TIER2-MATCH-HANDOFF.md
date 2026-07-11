@@ -16,17 +16,17 @@ what is done, the rules you must follow, and what is left.
    self-hosted compiler) is canonical. All language work goes in `compiler/`.
 
 2. **The `src/` cord is CUT (done 2026-06-25). Build via `bin/`, never `src/`.**
-   - The committed prebuilt self-host binary is **`bin/lazarusc.lua`** (the
+   - The committed prebuilt self-host binary is **`bin/lazec.lua`** (the
      fixpoint binary). `src/` is frozen legacy and no longer in the build path.
    - After ANY change to `compiler/*.laz`, run **`make selfhost`** (= `bin/build-compiler`):
      it recompiles `compiler/` with the current `bin/` seed, verifies a
-     stage1==stage2 fixpoint, then installs the new `bin/lazarusc.lua`. Commit
+     stage1==stage2 fixpoint, then installs the new `bin/lazec.lua`. Commit
      the refreshed binary alongside the source.
-   - **`compiler/` source MAY now use `match`/`enum`** — `bin/lazarusc.lua`
+   - **`compiler/` source MAY now use `match`/`enum`** — `bin/lazec.lua`
      understands them. (The bootstrap ladder is only needed for a *brand-new*
      syntax: implement it in old syntax, `make selfhost` once so the binary
      learns it, then start using it.)
-   - Compile a program: `make selfbuild FILE=x.laz` or `lua bin/lazarusc.lua
+   - Compile a program: `make selfbuild FILE=x.laz` or `lua bin/lazec.lua
      x.laz` (writes `./Main.lua`).
 
 3. **Always verify with the same four checks** (this is how Phase 1 was signed
@@ -160,7 +160,7 @@ Decisions to make (and write down):
 - **Runtime rep (erased):** a tagged table, mirroring the existing Option/list
   runtime — `{ kind = 'Circle', ... }`. See `compiler/backend/Runtime.laz` for
   the existing `{ kind = ... }` convention (tag strings are SINGLE-quoted so they
-  sit inside Lazarus double-quoted literals — the lexer has no escapes).
+  sit inside Laze double-quoted literals — the lexer has no escapes).
 - **Pattern binding:** `Circle(r) =>` must bind `r` in the arm scope. Extend
   `MatchArm` with bound names; `check_match` declares them in the arm's child
   scope; `emit_match` pulls them out of the tagged table.
@@ -185,10 +185,10 @@ ideally introduce a `NodeKind` enum and `match node.kind { LiteralExpr => ... }`
 in place of the stringly-typed `if k == "..."` chains — deleting the "everything
 else falls through" comments in favour of compiler-checked exhaustiveness.
 
-**The bootstrap groundwork is already done** (`bin/lazarusc.lua` + `make
+**The bootstrap groundwork is already done** (`bin/lazec.lua` + `make
 selfhost`), so this is now a normal change, not a milestone: edit the source, run
 `make selfhost` to refresh + fixpoint-check the binary, run `busted`, commit the
-source and the refreshed `bin/lazarusc.lua` together.
+source and the refreshed `bin/lazec.lua` together.
 
 Recommended approach: migrate ONE ladder at a time (e.g. `StmtEmitter.emit_stmt`
 first), `make selfhost` + `busted` after each, so a regression is easy to

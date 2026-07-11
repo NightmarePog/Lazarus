@@ -1,4 +1,4 @@
-// Char — character classification by ASCII byte code (Lazarus has no `%a`/`%d`
+// Char — character classification by ASCII byte code (Laze has no `%a`/`%d`
 // patterns). Each predicate takes a one-char string; the empty string (EOF) has
 // no byte, so `code_of` is None and `unwrap_or(0)` makes every predicate false.
 

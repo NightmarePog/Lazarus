@@ -1,6 +1,6 @@
-# Lazarus – Adding a Language Feature
+# Laze – Adding a Language Feature
 
-This is the standard recipe for implementing a new feature. Lazarus is a
+This is the standard recipe for implementing a new feature. Laze is a
 six-stage pipeline (see [`pipeline.md`](pipeline.md)); a feature is added by
 walking it **front to back**, touching only the stages the feature needs. Each
 stage has a single, well-defined registration point so new code is *added*, not

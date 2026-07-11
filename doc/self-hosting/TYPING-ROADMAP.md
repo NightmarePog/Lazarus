@@ -6,8 +6,8 @@ Per-phase detail also tracked in memory `lazarus-selfhost-compiler-status`.
 ## Ground rules (every phase)
 - Implement in `compiler/` only. `src/` is frozen legacy, not in the build path.
 - New syntax via the bootstrap ladder: write it in old syntax → `make selfhost`
-  (seeds from `bin/lazarusc.lua`, verifies the stage1==stage2 fixpoint, installs)
-  → then the binary understands it. Commit the refreshed `bin/lazarusc.lua` with
+  (seeds from `bin/lazec.lua`, verifies the stage1==stage2 fixpoint, installs)
+  → then the binary understands it. Commit the refreshed `bin/lazec.lua` with
   the source.
 - After each phase: `make selfhost` (fixpoint) **and** `busted` (must stay 394/0),
   plus a typed test program exercising the new behaviour.

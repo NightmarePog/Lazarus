@@ -35,17 +35,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${{ github.ref_name }}" \
-            bin/lazarusc.lua \
+            bin/lazec.lua \
             std.tar.gz \
-            --title "Lazarus ${{ github.ref_name }}" \
+            --title "Laze ${{ github.ref_name }}" \
             --notes-file - << 'EOF'
-          See the [changelog](https://github.com/NightmarePog/Lazarus/commits/${{ github.ref_name }}) for what changed in this release.
+          See the [changelog](https://github.com/NightmarePog/Laze/commits/${{ github.ref_name }}) for what changed in this release.
 
           ## Assets
 
           | File | Description |
           |---|---|
-          | `lazarusc.lua` | The self-hosted compiler. Run with `lua lazarusc.lua <File.class.laz>`. |
+          | `lazec.lua` | The self-hosted compiler. Run with `lua lazec.lua <File.class.laz>`. |
           | `std.tar.gz` | The standard library. Extract next to your source files. |
 
           ## Quick start
@@ -55,7 +55,7 @@ jobs:
           tar -xzf std.tar.gz
 
           # compile
-          lua lazarusc.lua MyProgram.class.laz
+          lua lazec.lua MyProgram.class.laz
           lua MyProgram.lua
           ```
           EOF
