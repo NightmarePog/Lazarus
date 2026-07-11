@@ -58,7 +58,7 @@ public bundle(): str {
             entry_is_trait = m.is_trait
             entry_source = m.source
         }
-        if not .is_extern_module(m) and not m.is_trait and not m.is_macro {
+        if not .is_extern_module(m) and not m.is_trait {
             if m.is_prebuilt {
                 blocks.push(m.prebuilt_lua)
             } else {

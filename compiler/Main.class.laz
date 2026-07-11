@@ -15,7 +15,6 @@ import frontend.schematic.Schematic
 import frontend.typecheck.Typecheck
 import frontend.optimizer.Optimizer
 import frontend.Collector
-import Expander
 import backend.Codegen
 import backend.Bundler
 import backend.MetaEmitter
@@ -171,13 +170,6 @@ static build_file(path: str, plat: str, pkg_path: str, opt_level: int): unit {
         }
     }
 
-    mut handler_cache = [:]
-    for m in modules {
-        if not m.is_trait and not m.is_prebuilt {
-            Expander(m.class_name, handler_cache).expand(m.ast, modules)
-        }
-    }
-
     for m in modules {
         if m.is_prebuilt {
             classes[m.class_name] = m.meta_sig
@@ -230,13 +222,6 @@ static build_lib(path: str, plat: str, pkg_path: str, opt_level: int): unit {
         if not m.is_prebuilt {
             Collector.collect_enums(m.ast, variant_owner, enums, variant_arity, variant_fields, enum_type_params)
             Collector.collect_traits(m.ast, traits, m.class_name)
-        }
-    }
-
-    mut handler_cache = [:]
-    for m in modules {
-        if not m.is_trait and not m.is_prebuilt {
-            Expander(m.class_name, handler_cache).expand(m.ast, modules)
         }
     }
 
